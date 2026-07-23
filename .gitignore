@@ -1,0 +1,25 @@
+# Backend
+**/target/
+*.class
+*.jar
+*.war
+
+# Frontend
+**/node_modules/
+**/dist/
+**/.angular/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+*.env
+application-local.yml
