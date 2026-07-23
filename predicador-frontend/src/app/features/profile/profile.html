@@ -1,0 +1,52 @@
+<div class="profile-container">
+  <div class="profile-card">
+    <h1>Bienvenido</h1>
+    <p class="subtitle">Ingresa tus datos para comenzar</p>
+
+    <div class="form-group">
+      <label for="name">Nombre</label>
+      <input
+        id="name"
+        type="text"
+        [value]="name()"
+        (input)="name.set($any($event.target).value)"
+        placeholder="Tu nombre"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="lastName">Apellido</label>
+      <input
+        id="lastName"
+        type="text"
+        [value]="lastName()"
+        (input)="lastName.set($any($event.target).value)"
+        placeholder="Tu apellido"
+      />
+    </div>
+
+    <div class="form-group">
+      <label>Selecciona tu avatar</label>
+      <div class="avatar-grid">
+        @for (avatar of avatars; track avatar.id) {
+          <button
+            class="avatar-btn"
+            [class.selected]="selectedAvatar() === avatar.id"
+            [style.background]="avatar.color"
+            (click)="selectAvatar(avatar.id)"
+          >
+            <span class="avatar-emoji">{{ avatar.emoji }}</span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <button
+      class="save-btn"
+      (click)="save()"
+      [disabled]="!name() || !lastName()"
+    >
+      Comenzar
+    </button>
+  </div>
+</div>

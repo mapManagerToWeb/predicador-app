@@ -1,0 +1,40 @@
+<div class="map-page">
+  <div class="search-bar">
+    <app-territory-search (territorySelected)="onTerritorioSeleccionado($event)" />
+  </div>
+
+  <div id="map" class="map-container"></div>
+
+  @if (tieneTerritorio()) {
+    <div class="bottom-panel">
+      <div class="panel-header">
+        <div class="stats">
+          <span class="stat-label">Territorio {{ territorioSeleccionado() }}</span>
+          <span class="stat-value">{{ manzanasCount() }} manzanas marcadas</span>
+        </div>
+        <button class="clear-btn" (click)="limpiarTodo()">Limpiar</button>
+      </div>
+
+      @if (manzanasMarcadas().length > 0) {
+        <div class="marked-list">
+          @for (manzana of manzanasMarcadas(); track manzana.id) {
+            <div class="marked-item manzana-tag">
+              <span class="item-dot manzana-dot"></span>
+              <span class="item-name">{{ manzana.nombreBloque }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <app-report />
+
+      <button
+        class="send-btn"
+        [disabled]="!tieneTerritorio() || manzanasCount() === 0"
+        (click)="onSendReport()"
+      >
+        Enviar reporte por WhatsApp
+      </button>
+    </div>
+  }
+</div>

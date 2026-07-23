@@ -1,0 +1,76 @@
+@if (!isLoggedIn()) {
+  <div class="login-container">
+    <div class="login-card">
+      <h1>Panel de Administrador</h1>
+      <p class="subtitle">Ingresá tus credenciales</p>
+
+      <div class="form-group">
+        <label for="user">Usuario</label>
+        <input
+          id="user"
+          type="text"
+          [value]="username()"
+          (input)="username.set($any($event.target).value)"
+          placeholder="Usuario"
+          (keyup.enter)="login()"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="pass">Contraseña</label>
+        <input
+          id="pass"
+          type="password"
+          [value]="password()"
+          (input)="password.set($any($event.target).value)"
+          placeholder="Contraseña"
+          (keyup.enter)="login()"
+        />
+      </div>
+
+      @if (loginError()) {
+        <div class="error-msg">Credenciales incorrectas</div>
+      }
+
+      <button class="login-btn" (click)="login()">Ingresar</button>
+    </div>
+  </div>
+} @else {
+  <div class="admin-container">
+    <header class="admin-header">
+      <h1>Administrador</h1>
+      <div class="header-actions">
+        <button class="nav-btn" (click)="goToMap()">Mapa</button>
+        <button class="logout-btn" (click)="logout()">Salir</button>
+      </div>
+    </header>
+
+    <div class="dashboard-section">
+      <h2>Colores de Territorios</h2>
+      <p class="help-text">Asigná un color único a cada territorio</p>
+
+      <div class="territory-color-grid">
+        @for (numero of numerosTerritorios(); track numero) {
+          <div class="territory-color-card">
+            <div class="territory-number">{{ numero }}</div>
+            <div class="territory-label">Territorio {{ numero }}</div>
+            <div class="color-picker-row">
+              @for (color of coloresPredefinidos; track color) {
+                <button
+                  class="color-swatch"
+                  [style.background]="color"
+                  [class.selected]="getColor(numero) === color"
+                  (click)="cambiarColor(numero, color)"
+                ></button>
+              }
+            </div>
+            <div class="current-color">
+              <span class="color-preview" [style.background]="getColor(numero)"></span>
+              <span class="color-hex">{{ getColor(numero) }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
