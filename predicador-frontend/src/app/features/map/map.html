@@ -1,40 +1,56 @@
 <div class="map-page">
-  <div class="search-bar">
+  <div class="map-container" id="map"></div>
+
+  <div class="top-bar">
     <app-territory-search (territorySelected)="onTerritorioSeleccionado($event)" />
   </div>
 
-  <div id="map" class="map-container"></div>
-
   @if (tieneTerritorio()) {
-    <div class="bottom-panel">
-      <div class="panel-header">
-        <div class="stats">
-          <span class="stat-label">Territorio {{ territorioSeleccionado() }}</span>
-          <span class="stat-value">{{ manzanasCount() }} manzanas marcadas</span>
-        </div>
-        <button class="clear-btn" (click)="limpiarTodo()">Limpiar</button>
+    <div class="bottom-bar">
+      <div class="mode-group">
+        <button class="mode-btn complete" [class.active]="modoMarcado() === 'completa'"
+          (click)="setModoMarcado('completa')" title="Marcaje completo — tildar manzanas">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        </button>
+        <button class="mode-btn partial" [class.active]="modoMarcado() === 'parcial'"
+          (click)="setModoMarcado('parcial')" title="Marcaje parcial — trazar zona">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
       </div>
 
-      @if (manzanasMarcadas().length > 0) {
-        <div class="marked-list">
-          @for (manzana of manzanasMarcadas(); track manzana.id) {
-            <div class="marked-item manzana-tag">
-              <span class="item-dot manzana-dot"></span>
-              <span class="item-name">{{ manzana.nombreBloque }}</span>
-            </div>
-          }
+      <div class="territory-info">
+        <span class="territory-number">{{ territorioSeleccionado() }}</span>
+        <span class="manzanas-count">{{ manzanasCount() }}/{{ totalManzanas() }}</span>
+      </div>
+
+      <div class="action-group">
+        <button class="action-btn report" (click)="guardarEnBaseDeDatos()" title="Guardar en base de datos">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+        </button>
+        <button class="action-btn clear" (click)="limpiarTodo()" title="Limpiar todo">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      @if (modoMarcado() === 'parcial') {
+        <div class="partial-inline">
+          <span class="partial-hint">{{ puntosCount() }}/6</span>
+
+          <button class="partial-btn undo" [disabled]="puntosCount() === 0"
+            (click)="deshacerPunto()" title="Deshacer último punto">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+          </button>
+
+          <button class="partial-btn cancel" (click)="cancelarParcial()" title="Cancelar">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+
+          <button class="partial-btn confirm" [disabled]="!puedeConfirmar()"
+            (click)="finalizarParcial()" title="Finalizar">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </button>
         </div>
       }
-
-      <app-report />
-
-      <button
-        class="send-btn"
-        [disabled]="!tieneTerritorio() || manzanasCount() === 0"
-        (click)="onSendReport()"
-      >
-        Enviar reporte por WhatsApp
-      </button>
     </div>
   }
 </div>

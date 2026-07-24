@@ -38,7 +38,7 @@ class ReportControllerTest {
     }
 
     private ReportDto createDto(Integer id, String nombre, String apellido, Long territorioNumero) {
-        return new ReportDto(id, 1, Instant.now(), nombre, apellido, "morning", "completed", territorioNumero);
+        return new ReportDto(id, "1-A", Instant.now(), nombre, apellido, "morning", "completed", territorioNumero);
     }
 
     @Test
@@ -73,7 +73,7 @@ class ReportControllerTest {
 
         mockMvc.perform(post("/api/v1/reports")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("[{\"manzanaId\":1,\"encargadoNombre\":\"Daniel\",\"encargadoApellido\":\"Uribe\",\"sessionTime\":\"morning\",\"estado\":\"completed\",\"territorioNumero\":1}]"))
+                .content("[{\"manzanaId\":\"1-A\",\"encargadoNombre\":\"Daniel\",\"encargadoApellido\":\"Uribe\",\"sessionTime\":\"morning\",\"estado\":\"completed\",\"territorioNumero\":1}]"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(1))
             .andExpect(jsonPath("$[0].encargadoNombre").value("Daniel"));

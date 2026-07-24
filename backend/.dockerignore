@@ -1,0 +1,13 @@
+**/target/
+**/node_modules/
+**/.git/
+**/.idea/
+**/.settings/
+**/.classpath
+**/.project
+**/.DS_Store
+**/dist/
+**/.angular/
+*.iml
+*.swp
+*.swo

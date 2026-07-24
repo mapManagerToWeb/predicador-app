@@ -1,7 +1,7 @@
 .report-panel {
   padding: 16px;
-  background: white;
-  border-top: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
 }
 
 .option-group {
@@ -12,7 +12,7 @@
   display: block;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--color-text-secondary);
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -26,20 +26,20 @@
 .radio-btn {
   flex: 1;
   padding: 12px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-border);
   border-radius: 10px;
-  background: white;
+  background: var(--color-surface);
   font-size: 0.9rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .radio-btn.active {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--color-primary);
+  background: var(--color-hover);
+  color: var(--color-primary);
 }
 
 .territories-summary {
@@ -51,7 +51,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border);
   font-size: 0.85rem;
 }
 
@@ -61,7 +61,7 @@
 
 .territory-name {
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text);
 }
 
 .status-badge {
@@ -72,8 +72,8 @@
 }
 
 .status-badge.completed {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--color-tag-bg);
+  color: var(--color-tag-text);
 }
 
 .status-badge.pending {
@@ -93,7 +93,7 @@
 }
 
 .capture-modal {
-  background: white;
+  background: var(--color-surface);
   border-radius: 16px;
   padding: 20px;
   max-width: 400px;
@@ -105,13 +105,13 @@
 .capture-modal h3 {
   margin: 0 0 12px;
   text-align: center;
-  color: #1e293b;
+  color: var(--color-text);
 }
 
 .capture-modal img {
   width: 100%;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .capture-actions {
@@ -133,12 +133,12 @@
 }
 
 .action-btn.copy {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--color-hover);
+  color: var(--color-text-secondary);
 }
 
 .action-btn.download {
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
 }
 
@@ -148,6 +148,6 @@
 }
 
 .action-btn.close {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--color-hover);
+  color: var(--color-text-secondary);
 }

@@ -8,7 +8,7 @@
 }
 
 .profile-card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 1.5rem;
   padding: 2rem;
   width: 100%;
@@ -21,12 +21,12 @@ h1 {
   font-size: 1.75rem;
   font-weight: 700;
   text-align: center;
-  color: #1e293b;
+  color: var(--color-text);
 }
 
 .subtitle {
   text-align: center;
-  color: #64748b;
+  color: var(--color-text-secondary);
   margin: 0.5rem 0 2rem;
 }
 
@@ -38,16 +38,18 @@ label {
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 
 input {
   width: 100%;
   padding: 0.875rem 1rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-border);
   border-radius: 0.75rem;
   font-size: 1rem;
+  background: var(--color-input-bg);
+  color: var(--color-text);
   transition: border-color 0.2s;
   box-sizing: border-box;
 }
@@ -80,7 +82,7 @@ input:focus {
 }
 
 .avatar-btn.selected {
-  border-color: #1e293b;
+  border-color: var(--color-text);
   transform: scale(1.15);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -108,6 +110,6 @@ input:focus {
 }
 
 .save-btn:disabled {
-  background: #cbd5e1;
+  background: var(--color-border);
   cursor: not-allowed;
 }

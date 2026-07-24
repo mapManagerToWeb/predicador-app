@@ -3,8 +3,8 @@ version: '3.8'
 services:
   config-server:
     build:
-      context: ./backend/config-server
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: config-server/Dockerfile
     container_name: config-server
     ports:
       - "8888:8888"
@@ -17,8 +17,8 @@ services:
 
   discovery-server:
     build:
-      context: ./backend/discovery-server
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: discovery-server/Dockerfile
     container_name: discovery-server
     ports:
       - "8761:8761"
@@ -34,8 +34,8 @@ services:
 
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
     ports:
       - "8080:8080"
@@ -53,8 +53,8 @@ services:
 
   territory-service:
     build:
-      context: ./backend/territory-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: territory-service/Dockerfile
     container_name: territory-service
     ports:
       - "8081:8081"
@@ -73,8 +73,8 @@ services:
 
   reporting-service:
     build:
-      context: ./backend/reporting-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: reporting-service/Dockerfile
     container_name: reporting-service
     ports:
       - "8082:8082"

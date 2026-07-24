@@ -18,43 +18,4 @@
       </button>
     </div>
   </div>
-
-  @if (territoriosEnSesion().length > 0) {
-    <div class="territories-summary">
-      <label class="option-label">Territorios en esta sesión</label>
-      @for (territorio of territoriosEnSesion(); track territorio.numero) {
-        <div class="territory-line">
-          <span class="territory-name">Territorio {{ territorio.numero }}</span>
-          @if (territorio.estado === 'completed') {
-            <span class="status-badge completed">Terminado</span>
-          } @else {
-            <span class="status-badge pending">Se predicó lo marcado</span>
-          }
-        </div>
-      }
-    </div>
-  }
 </div>
-
-@if (mostrarCaptura() && capturaUrl()) {
-  <div class="capture-overlay" (click)="cerrarCaptura()">
-    <div class="capture-modal" (click)="$event.stopPropagation()">
-      <h3>Vista previa del reporte</h3>
-      <img [src]="capturaUrl()" alt="Captura del mapa" />
-      <div class="capture-actions">
-        <button class="action-btn copy" (click)="copiarCaptura()">
-          Copiar imagen
-        </button>
-        <button class="action-btn download" (click)="descargarCaptura()">
-          Descargar
-        </button>
-        <button class="action-btn whatsapp" (click)="abrirWhatsApp()">
-          Abrir WhatsApp
-        </button>
-        <button class="action-btn close" (click)="cerrarCaptura()">
-          Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-}

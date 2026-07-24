@@ -3,10 +3,17 @@
   z-index: 1000;
 }
 
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .search-input-wrapper {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
 }
 
 .search-icon {
@@ -14,23 +21,49 @@
   left: 12px;
   width: 20px;
   height: 20px;
-  color: #94a3b8;
+  color: var(--color-text-secondary);
 }
 
 .search-input {
   width: 100%;
   padding: 14px 14px 14px 42px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: 1rem;
-  background: white;
+  background: var(--color-input-bg);
+  color: var(--color-text);
   box-sizing: border-box;
   transition: border-color 0.2s;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
+}
+
+.theme-toggle {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid var(--color-border);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-primary);
+  background: var(--color-hover);
 }
 
 .dropdown {
@@ -38,13 +71,13 @@
   top: 100%;
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   margin-top: 4px;
   max-height: 240px;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 30px var(--color-shadow);
 }
 
 .dropdown-item {
@@ -56,8 +89,8 @@
   background: none;
   cursor: pointer;
   font-size: 0.95rem;
-  color: #334155;
-  border-bottom: 1px solid #f1f5f9;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .dropdown-item:last-child {
@@ -65,12 +98,12 @@
 }
 
 .dropdown-item:hover {
-  background: #f1f5f9;
+  background: var(--color-hover);
 }
 
 .loading {
   padding: 12px;
   text-align: center;
-  color: #94a3b8;
+  color: var(--color-text-secondary);
   font-size: 0.875rem;
 }

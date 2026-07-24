@@ -14,4 +14,7 @@ public interface TerritoryRepository extends JpaRepository<ManzanaTerritorio, Lo
 
     @Query("SELECT DISTINCT m.territorioPadre FROM ManzanaTerritorio m WHERE m.territorioPadre IS NOT NULL ORDER BY m.territorioPadre")
     List<Long> findDistinctTerritorioPadres();
+
+    @Query("SELECT m FROM ManzanaTerritorio m WHERE m.territorioPadre IS NOT NULL ORDER BY m.territorioPadre, m.nombreBloque")
+    List<ManzanaTerritorio> findAllGroupedByTerritorio();
 }

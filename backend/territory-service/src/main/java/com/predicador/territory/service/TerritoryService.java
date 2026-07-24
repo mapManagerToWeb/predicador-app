@@ -54,18 +54,21 @@ public class TerritoryService {
     }
 
     public String getAllTerritoriesGeoJson() {
-        List<Long> numbers = getTerritoryNumbers();
+        List<ManzanaTerritorio> allManzanas = territoryRepository.findAllGroupedByTerritorio();
         Map<Long, String> colorMap = getAllColors();
+
+        Map<Long, List<ManzanaTerritorio>> byTerritorio = allManzanas.stream()
+                .collect(Collectors.groupingBy(ManzanaTerritorio::getTerritorioPadre, LinkedHashMap::new, Collectors.toList()));
 
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
 
         boolean first = true;
-        for (Long number : numbers) {
-            List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
+        for (Map.Entry<Long, List<ManzanaTerritorio>> entry : byTerritorio.entrySet()) {
+            Long number = entry.getKey();
             String color = colorMap.getOrDefault(number, "#3b82f6");
 
-            for (ManzanaTerritorio m : manzanas) {
+            for (ManzanaTerritorio m : entry.getValue()) {
                 String wkbHex = m.getGeometry();
                 if (wkbHex == null || wkbHex.isEmpty()) continue;
 
@@ -98,13 +101,15 @@ public class TerritoryService {
     }
 
     public Map<Long, String> getAllColors() {
-        Map<Long, String> colors = new HashMap<>();
-        List<Long> numbers = getTerritoryNumbers();
+        List<TerritoryColor> allColors = colorRepository.findAll();
+        Map<Long, String> colorMap = allColors.stream()
+                .collect(Collectors.toMap(TerritoryColor::getTerritoryNumber, TerritoryColor::getColor));
 
+        List<Long> numbers = territoryRepository.findDistinctTerritorioPadres();
+        Map<Long, String> colors = new LinkedHashMap<>();
         for (int i = 0; i < numbers.size(); i++) {
             Long num = numbers.get(i);
-            TerritoryColor tc = colorRepository.findById(num).orElse(null);
-            colors.put(num, tc != null ? tc.getColor() : PALETTE[i % PALETTE.length]);
+            colors.put(num, colorMap.getOrDefault(num, PALETTE[i % PALETTE.length]));
         }
         return colors;
     }
