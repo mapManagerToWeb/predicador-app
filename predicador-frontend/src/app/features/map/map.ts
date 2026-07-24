@@ -4,6 +4,7 @@ import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
+import type { Reporte } from '../../core/models/models';
 
 type ModoMarcado = 'none' | 'completa' | 'parcial';
 
@@ -44,6 +45,21 @@ const SNAP_THRESHOLD_PX = 50;
 const DEDUP_THRESHOLD_PX = 2;
 const CAPTURE_DELAY_MS = 400;
 const MAX_PUNTOS_PARCIAL = 6;
+
+export function elegirUltimoReporte(reportes: Reporte[]): Reporte | null {
+  if (!reportes.length) return null;
+
+  return [...reportes].sort((a, b) => {
+    const aTime = new Date(a.sessionTime).getTime();
+    const bTime = new Date(b.sessionTime).getTime();
+
+    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return (b.id ?? 0) - (a.id ?? 0);
+    if (Number.isNaN(aTime)) return 1;
+    if (Number.isNaN(bTime)) return -1;
+
+    return bTime - aTime;
+  })[0] ?? null;
+}
 
 @Component({
   selector: 'app-map',
@@ -134,9 +150,11 @@ export class MapPage implements OnDestroy {
         const layer = L.geoJSON(fc, {
           style: () => ({
             fillColor: color,
-            fillOpacity: 0,
+            fillOpacity: 0.03,
+            opacity: 0.75,
             color: color,
-            weight: 2
+            weight: 2,
+            smoothFactor: 1
           }),
           onEachFeature: (feature, l) => {
             if (l instanceof L.Polygon) {
@@ -165,6 +183,8 @@ export class MapPage implements OnDestroy {
           layer,
           centroidMarkers
         });
+
+        await this.restaurarMarcadoDesdeDB(territorioNum, color, { actualizarEstadoMarcado: false });
       }
     } catch (e) {
       console.error('Error al cargar territorios', e);
@@ -187,7 +207,7 @@ export class MapPage implements OnDestroy {
     let manzanaCount = 0;
     featureLayer.layer.eachLayer(l => {
       if (l instanceof L.Path) {
-        l.setStyle({ fillOpacity: 0, weight: 2 });
+        l.setStyle({ fillOpacity: 0.03, opacity: 0.75, weight: 2 });
         manzanaCount++;
       }
     });
@@ -198,27 +218,47 @@ export class MapPage implements OnDestroy {
       this.map.fitBounds(bounds, { padding: [30, 30] });
     }
 
-    await this.restaurarMarcadoDesdeDB(numero);
+    await this.restaurarMarcadoDesdeDB(numero, this.currentTerritoryColor, { actualizarEstadoMarcado: true });
   }
 
-  private async restaurarMarcadoDesdeDB(territorioNumero: number): Promise<void> {
+  private aplicarEstiloBaseTerritorio(territorioNumero: number, color: string): void {
+    for (const mc of this.manzanaIndex) {
+      if (mc.territorioNumero !== territorioNumero) continue;
+      mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.03, opacity: 0.75, color, weight: 2 });
+    }
+  }
+
+  private async restaurarMarcadoDesdeDB(
+    territorioNumero: number,
+    colorOverride?: string,
+    options: { actualizarEstadoMarcado?: boolean } = {}
+  ): Promise<void> {
     try {
       const reportes = await this.territorioService.getReportesPorTerritorio(territorioNumero);
-      if (reportes.length === 0) return;
+      const color = colorOverride ?? this.currentTerritoryColor;
+      const { actualizarEstadoMarcado = true } = options;
 
-      const ultimo = reportes[0];
-      const color = this.currentTerritoryColor;
+      this.aplicarEstiloBaseTerritorio(territorioNumero, color);
+
+      if (!reportes.length) return;
+
+      const ultimo = elegirUltimoReporte(reportes);
+      if (!ultimo) return;
 
       const ids = ultimo.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
+      const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
 
       for (const mc of this.manzanaIndex) {
         if (mc.territorioNumero !== territorioNumero) continue;
-        if (ids.includes(mc.id)) {
+        const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
+        if (isMarked) {
           mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.4, color, weight: 3 });
-          this.manzanasMarcadas.update(current => [
-            ...current,
-            { id: mc.id, nombreBloque: mc.nombreBloque, layer: mc.polygon as unknown as L.Path, territorioNumero }
-          ]);
+          if (actualizarEstadoMarcado) {
+            this.manzanasMarcadas.update(current => [
+              ...current,
+              { id: mc.id, nombreBloque: mc.nombreBloque, layer: mc.polygon as unknown as L.Path, territorioNumero }
+            ]);
+          }
         }
       }
 
@@ -243,31 +283,16 @@ export class MapPage implements OnDestroy {
               fillColor: color,
               fillOpacity: 0.4,
               color,
-              weight: 3,
-              dashArray: '8, 8'
+              weight: 3
             }).addTo(this.map);
 
             this.extraLayers.push(polygon);
 
-            this.manzanasMarcadas.update(current => [
-              ...current,
-              { id: parcialId, nombreBloque: 'Zona parcial', layer: polygon as unknown as L.Path, territorioNumero }
-            ]);
-
-            if (ultimo.puntosParciales) {
-              try {
-                const puntos = JSON.parse(ultimo.puntosParciales) as Array<{ lat: number; lng: number }>;
-                puntos.forEach(p => {
-                  const marker = L.circleMarker(L.latLng(p.lat, p.lng), {
-                    radius: 5,
-                    fillColor: color,
-                    fillOpacity: 1,
-                    color: '#fff',
-                    weight: 2
-                  }).addTo(this.map);
-                  this.markersParciales.push(marker);
-                });
-              } catch { /* ignore parse errors */ }
+            if (actualizarEstadoMarcado) {
+              this.manzanasMarcadas.update(current => [
+                ...current,
+                { id: parcialId, nombreBloque: 'Zona parcial', layer: polygon as unknown as L.Path, territorioNumero }
+              ]);
             }
           }
         } catch { /* ignore parse errors */ }
@@ -781,6 +806,15 @@ export class MapPage implements OnDestroy {
     this.manzanasMarcadas.set(current);
   }
 
+  private async refrescarTerritorioActual(): Promise<void> {
+    const territorio = this.territorioSeleccionado();
+    await this.loadAllTerritories();
+
+    if (territorio !== null) {
+      await this.onTerritorioSeleccionado(territorio);
+    }
+  }
+
   // ─── GUARDAR EN BASE DE DATOS ─────────────────────────
 
   async guardarEnBaseDeDatos(): Promise<void> {
@@ -829,6 +863,7 @@ export class MapPage implements OnDestroy {
     try {
       await this.territorioService.crearReportes([registro]);
       this.datosParcialesGuardados = null;
+      await this.refrescarTerritorioActual();
       this.toastService.show('Reporte guardado en la base de datos');
     } catch (e) {
       console.error('Error al guardar reporte', e);
