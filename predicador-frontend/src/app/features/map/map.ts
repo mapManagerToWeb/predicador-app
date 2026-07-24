@@ -1,10 +1,10 @@
-import { Component, OnDestroy, signal, computed, inject, afterNextRender } from '@angular/core';
+import { Component, OnDestroy, signal, computed, inject, afterNextRender, ChangeDetectionStrategy } from '@angular/core';
 import * as L from 'leaflet';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
-import type { Reporte } from '../../core/models/models';
+import type { Reporte, RegistroReporte } from '../../core/models/models';
 
 type ModoMarcado = 'none' | 'completa' | 'parcial';
 
@@ -49,20 +49,23 @@ const MAX_PUNTOS_PARCIAL = 6;
 export function elegirUltimoReporte(reportes: Reporte[]): Reporte | null {
   if (!reportes.length) return null;
 
-  return [...reportes].sort((a, b) => {
-    const aTime = new Date(a.sessionTime).getTime();
-    const bTime = new Date(b.sessionTime).getTime();
+  return reportes.reduce<Reporte | null>((best, r) => {
+    if (!best) return r;
 
-    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return (b.id ?? 0) - (a.id ?? 0);
-    if (Number.isNaN(aTime)) return 1;
-    if (Number.isNaN(bTime)) return -1;
+    const rTime = new Date(r.sessionTime).getTime();
+    const bTime = new Date(best.sessionTime).getTime();
 
-    return bTime - aTime;
-  })[0] ?? null;
+    if (Number.isNaN(rTime) && Number.isNaN(bTime)) return (r.id ?? 0) > (best.id ?? 0) ? r : best;
+    if (Number.isNaN(rTime)) return best;
+    if (Number.isNaN(bTime)) return r;
+
+    return rTime > bTime ? r : best;
+  }, null);
 }
 
 @Component({
   selector: 'app-map',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TerritorySearch],
   templateUrl: './map.html',
   styleUrl: './map.css'
@@ -72,6 +75,8 @@ export class MapPage implements OnDestroy {
   private profileService = inject(Profile);
   private toastService = inject(Toast);
   private map!: L.Map;
+  private tileLayer!: L.TileLayer;
+  private themeObserver: MutationObserver | null = null;
   private allTerritoriesLayer: FeatureLayer[] = [];
   private manzanaIndex: ManzanaIndex[] = [];
   private currentTerritoryColor = '';
@@ -108,16 +113,47 @@ export class MapPage implements OnDestroy {
       zoomControl: false
     }).setView([-37.4779, -73.345], 15);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    this.tileLayer = L.tileLayer(this.getTileLayerUrl(), {
       maxZoom: 18,
-      attribution: '&copy; OpenStreetMap'
+      attribution: this.getMapAttribution()
     }).addTo(this.map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    this.observeThemeChanges();
 
     this.map.on('click', (e: L.LeafletMouseEvent) => this.onMapClick(e));
 
     this.loadAllTerritories();
+  }
+
+  private getCurrentTheme(): 'light' | 'dark' {
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  }
+
+  private getTileLayerUrl(): string {
+    return this.getCurrentTheme() === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  }
+
+  private getMapAttribution(): string {
+    return this.getCurrentTheme() === 'dark'
+      ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+  }
+
+  private observeThemeChanges(): void {
+    if (typeof MutationObserver === 'undefined') return;
+
+    this.themeObserver = new MutationObserver(() => {
+      if (!this.tileLayer) return;
+      this.tileLayer.setUrl(this.getTileLayerUrl());
+    });
+
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
   }
 
   private async loadAllTerritories(): Promise<void> {
@@ -141,6 +177,8 @@ export class MapPage implements OnDestroy {
         }
       }
 
+      const restorePromises: Promise<void>[] = [];
+
       for (const [territorioNum, features] of byTerritorio) {
         const rawColor = features[0]?.properties?.['color'] || '#3b82f6';
         const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#3b82f6';
@@ -150,8 +188,8 @@ export class MapPage implements OnDestroy {
         const layer = L.geoJSON(fc, {
           style: () => ({
             fillColor: color,
-            fillOpacity: 0.03,
-            opacity: 0.75,
+            fillOpacity: 0.08,
+            opacity: 0.9,
             color: color,
             weight: 2,
             smoothFactor: 1
@@ -184,16 +222,19 @@ export class MapPage implements OnDestroy {
           centroidMarkers
         });
 
-        await this.restaurarMarcadoDesdeDB(territorioNum, color, { actualizarEstadoMarcado: false });
+        restorePromises.push(
+          this.restaurarMarcadoDesdeDB(territorioNum, color, { actualizarEstadoMarcado: false })
+        );
       }
-    } catch (e) {
-      console.error('Error al cargar territorios', e);
+
+      await Promise.all(restorePromises);
+    } catch {
       this.toastService.show('Error al cargar los territorios');
     }
   }
 
   async onTerritorioSeleccionado(numero: number): Promise<void> {
-    this.limpiarMarcas();
+    this.resetUIState();
     this.territorioSeleccionado.set(numero);
 
     const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === numero);
@@ -204,14 +245,7 @@ export class MapPage implements OnDestroy {
 
     this.currentTerritoryColor = featureLayer.color;
 
-    let manzanaCount = 0;
-    featureLayer.layer.eachLayer(l => {
-      if (l instanceof L.Path) {
-        l.setStyle({ fillOpacity: 0.03, opacity: 0.75, weight: 2 });
-        manzanaCount++;
-      }
-    });
-    this.totalManzanas.set(manzanaCount);
+    this.reaplicarMarcasTerritorio();
 
     const bounds = featureLayer.layer.getBounds();
     if (bounds.isValid()) {
@@ -224,7 +258,7 @@ export class MapPage implements OnDestroy {
   private aplicarEstiloBaseTerritorio(territorioNumero: number, color: string): void {
     for (const mc of this.manzanaIndex) {
       if (mc.territorioNumero !== territorioNumero) continue;
-      mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.03, opacity: 0.75, color, weight: 2 });
+      mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.08, opacity: 0.9, color, weight: 2 });
     }
   }
 
@@ -248,12 +282,14 @@ export class MapPage implements OnDestroy {
       const ids = ultimo.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
       const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
 
+      const existingIds = new Set(this.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).map(m => m.id));
+
       for (const mc of this.manzanaIndex) {
         if (mc.territorioNumero !== territorioNumero) continue;
         const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
         if (isMarked) {
-          mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.4, color, weight: 3 });
-          if (actualizarEstadoMarcado) {
+          mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.6, color, weight: 3 });
+          if (actualizarEstadoMarcado && !existingIds.has(mc.id)) {
             this.manzanasMarcadas.update(current => [
               ...current,
               { id: mc.id, nombreBloque: mc.nombreBloque, layer: mc.polygon as unknown as L.Path, territorioNumero }
@@ -297,8 +333,7 @@ export class MapPage implements OnDestroy {
           }
         } catch { /* ignore parse errors */ }
       }
-    } catch (e) {
-      console.error('Error al restaurar marcado', e);
+    } catch {
       this.toastService.show('Error al restaurar el marcado anterior');
     }
   }
@@ -482,7 +517,7 @@ export class MapPage implements OnDestroy {
       this.manzanaSeleccionada.setStyle({
         color: this.manzanaSeleccionadaColor,
         fillColor: this.manzanaSeleccionadaColor,
-        fillOpacity: 0,
+        fillOpacity: 0.08,
         weight: 2
       });
       this.manzanaSeleccionada = null;
@@ -712,9 +747,13 @@ export class MapPage implements OnDestroy {
 
         const latlngs = this.buildContourPolygon(actualizados);
         if (this.poligonoParcial) {
-          this.map.removeLayer(this.poligonoParcial);
-        }
-        if (latlngs.length >= 2) {
+          if (latlngs.length >= 2) {
+            this.poligonoParcial.setLatLngs(latlngs);
+          } else {
+            this.map.removeLayer(this.poligonoParcial);
+            this.poligonoParcial = null;
+          }
+        } else if (latlngs.length >= 2) {
           const color = this.currentTerritoryColor || '#22c55e';
           this.poligonoParcial = L.polygon(latlngs, {
             color,
@@ -797,10 +836,10 @@ export class MapPage implements OnDestroy {
 
     if (idx >= 0) {
       current.splice(idx, 1);
-      layer.setStyle({ fillColor: color, fillOpacity: 0, color: color, weight: 2 });
+      layer.setStyle({ fillColor: color, fillOpacity: 0.08, color: color, weight: 2 });
     } else {
       current.push({ id, nombreBloque, layer, territorioNumero });
-      layer.setStyle({ fillColor: color, fillOpacity: 0.4, color, weight: 3 });
+      layer.setStyle({ fillColor: color, fillOpacity: 0.6, color, weight: 3 });
     }
 
     this.manzanasMarcadas.set(current);
@@ -808,66 +847,93 @@ export class MapPage implements OnDestroy {
 
   private async refrescarTerritorioActual(): Promise<void> {
     const territorio = this.territorioSeleccionado();
-    await this.loadAllTerritories();
+    if (territorio === null) return;
 
-    if (territorio !== null) {
-      await this.onTerritorioSeleccionado(territorio);
-    }
+    this.territorioService.invalidateGeoJsonCache();
+    await this.onTerritorioSeleccionado(territorio);
   }
 
   // ─── GUARDAR EN BASE DE DATOS ─────────────────────────
 
   async guardarEnBaseDeDatos(): Promise<void> {
-    const territorio = this.territorioSeleccionado();
-    if (!territorio) return;
-
-    const marcadas = this.manzanasMarcadas();
-    const total = this.totalManzanas();
     const perfil = this.profileService.currentUser();
-
     if (!perfil) {
       this.toastService.show('No hay perfil configurado');
       return;
     }
 
-    const manzanasIds = marcadas.filter(m => !m.id.startsWith('parcial-')).map(m => m.id).join(',');
-
-    const nonPartial = marcadas.filter(m => !m.id.startsWith('parcial-'));
-    const manzanaId = nonPartial.length > 0 ? nonPartial[0].id : null;
-
-    let geometriaParcial: string | null = null;
-    let puntosParciales: string | null = null;
-    if (this.datosParcialesGuardados) {
-      geometriaParcial = this.datosParcialesGuardados.geometria;
-      puntosParciales = JSON.stringify(
-        this.datosParcialesGuardados.puntos.map(p => ({ lat: p.latlng.lat, lng: p.latlng.lng }))
-      );
+    const marcadas = this.manzanasMarcadas();
+    if (!marcadas.length) {
+      this.toastService.show('No hay manzanas marcadas');
+      return;
     }
 
-    const registro = {
-      territorioNumero: territorio,
-      manzanaId,
-      encargadoId: perfil.encargadoId || null,
-      encargadoNombre: perfil.name,
-      encargadoApellido: perfil.lastName,
-      sessionTime: new Date().toISOString(),
-      estado: total > 0 && marcadas.length >= total ? 'completed' : 'incomplete',
-      totalManzanas: total,
-      manzanasMarcadas: marcadas.length,
-      tipoSesion: total > 0 && marcadas.length >= total ? 'completa' : 'parcial',
-      geometriaParcial,
-      puntosParciales,
-      manzanasIds
-    };
+    const porTerritorio = new Map<number, typeof marcadas>();
+    for (const m of marcadas) {
+      const list = porTerritorio.get(m.territorioNumero) ?? [];
+      list.push(m);
+      porTerritorio.set(m.territorioNumero, list);
+    }
+
+    const registros: RegistroReporte[] = [];
+    for (const [territorioNum, marcadasTerritorio] of porTerritorio) {
+      const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === territorioNum);
+      const total = featureLayer
+        ? Array.from(featureLayer.layer.getLayers()).filter(l => l instanceof L.Path).length
+        : marcadasTerritorio.length;
+
+      const manzanasIds = marcadasTerritorio
+        .filter(m => !m.id.startsWith('parcial-'))
+        .map(m => m.id)
+        .join(',');
+
+      const nonPartial = marcadasTerritorio.filter(m => !m.id.startsWith('parcial-'));
+      const manzanaId = nonPartial.length > 0 ? nonPartial[0].id : null;
+
+      let geometriaParcial: string | null = null;
+      let puntosParciales: string | null = null;
+      if (territorioNum === this.territorioSeleccionado() && this.datosParcialesGuardados) {
+        geometriaParcial = this.datosParcialesGuardados.geometria;
+        puntosParciales = JSON.stringify(
+          this.datosParcialesGuardados.puntos.map(p => ({ lat: p.latlng.lat, lng: p.latlng.lng }))
+        );
+      }
+
+      registros.push({
+        territorioNumero: territorioNum,
+        manzanaId,
+        encargadoId: perfil.encargadoId || null,
+        encargadoNombre: perfil.name,
+        encargadoApellido: perfil.lastName,
+        sessionTime: new Date().toISOString(),
+        estado: total > 0 && marcadasTerritorio.length >= total ? 'completed' : 'incomplete',
+        totalManzanas: total,
+        manzanasMarcadas: marcadasTerritorio.length,
+        tipoSesion: total > 0 && marcadasTerritorio.length >= total ? 'completa' : 'parcial',
+        geometriaParcial,
+        puntosParciales,
+        manzanasIds
+      });
+    }
+
+    const previousMarcadas = [...marcadas];
+    const previousDatosParciales = this.datosParcialesGuardados;
+
+    this.toastService.show('Guardando reportes...');
+    this.datosParcialesGuardados = null;
 
     try {
-      await this.territorioService.crearReportes([registro]);
-      this.datosParcialesGuardados = null;
-      await this.refrescarTerritorioActual();
-      this.toastService.show('Reporte guardado en la base de datos');
-    } catch (e) {
-      console.error('Error al guardar reporte', e);
-      this.toastService.show('Error al guardar el reporte');
+      await this.territorioService.crearReportes(registros);
+      await this.loadAllTerritories();
+      const current = this.territorioSeleccionado();
+      if (current !== null) {
+        await this.onTerritorioSeleccionado(current);
+      }
+      this.toastService.show('Reportes guardados exitosamente');
+    } catch {
+      this.manzanasMarcadas.set(previousMarcadas);
+      this.datosParcialesGuardados = previousDatosParciales;
+      this.toastService.show('Error al guardar los reportes');
     }
   }
 
@@ -915,7 +981,7 @@ export class MapPage implements OnDestroy {
         if (l instanceof L.Path) {
           const isMarked = this.manzanasMarcadas().some(m => m.layer === l);
           if (!isMarked) {
-            l.setStyle({ opacity: 1, fillOpacity: 0, color: todoLayer.color, weight: 2 });
+            l.setStyle({ opacity: 1, fillOpacity: 0.08, color: todoLayer.color, weight: 2 });
           }
         }
       });
@@ -930,19 +996,46 @@ export class MapPage implements OnDestroy {
 
   // ─── LIMPIAR ──────────────────────────────────────────
 
-  limpiarMarcas(): void {
-    this.manzanasMarcadas.set([]);
+  private resetUIState(): void {
     this.limpiarParcial();
     this.restaurarManzanaAnterior();
     this.modoMarcado.set('none');
 
     this.extraLayers.forEach(l => this.map.removeLayer(l));
     this.extraLayers = [];
+  }
+
+  private reaplicarMarcasTerritorio(): void {
+    const territorioActual = this.territorioSeleccionado();
+    if (territorioActual === null) return;
+
+    const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === territorioActual);
+    if (!featureLayer) return;
+
+    featureLayer.layer.eachLayer(l => {
+      if (l instanceof L.Path) {
+        l.setStyle({ fillOpacity: 0.08, opacity: 0.9, weight: 2, fillColor: featureLayer.color, color: featureLayer.color });
+      }
+    });
+
+    const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === territorioActual);
+    for (const m of marcadas) {
+      m.layer.setStyle({ fillColor: featureLayer.color, fillOpacity: 0.6, color: featureLayer.color, weight: 3 });
+    }
+
+    this.totalManzanas.set(
+      Array.from(featureLayer.layer.getLayers()).filter(l => l instanceof L.Path).length
+    );
+  }
+
+  limpiarMarcas(): void {
+    this.manzanasMarcadas.set([]);
+    this.resetUIState();
 
     for (const fl of this.allTerritoriesLayer) {
       fl.layer.eachLayer(l => {
         if (l instanceof L.Path) {
-          l.setStyle({ fillColor: fl.color, fillOpacity: 0, color: fl.color, weight: 2, opacity: 1 });
+          l.setStyle({ fillColor: fl.color, fillOpacity: 0.08, color: fl.color, weight: 2, opacity: 1 });
         }
       });
       fl.centroidMarkers.forEach(m => m.setOpacity(1));
@@ -959,6 +1052,7 @@ export class MapPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.themeObserver?.disconnect();
     this.map?.remove();
   }
 }

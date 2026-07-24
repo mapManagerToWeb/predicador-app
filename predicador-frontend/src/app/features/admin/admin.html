@@ -32,7 +32,13 @@
         <div class="error-msg">Credenciales incorrectas</div>
       }
 
-      <button class="login-btn" (click)="login()">Ingresar</button>
+      <button class="login-btn" (click)="login()" [disabled]="logging()">
+        @if (logging()) {
+          Ingresando...
+        } @else {
+          Ingresar
+        }
+      </button>
     </div>
   </div>
 } @else {

@@ -39,43 +39,6 @@ describe('TerritorioService', () => {
     });
   });
 
-  describe('getTerritorio', () => {
-    it('should GET a single territory by number', async () => {
-      const mockTerritorio = {
-        number: 1,
-        name: 'Territorio 1',
-        geoJson: '{"type":"FeatureCollection","features":[]}',
-        color: '#ff0000'
-      };
-
-      const promise = service.getTerritorio(1);
-
-      const req = httpMock.expectOne(`${environment.apiUrl}/territories/1`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockTerritorio);
-
-      const result = await promise;
-      expect(result).toEqual(mockTerritorio);
-      expect(result.number).toBe(1);
-    });
-  });
-
-  describe('getGeoJsonTerritorio', () => {
-    it('should GET GeoJSON as text', async () => {
-      const mockGeoJson = '{"type":"FeatureCollection","features":[]}';
-
-      const promise = service.getGeoJsonTerritorio(1);
-
-      const req = httpMock.expectOne(`${environment.apiUrl}/territories/1/geojson`);
-      expect(req.request.method).toBe('GET');
-      expect(req.request.responseType).toBe('text');
-      req.flush(mockGeoJson);
-
-      const result = await promise;
-      expect(result).toBe(mockGeoJson);
-    });
-  });
-
   describe('getAllGeoJson', () => {
     it('should GET all territories GeoJSON as text', async () => {
       const mockGeoJson = '{"type":"FeatureCollection","features":[]}';
@@ -153,16 +116,18 @@ describe('TerritorioService', () => {
     });
   });
 
-  describe('getReportesHoy', () => {
-    it('should GET today reports', async () => {
-      const promise = service.getReportesHoy();
+  describe('getReportesPorTerritorio', () => {
+    it('should GET reports filtered by territory', async () => {
+      const mockReportes = [{ id: 1, territorioNumero: 5 }];
 
-      const req = httpMock.expectOne(`${environment.apiUrl}/reports/today`);
+      const promise = service.getReportesPorTerritorio(5);
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/reports?territorioNumero=5`);
       expect(req.request.method).toBe('GET');
-      req.flush([]);
+      req.flush(mockReportes);
 
       const result = await promise;
-      expect(result).toEqual([]);
+      expect(result).toEqual(mockReportes);
     });
   });
 });

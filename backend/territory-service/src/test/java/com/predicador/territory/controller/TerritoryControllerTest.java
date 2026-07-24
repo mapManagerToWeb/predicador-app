@@ -1,5 +1,6 @@
 package com.predicador.territory.controller;
 
+import com.predicador.territory.dto.TerritoryDto;
 import com.predicador.territory.service.TerritoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,5 +82,17 @@ class TerritoryControllerTest {
                 .contentType("application/json")
                 .content("{\"color\":\"#ff0000\"}"))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void getTerritory_shouldReturn200() throws Exception {
+        TerritoryDto dto = new TerritoryDto(1L, "Territorio 1", "{\"type\":\"FeatureCollection\",\"features\":[]}", "#ff0000");
+        when(territoryService.getTerritory(1L)).thenReturn(dto);
+
+        mockMvc.perform(get("/api/v1/territories/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.number").value(1))
+            .andExpect(jsonPath("$.name").value("Territorio 1"))
+            .andExpect(jsonPath("$.color").value("#ff0000"));
     }
 }

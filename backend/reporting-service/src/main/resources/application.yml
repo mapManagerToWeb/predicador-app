@@ -4,13 +4,13 @@ spring:
   config:
     import: "optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}"
   datasource:
-    url: jdbc:postgresql://ep-small-feather-acwivdj1-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/predicador}
     driver-class-name: org.postgresql.Driver
-    username: neondb_owner
+    username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
   sql:
     init:
-      mode: always
+      mode: never
   jpa:
     defer-datasource-initialization: true
     hibernate:

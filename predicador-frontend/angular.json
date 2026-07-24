@@ -55,16 +55,18 @@
           },
           "configurations": {
             "production": {
+              "optimization": true,
+              "sourceMap": false,
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumWarning": "400kB",
+                  "maximumError": "800kB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "5kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "4kB",
+                  "maximumError": "6kB"
                 }
               ],
               "outputHashing": "all",

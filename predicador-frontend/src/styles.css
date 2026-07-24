@@ -14,6 +14,11 @@
   --color-tag-text: #166534;
   --color-input-bg: #ffffff;
   --color-shadow: rgba(0, 0, 0, 0.1);
+  --map-bg: #f8fafc;
+  --map-tile-filter: none;
+  --map-border-color: rgba(30, 41, 59, 0.7);
+  --map-fill-opacity: 0.08;
+  --map-active-opacity: 0.6;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -35,9 +40,48 @@
   --color-tag-text: #86efac;
   --color-input-bg: #1e293b;
   --color-shadow: rgba(0, 0, 0, 0.4);
+  --map-bg: #08101f;
+  --map-tile-filter: brightness(0.45) saturate(0.7) contrast(0.95);
+  --map-border-color: rgba(226, 232, 240, 0.7);
+  --map-fill-opacity: 0.06;
+  --map-active-opacity: 0.7;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.leaflet-container {
+  background: var(--map-bg);
+}
+
+.leaflet-tile {
+  filter: var(--map-tile-filter);
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+:root[data-theme="dark"] .leaflet-container {
+  background: #08101f;
+}
+
+:root[data-theme="dark"] .leaflet-control {
+  background: rgba(15, 23, 42, 0.9);
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+:root[data-theme="dark"] .leaflet-control a,
+:root[data-theme="dark"] .leaflet-control button {
+  color: #f1f5f9;
+}
+
+:root[data-theme="dark"] .leaflet-popup-content-wrapper {
+  background: #1f2937;
+  color: #f8fafc;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .leaflet-popup-tip {
+  background: #1f2937;
 }
 
 * {

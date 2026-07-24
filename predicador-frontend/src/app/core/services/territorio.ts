@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { Territorio, RegistroReporte, Reporte, Encargado } from '../models/models';
+import { RegistroReporte, Reporte } from '../models/models';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -9,22 +9,22 @@ export class TerritorioService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/territories`;
   private reportesUrl = `${environment.apiUrl}/reports`;
-  private encargadosUrl = `${environment.apiUrl}/encargados`;
+
+  private geoJsonCache: string | null = null;
 
   async getNumerosTerritorios(): Promise<number[]> {
     return firstValueFrom(this.http.get<number[]>(`${this.apiUrl}`));
   }
 
-  async getTerritorio(numero: number): Promise<Territorio> {
-    return firstValueFrom(this.http.get<Territorio>(`${this.apiUrl}/${numero}`));
-  }
-
-  async getGeoJsonTerritorio(numero: number): Promise<string> {
-    return firstValueFrom(this.http.get(`${this.apiUrl}/${numero}/geojson`, { responseType: 'text' }));
-  }
-
   async getAllGeoJson(): Promise<string> {
-    return firstValueFrom(this.http.get(`${this.apiUrl}/all/geojson`, { responseType: 'text' }));
+    if (this.geoJsonCache !== null) return this.geoJsonCache;
+    const text = await firstValueFrom(this.http.get(`${this.apiUrl}/all/geojson`, { responseType: 'text' }));
+    this.geoJsonCache = text;
+    return text;
+  }
+
+  invalidateGeoJsonCache(): void {
+    this.geoJsonCache = null;
   }
 
   async getColores(): Promise<Record<number, string>> {
@@ -39,27 +39,7 @@ export class TerritorioService {
     return firstValueFrom(this.http.post<Reporte[]>(this.reportesUrl, reportes));
   }
 
-  async getReportesHoy(): Promise<Reporte[]> {
-    return firstValueFrom(this.http.get<Reporte[]>(`${this.reportesUrl}/today`));
-  }
-
   async getReportesPorTerritorio(territorioNumero: number): Promise<Reporte[]> {
     return firstValueFrom(this.http.get<Reporte[]>(`${this.reportesUrl}?territorioNumero=${territorioNumero}`));
-  }
-
-  async getEncargados(): Promise<Encargado[]> {
-    return firstValueFrom(this.http.get<Encargado[]>(this.encargadosUrl));
-  }
-
-  async buscarEncargados(nombre: string): Promise<Encargado[]> {
-    return firstValueFrom(this.http.get<Encargado[]>(`${this.encargadosUrl}/buscar?nombre=${encodeURIComponent(nombre)}`));
-  }
-
-  async crearEncargado(encargado: Omit<Encargado, 'id'>): Promise<Encargado> {
-    return firstValueFrom(this.http.post<Encargado>(this.encargadosUrl, encargado));
-  }
-
-  async actualizarEncargado(id: number, encargado: Partial<Encargado>): Promise<Encargado> {
-    return firstValueFrom(this.http.put<Encargado>(`${this.encargadosUrl}/${id}`, encargado));
   }
 }

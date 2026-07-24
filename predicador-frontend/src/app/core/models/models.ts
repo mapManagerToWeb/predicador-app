@@ -5,21 +5,6 @@ export interface UserProfile {
   encargadoId?: number;
 }
 
-export interface Encargado {
-  id: number;
-  nombre: string;
-  apellido: string;
-  avatar: number;
-  activo: boolean;
-}
-
-export interface Territorio {
-  number: number;
-  name: string;
-  geoJson: string;
-  color: string;
-}
-
 export interface Reporte {
   id: number;
   manzanaId: string | null;
