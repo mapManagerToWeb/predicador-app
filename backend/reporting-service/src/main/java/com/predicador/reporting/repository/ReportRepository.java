@@ -17,6 +17,10 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
 
     List<Report> findAllByOrderByFechaDesc();
 
+    List<Report> findByTerritorioNumeroOrderByFechaDesc(Long territorioNumero);
+
+    List<Report> findByEncargadoIdOrderByFechaDesc(Long encargadoId);
+
     @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin ORDER BY r.fecha DESC")
     List<Report> findByFechaRange(@Param("inicio") Instant inicio, @Param("fin") Instant fin);
 }

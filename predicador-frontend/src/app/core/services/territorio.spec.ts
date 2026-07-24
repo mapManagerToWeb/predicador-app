@@ -132,7 +132,7 @@ describe('TerritorioService', () => {
 
       const mockResponse = [{
         id: 1,
-        manzanaId: 1,
+        manzanaId: '1-A',
         fecha: '2026-07-22T00:00:00Z',
         encargadoNombre: 'Daniel',
         encargadoApellido: 'Uribe',

@@ -26,7 +26,7 @@ class ReportServiceTest {
     @InjectMocks
     private ReportService reportService;
 
-    private Report createReport(Integer id, Integer manzanaId, String nombre, String apellido,
+    private Report createReport(Integer id, String manzanaId, String nombre, String apellido,
                                  String sessionTime, String estado, Long territorioNumero) {
         Report report = new Report();
         report.setId(id);
@@ -42,8 +42,8 @@ class ReportServiceTest {
 
     @Test
     void createReports_shouldCreateAndReturnDtos() {
-        ReportDto dto = new ReportDto(null, 1, Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
-        Report saved = createReport(1, 1, "Daniel", "Uribe", "morning", "completed", 1L);
+        ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
+        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
 
         when(repository.save(any(Report.class))).thenReturn(saved);
 
@@ -60,11 +60,11 @@ class ReportServiceTest {
 
     @Test
     void createReports_shouldHandleMultipleReports() {
-        ReportDto dto1 = new ReportDto(null, 1, Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
-        ReportDto dto2 = new ReportDto(null, 2, Instant.now(), "Maria", "Lopez", "afternoon", "incomplete", 2L);
+        ReportDto dto1 = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
+        ReportDto dto2 = new ReportDto(null, "2-B", Instant.now(), "Maria", "Lopez", "afternoon", "incomplete", 2L);
 
-        Report saved1 = createReport(1, 1, "Daniel", "Uribe", "morning", "completed", 1L);
-        Report saved2 = createReport(2, 2, "Maria", "Lopez", "afternoon", "incomplete", 2L);
+        Report saved1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+        Report saved2 = createReport(2, "2-B", "Maria", "Lopez", "afternoon", "incomplete", 2L);
 
         when(repository.save(any(Report.class))).thenReturn(saved1).thenReturn(saved2);
 
@@ -76,8 +76,8 @@ class ReportServiceTest {
 
     @Test
     void createReports_shouldUseCurrentTimeWhenFechaIsNull() {
-        ReportDto dto = new ReportDto(null, 1, null, "Daniel", "Uribe", "morning", "completed", 1L);
-        Report saved = createReport(1, 1, "Daniel", "Uribe", "morning", "completed", 1L);
+        ReportDto dto = new ReportDto(null, "1-A", null, "Daniel", "Uribe", "morning", "completed", 1L);
+        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
 
         when(repository.save(any(Report.class))).thenReturn(saved);
 
@@ -89,8 +89,8 @@ class ReportServiceTest {
 
     @Test
     void getAllReports_shouldReturnAllReports() {
-        Report r1 = createReport(1, 1, "Daniel", "Uribe", "morning", "completed", 1L);
-        Report r2 = createReport(2, 2, "Maria", "Lopez", "afternoon", "incomplete", 2L);
+        Report r1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+        Report r2 = createReport(2, "2-B", "Maria", "Lopez", "afternoon", "incomplete", 2L);
 
         when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of(r1, r2));
 
@@ -112,7 +112,7 @@ class ReportServiceTest {
 
     @Test
     void getReportsForToday_shouldReturnTodayReports() {
-        Report r1 = createReport(1, 1, "Daniel", "Uribe", "morning", "completed", 1L);
+        Report r1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
 
         when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of(r1));
 

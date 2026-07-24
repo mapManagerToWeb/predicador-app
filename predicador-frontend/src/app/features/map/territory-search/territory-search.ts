@@ -1,6 +1,8 @@
 import { Component, signal, computed, output, inject, OnInit } from '@angular/core';
 import { TerritorioService } from '../../../core/services/territorio';
 
+const THEME_KEY = 'predicador_theme';
+
 @Component({
   selector: 'app-territory-search',
   templateUrl: './territory-search.html',
@@ -13,6 +15,7 @@ export class TerritorySearch implements OnInit {
   todosLosNumeros = signal<number[]>([]);
   mostrarDropdown = signal(false);
   cargando = signal(true);
+  isDark = signal(this.loadTheme());
 
   numerosFiltrados = computed(() => {
     const consulta = this.consultaBusqueda().toLowerCase();
@@ -24,6 +27,7 @@ export class TerritorySearch implements OnInit {
   territorySelected = output<number>();
 
   async ngOnInit(): Promise<void> {
+    this.applyTheme();
     try {
       const numeros = await this.territorioService.getNumerosTerritorios();
       this.todosLosNumeros.set(numeros);
@@ -32,6 +36,21 @@ export class TerritorySearch implements OnInit {
     } finally {
       this.cargando.set(false);
     }
+  }
+
+  private loadTheme(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(THEME_KEY) === 'dark';
+  }
+
+  private applyTheme(): void {
+    document.documentElement.setAttribute('data-theme', this.isDark() ? 'dark' : 'light');
+  }
+
+  toggleTheme(): void {
+    this.isDark.set(!this.isDark());
+    localStorage.setItem(THEME_KEY, this.isDark() ? 'dark' : 'light');
+    this.applyTheme();
   }
 
   onInput(event: Event): void {

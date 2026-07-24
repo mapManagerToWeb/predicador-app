@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { Territorio, RegistroReporte, Reporte } from '../models/models';
+import { Territorio, RegistroReporte, Reporte, Encargado } from '../models/models';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -9,6 +9,7 @@ export class TerritorioService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/territories`;
   private reportesUrl = `${environment.apiUrl}/reports`;
+  private encargadosUrl = `${environment.apiUrl}/encargados`;
 
   async getNumerosTerritorios(): Promise<number[]> {
     return firstValueFrom(this.http.get<number[]>(`${this.apiUrl}`));
@@ -40,5 +41,25 @@ export class TerritorioService {
 
   async getReportesHoy(): Promise<Reporte[]> {
     return firstValueFrom(this.http.get<Reporte[]>(`${this.reportesUrl}/today`));
+  }
+
+  async getReportesPorTerritorio(territorioNumero: number): Promise<Reporte[]> {
+    return firstValueFrom(this.http.get<Reporte[]>(`${this.reportesUrl}?territorioNumero=${territorioNumero}`));
+  }
+
+  async getEncargados(): Promise<Encargado[]> {
+    return firstValueFrom(this.http.get<Encargado[]>(this.encargadosUrl));
+  }
+
+  async buscarEncargados(nombre: string): Promise<Encargado[]> {
+    return firstValueFrom(this.http.get<Encargado[]>(`${this.encargadosUrl}/buscar?nombre=${encodeURIComponent(nombre)}`));
+  }
+
+  async crearEncargado(encargado: Omit<Encargado, 'id'>): Promise<Encargado> {
+    return firstValueFrom(this.http.post<Encargado>(this.encargadosUrl, encargado));
+  }
+
+  async actualizarEncargado(id: number, encargado: Partial<Encargado>): Promise<Encargado> {
+    return firstValueFrom(this.http.put<Encargado>(`${this.encargadosUrl}/${id}`, encargado));
   }
 }

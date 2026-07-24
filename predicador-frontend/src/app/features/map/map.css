@@ -1,136 +1,358 @@
-.map-page {
+:host {
+  display: block;
   height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  background: #f8fafc;
+  position: relative;
 }
 
-.search-bar {
-  padding: 12px;
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  z-index: 1000;
+.map-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .map-container {
-  flex: 1;
   width: 100%;
-  z-index: 1;
+  height: 100%;
+  background: var(--bg);
 }
 
-.bottom-panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  padding: 16px;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+/* ── Top bar ─────────────────────────── */
+
+.top-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
   z-index: 1000;
-  padding-bottom: calc(16px + var(--safe-bottom, 0px));
-  max-height: 60vh;
-  overflow-y: auto;
 }
 
-.panel-header {
+/* ── Bottom bar ──────────────────────── */
+
+.bottom-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 1000;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 6px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border);
 }
 
-.stats {
+/* ── Mode toggles ────────────────────── */
+
+.mode-group {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.stat-label {
+.mode-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.mode-btn .icon {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.mode-btn.complete {
+  background: #dbeafe;
+  color: #2563eb;
+  border-color: #93c5fd;
+}
+
+.mode-btn.complete.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+
+.mode-btn.partial {
+  background: #fef3c7;
+  color: #d97706;
+  border-color: #fcd34d;
+}
+
+.mode-btn.partial.active {
+  background: #d97706;
+  color: #fff;
+  border-color: #b45309;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.4);
+}
+
+/* ── Territory info ──────────────────── */
+
+.territory-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.territory-number {
   font-weight: 700;
-  font-size: 1rem;
-  color: #1e293b;
+  color: var(--text);
+  font-size: 13px;
 }
 
-.stat-value {
-  font-size: 0.8rem;
-  color: #64748b;
-}
-
-.clear-btn {
-  padding: 8px 16px;
-  background: #f1f5f9;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
+.manzanas-count {
+  font-size: 11px;
+  opacity: 0.7;
   white-space: nowrap;
 }
 
-.clear-btn:hover:not(:disabled) {
-  background: #e2e8f0;
-}
+/* ── Action buttons ──────────────────── */
 
-.marked-list {
+.action-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 4px;
+  margin-left: auto;
 }
 
-.marked-item {
+.action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.action-btn .icon {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.action-btn.report {
+  background: #dcfce7;
+  color: #16a34a;
+  border-color: #86efac;
+}
+
+.action-btn.report:hover {
+  background: #16a34a;
+  color: #fff;
+  border-color: #15803d;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.4);
+}
+
+.action-btn.clear {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.action-btn.clear:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #b91c1c;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+}
+
+/* ── Partial inline controls ─────────── */
+
+.partial-inline {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  margin-left: 4px;
 }
 
-.manzana-tag {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.item-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.manzana-dot {
-  background: #22c55e;
-}
-
-.item-name {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.send-btn {
-  width: 100%;
-  padding: 14px;
-  background: #25D366;
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 1rem;
+.partial-hint {
+  font-size: 12px;
   font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  min-width: 28px;
+  text-align: center;
+}
+
+.partial-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 2px solid transparent;
   cursor: pointer;
-  margin-top: 8px;
-  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
-.send-btn:hover:not(:disabled) {
-  background: #1da851;
+.partial-btn .icon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
 }
 
-.send-btn:disabled {
-  background: #cbd5e1;
+.partial-btn.undo {
+  background: #e0e7ff;
+  color: #4f46e5;
+  border-color: #a5b4fc;
+}
+
+.partial-btn.undo:hover:not(:disabled) {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4338ca;
+}
+
+.partial-btn.undo:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
+}
+
+.partial-btn.cancel {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.partial-btn.cancel:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #b91c1c;
+}
+
+.partial-btn.confirm {
+  background: #dcfce7;
+  color: #16a34a;
+  border-color: #86efac;
+}
+
+.partial-btn.confirm:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.partial-btn.confirm:not(:disabled):hover {
+  background: #16a34a;
+  color: #fff;
+  border-color: #15803d;
+}
+
+/* ── Partial markers ─────────────────── */
+
+:host ::ng-deep .partial-dot {
+  width: 14px;
+  height: 14px;
+  background: #22c55e;
+  border: 2.5px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+
+:host ::ng-deep .centroid-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+/* ── Dark mode ───────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+  .bottom-bar {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .mode-btn.complete {
+    background: #1e3a5f;
+    color: #60a5fa;
+    border-color: #2563eb;
+  }
+
+  .mode-btn.complete.active {
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .mode-btn.partial {
+    background: #422006;
+    color: #fbbf24;
+    border-color: #d97706;
+  }
+
+  .mode-btn.partial.active {
+    background: #d97706;
+    color: #fff;
+  }
+
+  .action-btn.report {
+    background: #052e16;
+    color: #4ade80;
+    border-color: #16a34a;
+  }
+
+  .action-btn.clear {
+    background: #450a0a;
+    color: #f87171;
+    border-color: #dc2626;
+  }
+
+  .partial-btn.undo {
+    background: #1e1b4b;
+    color: #818cf8;
+    border-color: #4f46e5;
+  }
+
+  .partial-btn.cancel {
+    background: #450a0a;
+    color: #f87171;
+    border-color: #dc2626;
+  }
+
+  .partial-btn.confirm {
+    background: #052e16;
+    color: #4ade80;
+    border-color: #16a34a;
+  }
+}
+
+/* ── Responsive ──────────────────────── */
+
+@media (max-width: 480px) {
+  .bottom-bar {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    gap: 6px;
+    padding: 5px 8px;
+  }
+
+  .territory-info {
+    font-size: 11px;
+  }
 }

@@ -30,6 +30,13 @@ public class ReportService {
             report.setSessionTime(dto.sessionTime());
             report.setEstado(dto.estado());
             report.setTerritorioNumero(dto.territorioNumero());
+            report.setEncargadoId(dto.encargadoId());
+            report.setTotalManzanas(dto.totalManzanas());
+            report.setManzanasMarcadas(dto.manzanasMarcadas());
+            report.setTipoSesion(dto.tipoSesion());
+            report.setGeometriaParcial(dto.geometriaParcial());
+            report.setPuntosParciales(dto.puntosParciales());
+            report.setManzanasIds(dto.manzanasIds());
             Report saved = repository.save(report);
             return toDto(saved);
         }).collect(Collectors.toList());
@@ -52,6 +59,20 @@ public class ReportService {
                 .collect(Collectors.toList());
     }
 
+    public List<ReportDto> getReportsByTerritorio(Long territorioNumero) {
+        return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero)
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<ReportDto> getReportsByEncargado(Long encargadoId) {
+        return repository.findByEncargadoIdOrderByFechaDesc(encargadoId)
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
     private ReportDto toDto(Report report) {
         return new ReportDto(
                 report.getId(),
@@ -61,7 +82,14 @@ public class ReportService {
                 report.getEncargadoApellido(),
                 report.getSessionTime(),
                 report.getEstado(),
-                report.getTerritorioNumero()
+                report.getTerritorioNumero(),
+                report.getEncargadoId(),
+                report.getTotalManzanas(),
+                report.getManzanasMarcadas(),
+                report.getTipoSesion(),
+                report.getGeometriaParcial(),
+                report.getPuntosParciales(),
+                report.getManzanasIds()
         );
     }
 }

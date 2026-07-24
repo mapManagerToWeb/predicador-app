@@ -23,7 +23,15 @@ public class ReportController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ReportDto>> getAllReports() {
+    public ResponseEntity<List<ReportDto>> getAllReports(
+            @RequestParam(required = false) Long territorioNumero,
+            @RequestParam(required = false) Long encargadoId) {
+        if (territorioNumero != null) {
+            return ResponseEntity.ok(reportService.getReportsByTerritorio(territorioNumero));
+        }
+        if (encargadoId != null) {
+            return ResponseEntity.ok(reportService.getReportsByEncargado(encargadoId));
+        }
         return ResponseEntity.ok(reportService.getAllReports());
     }
 

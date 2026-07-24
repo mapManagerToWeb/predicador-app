@@ -92,11 +92,9 @@ class TerritoryServiceTest {
         ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
         ManzanaTerritorio m2 = createManzana(2L, 2L, "2.a", createSimplePolygonHex());
 
+        when(territoryRepository.findAllGroupedByTerritorio()).thenReturn(List.of(m1, m2));
         when(territoryRepository.findDistinctTerritorioPadres()).thenReturn(List.of(1L, 2L));
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m1));
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(2L)).thenReturn(List.of(m2));
-        when(colorRepository.findById(1L)).thenReturn(Optional.empty());
-        when(colorRepository.findById(2L)).thenReturn(Optional.empty());
+        when(colorRepository.findAll()).thenReturn(List.of());
 
         String result = territoryService.getAllTerritoriesGeoJson();
 
@@ -109,8 +107,7 @@ class TerritoryServiceTest {
     @Test
     void getAllColors_shouldReturnDefaultPalette() {
         when(territoryRepository.findDistinctTerritorioPadres()).thenReturn(List.of(1L, 2L));
-        when(colorRepository.findById(1L)).thenReturn(Optional.empty());
-        when(colorRepository.findById(2L)).thenReturn(Optional.empty());
+        when(colorRepository.findAll()).thenReturn(List.of());
 
         Map<Long, String> result = territoryService.getAllColors();
 
@@ -126,7 +123,7 @@ class TerritoryServiceTest {
         tc.setColor("#ff0000");
 
         when(territoryRepository.findDistinctTerritorioPadres()).thenReturn(List.of(1L));
-        when(colorRepository.findById(1L)).thenReturn(Optional.of(tc));
+        when(colorRepository.findAll()).thenReturn(List.of(tc));
 
         Map<Long, String> result = territoryService.getAllColors();
 

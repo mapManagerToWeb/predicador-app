@@ -8,9 +8,13 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: neondb_owner
     password: ${DB_PASSWORD:}
+  sql:
+    init:
+      mode: always
   jpa:
+    defer-datasource-initialization: true
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
