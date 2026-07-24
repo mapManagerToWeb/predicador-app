@@ -2,10 +2,10 @@ spring:
   application:
     name: territory-service
   datasource:
-    url: jdbc:postgresql://ep-small-feather-acwivdj1-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/predicador}
     driver-class-name: org.postgresql.Driver
-    username: neondb_owner
-    password: npg_VUzQtlhq37BY
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
   jpa:
     hibernate:
       ddl-auto: update

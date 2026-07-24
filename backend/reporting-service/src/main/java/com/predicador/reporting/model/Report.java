@@ -109,9 +109,6 @@ public class Report {
     public String getManzanasIds() { return manzanasIds; }
     public void setManzanasIds(String manzanasIds) { this.manzanasIds = manzanasIds; }
 
-    public Integer getManzanasMarcadasCount() { return manzanasMarcadas; }
-    public void setManzanasMarcadasCount(Integer manzanasMarcadas) { this.manzanasMarcadas = manzanasMarcadas; }
-
     public Instant getCreadoEn() { return creadoEn; }
     public void setCreadoEn(Instant creadoEn) { this.creadoEn = creadoEn; }
 }

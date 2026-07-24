@@ -1,18 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { AdminPage } from './admin';
 import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
+import { environment } from '../../../environments/environment';
 
 describe('AdminPage', () => {
   let component: AdminPage;
+  let httpMock: HttpTestingController;
 
   beforeEach(() => {
     localStorage.clear();
 
     TestBed.configureTestingModule({
-      imports: [AdminPage],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -23,10 +24,12 @@ describe('AdminPage', () => {
 
     const fixture = TestBed.createComponent(AdminPage);
     component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     localStorage.clear();
+    httpMock.match(() => true);
   });
 
   it('should create', () => {
@@ -34,31 +37,51 @@ describe('AdminPage', () => {
   });
 
   describe('login', () => {
-    it('should login with correct credentials', () => {
+    it('should call auth endpoint and set isLoggedIn on success', async () => {
       component.username.set('admin');
-      component.password.set('2675');
-      component.login();
+      component.password.set('correct_password');
+
+      const loginPromise = component.login();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ username: 'admin', password: 'correct_password' });
+      req.flush({ success: true });
+
+      await loginPromise;
 
       expect(component.isLoggedIn()).toBeTruthy();
       expect(localStorage.getItem('isAdmin')).toBe('true');
     });
 
-    it('should show error with wrong credentials', () => {
+    it('should show error with wrong credentials', async () => {
       component.username.set('wrong');
       component.password.set('wrong');
-      component.login();
+
+      const loginPromise = component.login();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
+      req.flush({ success: false }, { status: 401, statusText: 'Unauthorized' });
+
+      await loginPromise;
 
       expect(component.isLoggedIn()).toBeFalsy();
       expect(component.loginError()).toBeTruthy();
     });
 
-    it('should clear login error on successful login', () => {
-      component.loginError.set(true);
+    it('should show error on network failure', async () => {
       component.username.set('admin');
-      component.password.set('2675');
-      component.login();
+      component.password.set('password');
 
-      expect(component.loginError()).toBeFalsy();
+      const loginPromise = component.login();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
+      req.error(new ErrorEvent('Network error'));
+
+      await loginPromise;
+
+      expect(component.isLoggedIn()).toBeFalsy();
+      expect(component.loginError()).toBeTruthy();
     });
   });
 

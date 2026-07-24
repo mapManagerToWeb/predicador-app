@@ -12,9 +12,6 @@ import java.util.List;
 @Repository
 public interface ReportRepository extends JpaRepository<Report, Integer> {
 
-    List<Report> findByTerritorioNumeroAndFechaBetweenOrderByFechaDesc(
-            Long territorioNumero, Instant inicio, Instant fin);
-
     List<Report> findAllByOrderByFechaDesc();
 
     List<Report> findByTerritorioNumeroOrderByFechaDesc(Long territorioNumero);

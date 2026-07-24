@@ -1,7 +1,10 @@
-import { Component, signal, inject, OnInit } from '@angular/core';
+import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
+import { environment } from '../../../environments/environment';
 
 const COLORES_PREDEFINIDOS = [
   '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
@@ -12,6 +15,7 @@ const COLORES_PREDEFINIDOS = [
 
 @Component({
   selector: 'app-admin',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin.html',
   styleUrl: './admin.css'
 })
@@ -19,11 +23,13 @@ export class AdminPage implements OnInit {
   private territorioService = inject(TerritorioService);
   private toastService = inject(Toast);
   private router = inject(Router);
+  private http = inject(HttpClient);
 
   isLoggedIn = signal(false);
   username = signal('');
   password = signal('');
   loginError = signal(false);
+  logging = signal(false);
 
   numerosTerritorios = signal<number[]>([]);
   colores = signal<Record<number, string>>({});
@@ -37,14 +43,27 @@ export class AdminPage implements OnInit {
     }
   }
 
-  login(): void {
+  async login(): Promise<void> {
     this.loginError.set(false);
-    if (this.username() === 'admin' && this.password() === '2675') {
-      localStorage.setItem('isAdmin', 'true');
-      this.isLoggedIn.set(true);
-      this.cargarDatos();
-    } else {
+    this.logging.set(true);
+    try {
+      const response = await firstValueFrom(
+        this.http.post<{ success: boolean }>(`${environment.apiUrl}/auth/login`, {
+          username: this.username(),
+          password: this.password()
+        })
+      );
+      if (response.success) {
+        localStorage.setItem('isAdmin', 'true');
+        this.isLoggedIn.set(true);
+        this.cargarDatos();
+      } else {
+        this.loginError.set(true);
+      }
+    } catch {
       this.loginError.set(true);
+    } finally {
+      this.logging.set(false);
     }
   }
 
@@ -62,8 +81,7 @@ export class AdminPage implements OnInit {
 
       const coloresMap = await this.territorioService.getColores();
       this.colores.set(coloresMap);
-    } catch (e) {
-      console.error('Error al cargar datos', e);
+    } catch {
       this.toastService.show('Error al cargar territorios');
     }
   }

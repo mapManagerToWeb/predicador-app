@@ -1,10 +1,11 @@
-import { Component, signal, computed, output, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, output, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { TerritorioService } from '../../../core/services/territorio';
 
 const THEME_KEY = 'predicador_theme';
 
 @Component({
   selector: 'app-territory-search',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './territory-search.html',
   styleUrl: './territory-search.css'
 })
@@ -31,8 +32,8 @@ export class TerritorySearch implements OnInit {
     try {
       const numeros = await this.territorioService.getNumerosTerritorios();
       this.todosLosNumeros.set(numeros);
-    } catch (e) {
-      console.error('Error al cargar territorios', e);
+    } catch {
+      // Error handled silently — territory list stays empty
     } finally {
       this.cargando.set(false);
     }

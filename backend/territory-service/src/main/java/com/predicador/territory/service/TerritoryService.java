@@ -1,6 +1,7 @@
 package com.predicador.territory.service;
 
 import com.predicador.territory.dto.TerritoryDto;
+import com.predicador.territory.exception.ResourceNotFoundException;
 import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
@@ -35,7 +36,7 @@ public class TerritoryService {
     public TerritoryDto getTerritory(Long number) {
         List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
         if (manzanas.isEmpty()) {
-            throw new RuntimeException("Territorio no encontrado: " + number);
+            throw new ResourceNotFoundException("Territorio", number);
         }
 
         String geoJson = convertToGeoJson(manzanas, number);
@@ -48,7 +49,7 @@ public class TerritoryService {
     public String getTerritoryGeoJson(Long number) {
         List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
         if (manzanas.isEmpty()) {
-            throw new RuntimeException("Territorio no encontrado: " + number);
+            throw new ResourceNotFoundException("Territorio", number);
         }
         return convertToGeoJson(manzanas, number);
     }

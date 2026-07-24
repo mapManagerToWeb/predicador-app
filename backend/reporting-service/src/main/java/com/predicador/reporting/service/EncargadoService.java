@@ -1,6 +1,7 @@
 package com.predicador.reporting.service;
 
 import com.predicador.reporting.dto.EncargadoDto;
+import com.predicador.reporting.exception.ResourceNotFoundException;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import org.springframework.stereotype.Service;
@@ -37,17 +38,13 @@ public class EncargadoService {
 
     public EncargadoDto actualizar(Long id, EncargadoDto dto) {
         Encargado encargado = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Encargado no encontrado: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Encargado", id));
         encargado.setNombre(dto.nombre());
         encargado.setApellido(dto.apellido());
         if (dto.avatar() != null) encargado.setAvatar(dto.avatar());
         if (dto.activo() != null) encargado.setActivo(dto.activo());
         Encargado saved = repository.save(encargado);
         return toDto(saved);
-    }
-
-    public Optional<EncargadoDto> buscarPorNombreApellido(String nombre, String apellido) {
-        return repository.findByNombreAndApellido(nombre, apellido).map(this::toDto);
     }
 
     public List<EncargadoDto> buscarPorNombre(String nombre) {
