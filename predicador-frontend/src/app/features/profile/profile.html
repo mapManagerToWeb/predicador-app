@@ -1,52 +1,99 @@
-<div class="profile-container">
-  <div class="profile-card">
-    <h1>Bienvenido</h1>
-    <p class="subtitle">Ingresa tus datos para comenzar</p>
+<div class="auth-shell">
+  <div class="auth-scroll">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <h1>Bienvenido</h1>
+        <p class="tagline">Crea tu perfil para comenzar</p>
+      </div>
 
-    <div class="form-group">
-      <label for="name">Nombre</label>
-      <input
-        id="name"
-        type="text"
-        [value]="name()"
-        (input)="name.set($any($event.target).value)"
-        placeholder="Tu nombre"
-      />
-    </div>
+      <div class="auth-body">
+        <div class="field-row">
+          <div class="field">
+            <label for="name">Nombre</label>
+            <input
+              id="name"
+              type="text"
+              [value]="name()"
+              (input)="onNameInput($event)"
+              placeholder="Tu nombre"
+              autocomplete="given-name"
+            />
+          </div>
+          <div class="field">
+            <label for="lastName">Apellido</label>
+            <input
+              id="lastName"
+              type="text"
+              [value]="lastName()"
+              (input)="onLastNameInput($event)"
+              placeholder="Tu apellido"
+              autocomplete="family-name"
+            />
+          </div>
+        </div>
 
-    <div class="form-group">
-      <label for="lastName">Apellido</label>
-      <input
-        id="lastName"
-        type="text"
-        [value]="lastName()"
-        (input)="lastName.set($any($event.target).value)"
-        placeholder="Tu apellido"
-      />
-    </div>
+        <div class="field">
+          <label for="telefono">Telefono</label>
+          <div class="input-phone">
+            <span class="prefix">+56</span>
+            <input
+              id="telefono"
+              type="tel"
+              inputmode="numeric"
+              [value]="telefono()"
+              (input)="onTelefonoInput($event)"
+              placeholder="9 1234 5678"
+              autocomplete="tel"
+            />
+          </div>
+        </div>
 
-    <div class="form-group">
-      <label>Selecciona tu avatar</label>
-      <div class="avatar-grid">
-        @for (avatar of avatars; track avatar.id) {
-          <button
-            class="avatar-btn"
-            [class.selected]="selectedAvatar() === avatar.id"
-            [style.background]="avatar.color"
-            (click)="selectAvatar(avatar.id)"
-          >
-            <span class="avatar-emoji">{{ avatar.emoji }}</span>
-          </button>
-        }
+        <fieldset class="field">
+          <legend>Avatar</legend>
+          <div class="avatar-grid">
+            @for (avatar of avatars; track avatar.id) {
+              <button
+                class="avatar-btn"
+                [class.selected]="selectedAvatar() === avatar.id"
+                [style.--avatar-color]="avatar.color"
+                (click)="selectAvatar(avatar.id)"
+                type="button"
+                [attr.aria-label]="'Avatar ' + (avatar.id + 1)"
+              >
+                {{ avatar.emoji }}
+              </button>
+            }
+          </div>
+        </fieldset>
+
+        <button
+          class="btn-primary"
+          (click)="save()"
+          [disabled]="!name() || !lastName() || !telefono() || loading()"
+        >
+          @if (loading()) {
+            <span class="spinner"></span>
+            <span>Guardando...</span>
+          } @else {
+            <span>Comenzar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+              <polyline points="12 5 19 12 12 19"/>
+            </svg>
+          }
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        <span>Ya tienes cuenta?</span>
+        <a routerLink="/login">Iniciar sesion</a>
       </div>
     </div>
-
-    <button
-      class="save-btn"
-      (click)="save()"
-      [disabled]="!name() || !lastName()"
-    >
-      Comenzar
-    </button>
   </div>
 </div>

@@ -1,4 +1,4 @@
-package com.predicador.reporting.exception;
+package com.predicador.shared.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;

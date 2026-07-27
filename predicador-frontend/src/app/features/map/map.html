@@ -1,53 +1,98 @@
 <div class="map-page">
   <div class="map-container" id="map"></div>
 
+  @if (isLoading()) {
+    <div class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <span class="loading-text">Cargando territorios...</span>
+    </div>
+  }
+
   <div class="top-bar">
     <app-territory-search (territorySelected)="onTerritorioSeleccionado($event)" />
   </div>
 
+  <button class="map-toggle-satellite" [class.active]="isSatellite()" (click)="toggleSatellite()"
+    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'">
+    @if (isSatellite()) {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/>
+      </svg>
+    } @else {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    }
+  </button>
+
   @if (tieneTerritorio()) {
     <div class="bottom-bar">
-      <div class="mode-group">
-        <button class="mode-btn complete" [class.active]="modoMarcado() === 'completa'"
-          (click)="setModoMarcado('completa')" title="Marcaje completo — tildar manzanas">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        </button>
-        <button class="mode-btn partial" [class.active]="modoMarcado() === 'parcial'"
-          (click)="setModoMarcado('parcial')" title="Marcaje parcial — trazar zona">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-        </button>
+      <!-- Row 1: mode + info + actions -->
+      <div class="bar-row">
+        <div class="mode-group">
+          <button class="mode-btn complete" [class.active]="modoMarcado() === 'completa'"
+            (click)="setModoMarcado('completa')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            <span class="mode-label">Marcar</span>
+          </button>
+          <button class="mode-btn partial" [class.active]="modoMarcado() === 'parcial'"
+            (click)="setModoMarcado('parcial')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            <span class="mode-label">Trazar</span>
+          </button>
+        </div>
+
+        <div class="territory-info">
+          @if (territoriosSeleccionados().length > 1) {
+            <span class="territory-number">{{ territoriosSeleccionados().length }} terr.</span>
+            <span class="manzanas-count">{{ manzanasCount() }} marcadas</span>
+          } @else {
+            <span class="territory-number">{{ territorioSeleccionado() }}</span>
+            <span class="manzanas-count">{{ manzanasCount() }}/{{ totalManzanas() }}</span>
+          }
+        </div>
+
+        <div class="action-group">
+          <select class="predicacion-select" [value]="predicacion()" (change)="predicacion.set($any($event.target).value)">
+            <option value="tarde">Tarde</option>
+            <option value="mañana">Mañana</option>
+          </select>
+          <button class="action-btn send" [disabled]="manzanasCount() === 0 || enviando()"
+            (click)="guardarYEnviar()">
+            @if (enviando()) {
+              <div class="btn-spinner"></div>
+            } @else {
+              <svg class="icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              <span class="mode-label">Enviar</span>
+            }
+          </button>
+          <button class="action-btn clear" (click)="limpiarTodo()">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            <span class="mode-label">Limpiar</span>
+          </button>
+        </div>
       </div>
 
-      <div class="territory-info">
-        <span class="territory-number">{{ territorioSeleccionado() }}</span>
-        <span class="manzanas-count">{{ manzanasCount() }}/{{ totalManzanas() }}</span>
-      </div>
-
-      <div class="action-group">
-        <button class="action-btn report" (click)="guardarEnBaseDeDatos()" title="Guardar en base de datos">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-        </button>
-        <button class="action-btn clear" (click)="limpiarTodo()" title="Limpiar todo">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
-      </div>
-
+      <!-- Row 2: partial mode controls -->
       @if (modoMarcado() === 'parcial') {
-        <div class="partial-inline">
+        <div class="partial-row">
           <span class="partial-hint">{{ puntosCount() }}/6</span>
 
           <button class="partial-btn undo" [disabled]="puntosCount() === 0"
-            (click)="deshacerPunto()" title="Deshacer último punto">
+            (click)="deshacerPunto()">
             <svg class="icon" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+            <span class="mode-label">Deshacer</span>
           </button>
 
-          <button class="partial-btn cancel" (click)="cancelarParcial()" title="Cancelar">
+          <button class="partial-btn cancel" (click)="cancelarParcial()">
             <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            <span class="mode-label">Cancelar</span>
           </button>
 
           <button class="partial-btn confirm" [disabled]="!puedeConfirmar()"
-            (click)="finalizarParcial()" title="Finalizar">
+            (click)="finalizarParcial()">
             <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            <span class="mode-label">Listo</span>
           </button>
         </div>
       }

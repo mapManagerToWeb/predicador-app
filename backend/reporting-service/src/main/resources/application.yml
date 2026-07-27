@@ -8,6 +8,9 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
+  threads:
+    virtual:
+      enabled: true
   sql:
     init:
       mode: never
@@ -37,3 +40,12 @@ management:
     web:
       exposure:
         include: health,info
+
+whatsapp:
+  api-version: "v21.0"
+  base-url: "https://graph.facebook.com"
+  phone-number-id: ${WHATSAPP_PHONE_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  template-name: ${WHATSAPP_TEMPLATE:}
+  language-code: ${WHATSAPP_LANG:es_CL}
+  destination-number: ${WHATSAPP_DESTINATION:}

@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/encargados")
@@ -35,5 +36,23 @@ public class EncargadoController {
     @GetMapping("/buscar")
     public ResponseEntity<List<EncargadoDto>> buscar(@RequestParam String nombre) {
         return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre));
+    }
+
+    @PostMapping("/buscar-crear")
+    public ResponseEntity<EncargadoDto> buscarOCrear(@RequestBody Map<String, String> body) {
+        String nombre = body.getOrDefault("nombre", "");
+        String apellido = body.getOrDefault("apellido", "");
+        String telefono = body.get("telefono");
+        return encargadoService.buscarOCrear(nombre, apellido, telefono)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.badRequest().build());
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<EncargadoDto> login(@RequestBody Map<String, String> body) {
+        String telefono = body.get("telefono");
+        return encargadoService.buscarPorTelefono(telefono)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

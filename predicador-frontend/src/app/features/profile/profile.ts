@@ -1,21 +1,28 @@
 import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Profile } from '../../core/services/profile';
-import { UserProfile } from '../../core/models/models';
+import { EncargadoService } from '../../core/services/encargado';
+import { Toast } from '../../core/services/toast';
+import { normalizePhone } from '../../core/utils/phone';
 
 @Component({
   selector: 'app-profile',
+  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './profile.html',
-  styleUrl: './profile.css'
+  styleUrls: ['./profile.css', '../auth/auth.css']
 })
 export class ProfilePage implements OnInit {
   private profileService = inject(Profile);
+  private encargadoService = inject(EncargadoService);
   private router = inject(Router);
+  private toast = inject(Toast);
 
   name = signal('');
   lastName = signal('');
+  telefono = signal('');
   selectedAvatar = signal(0);
+  loading = signal(false);
 
   avatars = [
     { id: 0, emoji: '👨', color: '#3b82f6' },
@@ -30,21 +37,60 @@ export class ProfilePage implements OnInit {
 
   ngOnInit(): void {
     if (this.profileService.hasProfile()) {
-      this.router.navigate(['/map']);
+      void this.router.navigate(['/map']);
     }
+  }
+
+  onNameInput(event: Event): void {
+    this.name.set((event.target as HTMLInputElement).value);
+  }
+
+  onLastNameInput(event: Event): void {
+    this.lastName.set((event.target as HTMLInputElement).value);
+  }
+
+  onTelefonoInput(event: Event): void {
+    this.telefono.set((event.target as HTMLInputElement).value);
   }
 
   selectAvatar(id: number): void {
     this.selectedAvatar.set(id);
   }
 
-  save(): void {
-    if (!this.name() || !this.lastName()) return;
-    this.profileService.save({
-      name: this.name(),
-      lastName: this.lastName(),
-      avatar: this.selectedAvatar()
-    });
-    this.router.navigate(['/map']);
+  async save(): Promise<void> {
+    if (!this.name() || !this.lastName() || !this.telefono() || this.loading()) return;
+
+    this.loading.set(true);
+    try {
+      const encargado = await this.encargadoService.buscarOCrear(
+        this.name(),
+        this.lastName(),
+        this.telefono()
+      );
+
+      const tel = this.telefono().trim();
+      this.profileService.save({
+        name: this.name(),
+        lastName: this.lastName(),
+        avatar: this.selectedAvatar(),
+        telefono: tel ? normalizePhone(tel) : undefined,
+        encargadoId: encargado.id ?? undefined,
+      });
+
+      this.toast.show('Perfil creado exitosamente', 2000, 'success');
+    } catch {
+      const tel = this.telefono().trim();
+      this.profileService.save({
+        name: this.name(),
+        lastName: this.lastName(),
+        avatar: this.selectedAvatar(),
+        telefono: tel ? normalizePhone(tel) : undefined,
+      });
+      this.toast.show('Perfil guardado localmente', 3000, 'warning');
+    } finally {
+      this.loading.set(false);
+    }
+
+    void this.router.navigate(['/map']);
   }
 }

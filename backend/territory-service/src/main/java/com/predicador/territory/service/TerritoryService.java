@@ -1,7 +1,7 @@
 package com.predicador.territory.service;
 
 import com.predicador.territory.dto.TerritoryDto;
-import com.predicador.territory.exception.ResourceNotFoundException;
+import com.predicador.shared.exception.ResourceNotFoundException;
 import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
@@ -18,10 +18,10 @@ public class TerritoryService {
     private final TerritoryColorRepository colorRepository;
 
     private static final String[] PALETTE = {
-        "#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
-        "#42d4f4", "#f032e6", "#bfef45", "#fabed4", "#469990",
-        "#dcbeff", "#9A6324", "#fffac8", "#800000", "#aaffc3",
-        "#808000", "#ffd8b1", "#000075", "#a9a9a9"
+        "#DC143C", "#00A86B", "#007FFF", "#FF6600", "#8A2BE2",
+        "#E0115F", "#FFBF00", "#00CED1", "#FF1493", "#32CD32",
+        "#FF4500", "#1E90FF", "#DA70D6", "#FFD700", "#00FF7F",
+        "#FF00FF", "#4169E1", "#FF69B4", "#7B68EE"
     };
 
     public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository) {
@@ -70,30 +70,15 @@ public class TerritoryService {
             String color = colorMap.getOrDefault(number, "#3b82f6");
 
             for (ManzanaTerritorio m : entry.getValue()) {
-                String wkbHex = m.getGeometry();
-                if (wkbHex == null || wkbHex.isEmpty()) continue;
-
-                double[][] coords = parseWkbHexToCoords(wkbHex);
+                double[][] coords = parseWkbHexToCoords(m.getGeometry());
                 if (coords == null || coords.length == 0) continue;
 
                 if (!first) sb.append(",");
                 first = false;
 
-                sb.append("{\"type\":\"Feature\",");
-                sb.append("\"properties\":{");
-                sb.append("\"id\":\"").append(number).append("-").append(m.getNombreBloque()).append("\",");
-                sb.append("\"nombre_bloque\":\"").append(escapeJson(m.getNombreBloque())).append("\",");
-                sb.append("\"territorio_padre\":").append(number).append(",");
-                sb.append("\"color\":\"").append(escapeJson(color)).append("\"");
-                sb.append("},");
-                sb.append("\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[");
-
-                for (int j = 0; j < coords.length; j++) {
-                    if (j > 0) sb.append(",");
-                    sb.append("[").append(coords[j][0]).append(",").append(coords[j][1]).append("]");
-                }
-
-                sb.append("]]}}");
+                appendFeature(sb, number, m.getNombreBloque(), coords);
+                injectProperty(sb, "color", escapeJson(color));
+                closeFeature(sb);
             }
         }
 
@@ -139,30 +124,40 @@ public class TerritoryService {
             ManzanaTerritorio m = manzanas.get(i);
             if (i > 0) sb.append(",");
 
-            String wkbHex = m.getGeometry();
-            if (wkbHex == null || wkbHex.isEmpty()) continue;
-
-            double[][] coords = parseWkbHexToCoords(wkbHex);
+            double[][] coords = parseWkbHexToCoords(m.getGeometry());
             if (coords == null || coords.length == 0) continue;
 
-            sb.append("{\"type\":\"Feature\",");
-            sb.append("\"properties\":{");
-            sb.append("\"id\":\"").append(territorioPadre).append("-").append(m.getNombreBloque()).append("\",");
-            sb.append("\"nombre_bloque\":\"").append(escapeJson(m.getNombreBloque())).append("\",");
-            sb.append("\"territorio_padre\":").append(territorioPadre);
-            sb.append("},");
-            sb.append("\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[");
-
-            for (int j = 0; j < coords.length; j++) {
-                if (j > 0) sb.append(",");
-                sb.append("[").append(coords[j][0]).append(",").append(coords[j][1]).append("]");
-            }
-
-            sb.append("]]}}");
+            appendFeature(sb, territorioPadre, m.getNombreBloque(), coords);
+            closeFeature(sb);
         }
 
         sb.append("]}");
         return sb.toString();
+    }
+
+    private void appendFeature(StringBuilder sb, Long territorioPadre, String nombreBloque, double[][] coords) {
+        sb.append("{\"type\":\"Feature\",");
+        sb.append("\"properties\":{");
+        sb.append("\"id\":\"").append(territorioPadre).append("-").append(nombreBloque).append("\",");
+        sb.append("\"nombre_bloque\":\"").append(escapeJson(nombreBloque)).append("\",");
+        sb.append("\"territorio_padre\":").append(territorioPadre);
+        sb.append("},");
+        sb.append("\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[");
+
+        for (int j = 0; j < coords.length; j++) {
+            if (j > 0) sb.append(",");
+            sb.append("[").append(coords[j][0]).append(",").append(coords[j][1]).append("]");
+        }
+
+        sb.append("]]");
+    }
+
+    private void injectProperty(StringBuilder sb, String key, String value) {
+        sb.append(",\"").append(key).append("\":\"").append(value).append("\"");
+    }
+
+    private void closeFeature(StringBuilder sb) {
+        sb.append("}}");
     }
 
     private double[][] parseWkbHexToCoords(String wkbHex) {
@@ -176,10 +171,8 @@ public class TerritoryService {
             int typeNum = geomType & 0xFF;
             if (typeNum != 3) return null;
 
-            int srid = 0;
             int offset = 5;
             if ((geomType & 0x20000000) != 0) {
-                srid = readInt32(bytes, 5, byteOrder == 0);
                 offset = 9;
             }
 

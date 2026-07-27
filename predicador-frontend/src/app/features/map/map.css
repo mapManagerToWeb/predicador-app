@@ -14,6 +14,58 @@
   width: 100%;
   height: 100%;
   background: var(--color-bg);
+  contain: layout style paint;
+  will-change: transform;
+}
+
+/* Prevent Leaflet tile-pane will-change memory bloat on mobile */
+:host ::ng-deep .leaflet-tile-pane {
+  will-change: auto !important;
+}
+
+/* Keep GPU acceleration only on the animated zoom layer */
+:host ::ng-deep .leaflet-zoom-animated {
+  will-change: transform;
+}
+
+:root[data-theme="light"] :host ::ng-deep .leaflet-container {
+  filter: brightness(0.92);
+}
+
+/* ── Loading overlay ──────────────────── */
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: color-mix(in srgb, var(--color-surface, #fff) 80%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  contain: layout style paint;
+}
+
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #2563eb);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Top bar ─────────────────────────── */
@@ -24,6 +76,60 @@
   left: 12px;
   right: 12px;
   z-index: 1000;
+  contain: layout style;
+}
+
+/* ── Satellite toggle ────────────────── */
+
+.map-toggle-satellite {
+  position: absolute;
+  bottom: 20px;
+  left: 12px;
+  z-index: 1000;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+  background: color-mix(in srgb, var(--color-surface, #fff) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--color-text-secondary, #64748b);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.map-toggle-satellite svg {
+  width: 20px;
+  height: 20px;
+}
+
+.map-toggle-satellite:active {
+  transform: scale(0.92);
+}
+
+.map-toggle-satellite.active {
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 15%, var(--color-surface, #fff));
+  color: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, #2563eb);
+}
+
+:root[data-theme="dark"] .map-toggle-satellite {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="dark"] .map-toggle-satellite.active {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60a5fa;
+  border-color: #2563eb;
 }
 
 /* ── Bottom bar ──────────────────────── */
@@ -34,39 +140,64 @@
   left: 12px;
   right: 12px;
   z-index: 1000;
-  background: var(--color-surface);
-  border-radius: 14px;
-  padding: 6px 10px;
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 18px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 24px var(--color-shadow);
+  border: 1px solid var(--color-border);
+  contain: layout style;
+}
+
+/* ── Row 1: mode buttons + territory info + actions ── */
+
+.bar-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 20px var(--color-shadow);
-  border: 1px solid var(--color-border);
+  flex-wrap: wrap;
 }
 
 /* ── Mode toggles ────────────────────── */
 
 .mode-group {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
 .mode-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 14px;
   border: 2px solid transparent;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1px;
   transition: all 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
 }
 
 .mode-btn .icon {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
+}
+
+.mode-label {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .mode-btn.complete {
@@ -79,7 +210,7 @@
   background: #2563eb;
   color: #fff;
   border-color: #1d4ed8;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.45);
 }
 
 .mode-btn.partial {
@@ -92,7 +223,7 @@
   background: #d97706;
   color: #fff;
   border-color: #b45309;
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.4);
+  box-shadow: 0 2px 10px rgba(217, 119, 6, 0.45);
 }
 
 /* ── Territory info ──────────────────── */
@@ -100,22 +231,22 @@
 .territory-info {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 6px;
   color: var(--color-text-secondary);
   min-width: 0;
-  padding-left: 8px;
+  padding-left: 10px;
   border-left: 1px solid var(--color-border);
+  flex: 1;
 }
 
 .territory-number {
-  font-weight: 700;
+  font-weight: 800;
   color: var(--color-text);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .manzanas-count {
-  font-size: 11px;
+  font-size: 13px;
   opacity: 0.7;
   white-space: nowrap;
 }
@@ -124,39 +255,79 @@
 
 .action-group {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   margin-left: auto;
 }
 
 .action-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 14px;
   border: 2px solid transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   transition: all 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .action-btn .icon {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
 }
 
-.action-btn.report {
-  background: #dcfce7;
-  color: #16a34a;
-  border-color: #86efac;
+.action-btn.send {
+  background: #2563eb;
+  color: #fff;
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 
-.action-btn.report:hover {
-  background: #16a34a;
-  color: #fff;
-  border-color: #15803d;
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.4);
+.action-btn.send:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.action-btn.send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.predicacion-select {
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 2px solid var(--color-border, #d1d5db);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #111827);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
 }
 
 .action-btn.clear {
@@ -165,48 +336,52 @@
   border-color: #fca5a5;
 }
 
-.action-btn.clear:hover {
+.action-btn.clear:active {
   background: #dc2626;
   color: #fff;
   border-color: #b91c1c;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
 }
 
-/* ── Partial inline controls ─────────── */
+/* ── Row 2: partial controls ─────────── */
 
-.partial-inline {
+.partial-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-left: 8px;
-  border-left: 1px solid var(--color-border);
-  margin-left: 4px;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
 }
 
 .partial-hint {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--color-text);
   white-space: nowrap;
-  min-width: 28px;
+  min-width: 36px;
   text-align: center;
 }
 
 .partial-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 12px;
   border: 2px solid transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   transition: all 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .partial-btn .icon {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
 
@@ -216,7 +391,7 @@
   border-color: #a5b4fc;
 }
 
-.partial-btn.undo:hover:not(:disabled) {
+.partial-btn.undo:active:not(:disabled) {
   background: #4f46e5;
   color: #fff;
   border-color: #4338ca;
@@ -233,7 +408,7 @@
   border-color: #fca5a5;
 }
 
-.partial-btn.cancel:hover {
+.partial-btn.cancel:active {
   background: #dc2626;
   color: #fff;
   border-color: #b91c1c;
@@ -250,7 +425,7 @@
   cursor: not-allowed;
 }
 
-.partial-btn.confirm:not(:disabled):hover {
+.partial-btn.confirm:not(:disabled):active {
   background: #16a34a;
   color: #fff;
   border-color: #15803d;
@@ -259,36 +434,106 @@
 /* ── Partial markers ─────────────────── */
 
 :host ::ng-deep .partial-dot {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   background: #22c55e;
-  border: 2.5px solid #fff;
+  border: 3px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-:host ::ng-deep .centroid-dot {
-  display: flex;
+/* ── Territory number labels ─────────── */
+
+:host ::ng-deep .territory-label {
+  background: none;
+  border: none;
+}
+
+:host ::ng-deep .territory-label__text {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  color: #fff;
-  font-size: 11px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
   font-weight: 700;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  color: #1e293b;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+:root[data-theme="dark"] :host ::ng-deep .territory-label__text {
+  background: rgba(30, 41, 59, 0.85);
+  color: #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Leaflet dark mode ───────────────── */
+
+:root[data-theme="dark"] .map-container {
+  background: #0f172a;
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-container {
+  background: #0f172a;
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-bar,
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-zoom a,
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-attribution,
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-layers {
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 3px 10px rgba(2, 6, 23, 0.28);
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-zoom a {
+  color: #f8fafc;
+  border-bottom-color: rgba(148, 163, 184, 0.18);
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-zoom a:hover,
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-layers:hover {
+  background: rgba(30, 41, 59, 0.95);
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-attribution,
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-attribution a {
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-control-attribution a {
+  color: #93c5fd;
+}
+
+:root[data-theme="dark"] :host ::ng-deep .leaflet-interactive {
+  stroke: rgba(255, 255, 255, 0.55);
 }
 
 /* ── Dark mode ───────────────────────── */
 
-:root[data-theme="dark"] .leaflet-tile {
-  filter: brightness(0.65) saturate(0.8);
+:root[data-theme="dark"] .bottom-bar {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
 }
 
-:root[data-theme="dark"] .bottom-bar {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+:root[data-theme="dark"] .loading-overlay {
+  background: color-mix(in srgb, #0f172a 80%, transparent);
+}
+
+:root[data-theme="dark"] .predicacion-select {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 }
 
 :root[data-theme="dark"] .mode-btn.complete {
@@ -313,10 +558,10 @@
   color: #fff;
 }
 
-:root[data-theme="dark"] .action-btn.report {
-  background: #052e16;
-  color: #4ade80;
-  border-color: #16a34a;
+:root[data-theme="dark"] .action-btn.send {
+  background: #2563eb;
+  color: #fff;
+  border-color: #1d4ed8;
 }
 
 :root[data-theme="dark"] .action-btn.clear {
@@ -343,18 +588,145 @@
   border-color: #16a34a;
 }
 
-/* ── Responsive ──────────────────────── */
+/* ── Mobile: stack mode buttons and actions ── */
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .bottom-bar {
-    bottom: 8px;
+    bottom: env(safe-area-inset-bottom, 8px);
     left: 8px;
     right: 8px;
-    gap: 6px;
-    padding: 5px 8px;
+    padding: 10px;
+    border-radius: 20px;
+    gap: 10px;
+  }
+
+  .map-toggle-satellite {
+    bottom: 180px;
+  }
+
+  .bar-row {
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .mode-group {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mode-btn {
+    width: 100%;
+    height: 58px;
+    padding: 0 12px;
+    border-radius: 14px;
+    gap: 2px;
+  }
+
+  .mode-btn .icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mode-label {
+    font-size: 10px;
   }
 
   .territory-info {
+    width: 100%;
+    justify-content: space-between;
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+    padding-left: 0;
+    padding-top: 8px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .territory-number {
+    font-size: 18px;
+  }
+
+  .manzanas-count {
+    font-size: 13px;
+  }
+
+  .action-group {
+    width: 100%;
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+  }
+
+  .action-btn {
+    height: 56px;
+    padding: 0 12px;
     font-size: 11px;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .action-btn .icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .predicacion-select {
+    height: 56px;
+    font-size: 14px;
+    padding: 0 12px;
+    padding-right: 32px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .partial-row {
+    gap: 8px;
+    padding-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .partial-hint {
+    flex-basis: 100%;
+    text-align: left;
+    padding-left: 2px;
+  }
+
+  .partial-btn {
+    height: 52px;
+    padding: 0 14px;
+    font-size: 12px;
+    gap: 5px;
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: 92px;
+  }
+
+  .partial-btn .icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ── Very small screens: full-width buttons ── */
+
+@media (max-width: 420px) {
+  .action-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .predicacion-select {
+    grid-column: 1 / -1;
+  }
+
+  .action-btn.send,
+  .action-btn.clear {
+    width: 100%;
+  }
+
+  .partial-btn {
+    flex-basis: calc(50% - 4px);
+    min-width: 0;
   }
 }

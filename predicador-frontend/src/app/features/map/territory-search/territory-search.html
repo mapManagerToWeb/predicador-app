@@ -34,10 +34,22 @@
         </svg>
       }
     </button>
+    <button class="logout-toggle" (click)="logout()" aria-label="Cerrar sesion">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
   </div>
 
   @if (mostrarDropdown() && numerosFiltrados().length > 0) {
     <div class="dropdown">
+      @if (seleccionMultiple()) {
+        <button class="dropdown-item dropdown-item-all" (mousedown)="onSeleccionMultiple()">
+          Seleccionar {{ territoriosSeleccionados().length }} territorios
+        </button>
+      }
       @for (numero of numerosFiltrados(); track numero) {
         <button class="dropdown-item" (mousedown)="onSeleccion(numero)">
           Territorio {{ numero }}

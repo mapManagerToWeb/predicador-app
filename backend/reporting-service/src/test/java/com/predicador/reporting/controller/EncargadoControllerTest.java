@@ -13,6 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -38,7 +40,7 @@ class EncargadoControllerTest {
     }
 
     private EncargadoDto createDto(Long id, String nombre, String apellido) {
-        return new EncargadoDto(id, nombre, apellido, 1, true);
+        return new EncargadoDto(id, nombre, apellido, 1, null, true);
     }
 
     @Test
@@ -90,5 +92,19 @@ class EncargadoControllerTest {
         mockMvc.perform(get("/api/v1/encargados/buscar").param("nombre", "Daniel"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].nombre").value("Daniel"));
+    }
+
+    @Test
+    void buscarOCrear_shouldReturn200() throws Exception {
+        EncargadoDto dto = createDto(1L, "Daniel", "Uribe");
+
+        when(encargadoService.buscarOCrear(anyString(), anyString(), any()))
+                .thenReturn(Optional.of(dto));
+
+        mockMvc.perform(post("/api/v1/encargados/buscar-crear")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombre\":\"Daniel\",\"apellido\":\"Uribe\",\"telefono\":\"56912345678\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nombre").value("Daniel"));
     }
 }

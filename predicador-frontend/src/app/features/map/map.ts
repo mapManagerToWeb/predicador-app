@@ -3,24 +3,24 @@ import * as L from 'leaflet';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
+import { WhatsAppService } from '../../core/services/whatsapp';
 import { TerritorySearch } from './territory-search/territory-search';
-import type { Reporte, RegistroReporte } from '../../core/models/models';
+import type { Reporte } from '../../core/models/models';
+import {
+  pointInPolygon,
+  projectOnSegment,
+  latLngDist,
+  snapToContour,
+  traceContourBetween,
+  DEDUP_THRESHOLD_PX,
+  type SnappedPoint,
+  type Edge
+} from './map-geometry';
+import { MapReportService, type ManzanaMarcada, type FeatureLayer, type DatosParciales } from './map-report.service';
+
+export type { ManzanaMarcada, FeatureLayer, DatosParciales };
 
 type ModoMarcado = 'none' | 'completa' | 'parcial';
-
-interface ManzanaMarcada {
-  id: string;
-  nombreBloque: string;
-  layer: L.Path;
-  territorioNumero: number;
-}
-
-interface FeatureLayer {
-  territorioPadre: number;
-  color: string;
-  layer: L.GeoJSON;
-  centroidMarkers: L.Marker[];
-}
 
 interface ManzanaIndex {
   polygon: L.Polygon;
@@ -28,23 +28,12 @@ interface ManzanaIndex {
   nombreBloque: string;
   color: string;
   territorioNumero: number;
+  bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number };
 }
 
-interface SnappedPoint {
-  latlng: L.LatLng;
-  edgeIdx: number;
-  t: number;
-}
-
-interface Edge {
-  from: L.LatLng;
-  to: L.LatLng;
-}
-
-const SNAP_THRESHOLD_PX = 50;
-const DEDUP_THRESHOLD_PX = 2;
 const CAPTURE_DELAY_MS = 400;
 const MAX_PUNTOS_PARCIAL = 6;
+const LABEL_MIN_ZOOM = 14;
 
 export function elegirUltimoReporte(reportes: Reporte[]): Reporte | null {
   if (!reportes.length) return null;
@@ -63,6 +52,26 @@ export function elegirUltimoReporte(reportes: Reporte[]): Reporte | null {
   }, null);
 }
 
+export function getTerritoryFillOpacity(isComplete: boolean): number {
+  return isComplete ? 0.85 : 0.05;
+}
+
+const TERRITORY_COLORS = [
+  '#DC143C', '#00A86B', '#FF6600', '#8A2BE2', '#E0115F',
+  '#00CED1', '#FF1493', '#32CD32', '#FF4500', '#1E90FF',
+  '#DA70D6', '#FFD700', '#00FF7F', '#FF00FF', '#4169E1',
+  '#FF69B4', '#7B68EE', '#FF8C00', '#00BFFF', '#FF6347',
+  '#9370DB', '#3CB371', '#FF1493', '#4682B4', '#FFA500',
+  '#2E8B57', '#CD5C5C', '#6A5ACD', '#20B2AA', '#DAA520'
+];
+
+function getColorForTerritorio(territorioNum: number, backendColor: string | null): string {
+  if (backendColor && /^#[0-9a-fA-F]{3,8}$/.test(backendColor)) {
+    return backendColor;
+  }
+  return TERRITORY_COLORS[((territorioNum - 1) % TERRITORY_COLORS.length + TERRITORY_COLORS.length) % TERRITORY_COLORS.length];
+}
+
 @Component({
   selector: 'app-map',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,24 +83,36 @@ export class MapPage implements OnDestroy {
   private territorioService = inject(TerritorioService);
   private profileService = inject(Profile);
   private toastService = inject(Toast);
+  private whatsappService = inject(WhatsAppService);
+  private reportService = inject(MapReportService);
   private map!: L.Map;
   private tileLayer!: L.TileLayer;
+  private satelliteLayer!: L.TileLayer;
   private themeObserver: MutationObserver | null = null;
   private allTerritoriesLayer: FeatureLayer[] = [];
   private manzanaIndex: ManzanaIndex[] = [];
   private currentTerritoryColor = '';
+  private territoryDataCache = new Map<number, { fc: GeoJSON.FeatureCollection; color: string; bounds: L.LatLngBounds }>();
 
   manzanasMarcadas = signal<ManzanaMarcada[]>([]);
   manzanasCount = computed(() => this.manzanasMarcadas().length);
   totalManzanas = signal(0);
   territorioSeleccionado = signal<number | null>(null);
-  tieneTerritorio = computed(() => this.territorioSeleccionado() !== null);
+  territoriosSeleccionados = signal<number[]>([]);
+  tieneTerritorio = computed(() => this.territoriosSeleccionados().length > 0);
 
   modoMarcado = signal<ModoMarcado>('none');
   puntosParciales = signal<SnappedPoint[]>([]);
   puntosCount = computed(() => this.puntosParciales().length);
   puedeConfirmar = computed(() => this.puntosCount() >= 3);
 
+  enviando = signal(false);
+  isLoading = signal(false);
+  isSatellite = signal(false);
+  predicacion = signal<string>('tarde');
+  screenshotPreview = signal<string | null>(null);
+
+  private territoryLabels: L.Marker[] = [];
   private poligonoParcial: L.Polygon | null = null;
   private markersParciales: L.Layer[] = [];
   private extraLayers: L.Layer[] = [];
@@ -100,6 +121,8 @@ export class MapPage implements OnDestroy {
   private manzanaSeleccionadaColor = '';
   private manzanaSeleccionadaNombre = '';
   private manzanaEdges: Edge[] = [];
+  private pendingStyleFrame: number | null = null;
+  private pendingStyleQueue: Array<() => void> = [];
 
   constructor() {
     afterNextRender(() => {
@@ -118,12 +141,19 @@ export class MapPage implements OnDestroy {
       attribution: this.getMapAttribution()
     }).addTo(this.map);
 
+    this.satelliteLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 18, attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
+    );
+
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     this.observeThemeChanges();
 
     this.map.on('click', (e: L.LeafletMouseEvent) => this.onMapClick(e));
+    this.map.on('zoomend', () => this.updateLabelsVisibility());
+    this.map.on('moveend', () => this.updateVisibleTerritories());
 
-    this.loadAllTerritories();
+    void this.loadAllTerritories();
   }
 
   private getCurrentTheme(): 'light' | 'dark' {
@@ -146,7 +176,7 @@ export class MapPage implements OnDestroy {
     if (typeof MutationObserver === 'undefined') return;
 
     this.themeObserver = new MutationObserver(() => {
-      if (!this.tileLayer) return;
+      if (!this.tileLayer || this.isSatellite()) return;
       this.tileLayer.setUrl(this.getTileLayerUrl());
     });
 
@@ -157,13 +187,20 @@ export class MapPage implements OnDestroy {
   }
 
   private async loadAllTerritories(): Promise<void> {
+    if (this.isLoading()) return;
+    this.isLoading.set(true);
+
     try {
       for (const fl of this.allTerritoriesLayer) {
         fl.layer.remove();
-        fl.centroidMarkers.forEach(m => m.remove());
+      }
+      for (const lbl of this.territoryLabels) {
+        lbl.remove();
       }
       this.allTerritoriesLayer = [];
+      this.territoryLabels = [];
       this.manzanaIndex = [];
+      this.territoryDataCache.clear();
 
       const geoJsonText = await this.territorioService.getAllGeoJson();
       const geoJson = JSON.parse(geoJsonText) as GeoJSON.FeatureCollection;
@@ -177,88 +214,297 @@ export class MapPage implements OnDestroy {
         }
       }
 
-      const restorePromises: Promise<void>[] = [];
-
       for (const [territorioNum, features] of byTerritorio) {
-        const rawColor = features[0]?.properties?.['color'] || '#3b82f6';
-        const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#3b82f6';
-
+        const rawColor = features[0]?.properties?.['color'] ?? null;
+        const color = getColorForTerritorio(territorioNum, rawColor);
         const fc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features };
 
-        const layer = L.geoJSON(fc, {
-          style: () => ({
-            fillColor: color,
-            fillOpacity: 0.08,
-            opacity: 0.9,
-            color: color,
-            weight: 2,
-            smoothFactor: 1
-          }),
-          onEachFeature: (feature, l) => {
-            if (l instanceof L.Polygon) {
-              const id = String(feature.properties?.['id'] ?? '');
-              const nombreBloque = String(feature.properties?.['nombre_bloque'] ?? '');
-
-              this.manzanaIndex.push({ polygon: l, id, nombreBloque, color, territorioNumero: territorioNum });
-
-              l.on('click', (e) => {
-                if (this.modoMarcado() === 'completa') {
-                  L.DomEvent.stop(e);
-                  this.toggleManzana(id, nombreBloque, l, color, territorioNum);
+        let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+        for (const f of features) {
+          const geom = f.geometry;
+          if (geom?.type === 'Polygon') {
+            for (const ring of (geom as GeoJSON.Polygon).coordinates) {
+              for (const [lng, lat] of ring) {
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
+                if (lng < minLng) minLng = lng;
+                if (lng > maxLng) maxLng = lng;
+              }
+            }
+          } else if (geom?.type === 'MultiPolygon') {
+            for (const poly of (geom as GeoJSON.MultiPolygon).coordinates) {
+              for (const ring of poly) {
+                for (const [lng, lat] of ring) {
+                  if (lat < minLat) minLat = lat;
+                  if (lat > maxLat) maxLat = lat;
+                  if (lng < minLng) minLng = lng;
+                  if (lng > maxLng) maxLng = lng;
                 }
-              });
+              }
             }
           }
-        });
+        }
 
-        layer.addTo(this.map);
-
-        const centroidMarkers = this.crearMarcadoresCentroide(fc, color, territorioNum);
-
-        this.allTerritoriesLayer.push({
-          territorioPadre: territorioNum,
-          color,
-          layer,
-          centroidMarkers
-        });
-
-        restorePromises.push(
-          this.restaurarMarcadoDesdeDB(territorioNum, color, { actualizarEstadoMarcado: false })
-        );
+        const bounds = L.latLngBounds(L.latLng(minLat, minLng), L.latLng(maxLat, maxLng));
+        this.territoryDataCache.set(territorioNum, { fc, color, bounds });
       }
 
-      await Promise.all(restorePromises);
+      this.updateVisibleTerritories();
+      await this.restoreAllMarks();
     } catch {
       this.toastService.show('Error al cargar los territorios');
+    } finally {
+      this.isLoading.set(false);
     }
   }
 
-  async onTerritorioSeleccionado(numero: number): Promise<void> {
-    this.resetUIState();
-    this.territorioSeleccionado.set(numero);
+  private updateVisibleTerritories(): void {
+    const mapBounds = this.map.getBounds().pad(0.15);
+    const loadedNums = new Set(this.allTerritoriesLayer.map(fl => fl.territorioPadre));
+    const newlyLoaded: number[] = [];
 
-    const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === numero);
-    if (!featureLayer) {
-      this.toastService.show('Territorio no encontrado');
-      return;
+    for (const [num, data] of this.territoryDataCache) {
+      const isVisible = data.bounds.isValid() && data.bounds.intersects(mapBounds);
+      const isLoaded = loadedNums.has(num);
+
+      if (isVisible && !isLoaded) {
+        this.addTerritoryLayer(num, data);
+        newlyLoaded.push(num);
+      } else if (!isVisible && isLoaded) {
+        this.removeTerritoryLayer(num);
+      }
     }
 
-    this.currentTerritoryColor = featureLayer.color;
+    this.updateLabelsVisibility();
 
-    this.reaplicarMarcasTerritorio();
+    for (const num of newlyLoaded) {
+      const fl = this.allTerritoriesLayer.find(f => f.territorioPadre === num);
+      if (fl) void this.restaurarMarcadoDesdeDB(num, fl.color, { actualizarEstadoMarcado: false });
+    }
 
-    const bounds = featureLayer.layer.getBounds();
+    if (this.modoMarcado() !== 'none' && newlyLoaded.length > 0) {
+      this.ocultarPoligonosNoSeleccionados();
+    }
+  }
+
+  private ensureTerritoryLoaded(territorioNum: number): void {
+    if (this.allTerritoriesLayer.some(fl => fl.territorioPadre === territorioNum)) return;
+    const data = this.territoryDataCache.get(territorioNum);
+    if (data) this.addTerritoryLayer(territorioNum, data);
+  }
+
+  private addTerritoryLayer(territorioNum: number, data: { fc: GeoJSON.FeatureCollection; color: string; bounds: L.LatLngBounds }): void {
+    const { fc, color, bounds } = data;
+
+    const layer = L.geoJSON(fc, {
+      style: () => ({
+        fillColor: color,
+        fillOpacity: getTerritoryFillOpacity(false),
+        opacity: 1,
+        color: color,
+        weight: 3,
+        smoothFactor: 1
+      }),
+      onEachFeature: (feature, l) => {
+        if (l instanceof L.Polygon) {
+          const id = String(feature.properties?.['id'] ?? '');
+          const nombreBloque = String(feature.properties?.['nombre_bloque'] ?? '');
+
+          const rings = l.getLatLngs();
+          const outer = rings[0] as L.LatLng[];
+          let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+          if (outer) {
+            for (const pt of outer) {
+              if (pt.lat < minLat) minLat = pt.lat;
+              if (pt.lat > maxLat) maxLat = pt.lat;
+              if (pt.lng < minLng) minLng = pt.lng;
+              if (pt.lng > maxLng) maxLng = pt.lng;
+            }
+          }
+          const bbox = { minLat, maxLat, minLng, maxLng };
+
+          this.manzanaIndex.push({ polygon: l, id, nombreBloque, color, territorioNumero: territorioNum, bbox });
+
+          l.on('click', (e) => {
+            if (this.modoMarcado() === 'completa') {
+              L.DomEvent.stop(e);
+              this.toggleManzana(id, nombreBloque, l, color, territorioNum);
+            }
+          });
+        }
+      }
+    });
+
+    layer.addTo(this.map);
+
     if (bounds.isValid()) {
-      this.map.fitBounds(bounds, { padding: [30, 30] });
+      const center = bounds.getCenter();
+      const label = L.marker(center, {
+        icon: L.divIcon({
+          className: 'territory-label',
+          html: `<span class="territory-label__text">${territorioNum}</span>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        }),
+        interactive: false,
+        keyboard: false
+      }).addTo(this.map);
+      this.territoryLabels.push(label);
     }
 
-    await this.restaurarMarcadoDesdeDB(numero, this.currentTerritoryColor, { actualizarEstadoMarcado: true });
+    this.allTerritoriesLayer.push({
+      territorioPadre: territorioNum,
+      color,
+      layer
+    });
   }
 
-  private aplicarEstiloBaseTerritorio(territorioNumero: number, color: string): void {
+  private removeTerritoryLayer(territorioNum: number): void {
+    const idx = this.allTerritoriesLayer.findIndex(fl => fl.territorioPadre === territorioNum);
+    if (idx < 0) return;
+
+    const fl = this.allTerritoriesLayer[idx];
+    fl.layer.remove();
+    this.allTerritoriesLayer.splice(idx, 1);
+
+    const labelIdx = this.territoryLabels.findIndex(lbl => {
+      const el = lbl.getElement();
+      if (!el) return false;
+      const text = el.querySelector('.territory-label__text')?.textContent;
+      return text === String(territorioNum);
+    });
+    if (labelIdx >= 0) {
+      this.territoryLabels[labelIdx].remove();
+      this.territoryLabels.splice(labelIdx, 1);
+    }
+
+    for (let i = this.manzanaIndex.length - 1; i >= 0; i--) {
+      if (this.manzanaIndex[i].territorioNumero === territorioNum) {
+        this.manzanaIndex.splice(i, 1);
+      }
+    }
+  }
+
+  private async restoreAllMarks(): Promise<void> {
+    const BATCH_SIZE = 4;
+    const layers = this.allTerritoriesLayer;
+
+    for (let i = 0; i < layers.length; i += BATCH_SIZE) {
+      const batch = layers.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map(fl =>
+          this.restaurarMarcadoDesdeDB(fl.territorioPadre, fl.color, { actualizarEstadoMarcado: false })
+        )
+      );
+    }
+  }
+
+  async onTerritorioSeleccionado(numeros: number[]): Promise<void> {
+    const estabaEnModoMarcado = this.modoMarcado() !== 'none';
+
+    if (!estabaEnModoMarcado) {
+      this.resetUIState();
+    } else {
+      this.limpiarParcial();
+      this.restaurarManzanaAnterior();
+      this.extraLayers.forEach(l => this.map.removeLayer(l));
+      this.extraLayers = [];
+    }
+
+    if (estabaEnModoMarcado) {
+      const existentes = new Set(this.territoriosSeleccionados());
+      for (const n of numeros) existentes.add(n);
+      this.territoriosSeleccionados.set(Array.from(existentes));
+    } else {
+      this.modoMarcado.set('none');
+      this.territoriosSeleccionados.set(numeros);
+    }
+    this.territorioSeleccionado.set(this.territoriosSeleccionados().length === 1 ? this.territoriosSeleccionados()[0] : null);
+
+    for (const numero of numeros) {
+      this.ensureTerritoryLoaded(numero);
+    }
+
+    let combinedBounds: L.LatLngBounds | null = null;
+
+    const numsAConsiderar = estabaEnModoMarcado ? this.territoriosSeleccionados() : numeros;
+
+    for (const numero of numsAConsiderar) {
+      const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === numero);
+      if (!featureLayer) continue;
+
+      this.currentTerritoryColor = featureLayer.color;
+
+      this.reaplicarMarcasTerritorio(numero);
+
+      const bounds = featureLayer.layer.getBounds();
+      if (bounds.isValid()) {
+        if (!combinedBounds) combinedBounds = bounds;
+        else combinedBounds.extend(bounds);
+      }
+
+      await this.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
+    }
+
+    if (combinedBounds && combinedBounds.isValid()) {
+      this.map.fitBounds(combinedBounds, { padding: [30, 30] });
+    }
+
+    this.cancelPendingStyleUpdates();
+    this.ocultarPoligonosNoSeleccionados();
+
+    if (numsAConsiderar.length === 1) {
+      const fl = this.allTerritoriesLayer.find(f => f.territorioPadre === numsAConsiderar[0]);
+      if (fl) {
+        this.totalManzanas.set(
+          Array.from(fl.layer.getLayers()).filter(l => l instanceof L.Path).length
+        );
+      }
+    } else {
+      let total = 0;
+      for (const numero of numsAConsiderar) {
+        const fl = this.allTerritoriesLayer.find(f => f.territorioPadre === numero);
+        if (fl) {
+          total += Array.from(fl.layer.getLayers()).filter(l => l instanceof L.Path).length;
+        }
+      }
+      this.totalManzanas.set(total);
+    }
+  }
+
+  private queueStyleUpdate(fn: () => void): void {
+    this.pendingStyleQueue.push(fn);
+    if (this.pendingStyleFrame === null) {
+      this.pendingStyleFrame = requestAnimationFrame(() => {
+        this.pendingStyleFrame = null;
+        const queue = this.pendingStyleQueue;
+        this.pendingStyleQueue = [];
+        for (const fn of queue) fn();
+      });
+    }
+  }
+
+  private cancelPendingStyleUpdates(): void {
+    if (this.pendingStyleFrame !== null) {
+      cancelAnimationFrame(this.pendingStyleFrame);
+      this.pendingStyleFrame = null;
+    }
+    this.pendingStyleQueue = [];
+  }
+
+  private aplicarEstiloBaseTerritorio(
+    territorioNumero: number,
+    color: string,
+    options: { total?: number; marcadas?: number; isComplete?: boolean } = {}
+  ): void {
+    const total = options.total ?? this.manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
+    const marcadas = options.marcadas ?? this.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).length;
+    const isComplete = options.isComplete ?? (total > 0 && marcadas >= total);
+
     for (const mc of this.manzanaIndex) {
       if (mc.territorioNumero !== territorioNumero) continue;
-      mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.08, opacity: 0.9, color, weight: 2 });
+      const fillOpacity = getTerritoryFillOpacity(isComplete);
+      mc.polygon.setStyle({ fillColor: color, fillOpacity, opacity: 1, color, weight: 3 });
     }
   }
 
@@ -272,14 +518,15 @@ export class MapPage implements OnDestroy {
       const color = colorOverride ?? this.currentTerritoryColor;
       const { actualizarEstadoMarcado = true } = options;
 
-      this.aplicarEstiloBaseTerritorio(territorioNumero, color);
-
-      if (!reportes.length) return;
-
       const ultimo = elegirUltimoReporte(reportes);
-      if (!ultimo) return;
+      const ids = ultimo?.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
+      const total = this.manzanaIndex.filter(mc => mc.territorioNumero === territorioNumero).length;
+      const marcadas = ids.length;
+      const isComplete = total > 0 && marcadas >= total;
 
-      const ids = ultimo.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
+      this.aplicarEstiloBaseTerritorio(territorioNumero, color, { total, marcadas, isComplete });
+
+      if (!reportes.length || !ultimo) return;
       const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
 
       const existingIds = new Set(this.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).map(m => m.id));
@@ -288,7 +535,7 @@ export class MapPage implements OnDestroy {
         if (mc.territorioNumero !== territorioNumero) continue;
         const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
         if (isMarked) {
-          mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.6, color, weight: 3 });
+          mc.polygon.setStyle({ fillColor: color, fillOpacity: 0.70, color, weight: 3 });
           if (actualizarEstadoMarcado && !existingIds.has(mc.id)) {
             this.manzanasMarcadas.update(current => [
               ...current,
@@ -317,12 +564,17 @@ export class MapPage implements OnDestroy {
             const parcialId = `parcial-${Date.now()}`;
             const polygon = L.polygon(latlngs, {
               fillColor: color,
-              fillOpacity: 0.4,
+              fillOpacity: 0.35,
               color,
               weight: 3
             }).addTo(this.map);
 
             this.extraLayers.push(polygon);
+
+            polygon.on('click', (e: L.LeafletMouseEvent) => {
+              L.DomEvent.stop(e);
+              this.eliminarParcial(parcialId);
+            });
 
             if (actualizarEstadoMarcado) {
               this.manzanasMarcadas.update(current => [
@@ -338,63 +590,69 @@ export class MapPage implements OnDestroy {
     }
   }
 
-  private crearMarcadoresCentroide(geoJson: GeoJSON.FeatureCollection, color: string, territorioNum: number): L.Marker[] {
-    const polygonCentroids: L.LatLng[] = [];
-
-    for (const feature of geoJson.features) {
-      if (feature.geometry.type === 'Polygon') {
-        const coords = feature.geometry.coordinates[0];
-        let sumLat = 0;
-        let sumLng = 0;
-        for (const coord of coords) {
-          sumLng += coord[0];
-          sumLat += coord[1];
-        }
-        polygonCentroids.push(L.latLng(sumLat / coords.length, sumLng / coords.length));
-      }
-    }
-
-    if (polygonCentroids.length === 0) return [];
-
-    const lat = polygonCentroids.reduce((s, c) => s + c.lat, 0) / polygonCentroids.length;
-    const lng = polygonCentroids.reduce((s, c) => s + c.lng, 0) / polygonCentroids.length;
-
-    const safeNum = String(territorioNum).replace(/\D/g, '');
-
-    const icon = L.divIcon({
-      className: 'centroid-label',
-      html: `<div class="centroid-dot" style="background:${color}">${safeNum}</div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
-    });
-
-    const marker = L.marker([lat, lng], { icon, interactive: true }).addTo(this.map);
-
-    marker.on('click', () => {
-      this.onTerritorioSeleccionado(territorioNum);
-    });
-
-    return [marker];
-  }
-
   // ─── CLICK DISPATCH ───────────────────────────────────
 
   private onMapClick(e: L.LeafletMouseEvent): void {
     const modo = this.modoMarcado();
 
+    const hitParcial = this.findParcialAtPoint(e.latlng);
+    if (hitParcial) {
+      this.eliminarParcial(hitParcial.id);
+      return;
+    }
+
+    if (modo === 'none') {
+      const hit = this.findManzanaInside(e.latlng);
+      if (hit) {
+        const current = this.manzanasMarcadas();
+        const isMarked = current.some(m => m.id === hit.id);
+        if (isMarked) {
+          this.toggleManzana(hit.id, hit.nombreBloque, hit.polygon, hit.color, hit.territorioNumero);
+          return;
+        }
+        if (this.territoriosSeleccionados().includes(hit.territorioNumero)) {
+          void this.onTerritorioSeleccionado(this.territoriosSeleccionados().filter(n => n !== hit.territorioNumero));
+        } else if (this.territoriosSeleccionados().length > 0) {
+          void this.onTerritorioSeleccionado([...this.territoriosSeleccionados(), hit.territorioNumero]);
+        } else {
+          void this.onTerritorioSeleccionado([hit.territorioNumero]);
+        }
+      }
+      return;
+    }
+
     if (modo === 'completa') {
       const hit = this.findManzanaInside(e.latlng);
       if (hit) {
-        this.toggleManzana(hit.id, hit.nombreBloque, hit.polygon, hit.color, hit.territorioNumero);
+        if (!this.territoriosSeleccionados().includes(hit.territorioNumero)) {
+          void this.onTerritorioSeleccionado([...this.territoriosSeleccionados(), hit.territorioNumero]);
+        } else {
+          this.toggleManzana(hit.id, hit.nombreBloque, hit.polygon, hit.color, hit.territorioNumero);
+        }
       }
       return;
     }
 
     if (modo === 'parcial') {
+      const hit = this.findManzanaInside(e.latlng);
+      if (hit) {
+        const current = this.manzanasMarcadas();
+        const isMarked = current.some(m => m.id === hit.id);
+        if (isMarked) {
+          this.toggleManzana(hit.id, hit.nombreBloque, hit.polygon, hit.color, hit.territorioNumero);
+          return;
+        }
+
+        if (!this.territoriosSeleccionados().includes(hit.territorioNumero)) {
+          void this.onTerritorioSeleccionado([...this.territoriosSeleccionados(), hit.territorioNumero]);
+          return;
+        }
+      }
+
       if (!this.manzanaSeleccionada) {
-        const hit = this.findNearestManzana(e.latlng);
-        if (hit) {
-          this.seleccionarManzana(hit.polygon, hit.color, hit.nombreBloque);
+        const nearest = hit ?? this.findNearestManzana(e.latlng);
+        if (nearest) {
+          this.seleccionarManzana(nearest.polygon, nearest.color, nearest.nombreBloque, nearest.territorioNumero);
         } else {
           this.toastService.show('No se encontró una manzana cerca');
           return;
@@ -406,18 +664,55 @@ export class MapPage implements OnDestroy {
         return;
       }
 
-      const snapped = this.snapToContour(e.latlng);
+      const snapped = snapToContour(e.latlng, this.manzanaEdges, this.map);
       this.agregarPunto(snapped);
+      return;
     }
+  }
+
+  private findParcialAtPoint(latlng: L.LatLng): ManzanaMarcada | null {
+    const marcadas = this.manzanasMarcadas();
+    for (const m of marcadas) {
+      if (!m.id.startsWith('parcial-')) continue;
+      if (m.layer instanceof L.Polygon) {
+        const rings = m.layer.getLatLngs();
+        const outer = rings[0] as L.LatLng[];
+        if (outer && pointInPolygon(latlng, outer)) {
+          return m;
+        }
+      }
+    }
+    return null;
+  }
+
+  private eliminarParcial(id: string): void {
+    const current = [...this.manzanasMarcadas()];
+    const idx = current.findIndex(m => m.id === id);
+    if (idx < 0) return;
+
+    const marcada = current[idx];
+    this.map.removeLayer(marcada.layer);
+
+    const extraIdx = this.extraLayers.indexOf(marcada.layer);
+    if (extraIdx >= 0) this.extraLayers.splice(extraIdx, 1);
+
+    current.splice(idx, 1);
+    this.manzanasMarcadas.set(current);
+
+    this.datosParcialesGuardados = null;
+    this.toastService.show('Zona parcial eliminada');
   }
 
   // ─── POINT-IN-POLYGON ─────────────────────────────────
 
   private findManzanaInside(latlng: L.LatLng): ManzanaIndex | null {
+    const { lat, lng } = latlng;
     for (const mc of this.manzanaIndex) {
+      if (lat < mc.bbox.minLat || lat > mc.bbox.maxLat ||
+          lng < mc.bbox.minLng || lng > mc.bbox.maxLng) continue;
       const rings = mc.polygon.getLatLngs();
       const outer = rings[0] as L.LatLng[];
-      if (outer && this.pointInPolygon(latlng, outer)) {
+      if (outer && pointInPolygon(latlng, outer)) {
         return mc;
       }
     }
@@ -433,6 +728,14 @@ export class MapPage implements OnDestroy {
     let bestDist = Infinity;
 
     for (const mc of this.manzanaIndex) {
+      const { minLat, maxLat, minLng, maxLng } = mc.bbox;
+      const clampLat = Math.max(minLat, Math.min(latlng.lat, maxLat));
+      const clampLng = Math.max(minLng, Math.min(latlng.lng, maxLng));
+      const bboxDx = (latlng.lat - clampLat) * 111000;
+      const bboxDy = (latlng.lng - clampLng) * 111000 * Math.cos(latlng.lat * Math.PI / 180);
+      const bboxDist = Math.sqrt(bboxDx * bboxDx + bboxDy * bboxDy);
+      if (bboxDist >= bestDist) continue;
+
       const rings = mc.polygon.getLatLngs();
       const outer = rings[0] as L.LatLng[];
       if (!outer) continue;
@@ -440,7 +743,7 @@ export class MapPage implements OnDestroy {
       for (let i = 0; i < outer.length; i++) {
         const a = outer[i];
         const b = outer[(i + 1) % outer.length];
-        const proj = this.projectOnSegment(latlng, a, b);
+        const proj = projectOnSegment(latlng, a, b, this.map);
         const projPt = this.map.latLngToContainerPoint(proj);
         const d = clickPt.distanceTo(projPt);
         if (d < bestDist) {
@@ -453,39 +756,119 @@ export class MapPage implements OnDestroy {
     return best;
   }
 
-  private pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
-    const x = point.lat;
-    const y = point.lng;
-    let inside = false;
-
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].lat;
-      const yi = polygon[i].lng;
-      const xj = polygon[j].lat;
-      const yj = polygon[j].lng;
-
-      const intersect = ((yi > y) !== (yj > y)) &&
-        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-    }
-
-    return inside;
-  }
-
   // ─── MODO ─────────────────────────────────────────────
+
+  toggleSatellite(): void {
+    const satellite = !this.isSatellite();
+    this.isSatellite.set(satellite);
+
+    if (satellite) {
+      this.map.removeLayer(this.tileLayer);
+      this.satelliteLayer.addTo(this.map);
+    } else {
+      this.map.removeLayer(this.satelliteLayer);
+      this.tileLayer.addTo(this.map);
+    }
+  }
 
   setModoMarcado(modo: ModoMarcado): void {
     this.limpiarParcial();
     this.modoMarcado.set(modo);
 
-    if (modo === 'parcial') {
-      this.toastService.show('Tocá en cualquier parte del mapa');
+    if (modo === 'completa' || modo === 'parcial') {
+      this.ocultarPoligonosNoSeleccionados();
+      this.toastService.show(modo === 'parcial' ? 'Tocá en cualquier parte del mapa' : 'Tocá una manzana para marcarla');
+    } else {
+      this.restaurarVisibilidadPoligonos();
+    }
+  }
+
+  private ocultarPoligonosNoSeleccionados(): void {
+    const seleccionados = new Set(this.territoriosSeleccionados());
+
+    for (const fl of this.allTerritoriesLayer) {
+      if (seleccionados.has(fl.territorioPadre)) continue;
+
+      fl.layer.eachLayer(l => {
+        if (l instanceof L.Path) {
+          l.setStyle({ opacity: 0, fillOpacity: 0 });
+        }
+      });
+    }
+
+    this.actualizarVisibilidadLabels(seleccionados);
+  }
+
+  private restaurarVisibilidadPoligonos(): void {
+    this.cancelPendingStyleUpdates();
+
+    this.queueStyleUpdate(() => {
+      for (const fl of this.allTerritoriesLayer) {
+        const total = this.manzanaIndex.filter(m => m.territorioNumero === fl.territorioPadre).length;
+        const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === fl.territorioPadre).length;
+        const isComplete = total > 0 && marcadas >= total;
+        const baseOpacity = getTerritoryFillOpacity(isComplete);
+
+        fl.layer.eachLayer(l => {
+          if (l instanceof L.Path) {
+            l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: fl.color, weight: 3 });
+          }
+        });
+      }
+
+      const seleccionados = this.territoriosSeleccionados();
+      for (const num of seleccionados) {
+        const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === num);
+        if (!featureLayer) continue;
+
+        const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === num);
+        for (const m of marcadas) {
+          m.layer.setStyle({ fillColor: featureLayer.color, fillOpacity: 0.95, color: featureLayer.color, weight: 3 });
+        }
+      }
+
+      this.mostrarTodosLosLabels();
+    });
+  }
+
+  private mostrarTodosLosLabels(): void {
+    const show = this.map.getZoom() >= LABEL_MIN_ZOOM;
+    for (const lbl of this.territoryLabels) {
+      lbl.setOpacity(show ? 1 : 0);
+    }
+  }
+
+  private updateLabelsVisibility(): void {
+    const show = this.map.getZoom() >= LABEL_MIN_ZOOM;
+    for (const lbl of this.territoryLabels) {
+      lbl.setOpacity(show ? 1 : 0);
+    }
+  }
+
+  private actualizarVisibilidadLabels(seleccionados: Set<number>): void {
+    const zoomVisible = this.map.getZoom() >= LABEL_MIN_ZOOM;
+
+    if (seleccionados.size === 0 || !zoomVisible) {
+      this.mostrarTodosLosLabels();
+      return;
+    }
+
+    const nums = new Set(seleccionados);
+    for (const lbl of this.territoryLabels) {
+      const el = lbl.getElement();
+      if (!el) continue;
+      const text = el.querySelector('.territory-label__text')?.textContent;
+      if (text && nums.has(Number(text))) {
+        lbl.setOpacity(1);
+      } else {
+        lbl.setOpacity(0);
+      }
     }
   }
 
   // ─── SELECCIÓN DE MANZANA ─────────────────────────────
 
-  private seleccionarManzana(polygon: L.Polygon, color: string, nombreBloque: string): void {
+  private seleccionarManzana(polygon: L.Polygon, color: string, nombreBloque: string, territorioNumero: number): void {
     this.restaurarManzanaAnterior();
 
     this.manzanaSeleccionada = polygon;
@@ -509,147 +892,50 @@ export class MapPage implements OnDestroy {
       weight: 4
     });
 
+    if (!this.territoriosSeleccionados().includes(territorioNumero)) {
+      this.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
+      this.territorioSeleccionado.set(this.territoriosSeleccionados().length === 1 ? territorioNumero : null);
+
+      const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === territorioNumero);
+      if (featureLayer) {
+        const total = this.manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
+        const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).length;
+        const isComplete = total > 0 && marcadas >= total;
+        const baseOpacity = getTerritoryFillOpacity(isComplete);
+
+        featureLayer.layer.eachLayer(l => {
+          if (l instanceof L.Path) {
+            l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: 3 });
+          }
+        });
+      }
+
+      this.ocultarPoligonosNoSeleccionados();
+      this.totalManzanas.set(
+        this.manzanaIndex.filter(m => this.territoriosSeleccionados().includes(m.territorioNumero)).length
+      );
+    }
+
     this.toastService.show(`Manzana "${nombreBloque}" — tocá para colocar puntos`);
   }
 
   private restaurarManzanaAnterior(): void {
     if (this.manzanaSeleccionada) {
+      const total = this.manzanaIndex.filter(m => m.territorioNumero === this.territoriosSeleccionados()[0]).length;
+      const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === this.territoriosSeleccionados()[0]).length;
+      const isComplete = total > 0 && marcadas >= total;
+      const baseOpacity = getTerritoryFillOpacity(isComplete);
+
       this.manzanaSeleccionada.setStyle({
         color: this.manzanaSeleccionadaColor,
         fillColor: this.manzanaSeleccionadaColor,
-        fillOpacity: 0.08,
-        weight: 2
+        fillOpacity: baseOpacity,
+        weight: 3
       });
       this.manzanaSeleccionada = null;
       this.manzanaSeleccionadaNombre = '';
       this.manzanaEdges = [];
     }
-  }
-
-  // ─── SNAP TO CONTOUR ──────────────────────────────────
-
-  private snapToContour(latlng: L.LatLng): SnappedPoint {
-    const fallback: SnappedPoint = { latlng, edgeIdx: -1, t: 0 };
-    if (!this.manzanaSeleccionada) return fallback;
-
-    const edges = this.manzanaEdges;
-    if (edges.length === 0) return fallback;
-
-    const clickPt = this.map.latLngToContainerPoint(latlng);
-    let bestPoint: L.LatLng = latlng;
-    let bestEdgeIdx = -1;
-    let bestT = 0;
-    let bestDist = Infinity;
-
-    for (let i = 0; i < edges.length; i++) {
-      const edge = edges[i];
-      const projected = this.projectOnSegment(latlng, edge.from, edge.to);
-      const projPt = this.map.latLngToContainerPoint(projected);
-      const d = clickPt.distanceTo(projPt);
-
-      if (d < bestDist) {
-        bestDist = d;
-        bestPoint = projected;
-        bestEdgeIdx = i;
-        bestT = this.computeT(latlng, edge.from, edge.to);
-      }
-    }
-
-    if (bestDist <= SNAP_THRESHOLD_PX) {
-      return { latlng: bestPoint, edgeIdx: bestEdgeIdx, t: bestT };
-    }
-    return { latlng, edgeIdx: -1, t: 0 };
-  }
-
-  private computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng): number {
-    const p = this.map.latLngToContainerPoint(point);
-    const pa = this.map.latLngToContainerPoint(a);
-    const pb = this.map.latLngToContainerPoint(b);
-
-    const abx = pb.x - pa.x;
-    const aby = pb.y - pa.y;
-    const apx = p.x - pa.x;
-    const apy = p.y - pa.y;
-
-    const ab2 = abx * abx + aby * aby;
-    if (ab2 === 0) return 0;
-
-    let t = (apx * abx + apy * aby) / ab2;
-    return Math.max(0, Math.min(1, t));
-  }
-
-  private projectOnSegment(point: L.LatLng, a: L.LatLng, b: L.LatLng): L.LatLng {
-    const t = this.computeT(point, a, b);
-    return L.latLng(
-      a.lat + t * (b.lat - a.lat),
-      a.lng + t * (b.lng - a.lng)
-    );
-  }
-
-  // ─── CONTOUR PATH BETWEEN TWO SNAPPED POINTS ──────────
-
-  private traceContourBetween(a: SnappedPoint, b: SnappedPoint): L.LatLng[] {
-    const edges = this.manzanaEdges;
-    if (edges.length === 0 || a.edgeIdx < 0 || b.edgeIdx < 0) {
-      return [a.latlng, b.latlng];
-    }
-
-    const startEdge = edges[a.edgeIdx];
-    const endEdge = edges[b.edgeIdx];
-
-    const startLatLng = L.latLng(
-      startEdge.from.lat + a.t * (startEdge.to.lat - startEdge.from.lat),
-      startEdge.from.lng + a.t * (startEdge.to.lng - startEdge.from.lng)
-    );
-
-    const endLatLng = L.latLng(
-      endEdge.from.lat + b.t * (endEdge.to.lat - endEdge.from.lat),
-      endEdge.from.lng + b.t * (endEdge.to.lng - endEdge.from.lng)
-    );
-
-    if (a.edgeIdx === b.edgeIdx) {
-      return [startLatLng, endLatLng];
-    }
-
-    const n = edges.length;
-    const stepsForward = (b.edgeIdx - a.edgeIdx + n) % n;
-    const stepsBackward = (a.edgeIdx - b.edgeIdx + n) % n;
-
-    const result: L.LatLng[] = [startLatLng];
-
-    if (stepsForward <= stepsBackward) {
-      const nextVertex = edges[a.edgeIdx].to;
-      if (this.latLngDist(startLatLng, nextVertex) > 1) {
-        result.push(nextVertex);
-      }
-      for (let step = 1; step < stepsForward; step++) {
-        const idx = (a.edgeIdx + step) % n;
-        result.push(edges[idx].to);
-      }
-      if (this.latLngDist(result[result.length - 1], endLatLng) > 1) {
-        result.push(endLatLng);
-      }
-    } else {
-      const prevVertex = edges[a.edgeIdx].from;
-      if (this.latLngDist(startLatLng, prevVertex) > 1) {
-        result.push(prevVertex);
-      }
-      for (let step = 1; step < stepsBackward; step++) {
-        const idx = (a.edgeIdx - step + n) % n;
-        result.push(edges[idx].from);
-      }
-      if (this.latLngDist(result[result.length - 1], endLatLng) > 1) {
-        result.push(endLatLng);
-      }
-    }
-
-    return result;
-  }
-
-  private latLngDist(a: L.LatLng, b: L.LatLng): number {
-    const pa = this.map.latLngToContainerPoint(a);
-    const pb = this.map.latLngToContainerPoint(b);
-    return pa.distanceTo(pb);
   }
 
   // ─── PUNTOS PARCIALES ─────────────────────────────────
@@ -659,7 +945,7 @@ export class MapPage implements OnDestroy {
 
     if (actuales.length > 0) {
       const last = actuales[actuales.length - 1];
-      if (this.latLngDist(last.latlng, punto.latlng) < DEDUP_THRESHOLD_PX) {
+      if (latLngDist(last.latlng, punto.latlng, this.map) < DEDUP_THRESHOLD_PX) {
         return;
       }
     }
@@ -687,7 +973,7 @@ export class MapPage implements OnDestroy {
       this.poligonoParcial = L.polygon(latlngs, {
         color,
         fillColor: color,
-        fillOpacity: 0.35,
+        fillOpacity: 0.3,
         weight: 3,
         dashArray: latlngs.length < 3 ? '8, 8' : undefined
       }).addTo(this.map);
@@ -702,13 +988,13 @@ export class MapPage implements OnDestroy {
 
     const result: L.LatLng[] = [];
     for (let i = 0; i < puntos.length - 1; i++) {
-      const segment = this.traceContourBetween(puntos[i], puntos[i + 1]);
+      const segment = traceContourBetween(puntos[i], puntos[i + 1], this.manzanaEdges, this.map);
       for (let j = 0; j < segment.length; j++) {
         if (result.length === 0) {
           result.push(segment[j]);
         } else {
           const last = result[result.length - 1];
-          if (this.latLngDist(last, segment[j]) > 1) {
+          if (latLngDist(last, segment[j], this.map) > 1) {
             result.push(segment[j]);
           }
         }
@@ -718,7 +1004,7 @@ export class MapPage implements OnDestroy {
     if (result.length >= 3) {
       const last = result[result.length - 1];
       const first = result[0];
-      if (this.latLngDist(last, first) < 1) {
+      if (latLngDist(last, first, this.map) < 1) {
         result.pop();
       }
     }
@@ -741,7 +1027,7 @@ export class MapPage implements OnDestroy {
       m.on('drag', () => {
         const actualizados = [...this.puntosParciales()];
         const newLatLng = m.getLatLng();
-        const snapped = this.snapToContour(newLatLng);
+        const snapped = snapToContour(newLatLng, this.manzanaEdges, this.map);
         actualizados[idx] = snapped;
         this.puntosParciales.set(actualizados);
 
@@ -758,7 +1044,7 @@ export class MapPage implements OnDestroy {
           this.poligonoParcial = L.polygon(latlngs, {
             color,
             fillColor: color,
-            fillOpacity: 0.35,
+            fillOpacity: 0.3,
             weight: 3,
             dashArray: latlngs.length < 3 ? '8, 8' : undefined
           }).addTo(this.map);
@@ -795,6 +1081,12 @@ export class MapPage implements OnDestroy {
         { id, nombreBloque, layer: this.poligonoParcial as unknown as L.Path, territorioNumero: territorio }
       ]);
       this.extraLayers.push(this.poligonoParcial);
+
+      this.poligonoParcial.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stop(e);
+        this.eliminarParcial(id);
+      });
+
       this.poligonoParcial = null;
     }
 
@@ -804,7 +1096,8 @@ export class MapPage implements OnDestroy {
 
     this.restaurarManzanaAnterior();
     this.modoMarcado.set('none');
-    this.toastService.show('Zona parcial marcada');
+    this.restaurarVisibilidadPoligonos();
+    this.toastService.show('Zona parcial marcada — tocá para eliminar');
   }
 
   cancelarParcial(): void {
@@ -836,27 +1129,47 @@ export class MapPage implements OnDestroy {
 
     if (idx >= 0) {
       current.splice(idx, 1);
-      layer.setStyle({ fillColor: color, fillOpacity: 0.08, color: color, weight: 2 });
+      const total = this.manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
+      const marcadas = current.filter(m => m.territorioNumero === territorioNumero).length;
+      const isComplete = total > 0 && marcadas >= total;
+      const baseOpacity = getTerritoryFillOpacity(isComplete);
+      layer.setStyle({ fillColor: color, fillOpacity: baseOpacity, color: color, weight: 3 });
     } else {
       current.push({ id, nombreBloque, layer, territorioNumero });
-      layer.setStyle({ fillColor: color, fillOpacity: 0.6, color, weight: 3 });
+      layer.setStyle({ fillColor: color, fillOpacity: 0.95, color, weight: 3 });
+
+      if (!this.territoriosSeleccionados().includes(territorioNumero)) {
+        this.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
+        this.territorioSeleccionado.set(this.territoriosSeleccionados().length === 1 ? territorioNumero : null);
+
+        const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === territorioNumero);
+        if (featureLayer) {
+          const total = this.manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
+          const marcadas = current.filter(m => m.territorioNumero === territorioNumero).length;
+          const isComplete = total > 0 && marcadas >= total;
+          const baseOpacity = getTerritoryFillOpacity(isComplete);
+
+          featureLayer.layer.eachLayer(l => {
+            if (l instanceof L.Path) {
+              l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: 3 });
+            }
+          });
+        }
+
+        this.ocultarPoligonosNoSeleccionados();
+      }
     }
 
     this.manzanasMarcadas.set(current);
-  }
-
-  private async refrescarTerritorioActual(): Promise<void> {
-    const territorio = this.territorioSeleccionado();
-    if (territorio === null) return;
-
-    this.territorioService.invalidateGeoJsonCache();
-    await this.onTerritorioSeleccionado(territorio);
+    this.totalManzanas.set(
+      this.manzanaIndex.filter(m => this.territoriosSeleccionados().includes(m.territorioNumero)).length
+    );
   }
 
   // ─── GUARDAR EN BASE DE DATOS ─────────────────────────
 
   async guardarEnBaseDeDatos(): Promise<void> {
-    const perfil = this.profileService.currentUser();
+    const perfil = this.reportService.getProfile();
     if (!perfil) {
       this.toastService.show('No hay perfil configurado');
       return;
@@ -868,53 +1181,12 @@ export class MapPage implements OnDestroy {
       return;
     }
 
-    const porTerritorio = new Map<number, typeof marcadas>();
-    for (const m of marcadas) {
-      const list = porTerritorio.get(m.territorioNumero) ?? [];
-      list.push(m);
-      porTerritorio.set(m.territorioNumero, list);
-    }
+    if (this.enviando()) return;
+    this.enviando.set(true);
 
-    const registros: RegistroReporte[] = [];
-    for (const [territorioNum, marcadasTerritorio] of porTerritorio) {
-      const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === territorioNum);
-      const total = featureLayer
-        ? Array.from(featureLayer.layer.getLayers()).filter(l => l instanceof L.Path).length
-        : marcadasTerritorio.length;
-
-      const manzanasIds = marcadasTerritorio
-        .filter(m => !m.id.startsWith('parcial-'))
-        .map(m => m.id)
-        .join(',');
-
-      const nonPartial = marcadasTerritorio.filter(m => !m.id.startsWith('parcial-'));
-      const manzanaId = nonPartial.length > 0 ? nonPartial[0].id : null;
-
-      let geometriaParcial: string | null = null;
-      let puntosParciales: string | null = null;
-      if (territorioNum === this.territorioSeleccionado() && this.datosParcialesGuardados) {
-        geometriaParcial = this.datosParcialesGuardados.geometria;
-        puntosParciales = JSON.stringify(
-          this.datosParcialesGuardados.puntos.map(p => ({ lat: p.latlng.lat, lng: p.latlng.lng }))
-        );
-      }
-
-      registros.push({
-        territorioNumero: territorioNum,
-        manzanaId,
-        encargadoId: perfil.encargadoId || null,
-        encargadoNombre: perfil.name,
-        encargadoApellido: perfil.lastName,
-        sessionTime: new Date().toISOString(),
-        estado: total > 0 && marcadasTerritorio.length >= total ? 'completed' : 'incomplete',
-        totalManzanas: total,
-        manzanasMarcadas: marcadasTerritorio.length,
-        tipoSesion: total > 0 && marcadasTerritorio.length >= total ? 'completa' : 'parcial',
-        geometriaParcial,
-        puntosParciales,
-        manzanasIds
-      });
-    }
+    const registros = this.reportService.buildRegistros(
+      marcadas, this.allTerritoriesLayer, this.territoriosSeleccionados(), this.datosParcialesGuardados
+    );
 
     const previousMarcadas = [...marcadas];
     const previousDatosParciales = this.datosParcialesGuardados;
@@ -923,17 +1195,22 @@ export class MapPage implements OnDestroy {
     this.datosParcialesGuardados = null;
 
     try {
-      await this.territorioService.crearReportes(registros);
-      await this.loadAllTerritories();
-      const current = this.territorioSeleccionado();
-      if (current !== null) {
-        await this.onTerritorioSeleccionado(current);
+      await this.reportService.saveToDatabase(registros);
+
+      const seleccionados = this.territoriosSeleccionados();
+      for (const num of seleccionados) {
+        this.territorioService.invalidateReportCache(num);
+        await this.restaurarMarcadoDesdeDB(num, undefined, { actualizarEstadoMarcado: true });
       }
+
+      this.reaplicarMarcasTerritorio();
       this.toastService.show('Reportes guardados exitosamente');
     } catch {
       this.manzanasMarcadas.set(previousMarcadas);
       this.datosParcialesGuardados = previousDatosParciales;
       this.toastService.show('Error al guardar los reportes');
+    } finally {
+      this.enviando.set(false);
     }
   }
 
@@ -943,17 +1220,26 @@ export class MapPage implements OnDestroy {
     const marcadas = this.manzanasMarcadas();
     if (marcadas.length === 0) return Promise.resolve();
 
-    const todoLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === this.territorioSeleccionado());
-    if (todoLayer) {
-      todoLayer.layer.eachLayer(l => {
+    const seleccionados = new Set(this.territoriosSeleccionados());
+
+    for (const fl of this.allTerritoriesLayer) {
+      if (!seleccionados.has(fl.territorioPadre)) {
+        fl.layer.eachLayer(l => {
+          if (l instanceof L.Path) {
+            l.setStyle({ opacity: 0, fillOpacity: 0 });
+          }
+        });
+        continue;
+      }
+
+      fl.layer.eachLayer(l => {
         if (l instanceof L.Path) {
           const isMarked = marcadas.some(m => m.layer === l);
           if (!isMarked) {
-            l.setStyle({ opacity: 0, fillOpacity: 0 });
+            l.setStyle({ opacity: 0.3, fillOpacity: 0.02, color: fl.color, weight: 1 });
           }
         }
       });
-      todoLayer.centroidMarkers.forEach(m => m.setOpacity(0));
     }
 
     let combined: L.LatLngBounds | null = null;
@@ -971,26 +1257,57 @@ export class MapPage implements OnDestroy {
       this.map.fitBounds(combined, { padding: [50, 50] });
     }
 
-    return new Promise(resolve => setTimeout(resolve, CAPTURE_DELAY_MS));
+    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, CAPTURE_DELAY_MS)));
   }
 
   restaurarMapaPostCaptura(): void {
-    const todoLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === this.territorioSeleccionado());
-    if (todoLayer) {
-      todoLayer.layer.eachLayer(l => {
+    const seleccionados = new Set(this.territoriosSeleccionados());
+
+    for (const fl of this.allTerritoriesLayer) {
+      const total = this.manzanaIndex.filter(m => m.territorioNumero === fl.territorioPadre).length;
+      const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === fl.territorioPadre).length;
+      const isComplete = total > 0 && marcadas >= total;
+      const baseOpacity = getTerritoryFillOpacity(isComplete);
+
+      if (!seleccionados.has(fl.territorioPadre)) {
+        const isVisible = this.modoMarcado() === 'none';
+        fl.layer.eachLayer(l => {
+          if (l instanceof L.Path) {
+            l.setStyle({
+              opacity: isVisible ? 1 : 0,
+              fillOpacity: isVisible ? baseOpacity : 0,
+              color: fl.color,
+              weight: 3
+            });
+          }
+        });
+        continue;
+      }
+
+      fl.layer.eachLayer(l => {
         if (l instanceof L.Path) {
           const isMarked = this.manzanasMarcadas().some(m => m.layer === l);
           if (!isMarked) {
-            l.setStyle({ opacity: 1, fillOpacity: 0.08, color: todoLayer.color, weight: 2 });
+            l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: fl.color, weight: 3 });
           }
         }
       });
-      todoLayer.centroidMarkers.forEach(m => m.setOpacity(1));
     }
 
-    const bounds = todoLayer?.layer.getBounds();
-    if (bounds && bounds.isValid()) {
-      this.map.fitBounds(bounds, { padding: [30, 30] });
+    let combined: L.LatLngBounds | null = null;
+    for (const num of seleccionados) {
+      const fl = this.allTerritoriesLayer.find(f => f.territorioPadre === num);
+      if (fl) {
+        const bounds = fl.layer.getBounds();
+        if (bounds.isValid()) {
+          if (!combined) combined = bounds;
+          else combined.extend(bounds);
+        }
+      }
+    }
+
+    if (combined && combined.isValid()) {
+      this.map.fitBounds(combined, { padding: [30, 30] });
     }
   }
 
@@ -1003,29 +1320,35 @@ export class MapPage implements OnDestroy {
 
     this.extraLayers.forEach(l => this.map.removeLayer(l));
     this.extraLayers = [];
+
+    this.restaurarVisibilidadPoligonos();
   }
 
-  private reaplicarMarcasTerritorio(): void {
-    const territorioActual = this.territorioSeleccionado();
-    if (territorioActual === null) return;
+  private reaplicarMarcasTerritorio(territorioNumero?: number): void {
+    const numeros = territorioNumero !== undefined
+      ? [territorioNumero]
+      : this.territoriosSeleccionados();
 
-    const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === territorioActual);
-    if (!featureLayer) return;
+    for (const num of numeros) {
+      const featureLayer = this.allTerritoriesLayer.find(f => f.territorioPadre === num);
+      if (!featureLayer) continue;
 
-    featureLayer.layer.eachLayer(l => {
-      if (l instanceof L.Path) {
-        l.setStyle({ fillOpacity: 0.08, opacity: 0.9, weight: 2, fillColor: featureLayer.color, color: featureLayer.color });
+      const total = this.manzanaIndex.filter(m => m.territorioNumero === num).length;
+      const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === num).length;
+      const isComplete = total > 0 && marcadas >= total;
+      const fillOpacity = getTerritoryFillOpacity(isComplete);
+
+      featureLayer.layer.eachLayer(l => {
+        if (l instanceof L.Path) {
+          l.setStyle({ fillOpacity, opacity: 1, weight: 3, fillColor: featureLayer.color, color: featureLayer.color });
+        }
+      });
+
+      const marcadasLayers = this.manzanasMarcadas().filter(m => m.territorioNumero === num);
+      for (const m of marcadasLayers) {
+        m.layer.setStyle({ fillColor: featureLayer.color, fillOpacity: 0.95, color: featureLayer.color, weight: 3 });
       }
-    });
-
-    const marcadas = this.manzanasMarcadas().filter(m => m.territorioNumero === territorioActual);
-    for (const m of marcadas) {
-      m.layer.setStyle({ fillColor: featureLayer.color, fillOpacity: 0.6, color: featureLayer.color, weight: 3 });
     }
-
-    this.totalManzanas.set(
-      Array.from(featureLayer.layer.getLayers()).filter(l => l instanceof L.Path).length
-    );
   }
 
   limpiarMarcas(): void {
@@ -1035,23 +1358,93 @@ export class MapPage implements OnDestroy {
     for (const fl of this.allTerritoriesLayer) {
       fl.layer.eachLayer(l => {
         if (l instanceof L.Path) {
-          l.setStyle({ fillColor: fl.color, fillOpacity: 0.08, color: fl.color, weight: 2, opacity: 1 });
+          l.setStyle({ fillColor: fl.color, fillOpacity: 0.05, color: fl.color, weight: 3, opacity: 1 });
         }
       });
-      fl.centroidMarkers.forEach(m => m.setOpacity(1));
     }
 
     this.totalManzanas.set(0);
     this.territorioSeleccionado.set(null);
+    this.territoriosSeleccionados.set([]);
     this.currentTerritoryColor = '';
   }
 
+  // ─── ENVIAR TERRITORIO ────────────────────────────────
+
+  async guardarYEnviar(): Promise<void> {
+    const perfil = this.reportService.getProfile();
+    if (!perfil) {
+      this.toastService.show('No hay perfil configurado');
+      return;
+    }
+
+    const marcadas = this.manzanasMarcadas();
+    if (!marcadas.length) {
+      this.toastService.show('No hay territorios marcados');
+      return;
+    }
+
+    if (this.enviando()) return;
+    this.enviando.set(true);
+
+    const territorios = this.reportService.buildTerritoriosEnvio(marcadas, this.allTerritoriesLayer);
+    const requiereScreenshot = territorios.some(t => !t.finalizado);
+
+    let screenshotBase64: string | null = null;
+    if (requiereScreenshot) {
+      screenshotBase64 = await this.reportService.captureScreenshot(
+        () => this.prepararCaptura(),
+        () => this.restaurarMapaPostCaptura()
+      );
+    }
+
+    const request = this.reportService.buildWhatsAppRequest(perfil, territorios, screenshotBase64, this.predicacion());
+
+    try {
+      const registros = this.reportService.buildRegistros(
+        this.manzanasMarcadas(), this.allTerritoriesLayer, this.territoriosSeleccionados(), this.datosParcialesGuardados
+      );
+      await this.reportService.saveToDatabase(registros);
+
+      const seleccionados = this.territoriosSeleccionados();
+      for (const num of seleccionados) {
+        this.territorioService.invalidateReportCache(num);
+        await this.restaurarMarcadoDesdeDB(num, undefined, { actualizarEstadoMarcado: true });
+      }
+
+      this.reaplicarMarcasTerritorio();
+
+      const success = await this.reportService.sendWhatsApp(request);
+
+      if (success) {
+        const mensajes = territorios.map(t => {
+          const estado = t.finalizado ? '*terminado*' : '*faltante*';
+          return `Territorio ${t.numero} ${estado}`;
+        });
+        this.toastService.show(mensajes.join('\n'));
+      } else {
+        this.toastService.show('Error enviando WhatsApp');
+      }
+    } catch {
+      this.toastService.show('Error al procesar el reporte');
+    } finally {
+      this.enviando.set(false);
+      this.screenshotPreview.set(null);
+    }
+  }
+
   limpiarTodo(): void {
+    const hasData = this.manzanasMarcadas().length > 0 || this.territoriosSeleccionados().length > 0;
     this.limpiarMarcas();
-    this.loadAllTerritories();
+
+    if (hasData) {
+      this.territorioService.invalidateAll();
+      void this.loadAllTerritories();
+    }
   }
 
   ngOnDestroy(): void {
+    this.cancelPendingStyleUpdates();
     this.themeObserver?.disconnect();
     this.map?.remove();
   }

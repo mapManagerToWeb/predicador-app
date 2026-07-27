@@ -3,6 +3,10 @@ import { profileGuard } from './core/guards/profile.guard';
 
 export const routes: Routes = [
   {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login').then(m => m.LoginPage)
+  },
+  {
     path: 'profile',
     loadComponent: () => import('./features/profile/profile').then(m => m.ProfilePage)
   },
@@ -15,5 +19,5 @@ export const routes: Routes = [
     path: 'admin',
     loadComponent: () => import('./features/admin/admin').then(m => m.AdminPage)
   },
-  { path: '**', redirectTo: 'profile' }
+  { path: '**', redirectTo: 'login' }
 ];
