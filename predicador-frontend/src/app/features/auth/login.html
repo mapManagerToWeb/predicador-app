@@ -1,0 +1,60 @@
+<div class="auth-shell">
+  <div class="auth-scroll">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </div>
+        <h1>Predicador</h1>
+        <p class="tagline">Gestion de territorios</p>
+      </div>
+
+      <div class="auth-body">
+        <p class="section-label">Inicia sesion con tu telefono</p>
+
+        <div class="field">
+          <label for="telefono">Telefono</label>
+          <div class="input-phone">
+            <span class="prefix">+56</span>
+            <input
+              id="telefono"
+              type="tel"
+              inputmode="numeric"
+              [value]="telefono()"
+              (input)="onTelefonoInput($event)"
+              (keyup.enter)="login()"
+              placeholder="9 1234 5678"
+              [disabled]="loading()"
+              autocomplete="tel"
+            />
+          </div>
+        </div>
+
+        <button
+          class="btn-primary"
+          (click)="login()"
+          [disabled]="!telefono() || loading()"
+        >
+          @if (loading()) {
+            <span class="spinner"></span>
+            <span>Conectando...</span>
+          } @else {
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            <span>Conectar</span>
+          }
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        <span>No tienes cuenta?</span>
+        <a routerLink="/profile">Crear perfil</a>
+      </div>
+    </div>
+  </div>
+</div>

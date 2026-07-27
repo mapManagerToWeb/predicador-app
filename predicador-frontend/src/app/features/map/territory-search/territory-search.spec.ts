@@ -101,7 +101,7 @@ describe('TerritorySearch', () => {
 
       expect(component.consultaBusqueda()).toBe('5');
       expect(component.mostrarDropdown()).toBeFalsy();
-      expect(emitSpy).toHaveBeenCalledWith(5);
+      expect(emitSpy).toHaveBeenCalledWith([5]);
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { elegirUltimoReporte } from './map';
+import { elegirUltimoReporte, getTerritoryFillOpacity } from './map';
 import type { Reporte } from '../../core/models/models';
 
 describe('elegirUltimoReporte', () => {
@@ -49,5 +49,15 @@ describe('elegirUltimoReporte', () => {
 
   it('should return null when report list is empty', () => {
     expect(elegirUltimoReporte([])).toBeNull();
+  });
+});
+
+describe('getTerritoryFillOpacity', () => {
+  it('should return slightly reduced opacity for complete territories', () => {
+    expect(getTerritoryFillOpacity(true)).toBe(0.85);
+  });
+
+  it('should return low opacity for incomplete territories', () => {
+    expect(getTerritoryFillOpacity(false)).toBe(0.05);
   });
 });

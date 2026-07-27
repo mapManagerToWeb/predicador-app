@@ -4,6 +4,7 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { AdminPage } from './admin';
 import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
+import { Profile } from '../../core/services/profile';
 import { environment } from '../../../environments/environment';
 
 describe('AdminPage', () => {
@@ -18,7 +19,8 @@ describe('AdminPage', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         TerritorioService,
-        Toast
+        Toast,
+        Profile
       ]
     });
 
@@ -86,14 +88,16 @@ describe('AdminPage', () => {
   });
 
   describe('logout', () => {
-    it('should logout and clear state', () => {
+    it('should logout and clear admin state and user profile', () => {
       localStorage.setItem('isAdmin', 'true');
+      localStorage.setItem('predicador_profile', JSON.stringify({ name: 'Test' }));
       component.isLoggedIn.set(true);
 
       component.logout();
 
       expect(component.isLoggedIn()).toBeFalsy();
       expect(localStorage.getItem('isAdmin')).toBeNull();
+      expect(localStorage.getItem('predicador_profile')).toBeNull();
       expect(component.username()).toBe('');
       expect(component.password()).toBe('');
     });

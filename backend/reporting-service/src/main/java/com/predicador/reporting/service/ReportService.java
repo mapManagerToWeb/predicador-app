@@ -21,25 +21,9 @@ public class ReportService {
     }
 
     public List<ReportDto> createReports(List<ReportDto> dtos) {
-        return dtos.stream().map(dto -> {
-            Report report = new Report();
-            report.setManzanaId(dto.manzanaId());
-            report.setFecha(dto.fecha() != null ? dto.fecha() : Instant.now());
-            report.setEncargadoNombre(dto.encargadoNombre());
-            report.setEncargadoApellido(dto.encargadoApellido());
-            report.setSessionTime(dto.sessionTime());
-            report.setEstado(dto.estado());
-            report.setTerritorioNumero(dto.territorioNumero());
-            report.setEncargadoId(dto.encargadoId());
-            report.setTotalManzanas(dto.totalManzanas());
-            report.setManzanasMarcadas(dto.manzanasMarcadas());
-            report.setTipoSesion(dto.tipoSesion());
-            report.setGeometriaParcial(dto.geometriaParcial());
-            report.setPuntosParciales(dto.puntosParciales());
-            report.setManzanasIds(dto.manzanasIds());
-            Report saved = repository.save(report);
-            return toDto(saved);
-        }).collect(Collectors.toList());
+        List<Report> reports = dtos.stream().map(this::toEntity).collect(Collectors.toList());
+        List<Report> saved = repository.saveAll(reports);
+        return saved.stream().map(this::toDto).collect(Collectors.toList());
     }
 
     public List<ReportDto> getAllReports() {
@@ -71,6 +55,25 @@ public class ReportService {
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    private Report toEntity(ReportDto dto) {
+        Report report = new Report();
+        report.setManzanaId(dto.manzanaId());
+        report.setFecha(dto.fecha() != null ? dto.fecha() : Instant.now());
+        report.setEncargadoNombre(dto.encargadoNombre());
+        report.setEncargadoApellido(dto.encargadoApellido());
+        report.setSessionTime(dto.sessionTime());
+        report.setEstado(dto.estado());
+        report.setTerritorioNumero(dto.territorioNumero());
+        report.setEncargadoId(dto.encargadoId());
+        report.setTotalManzanas(dto.totalManzanas());
+        report.setManzanasMarcadas(dto.manzanasMarcadas());
+        report.setTipoSesion(dto.tipoSesion());
+        report.setGeometriaParcial(dto.geometriaParcial());
+        report.setPuntosParciales(dto.puntosParciales());
+        report.setManzanasIds(dto.manzanasIds());
+        return report;
     }
 
     private ReportDto toDto(Report report) {

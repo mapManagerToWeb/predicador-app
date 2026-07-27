@@ -10,6 +10,6 @@ export const profileGuard: CanActivateFn = () => {
     return true;
   }
 
-  router.navigate(['/profile']);
+  void router.navigate(['/login']);
   return false;
 };

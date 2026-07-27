@@ -5,12 +5,14 @@ import com.predicador.territory.service.TerritoryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/v1/territories")
 public class TerritoryController {
+
+    private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9a-fA-F]{6}$");
 
     private final TerritoryService territoryService;
 
@@ -19,7 +21,7 @@ public class TerritoryController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Long>> getTerritoryNumbers() {
+    public ResponseEntity<java.util.List<Long>> getTerritoryNumbers() {
         return ResponseEntity.ok(territoryService.getTerritoryNumbers());
     }
 
@@ -45,7 +47,11 @@ public class TerritoryController {
 
     @PutMapping("/{number}/color")
     public ResponseEntity<Void> assignColor(@PathVariable Long number, @RequestBody Map<String, String> body) {
-        territoryService.assignColor(number, body.get("color"));
+        String color = body.get("color");
+        if (color == null || !HEX_COLOR.matcher(color).matches()) {
+            return ResponseEntity.badRequest().build();
+        }
+        territoryService.assignColor(number, color);
         return ResponseEntity.ok().build();
     }
 }

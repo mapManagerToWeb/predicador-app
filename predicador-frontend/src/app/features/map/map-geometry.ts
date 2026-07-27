@@ -1,0 +1,166 @@
+import type * as L from 'leaflet';
+
+export interface SnappedPoint {
+  latlng: L.LatLng;
+  edgeIdx: number;
+  t: number;
+}
+
+export interface Edge {
+  from: L.LatLng;
+  to: L.LatLng;
+}
+
+export function makeLatLng(lat: number, lng: number): L.LatLng {
+  return { lat, lng } as L.LatLng;
+}
+
+export const SNAP_THRESHOLD_PX = 50;
+export const DEDUP_THRESHOLD_PX = 2;
+
+export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
+  const x = point.lat;
+  const y = point.lng;
+  let inside = false;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lat;
+    const yi = polygon[i].lng;
+    const xj = polygon[j].lat;
+    const yj = polygon[j].lng;
+
+    const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+}
+
+export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map): number {
+  const p = map.latLngToContainerPoint(point);
+  const pa = map.latLngToContainerPoint(a);
+  const pb = map.latLngToContainerPoint(b);
+
+  const abx = pb.x - pa.x;
+  const aby = pb.y - pa.y;
+  const apx = p.x - pa.x;
+  const apy = p.y - pa.y;
+
+  const ab2 = abx * abx + aby * aby;
+  if (ab2 === 0) return 0;
+
+  const t = (apx * abx + apy * aby) / ab2;
+  return Math.max(0, Math.min(1, t));
+}
+
+export function projectOnSegment(
+  point: L.LatLng,
+  a: L.LatLng,
+  b: L.LatLng,
+  map: L.Map
+): L.LatLng {
+  const t = computeT(point, a, b, map);
+  return makeLatLng(a.lat + t * (b.lat - a.lat), a.lng + t * (b.lng - a.lng));
+}
+
+export function latLngDist(a: L.LatLng, b: L.LatLng, map: L.Map): number {
+  const pa = map.latLngToContainerPoint(a);
+  const pb = map.latLngToContainerPoint(b);
+  return pa.distanceTo(pb);
+}
+
+export function snapToContour(
+  latlng: L.LatLng,
+  edges: Edge[],
+  map: L.Map
+): SnappedPoint {
+  const fallback: SnappedPoint = { latlng, edgeIdx: -1, t: 0 };
+  if (edges.length === 0) return fallback;
+
+  const clickPt = map.latLngToContainerPoint(latlng);
+  let bestPoint: L.LatLng = latlng;
+  let bestEdgeIdx = -1;
+  let bestT = 0;
+  let bestDist = Infinity;
+
+  for (let i = 0; i < edges.length; i++) {
+    const edge = edges[i];
+    const projected = projectOnSegment(latlng, edge.from, edge.to, map);
+    const projPt = map.latLngToContainerPoint(projected);
+    const d = clickPt.distanceTo(projPt);
+
+    if (d < bestDist) {
+      bestDist = d;
+      bestPoint = projected;
+      bestEdgeIdx = i;
+      bestT = computeT(latlng, edge.from, edge.to, map);
+    }
+  }
+
+  if (bestDist <= SNAP_THRESHOLD_PX) {
+    return { latlng: bestPoint, edgeIdx: bestEdgeIdx, t: bestT };
+  }
+  return { latlng, edgeIdx: -1, t: 0 };
+}
+
+export function traceContourBetween(
+  a: SnappedPoint,
+  b: SnappedPoint,
+  edges: Edge[],
+  map: L.Map
+): L.LatLng[] {
+  if (edges.length === 0 || a.edgeIdx < 0 || b.edgeIdx < 0) {
+    return [a.latlng, b.latlng];
+  }
+
+  const startEdge = edges[a.edgeIdx];
+  const endEdge = edges[b.edgeIdx];
+
+  const startLatLng = makeLatLng(
+    startEdge.from.lat + a.t * (startEdge.to.lat - startEdge.from.lat),
+    startEdge.from.lng + a.t * (startEdge.to.lng - startEdge.from.lng)
+  );
+
+  const endLatLng = makeLatLng(
+    endEdge.from.lat + b.t * (endEdge.to.lat - endEdge.from.lat),
+    endEdge.from.lng + b.t * (endEdge.to.lng - endEdge.from.lng)
+  );
+
+  if (a.edgeIdx === b.edgeIdx) {
+    return [startLatLng, endLatLng];
+  }
+
+  const n = edges.length;
+  const stepsForward = (b.edgeIdx - a.edgeIdx + n) % n;
+  const stepsBackward = (a.edgeIdx - b.edgeIdx + n) % n;
+
+  const result: L.LatLng[] = [startLatLng];
+
+  if (stepsForward <= stepsBackward) {
+    const nextVertex = edges[a.edgeIdx].to;
+    if (latLngDist(startLatLng, nextVertex, map) > 1) {
+      result.push(nextVertex);
+    }
+    for (let step = 1; step < stepsForward; step++) {
+      const idx = (a.edgeIdx + step) % n;
+      result.push(edges[idx].to);
+    }
+    if (latLngDist(result[result.length - 1], endLatLng, map) > 1) {
+      result.push(endLatLng);
+    }
+  } else {
+    const prevVertex = edges[a.edgeIdx].from;
+    if (latLngDist(startLatLng, prevVertex, map) > 1) {
+      result.push(prevVertex);
+    }
+    for (let step = 1; step < stepsBackward; step++) {
+      const idx = (a.edgeIdx - step + n) % n;
+      result.push(edges[idx].from);
+    }
+    if (latLngDist(result[result.length - 1], endLatLng, map) > 1) {
+      result.push(endLatLng);
+    }
+  }
+
+  return result;
+}

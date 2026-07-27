@@ -97,6 +97,10 @@ services:
       - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
       - DB_USERNAME=${DB_USERNAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-1194956653707331}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-asignacion_territorio}
+      - WHATSAPP_DESTINATION=${WHATSAPP_DESTINATION:-56936577203}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8082/actuator/health || exit 1"]
       interval: 10s

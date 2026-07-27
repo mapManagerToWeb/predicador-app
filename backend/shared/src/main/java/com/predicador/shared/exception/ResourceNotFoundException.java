@@ -1,4 +1,4 @@
-package com.predicador.territory.exception;
+package com.predicador.shared.exception;
 
 public class ResourceNotFoundException extends RuntimeException {
 

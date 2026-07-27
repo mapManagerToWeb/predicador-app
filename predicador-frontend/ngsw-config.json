@@ -24,5 +24,26 @@
         "files": ["/**/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|otf|ttf|woff|woff2)"]
       }
     }
+  ],
+  "dataGroups": [
+    {
+      "name": "territory-geo",
+      "urls": ["/api/v1/territories/**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 20,
+        "maxAge": "1h"
+      }
+    },
+    {
+      "name": "api-fresh",
+      "urls": ["/api/v1/reports/**", "/api/v1/encargados/**"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "30m",
+        "timeout": "8s"
+      }
+    }
   ]
 }

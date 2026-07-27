@@ -3,7 +3,6 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -45,7 +44,7 @@ class ReportServiceTest {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
         Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
 
-        when(repository.save(any(Report.class))).thenReturn(saved);
+        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
 
         List<ReportDto> result = reportService.createReports(List.of(dto));
 
@@ -55,7 +54,7 @@ class ReportServiceTest {
         assertEquals("morning", result.get(0).sessionTime());
         assertEquals("completed", result.get(0).estado());
         assertEquals(1L, result.get(0).territorioNumero());
-        verify(repository, times(1)).save(any(Report.class));
+        verify(repository, times(1)).saveAll(anyList());
     }
 
     @Test
@@ -66,12 +65,12 @@ class ReportServiceTest {
         Report saved1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
         Report saved2 = createReport(2, "2-B", "Maria", "Lopez", "afternoon", "incomplete", 2L);
 
-        when(repository.save(any(Report.class))).thenReturn(saved1).thenReturn(saved2);
+        when(repository.saveAll(anyList())).thenReturn(List.of(saved1, saved2));
 
         List<ReportDto> result = reportService.createReports(List.of(dto1, dto2));
 
         assertEquals(2, result.size());
-        verify(repository, times(2)).save(any(Report.class));
+        verify(repository, times(1)).saveAll(anyList());
     }
 
     @Test
@@ -79,7 +78,7 @@ class ReportServiceTest {
         ReportDto dto = new ReportDto(null, "1-A", null, "Daniel", "Uribe", "morning", "completed", 1L);
         Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
 
-        when(repository.save(any(Report.class))).thenReturn(saved);
+        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
 
         List<ReportDto> result = reportService.createReports(List.of(dto));
 

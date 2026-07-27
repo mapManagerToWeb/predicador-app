@@ -11,14 +11,17 @@ export class TerritorioService {
   private reportesUrl = `${environment.apiUrl}/reports`;
 
   private geoJsonCache: string | null = null;
+  private reportCache = new Map<number, Reporte[]>();
 
   async getNumerosTerritorios(): Promise<number[]> {
-    return firstValueFrom(this.http.get<number[]>(`${this.apiUrl}`));
+    return firstValueFrom(this.http.get<number[]>(this.apiUrl));
   }
 
   async getAllGeoJson(): Promise<string> {
     if (this.geoJsonCache !== null) return this.geoJsonCache;
-    const text = await firstValueFrom(this.http.get(`${this.apiUrl}/all/geojson`, { responseType: 'text' }));
+    const text = await firstValueFrom(
+      this.http.get(`${this.apiUrl}/all/geojson`, { responseType: 'text' })
+    );
     this.geoJsonCache = text;
     return text;
   }
@@ -36,10 +39,33 @@ export class TerritorioService {
   }
 
   async crearReportes(reportes: RegistroReporte[]): Promise<Reporte[]> {
-    return firstValueFrom(this.http.post<Reporte[]>(this.reportesUrl, reportes));
+    const saved = await firstValueFrom(this.http.post<Reporte[]>(this.reportesUrl, reportes));
+    for (const r of saved) {
+      this.invalidateReportCache(r.territorioNumero);
+    }
+    return saved;
   }
 
   async getReportesPorTerritorio(territorioNumero: number): Promise<Reporte[]> {
-    return firstValueFrom(this.http.get<Reporte[]>(`${this.reportesUrl}?territorioNumero=${territorioNumero}`));
+    const cached = this.reportCache.get(territorioNumero);
+    if (cached !== undefined) return cached;
+    const reportes = await firstValueFrom(
+      this.http.get<Reporte[]>(`${this.reportesUrl}?territorioNumero=${territorioNumero}`)
+    );
+    this.reportCache.set(territorioNumero, reportes);
+    return reportes;
+  }
+
+  invalidateReportCache(territorioNumero?: number): void {
+    if (territorioNumero !== undefined) {
+      this.reportCache.delete(territorioNumero);
+    } else {
+      this.reportCache.clear();
+    }
+  }
+
+  invalidateAll(): void {
+    this.geoJsonCache = null;
+    this.reportCache.clear();
   }
 }

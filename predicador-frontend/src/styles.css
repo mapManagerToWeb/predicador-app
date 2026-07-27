@@ -41,7 +41,7 @@
   --color-input-bg: #1e293b;
   --color-shadow: rgba(0, 0, 0, 0.4);
   --map-bg: #08101f;
-  --map-tile-filter: brightness(0.45) saturate(0.7) contrast(0.95);
+  --map-tile-filter: none;
   --map-border-color: rgba(226, 232, 240, 0.7);
   --map-fill-opacity: 0.06;
   --map-active-opacity: 0.7;
@@ -55,23 +55,11 @@
 }
 
 .leaflet-tile {
-  filter: var(--map-tile-filter);
-  transition: filter 0.2s ease, opacity 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 :root[data-theme="dark"] .leaflet-container {
   background: #08101f;
-}
-
-:root[data-theme="dark"] .leaflet-control {
-  background: rgba(15, 23, 42, 0.9);
-  color: #f1f5f9;
-  border-color: #334155;
-}
-
-:root[data-theme="dark"] .leaflet-control a,
-:root[data-theme="dark"] .leaflet-control button {
-  color: #f1f5f9;
 }
 
 :root[data-theme="dark"] .leaflet-popup-content-wrapper {

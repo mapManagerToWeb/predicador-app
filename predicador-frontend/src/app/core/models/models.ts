@@ -2,6 +2,7 @@ export interface UserProfile {
   name: string;
   lastName: string;
   avatar: number;
+  telefono?: string;
   encargadoId?: number;
 }
 
@@ -37,4 +38,27 @@ export interface RegistroReporte {
   geometriaParcial?: string | null;
   puntosParciales?: string | null;
   manzanasIds?: string | null;
+}
+
+export interface TerritorioReporteEnvio {
+  numero: number;
+  finalizado: boolean;
+  totalManzanas: number;
+  manzanasMarcadas: number;
+}
+
+export interface WhatsAppSendRequest {
+  encargadoNombre: string;
+  encargadoApellido: string;
+  fechaRegistro: string;
+  predicacion: string;
+  territorios: TerritorioReporteEnvio[];
+  screenshotBase64: string | null;
+  destinationNumber: string | null;
+}
+
+export interface WhatsAppSendResponse {
+  success: boolean;
+  messageId: string | null;
+  error: string | null;
 }

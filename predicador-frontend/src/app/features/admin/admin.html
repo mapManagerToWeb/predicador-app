@@ -1,44 +1,61 @@
 @if (!isLoggedIn()) {
   <div class="login-container">
     <div class="login-card">
-      <h1>Panel de Administrador</h1>
-      <p class="subtitle">Ingresá tus credenciales</p>
-
-      <div class="form-group">
-        <label for="user">Usuario</label>
-        <input
-          id="user"
-          type="text"
-          [value]="username()"
-          (input)="username.set($any($event.target).value)"
-          placeholder="Usuario"
-          (keyup.enter)="login()"
-        />
+      <div class="login-brand">
+        <div class="brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <h1>Panel de Administrador</h1>
+        <p class="subtitle">Ingresá tus credenciales</p>
       </div>
 
-      <div class="form-group">
-        <label for="pass">Contraseña</label>
-        <input
-          id="pass"
-          type="password"
-          [value]="password()"
-          (input)="password.set($any($event.target).value)"
-          placeholder="Contraseña"
-          (keyup.enter)="login()"
-        />
-      </div>
+      <div class="login-body">
+        <div class="form-group">
+          <label for="user">Usuario</label>
+          <input
+            id="user"
+            type="text"
+            [value]="username()"
+            (input)="onUsernameInput($event)"
+            placeholder="Usuario"
+            (keyup.enter)="login()"
+            autocomplete="username"
+          />
+        </div>
 
-      @if (loginError()) {
-        <div class="error-msg">Credenciales incorrectas</div>
-      }
+        <div class="form-group">
+          <label for="pass">Contraseña</label>
+          <input
+            id="pass"
+            type="password"
+            [value]="password()"
+            (input)="onPasswordInput($event)"
+            placeholder="Contraseña"
+            (keyup.enter)="login()"
+            autocomplete="current-password"
+          />
+        </div>
 
-      <button class="login-btn" (click)="login()" [disabled]="logging()">
-        @if (logging()) {
-          Ingresando...
-        } @else {
-          Ingresar
+        @if (loginError()) {
+          <div class="error-msg">Credenciales incorrectas</div>
         }
-      </button>
+
+        <button class="login-btn" (click)="login()" [disabled]="logging()">
+          @if (logging()) {
+            <span class="spinner"></span>
+            <span>Ingresando...</span>
+          } @else {
+            <span>Ingresar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+          }
+        </button>
+      </div>
     </div>
   </div>
 } @else {
@@ -55,28 +72,40 @@
       <h2>Colores de Territorios</h2>
       <p class="help-text">Asigná un color único a cada territorio</p>
 
-      <div class="territory-color-grid">
-        @for (numero of numerosTerritorios(); track numero) {
-          <div class="territory-color-card">
-            <div class="territory-number">{{ numero }}</div>
-            <div class="territory-label">Territorio {{ numero }}</div>
-            <div class="color-picker-row">
-              @for (color of coloresPredefinidos; track color) {
-                <button
-                  class="color-swatch"
-                  [style.background]="color"
-                  [class.selected]="getColor(numero) === color"
-                  (click)="cambiarColor(numero, color)"
-                ></button>
-              }
+      @if (numerosTerritorios().length === 0) {
+        <div class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <p>No hay territorios configurados</p>
+        </div>
+      } @else {
+        <div class="territory-color-grid">
+          @for (numero of numerosTerritorios(); track numero) {
+            <div class="territory-color-card">
+              <div class="territory-number">{{ numero }}</div>
+              <div class="territory-label">Territorio {{ numero }}</div>
+              <div class="color-picker-row">
+                @for (color of coloresPredefinidos; track color) {
+                  <button
+                    class="color-swatch"
+                    [style.background]="color"
+                    [class.selected]="getColor(numero) === color"
+                    [attr.aria-label]="'Color ' + color"
+                    (click)="cambiarColor(numero, color)"
+                  ></button>
+                }
+              </div>
+              <div class="current-color">
+                <span class="color-preview" [style.background]="getColor(numero)"></span>
+                <span class="color-hex">{{ getColor(numero) }}</span>
+              </div>
             </div>
-            <div class="current-color">
-              <span class="color-preview" [style.background]="getColor(numero)"></span>
-              <span class="color-hex">{{ getColor(numero) }}</span>
-            </div>
-          </div>
-        }
-      </div>
+          }
+        </div>
+      }
     </div>
   </div>
 }

@@ -20,6 +20,9 @@ public class Encargado {
     @Column(name = "avatar")
     private Integer avatar;
 
+    @Column(name = "telefono", length = 20)
+    private String telefono;
+
     @Column(name = "activo")
     private Boolean activo;
 
@@ -55,6 +58,9 @@ public class Encargado {
 
     public Integer getAvatar() { return avatar; }
     public void setAvatar(Integer avatar) { this.avatar = avatar; }
+
+    public String getTelefono() { return telefono; }
+    public void setTelefono(String telefono) { this.telefono = telefono; }
 
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }

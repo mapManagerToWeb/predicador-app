@@ -1,6 +1,9 @@
 package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.ReportDto;
+import com.predicador.reporting.dto.WhatsAppSendRequest;
+import com.predicador.reporting.dto.WhatsAppSendResponse;
+import com.predicador.reporting.service.ReportSendService;
 import com.predicador.reporting.service.ReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,13 +15,26 @@ import java.util.List;
 public class ReportController {
 
     private final ReportService reportService;
+    private final ReportSendService reportSendService;
 
-    public ReportController(ReportService reportService) {
+    public ReportController(ReportService reportService, ReportSendService reportSendService) {
         this.reportService = reportService;
+        this.reportSendService = reportSendService;
     }
 
     @PostMapping
     public ResponseEntity<List<ReportDto>> createReports(@RequestBody List<ReportDto> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        for (ReportDto dto : dtos) {
+            if (dto.encargadoNombre() == null || dto.encargadoNombre().isBlank()) {
+                return ResponseEntity.badRequest().build();
+            }
+            if (dto.territorioNumero() == null || dto.territorioNumero() < 0) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
         return ResponseEntity.ok(reportService.createReports(dtos));
     }
 
@@ -38,5 +54,11 @@ public class ReportController {
     @GetMapping("/today")
     public ResponseEntity<List<ReportDto>> getTodayReports() {
         return ResponseEntity.ok(reportService.getReportsForToday());
+    }
+
+    @PostMapping("/send")
+    public ResponseEntity<WhatsAppSendResponse> sendWhatsAppReport(
+            @RequestBody WhatsAppSendRequest request) {
+        return ResponseEntity.ok(reportSendService.sendReport(request));
     }
 }

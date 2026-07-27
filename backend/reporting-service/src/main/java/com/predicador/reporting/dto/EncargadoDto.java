@@ -5,5 +5,6 @@ public record EncargadoDto(
         String nombre,
         String apellido,
         Integer avatar,
+        String telefono,
         Boolean activo
 ) {}

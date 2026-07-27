@@ -4,13 +4,16 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
+import { Profile } from '../../core/services/profile';
 import { environment } from '../../../environments/environment';
 
 const COLORES_PREDEFINIDOS = [
-  '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
-  '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990',
-  '#dcbeff', '#9A6324', '#fffac8', '#800000', '#aaffc3',
-  '#808000', '#ffd8b1', '#000075', '#a9a9a9'
+  '#DC143C', '#00A86B', '#FF6600', '#8A2BE2', '#E0115F',
+  '#00CED1', '#FF1493', '#32CD32', '#FF4500', '#1E90FF',
+  '#DA70D6', '#FFD700', '#00FF7F', '#FF00FF', '#4169E1',
+  '#FF69B4', '#7B68EE', '#FF8C00', '#00BFFF', '#FF6347',
+  '#9370DB', '#3CB371', '#FF1493', '#4682B4', '#FFA500',
+  '#2E8B57', '#CD5C5C', '#6A5ACD', '#20B2AA', '#DAA520'
 ];
 
 @Component({
@@ -24,6 +27,7 @@ export class AdminPage implements OnInit {
   private toastService = inject(Toast);
   private router = inject(Router);
   private http = inject(HttpClient);
+  private profileService = inject(Profile);
 
   isLoggedIn = signal(false);
   username = signal('');
@@ -39,8 +43,16 @@ export class AdminPage implements OnInit {
   ngOnInit(): void {
     if (localStorage.getItem('isAdmin') === 'true') {
       this.isLoggedIn.set(true);
-      this.cargarDatos();
+      void this.cargarDatos();
     }
+  }
+
+  onUsernameInput(event: Event): void {
+    this.username.set((event.target as HTMLInputElement).value);
+  }
+
+  onPasswordInput(event: Event): void {
+    this.password.set((event.target as HTMLInputElement).value);
   }
 
   async login(): Promise<void> {
@@ -56,7 +68,7 @@ export class AdminPage implements OnInit {
       if (response.success) {
         localStorage.setItem('isAdmin', 'true');
         this.isLoggedIn.set(true);
-        this.cargarDatos();
+        void this.cargarDatos();
       } else {
         this.loginError.set(true);
       }
@@ -69,9 +81,11 @@ export class AdminPage implements OnInit {
 
   logout(): void {
     localStorage.removeItem('isAdmin');
+    this.profileService.clear();
     this.isLoggedIn.set(false);
     this.username.set('');
     this.password.set('');
+    void this.router.navigate(['/login']);
   }
 
   async cargarDatos(): Promise<void> {
@@ -97,13 +111,12 @@ export class AdminPage implements OnInit {
     try {
       await this.territorioService.asignarColor(numero, color);
       this.toastService.show(`Color del territorio ${numero} actualizado`);
-    } catch (e) {
-      console.error('Error al guardar color', e);
+    } catch {
       this.toastService.show('Error al guardar color');
     }
   }
 
   goToMap(): void {
-    this.router.navigate(['/map']);
+    void this.router.navigate(['/map']);
   }
 }
