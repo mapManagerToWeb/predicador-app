@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AuthTokenService } from './auth-token';
 
 export interface EncargadoDto {
   id: number | null;
@@ -12,28 +13,66 @@ export interface EncargadoDto {
   activo: boolean | null;
 }
 
+/**
+ * Backend response shape after Fase 1 backend changes. The DTO is wrapped and
+ * a session token may be returned. Older backends (without the token feature
+ * deployed yet) still return the bare {@link EncargadoDto}; both shapes are
+ * accepted so a partial rollout does not brick the client.
+ */
+interface LoginResponse {
+  encargado?: EncargadoDto;
+  token?: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class EncargadoService {
   private http = inject(HttpClient);
+  private authToken = inject(AuthTokenService);
   private apiUrl = `${environment.apiUrl}/encargados`;
 
   async buscarOCrear(
     nombre: string,
     apellido: string,
-    telefono: string | null
+    telefono: string | null,
   ): Promise<EncargadoDto> {
-    return firstValueFrom(
-      this.http.post<EncargadoDto>(`${this.apiUrl}/buscar-crear`, {
+    const response = await firstValueFrom(
+      this.http.post<LoginResponse | EncargadoDto>(`${this.apiUrl}/buscar-crear`, {
         nombre,
         apellido,
         telefono,
-      })
+      }),
     );
+    return this.extract(response);
   }
 
   async loginByPhone(telefono: string): Promise<EncargadoDto> {
-    return firstValueFrom(
-      this.http.post<EncargadoDto>(`${this.apiUrl}/login`, { telefono })
+    const response = await firstValueFrom(
+      this.http.post<LoginResponse | EncargadoDto>(`${this.apiUrl}/login`, { telefono }),
+    );
+    return this.extract(response);
+  }
+
+  /**
+   * Unwrap either shape and, if a token comes with the response, persist it
+   * as the current session so the auth interceptor can attach it downstream.
+   */
+  private extract(response: LoginResponse | EncargadoDto): EncargadoDto {
+    if (this.isLoginResponse(response)) {
+      if (response.token) {
+        this.authToken.set(response.token, 'encargado');
+      }
+      // encargado is guaranteed present when isLoginResponse returns true.
+      return response.encargado as EncargadoDto;
+    }
+    return response;
+  }
+
+  private isLoginResponse(x: LoginResponse | EncargadoDto): x is LoginResponse {
+    return (
+      typeof x === 'object' &&
+      x !== null &&
+      'encargado' in x &&
+      typeof (x as LoginResponse).encargado === 'object'
     );
   }
 }

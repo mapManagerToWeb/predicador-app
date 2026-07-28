@@ -43,6 +43,13 @@ eureka:
     prefer-ip-address: true
     health-check-url-path: /actuator/health
 
+app:
+  session:
+    # Debe coincidir con api-gateway y reporting-service. Si queda vacío,
+    # SessionAuthFilter arranca en modo compatibilidad (no aplica enforcement).
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+
 management:
   endpoints:
     web:

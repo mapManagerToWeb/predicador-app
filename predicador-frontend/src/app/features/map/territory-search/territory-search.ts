@@ -2,6 +2,7 @@ import { Component, signal, computed, output, inject, OnInit, ChangeDetectionStr
 import { Router } from '@angular/router';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Profile } from '../../../core/services/profile';
+import { AuthTokenService } from '../../../core/services/auth-token';
 
 const THEME_KEY = 'predicador_theme';
 
@@ -14,6 +15,7 @@ const THEME_KEY = 'predicador_theme';
 export class TerritorySearch implements OnInit {
   private territorioService = inject(TerritorioService);
   private profileService = inject(Profile);
+  private authToken = inject(AuthTokenService);
   private router = inject(Router);
 
   consultaBusqueda = signal('');
@@ -103,6 +105,7 @@ export class TerritorySearch implements OnInit {
 
   logout(): void {
     this.profileService.clear();
+    this.authToken.clear();
     void this.router.navigate(['/login']);
   }
 

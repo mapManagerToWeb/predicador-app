@@ -48,6 +48,13 @@ management:
       exposure:
         include: health,info
 
+app:
+  session:
+    # Debe ser >= 32 bytes de entropía real. Si queda vacío, los tokens
+    # no se emiten (modo compatibilidad hacia atrás durante despliegue).
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+
 whatsapp:
   api-version: "v21.0"
   base-url: "https://graph.facebook.com"

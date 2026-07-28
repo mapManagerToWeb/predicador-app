@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
+import { AuthTokenService } from '../../core/services/auth-token';
 import { environment } from '../../../environments/environment';
 
 const COLORES_PREDEFINIDOS = [
@@ -28,6 +29,7 @@ export class AdminPage implements OnInit {
   private router = inject(Router);
   private http = inject(HttpClient);
   private profileService = inject(Profile);
+  private authToken = inject(AuthTokenService);
 
   isLoggedIn = signal(false);
   username = signal('');
@@ -41,7 +43,10 @@ export class AdminPage implements OnInit {
   guardando = signal(false);
 
   ngOnInit(): void {
-    if (localStorage.getItem('isAdmin') === 'true') {
+    // Prefer a real admin token when present; the legacy `isAdmin` flag remains
+    // as a fallback so users mid-rollout are not locked out until they refresh
+    // credentials. Both are cleared together on logout.
+    if (this.authToken.isAdmin() || localStorage.getItem('isAdmin') === 'true') {
       this.isLoggedIn.set(true);
       void this.cargarDatos();
     }
@@ -60,13 +65,16 @@ export class AdminPage implements OnInit {
     this.logging.set(true);
     try {
       const response = await firstValueFrom(
-        this.http.post<{ success: boolean }>(`${environment.apiUrl}/auth/login`, {
+        this.http.post<{ success: boolean; token?: string }>(`${environment.apiUrl}/auth/login`, {
           username: this.username(),
           password: this.password()
         })
       );
       if (response.success) {
         localStorage.setItem('isAdmin', 'true');
+        if (response.token) {
+          this.authToken.set(response.token, 'admin');
+        }
         this.isLoggedIn.set(true);
         void this.cargarDatos();
       } else {
@@ -81,6 +89,7 @@ export class AdminPage implements OnInit {
 
   logout(): void {
     localStorage.removeItem('isAdmin');
+    this.authToken.clear();
     this.profileService.clear();
     this.isLoggedIn.set(false);
     this.username.set('');

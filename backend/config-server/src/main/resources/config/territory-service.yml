@@ -32,6 +32,11 @@ eureka:
     prefer-ip-address: true
     health-check-url-path: /actuator/health
 
+app:
+  session:
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+
 management:
   endpoints:
     web:

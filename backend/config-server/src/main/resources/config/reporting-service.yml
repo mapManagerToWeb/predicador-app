@@ -38,6 +38,11 @@ management:
       exposure:
         include: health,info
 
+app:
+  session:
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+
 whatsapp:
   api-version: "v21.0"
   base-url: "https://graph.facebook.com"
