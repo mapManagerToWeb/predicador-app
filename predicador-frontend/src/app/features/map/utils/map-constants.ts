@@ -1,0 +1,98 @@
+import { CAPTURE_DELAY_MS, LABEL_MIN_ZOOM, MAX_PUNTOS_PARCIAL } from './territory-colors';
+
+export const MAP_DEFAULTS = {
+  initialView: { lat: -37.4779, lng: -73.345 },
+  initialZoom: 15,
+  maxZoom: 18,
+  boundsPadding: [30, 30] as [number, number],
+  capturePadding: [50, 50] as [number, number],
+  mapBoundsPadFactor: 0.15,
+  labelMinZoom: LABEL_MIN_ZOOM,
+  captureDelayMs: CAPTURE_DELAY_MS,
+} as const;
+
+export const STYLE_DEFAULTS = {
+  polygon: {
+    weight: 3,
+    smoothFactor: 1,
+    opacity: 1,
+    fillOpacity: 0.05,
+  },
+  markedPolygon: {
+    weight: 3,
+    opacity: 1,
+    fillOpacity: 0.95,
+  },
+  completePolygon: {
+    weight: 3,
+    opacity: 1,
+    fillOpacity: 0.85,
+  },
+  partialPolygon: {
+    weight: 3,
+    fillOpacity: 0.75,
+    dashArray: '8, 8',
+  },
+  partialPolygonComplete: {
+    weight: 3,
+    fillOpacity: 0.85,
+  },
+  selectedManzana: {
+    weight: 4,
+    color: '#facc15',
+    fillColor: '#facc15',
+    fillOpacity: 0.15,
+  },
+  hiddenPolygon: {
+    opacity: 0,
+    fillOpacity: 0,
+  },
+  captureUnmarked: {
+    opacity: 0.3,
+    fillOpacity: 0.02,
+    weight: 1,
+  },
+  label: {
+    className: 'territory-label',
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  },
+  partialPoint: {
+    className: 'partial-point',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  },
+} as const;
+
+export const TILE_LAYERS = {
+  light: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+} as const;
+
+export const ATTRIBUTIONS = {
+  light: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  dark: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  satellite: '&copy; Esri, Maxar, Earthstar Geographics',
+} as const;
+
+export const TOAST_MESSAGES = {
+  loadError: 'Error al cargar los territorios',
+  restoreError: 'Error al restaurar el marcado anterior',
+  noProfile: 'No hay perfil configurado',
+  noMarked: 'No hay manzanas marcadas',
+  noTerritories: 'No hay territorios marcados',
+  saving: 'Guardando reportes...',
+  saveSuccess: 'Reportes guardados exitosamente',
+  saveError: 'Error al guardar los reportes',
+  sendError: 'Error enviando WhatsApp',
+  processError: 'Error al procesar el reporte',
+  maxPoints: `Máximo ${MAX_PUNTOS_PARCIAL} puntos`,
+  minPoints: 'Necesitás al menos 2 puntos',
+  partialMarked: 'Zona parcial marcada — tocá para eliminar',
+  partialDeleted: 'Zona parcial eliminada',
+  noNearbyManzana: 'No se encontró una manzana cerca',
+  selectManzana: (nombre: string) => `Manzana "${nombre}" — tocá para colocar puntos`,
+  partialMode: 'Tocá en cualquier parte del mapa',
+  completeMode: 'Tocá una manzana para marcarla',
+} as const;

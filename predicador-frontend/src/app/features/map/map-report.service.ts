@@ -40,7 +40,7 @@ export class MapReportService {
     marcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[],
     territoriosSeleccionados: number[],
-    datosParcialesGuardados: DatosParciales | null
+    datosParcialesPorTerritorio: Map<number, DatosParciales>
   ): RegistroReporte[] {
     const perfil = this.profileService.currentUser();
     if (!perfil) return [];
@@ -65,12 +65,14 @@ export class MapReportService {
       const manzanaId = nonPartial.length > 0 ? nonPartial[0].id : null;
       const manzanasIds = nonPartial.map(m => m.id).join(',');
 
+      // Buscar los datos parciales ESPECÍFICOS del territorio (no compartidos entre todos).
+      const parcialTerritorio = datosParcialesPorTerritorio.get(territorioNum);
       let geometriaParcial: string | null = null;
       let puntosParciales: string | null = null;
-      if (seleccionados.has(territorioNum) && datosParcialesGuardados) {
-        geometriaParcial = datosParcialesGuardados.geometria;
+      if (parcialTerritorio) {
+        geometriaParcial = parcialTerritorio.geometria;
         puntosParciales = JSON.stringify(
-          datosParcialesGuardados.puntos.map(p => ({ lat: p.latlng.lat, lng: p.latlng.lng }))
+          parcialTerritorio.puntos.map(p => ({ lat: p.latlng.lat, lng: p.latlng.lng }))
         );
       }
 

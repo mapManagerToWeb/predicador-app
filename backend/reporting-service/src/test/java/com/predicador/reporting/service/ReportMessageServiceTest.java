@@ -55,7 +55,7 @@ class ReportMessageServiceTest {
 
         Map<String, String> params = service.generarParametrosTemplate(request);
 
-        assertEquals("Territorio 1 *terminado*\nTerritorio 2 *faltante*", params.get("territorio"));
+        assertEquals("Territorio 1 *terminado* | Territorio 2 *faltante*", params.get("territorio"));
         assertEquals("tarde", params.get("estado"));
     }
 
@@ -72,7 +72,7 @@ class ReportMessageServiceTest {
 
         Map<String, String> params = service.generarParametrosTemplate(request);
 
-        assertEquals("Territorio 1 *terminado*\nTerritorio 2 *terminado*", params.get("territorio"));
+        assertEquals("Territorio 1 *terminado* | Territorio 2 *terminado*", params.get("territorio"));
         assertEquals("mañana", params.get("estado"));
     }
 

@@ -110,6 +110,11 @@ export class TerritorySearch implements OnInit {
     const valor = (event.target as HTMLInputElement).value;
     this.consultaBusqueda.set(valor);
     this.mostrarDropdown.set(valor.length > 0);
+    
+    // Emitir array vacío cuando se limpia la búsqueda para deseleccionar territorios
+    if (valor.trim() === '') {
+      this.territorySelected.emit([]);
+    }
   }
 
   onSeleccion(numero: number): void {
