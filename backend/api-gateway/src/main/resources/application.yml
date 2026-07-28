@@ -12,9 +12,15 @@ spring:
 app:
   admin:
     username: ${ADMIN_USERNAME:admin}
+    # Preferir ADMIN_PASSWORD_BCRYPT en producción. ADMIN_PASSWORD queda como
+    # fallback plano sólo para desarrollo local.
     password: ${ADMIN_PASSWORD:}
+    password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  session:
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
 
 server:
   port: 8080
@@ -30,4 +36,37 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health,info,gateway,circuitbreakers
+
+# Resilience4j circuit breakers y timelimiter. Nombres coinciden con los
+# usados en RouteConfig.customRouteLocator(). Umbrales conservadores para
+# no abrir el circuito con el primer error transitorio.
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      territoryCB:
+        base-config: default
+      reportingCB:
+        base-config: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 5s
+        cancel-running-future: true
+    instances:
+      territoryCB:
+        base-config: default
+      reportingCB:
+        # El endpoint de enviar reporte llama a la Graph API de Meta y sube
+        # una imagen; tolera timeouts más largos.
+        timeout-duration: 20s
+        cancel-running-future: true

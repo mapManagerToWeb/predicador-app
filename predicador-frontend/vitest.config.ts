@@ -4,10 +4,23 @@ import angular from '@analogjs/vite-plugin-angular';
 
 export default defineConfig({
   plugins: [angular()],
+  // Evita que Vite escanee artefactos de producción (dist/) como si fueran
+  // fuentes. Sin esto, el dep-scanner intenta resolver los chunks del SSR
+  // build y emite un warning ruidoso al correr `vitest run`.
+  optimizeDeps: {
+    entries: ['src/**/*.{ts,html}'],
+  },
+  server: {
+    fs: {
+      // Solo permitir leer desde el workspace, no desde dist/.
+      strict: true,
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',
     include: ['src/**/*.spec.ts'],
+    exclude: ['node_modules/**', 'dist/**'],
     setupFiles: ['src/test-setup.ts'],
     // Coverage con V8 (nativo del runtime, sin instrumentation). Umbrales
     // conservadores para no bloquear CI mientras se agrega cobertura al

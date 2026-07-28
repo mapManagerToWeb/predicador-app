@@ -228,6 +228,11 @@ export class MapRenderingService {
     const map = this.map();
     if (!map) return;
 
+    // Acumula las entradas de índice por territorio y hace un único update del
+    // signal al final. Antes hacíamos `this.manzanaIndex.update(idx => [...idx, entry])`
+    // por cada manzana → O(n²) por copia de array y N notificaciones de signal.
+    const newEntries: ManzanaIndex[] = [];
+
     const layer = L.geoJSON(fc, {
       style: () => ({
         fillColor: color,
@@ -258,10 +263,14 @@ export class MapRenderingService {
           }
           const bbox = { minLat, maxLat, minLng, maxLng };
 
-          this.manzanaIndex.update(idx => [
-            ...idx,
-            { polygon: l, id, nombreBloque, color, territorioNumero: territorioNum, bbox },
-          ]);
+          newEntries.push({
+            polygon: l,
+            id,
+            nombreBloque,
+            color,
+            territorioNumero: territorioNum,
+            bbox,
+          });
 
           l.on('click', (e: L.LeafletMouseEvent) => {
             this.manzanaClickHandler?.(id, nombreBloque, l, color, territorioNum, e);
@@ -269,6 +278,10 @@ export class MapRenderingService {
         }
       },
     });
+
+    if (newEntries.length > 0) {
+      this.manzanaIndex.update(idx => [...idx, ...newEntries]);
+    }
 
     layer.addTo(map);
 

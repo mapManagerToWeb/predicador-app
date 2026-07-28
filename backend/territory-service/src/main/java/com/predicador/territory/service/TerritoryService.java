@@ -1,11 +1,15 @@
 package com.predicador.territory.service;
 
+import com.predicador.territory.config.CacheConfig;
 import com.predicador.territory.dto.TerritoryDto;
 import com.predicador.shared.exception.ResourceNotFoundException;
 import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -29,11 +33,14 @@ public class TerritoryService {
         this.colorRepository = colorRepository;
     }
 
+    @Cacheable(CacheConfig.CACHE_NUMBERS)
     public List<Long> getTerritoryNumbers() {
         return territoryRepository.findDistinctTerritorioPadres();
     }
 
     public TerritoryDto getTerritory(Long number) {
+        // No cacheado individualmente: la mayoría del tráfico usa el endpoint
+        // /all/geojson agregado. Cachear cada TerritoryDto duplicaría memoria.
         List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
         if (manzanas.isEmpty()) {
             throw new ResourceNotFoundException("Territorio", number);
@@ -46,6 +53,7 @@ public class TerritoryService {
         return new TerritoryDto(number, name, geoJson, color);
     }
 
+    @Cacheable(value = CacheConfig.CACHE_GEOJSON_ONE, key = "#number")
     public String getTerritoryGeoJson(Long number) {
         List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
         if (manzanas.isEmpty()) {
@@ -54,6 +62,7 @@ public class TerritoryService {
         return convertToGeoJson(manzanas, number);
     }
 
+    @Cacheable(CacheConfig.CACHE_GEOJSON_ALL)
     public String getAllTerritoriesGeoJson() {
         List<ManzanaTerritorio> allManzanas = territoryRepository.findAllGroupedByTerritorio();
         Map<Long, String> colorMap = getAllColors();
@@ -86,6 +95,7 @@ public class TerritoryService {
         return sb.toString();
     }
 
+    @Cacheable(CacheConfig.CACHE_COLORS)
     public Map<Long, String> getAllColors() {
         List<TerritoryColor> allColors = colorRepository.findAll();
         Map<Long, String> colorMap = allColors.stream()
@@ -100,6 +110,15 @@ public class TerritoryService {
         return colors;
     }
 
+    /**
+     * Persists a color assignment and invalidates every derived cache so the
+     * change is visible immediately to the frontend (admin panel flow).
+     */
+    @Caching(evict = {
+        @CacheEvict(value = CacheConfig.CACHE_COLORS, allEntries = true),
+        @CacheEvict(value = CacheConfig.CACHE_GEOJSON_ALL, allEntries = true),
+        @CacheEvict(value = CacheConfig.CACHE_GEOJSON_ONE, key = "#territoryNumber")
+    })
     public void assignColor(Long territoryNumber, String color) {
         TerritoryColor tc = colorRepository.findById(territoryNumber)
                 .orElse(new TerritoryColor());

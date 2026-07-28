@@ -2,10 +2,10 @@ package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.service.EncargadoService;
+import com.predicador.shared.security.SessionTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -13,7 +13,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -31,11 +30,14 @@ class EncargadoControllerTest {
     @Mock
     private EncargadoService encargadoService;
 
-    @InjectMocks
+    @Mock
+    private SessionTokenService tokens;
+
     private EncargadoController encargadoController;
 
     @BeforeEach
     void setUp() {
+        encargadoController = new EncargadoController(encargadoService, tokens);
         mockMvc = MockMvcBuilders.standaloneSetup(encargadoController).build();
     }
 
@@ -95,16 +97,44 @@ class EncargadoControllerTest {
     }
 
     @Test
-    void buscarOCrear_shouldReturn200() throws Exception {
+    void buscarOCrear_shouldReturn200_conTokenCuandoConfigurado() throws Exception {
         EncargadoDto dto = createDto(1L, "Daniel", "Uribe");
 
         when(encargadoService.buscarOCrear(anyString(), anyString(), any()))
                 .thenReturn(Optional.of(dto));
+        when(tokens.isConfigured()).thenReturn(true);
+        when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 
         mockMvc.perform(post("/api/v1/encargados/buscar-crear")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"nombre\":\"Daniel\",\"apellido\":\"Uribe\",\"telefono\":\"56912345678\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.nombre").value("Daniel"));
+            .andExpect(jsonPath("$.encargado.nombre").value("Daniel"))
+            .andExpect(jsonPath("$.token").value("fake.token"));
+    }
+
+    @Test
+    void login_shouldReturn200_conEnvoltorioLoginResponse() throws Exception {
+        EncargadoDto dto = createDto(7L, "Ana", "Perez");
+
+        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
+        when(tokens.isConfigured()).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefono\":\"56911111111\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.encargado.id").value(7))
+            .andExpect(jsonPath("$.encargado.nombre").value("Ana"));
+    }
+
+    @Test
+    void login_shouldReturn404_siNoExiste() throws Exception {
+        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefono\":\"56900000000\"}"))
+            .andExpect(status().isNotFound());
     }
 }

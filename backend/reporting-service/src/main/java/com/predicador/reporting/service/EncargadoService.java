@@ -54,10 +54,12 @@ public class EncargadoService {
 
     public EncargadoDto crear(EncargadoDto dto) {
         Encargado encargado = new Encargado();
-        encargado.setNombre(dto.nombre());
-        encargado.setApellido(dto.apellido());
+        encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : "");
+        encargado.setApellido(dto.apellido() != null ? dto.apellido().trim() : "");
         encargado.setAvatar(dto.avatar() != null ? dto.avatar() : 1);
-        encargado.setTelefono(dto.telefono());
+        // Normalizamos aquí para que el registro directo respete el mismo
+        // formato E.164 chileno que buscarOCrear/buscarPorTelefono.
+        encargado.setTelefono(normalizePhone(dto.telefono()));
         encargado.setActivo(true);
         Encargado saved = repository.save(encargado);
         return toDto(saved);
@@ -66,10 +68,10 @@ public class EncargadoService {
     public EncargadoDto actualizar(Long id, EncargadoDto dto) {
         Encargado encargado = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Encargado", id));
-        encargado.setNombre(dto.nombre());
-        encargado.setApellido(dto.apellido());
+        encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : encargado.getNombre());
+        encargado.setApellido(dto.apellido() != null ? dto.apellido().trim() : encargado.getApellido());
         if (dto.avatar() != null) encargado.setAvatar(dto.avatar());
-        if (dto.telefono() != null) encargado.setTelefono(dto.telefono());
+        if (dto.telefono() != null) encargado.setTelefono(normalizePhone(dto.telefono()));
         if (dto.activo() != null) encargado.setActivo(dto.activo());
         Encargado saved = repository.save(encargado);
         return toDto(saved);

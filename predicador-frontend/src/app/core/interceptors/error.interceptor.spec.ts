@@ -1,0 +1,78 @@
+import { TestBed } from '@angular/core/testing';
+import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
+import { AuthTokenService } from '../services/auth-token';
+import { Profile } from '../services/profile';
+import { errorInterceptor } from './error.interceptor';
+
+describe('errorInterceptor', () => {
+  let http: HttpClient;
+  let httpMock: HttpTestingController;
+  let authToken: AuthTokenService;
+  let profile: Profile;
+  let router: Router;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    });
+    http = TestBed.inject(HttpClient);
+    httpMock = TestBed.inject(HttpTestingController);
+    authToken = TestBed.inject(AuthTokenService);
+    profile = TestBed.inject(Profile);
+    router = TestBed.inject(Router);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
+
+  it('en 401 fuera de rutas de auth: limpia token/profile y navega a /login', () => {
+    authToken.set('abc.def', 'encargado');
+    profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/reports').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/reports');
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(authToken.token()).toBeNull();
+    expect(profile.currentUser()).toBeNull();
+    expect(navSpy).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('en 401 sobre rutas de login: NO limpia token ni redirige', () => {
+    authToken.set('abc.def', 'encargado');
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.post('/api/v1/encargados/login', {}).subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/encargados/login');
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(authToken.token()).toBe('abc.def');
+    expect(navSpy).not.toHaveBeenCalled();
+  });
+
+  it('propaga el error para que el caller pueda reaccionar', () => {
+    let capturedStatus: number | undefined;
+    http.get('/api/v1/reports').subscribe({
+      error: (err: { status?: number }) => {
+        capturedStatus = err.status;
+      },
+    });
+    const req = httpMock.expectOne('/api/v1/reports');
+    req.flush({}, { status: 500, statusText: 'Server' });
+
+    expect(capturedStatus).toBe(500);
+  });
+});

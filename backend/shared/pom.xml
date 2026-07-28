@@ -15,9 +15,21 @@
     <description>Shared code for Predicador backend services</description>
 
     <dependencies>
+        <!--
+            spring-boot-starter-web es necesario SÓLO para GlobalExceptionHandler
+            (@RestControllerAdvice de Spring MVC). Se marca <optional> para que
+            no se filtre transitivamente al api-gateway, que corre en WebFlux/
+            Netty y explota si ve Tomcat en el classpath.
+
+            Los servicios MVC (territory-service, reporting-service) ya
+            declaran spring-boot-starter-web por su cuenta, así que no
+            pierden nada con esta marca. El gateway obtiene SessionTokenService
+            (una utilidad pura de dominio) sin arrastrar el módulo web.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 
