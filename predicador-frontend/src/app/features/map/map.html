@@ -2,8 +2,8 @@
   <div class="map-container" id="map"></div>
 
   @if (isLoading()) {
-    <div class="loading-overlay">
-      <div class="loading-spinner"></div>
+    <div class="loading-overlay" role="status" aria-live="polite">
+      <div class="loading-spinner" aria-hidden="true"></div>
       <span class="loading-text">Cargando territorios...</span>
     </div>
   }
@@ -12,14 +12,20 @@
     <app-territory-search (territorySelected)="onTerritorioSeleccionado($event)" />
   </div>
 
-  <button class="map-toggle-satellite" [class.active]="isSatellite()" (click)="toggleSatellite()"
-    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'">
+  <button
+    type="button"
+    class="map-toggle-satellite"
+    [class.active]="isSatellite()"
+    (click)="toggleSatellite()"
+    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'"
+    [attr.aria-pressed]="isSatellite()"
+  >
     @if (isSatellite()) {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/>
       </svg>
     } @else {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
       </svg>
     }
@@ -29,20 +35,30 @@
     <div class="bottom-bar">
       <!-- Row 1: mode + info + actions -->
       <div class="bar-row">
-        <div class="mode-group">
-          <button class="mode-btn complete" [class.active]="modoMarcado() === 'completa'"
-            (click)="setModoMarcado('completa')">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <div class="mode-group" role="group" aria-label="Modo de marcado">
+          <button
+            type="button"
+            class="mode-btn complete"
+            [class.active]="modoMarcado() === 'completa'"
+            [attr.aria-pressed]="modoMarcado() === 'completa'"
+            (click)="setModoMarcado('completa')"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
             <span class="mode-label">Marcar</span>
           </button>
-          <button class="mode-btn partial" [class.active]="modoMarcado() === 'parcial'"
-            (click)="setModoMarcado('parcial')">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          <button
+            type="button"
+            class="mode-btn partial"
+            [class.active]="modoMarcado() === 'parcial'"
+            [attr.aria-pressed]="modoMarcado() === 'parcial'"
+            (click)="setModoMarcado('parcial')"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             <span class="mode-label">Trazar</span>
           </button>
         </div>
 
-        <div class="territory-info">
+        <div class="territory-info" aria-live="polite">
           @if (territoriosSeleccionados().length > 1) {
             <span class="territory-number">{{ territoriosSeleccionados().length }} terr.</span>
             <span class="manzanas-count">{{ manzanasCount() }} marcadas</span>
@@ -53,21 +69,37 @@
         </div>
 
         <div class="action-group">
-          <select class="predicacion-select" [value]="predicacion()" (change)="predicacion.set($any($event.target).value)">
+          <label class="visually-hidden" for="predicacion-select">Momento del día</label>
+          <select
+            id="predicacion-select"
+            class="predicacion-select"
+            [value]="predicacion()"
+            (change)="predicacion.set($any($event.target).value)"
+          >
             <option value="tarde">Tarde</option>
             <option value="mañana">Mañana</option>
           </select>
-          <button class="action-btn send" [disabled]="manzanasCount() === 0 || enviando()"
-            (click)="guardarYEnviar()">
+          <button
+            type="button"
+            class="action-btn send"
+            [disabled]="manzanasCount() === 0 || enviando()"
+            (click)="guardarYEnviar()"
+            aria-label="Guardar y enviar reporte"
+          >
             @if (enviando()) {
-              <div class="btn-spinner"></div>
+              <div class="btn-spinner" aria-hidden="true"></div>
             } @else {
-              <svg class="icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
               <span class="mode-label">Enviar</span>
             }
           </button>
-          <button class="action-btn clear" (click)="limpiarTodo()">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <button
+            type="button"
+            class="action-btn clear"
+            (click)="limpiarTodo()"
+            aria-label="Limpiar todas las marcas"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             <span class="mode-label">Limpiar</span>
           </button>
         </div>
@@ -75,23 +107,38 @@
 
       <!-- Row 2: partial mode controls -->
       @if (modoMarcado() === 'parcial') {
-        <div class="partial-row">
-          <span class="partial-hint">{{ puntosCount() }}/6</span>
+        <div class="partial-row" role="group" aria-label="Controles de marcado parcial">
+          <span class="partial-hint" aria-live="polite">{{ puntosCount() }}/6</span>
 
-          <button class="partial-btn undo" [disabled]="puntosCount() === 0"
-            (click)="deshacerPunto()">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+          <button
+            type="button"
+            class="partial-btn undo"
+            [disabled]="puntosCount() === 0"
+            (click)="deshacerPunto()"
+            aria-label="Deshacer último punto"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
             <span class="mode-label">Deshacer</span>
           </button>
 
-          <button class="partial-btn cancel" (click)="cancelarParcial()">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <button
+            type="button"
+            class="partial-btn cancel"
+            (click)="cancelarParcial()"
+            aria-label="Cancelar marcado parcial"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             <span class="mode-label">Cancelar</span>
           </button>
 
-          <button class="partial-btn confirm" [disabled]="!puedeConfirmar()"
-            (click)="finalizarParcial()">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          <button
+            type="button"
+            class="partial-btn confirm"
+            [disabled]="!puedeConfirmar()"
+            (click)="finalizarParcial()"
+            aria-label="Confirmar zona parcial"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
             <span class="mode-label">Listo</span>
           </button>
         </div>

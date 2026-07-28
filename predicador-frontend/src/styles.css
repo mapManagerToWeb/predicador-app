@@ -112,6 +112,28 @@ img {
   display: block;
 }
 
+/* Accesibilidad: oculta contenido visualmente manteniéndolo disponible para
+ * lectores de pantalla. Patrón estándar recomendado por WAI. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Foco visible consistente en todos los controles interactivos. Respeta la
+ * regla WCAG 2.4.7 sin depender del outline del navegador (que a menudo se
+ * pierde con resets). */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .centroid-label {
   background: none !important;
   border: none !important;
