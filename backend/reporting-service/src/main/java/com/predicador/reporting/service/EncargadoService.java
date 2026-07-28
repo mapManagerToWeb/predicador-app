@@ -86,7 +86,35 @@ public class EncargadoService {
         if (telefono == null || telefono.isBlank()) {
             return Optional.empty();
         }
-        return repository.findByTelefono(normalizePhone(telefono)).map(this::toDto);
+        String normalizado = normalizePhone(telefono);
+        if (normalizado == null || normalizado.isBlank()) {
+            return Optional.empty();
+        }
+        // Buscar primero el número normalizado (con 56)
+        Optional<Encargado> encontrado = repository.findByTelefono(normalizado);
+        if (encontrado.isPresent()) {
+            return encontrado.map(this::toDto);
+        }
+        // Fallback: buscar sin prefijo 56 (datos legacy)
+        final String sinPrefijo;
+        if (normalizado.startsWith("56") && normalizado.length() == 11) {
+            sinPrefijo = normalizado.substring(2);
+            encontrado = repository.findByTelefono(sinPrefijo);
+            if (encontrado.isPresent()) {
+                return encontrado.map(this::toDto);
+            }
+        } else {
+            sinPrefijo = normalizado;
+        }
+        // Fallback final: comparar sólo dígitos (ignora espacios en BD legacy)
+        return repository.findByActivoTrueOrderByNombreAsc().stream()
+                .filter(e -> {
+                    if (e.getTelefono() == null) return false;
+                    String bdDigits = e.getTelefono().replaceAll("[^0-9]", "");
+                    return bdDigits.equals(normalizado) || bdDigits.equals(sinPrefijo);
+                })
+                .findFirst()
+                .map(this::toDto);
     }
 
     private EncargadoDto toDto(Encargado encargado) {

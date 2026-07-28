@@ -151,8 +151,8 @@ describe('AdminPage', () => {
   });
 
   describe('coloresPredefinidos', () => {
-    it('should have 19 predefined colors', () => {
-      expect(component.coloresPredefinidos.length).toBe(19);
+    it('should have 30 predefined colors', () => {
+      expect(component.coloresPredefinidos.length).toBe(30);
     });
 
     it('should all be valid hex colors', () => {

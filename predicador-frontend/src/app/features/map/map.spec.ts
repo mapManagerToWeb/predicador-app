@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { elegirUltimoReporte, getTerritoryFillOpacity } from './map';
+import { elegirUltimoReporte } from './utils/report-utils';
+import { getTerritoryFillOpacity } from './utils/territory-colors';
 import type { Reporte } from '../../core/models/models';
 
 describe('elegirUltimoReporte', () => {

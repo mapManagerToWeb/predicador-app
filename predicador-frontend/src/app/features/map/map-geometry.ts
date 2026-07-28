@@ -15,7 +15,7 @@ export function makeLatLng(lat: number, lng: number): L.LatLng {
   return { lat, lng } as L.LatLng;
 }
 
-export const SNAP_THRESHOLD_PX = 50;
+export const SNAP_THRESHOLD_PX = 100;
 export const DEDUP_THRESHOLD_PX = 2;
 
 export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
