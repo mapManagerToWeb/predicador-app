@@ -11,30 +11,34 @@ export const MAP_DEFAULTS = {
   captureDelayMs: CAPTURE_DELAY_MS,
 } as const;
 
+// Aristas más anchas (weight=4) para compensar el fillOpacity=0.05 de los
+// polígonos incompletos y mantenerlos visibles a distancia sin sacrificar la
+// diferencia visual con los completos (fillOpacity=0.85). Cambio validado
+// contra el flujo de marcado descrito en AGENTS.md del frontend.
 export const STYLE_DEFAULTS = {
   polygon: {
-    weight: 3,
+    weight: 4,
     smoothFactor: 1,
     opacity: 1,
     fillOpacity: 0.05,
   },
   markedPolygon: {
-    weight: 3,
+    weight: 4,
     opacity: 1,
     fillOpacity: 0.95,
   },
   completePolygon: {
-    weight: 3,
+    weight: 4,
     opacity: 1,
     fillOpacity: 0.85,
   },
   partialPolygon: {
-    weight: 3,
+    weight: 4,
     fillOpacity: 0.75,
     dashArray: '8, 8',
   },
   partialPolygonComplete: {
-    weight: 3,
+    weight: 4,
     fillOpacity: 0.85,
   },
   selectedManzana: {

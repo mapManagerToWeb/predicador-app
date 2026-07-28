@@ -2,6 +2,7 @@ package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.service.EncargadoService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,12 +25,12 @@ public class EncargadoController {
     }
 
     @PostMapping
-    public ResponseEntity<EncargadoDto> crear(@RequestBody EncargadoDto dto) {
+    public ResponseEntity<EncargadoDto> crear(@Valid @RequestBody EncargadoDto dto) {
         return ResponseEntity.ok(encargadoService.crear(dto));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EncargadoDto> actualizar(@PathVariable Long id, @RequestBody EncargadoDto dto) {
+    public ResponseEntity<EncargadoDto> actualizar(@PathVariable Long id, @Valid @RequestBody EncargadoDto dto) {
         return ResponseEntity.ok(encargadoService.actualizar(id, dto));
     }
 

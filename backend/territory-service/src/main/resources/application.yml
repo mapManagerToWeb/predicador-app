@@ -13,12 +13,24 @@ spring:
       enabled: true
   jpa:
     hibernate:
+      # Hibernate sigue gestionando el schema hoy. Flyway se encarga sólo de
+      # migraciones incrementales versionadas (índices, etc.). Migrar a
+      # ddl-auto: validate + un V1__baseline.sql real es un paso posterior.
       ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+  flyway:
+    enabled: true
+    # Permite adoptar Flyway sobre una base que ya existe (Hibernate creó el
+    # schema previamente). Con baseline-version=0 los V1 actuales se aplican.
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    # Compatibilidad con Postgres 16+: fuerza el driver moderno de Flyway.
+    validate-on-migrate: true
 
 server:
   port: 8081

@@ -17,12 +17,19 @@ spring:
   jpa:
     defer-datasource-initialization: true
     hibernate:
+      # Ver comentario en territory-service: Hibernate gestiona el schema.
       ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    validate-on-migrate: true
 
 server:
   port: 8082
