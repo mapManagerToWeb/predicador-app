@@ -194,6 +194,7 @@ export class MapRenderingFacade {
             fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
             color: featureLayer.color,
             weight: STYLE_DEFAULTS.polygon.weight,
+            stroke: true,
           });
         }
       }
@@ -290,7 +291,7 @@ export class MapRenderingFacade {
     const isComplete = total > 0 && marcadas >= total;
     const fillOpacity = getTerritoryFillOpacity(isComplete);
     const color = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
-    return { opacity: 1, fillOpacity, color, weight: STYLE_DEFAULTS.polygon.weight };
+    return { opacity: 1, fillOpacity, color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true };
   }
 
   // ─── Private helpers ─────────────────────────────────────────────

@@ -50,7 +50,7 @@ export class MapSelectionService {
         const isComplete = total > 0 && marcadas >= total;
         const baseOpacity = getTerritoryFillOpacity(isComplete);
 
-        this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight });
+        this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
       }
 
       this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
@@ -120,7 +120,7 @@ export class MapSelectionService {
           const isComplete = total > 0 && marcadas >= total;
           const baseOpacity = getTerritoryFillOpacity(isComplete);
 
-          this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight });
+          this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
         }
 
         this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());

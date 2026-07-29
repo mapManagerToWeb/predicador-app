@@ -94,7 +94,7 @@ export class MapStyleService {
       if (fl.territorioPadre !== territorioNumero) continue;
       fl.layer.eachLayer(l => {
         if (l instanceof L.Path) {
-          l.setStyle({ fillColor: color, fillOpacity, opacity: 1, color, weight: STYLE_DEFAULTS.polygon.weight });
+          l.setStyle({ fillColor: color, fillOpacity, opacity: 1, color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
         }
       });
     }
@@ -121,6 +121,7 @@ export class MapStyleService {
         weight: STYLE_DEFAULTS.polygon.weight,
         fillColor: featureLayer.color,
         color: featureLayer.color,
+        stroke: true,
       });
 
       const marcadasLayers = manzanasMarcadas.filter(m => m.territorioNumero === num);
@@ -130,6 +131,7 @@ export class MapStyleService {
           fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
           color: featureLayer.color,
           weight: STYLE_DEFAULTS.polygon.weight,
+          stroke: true,
         });
       }
     }
@@ -143,6 +145,7 @@ export class MapStyleService {
         color: fl.color,
         weight: STYLE_DEFAULTS.polygon.weight,
         opacity: 1,
+        stroke: true,
       });
     }
   }
