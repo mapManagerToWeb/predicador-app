@@ -1,0 +1,40 @@
+# OpenTelemetry Collector config.
+#
+# Receives OTLP traces from every Spring Boot service (over http/protobuf on
+# :4318) and exports them to Jaeger via OTLP gRPC on :4317. Batching keeps
+# per-span overhead low; memory_limiter provides back-pressure so the
+# collector can never eat the host.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 75
+    spike_limit_percentage: 15
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+exporters:
+  # Jaeger 1.35+ native OTLP receiver on 4317.
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  # Debug output while wiring the pipeline. Comment out once stable.
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/jaeger, debug]

@@ -22,6 +22,16 @@
         <java.version>21</java.version>
         <spring-cloud.version>2025.1.0</spring-cloud.version>
         <springdoc.version>2.8.6</springdoc.version>
+        <!--
+            Observability stack. OpenTelemetry Spring Boot starter uses the
+            OTel BOM to align every otel-* artifact on the same generation.
+            logstash-logback-encoder emits JSON logs with MDC (traceId/spanId
+            injected by Micrometer Tracing) so Grafana Loki / any log collector
+            can correlate logs with traces without regex parsing.
+        -->
+        <opentelemetry.version>1.64.0</opentelemetry.version>
+        <opentelemetry-instrumentation.version>2.30.0</opentelemetry-instrumentation.version>
+        <logstash-logback.version>8.0</logstash-logback.version>
     </properties>
 
     <modules>
@@ -51,6 +61,13 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-instrumentation-bom</artifactId>
+                <version>${opentelemetry-instrumentation.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

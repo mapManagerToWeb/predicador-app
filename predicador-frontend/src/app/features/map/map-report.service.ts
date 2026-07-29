@@ -1,5 +1,4 @@
 import { inject, Injectable } from '@angular/core';
-import type * as L from 'leaflet';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
@@ -9,25 +8,7 @@ import type {
   WhatsAppSendRequest,
   TerritorioReporteEnvio
 } from '../../core/models/models';
-import type { SnappedPoint } from './map-geometry';
-
-export interface ManzanaMarcada {
-  id: string;
-  nombreBloque: string;
-  layer: L.Path;
-  territorioNumero: number;
-}
-
-export interface FeatureLayer {
-  territorioPadre: number;
-  color: string;
-  layer: L.GeoJSON;
-}
-
-export interface DatosParciales {
-  puntos: SnappedPoint[];
-  geometria: string;
-}
+import type { ManzanaMarcada, FeatureLayer, DatosParciales } from './types/map.types';
 
 @Injectable({ providedIn: 'root' })
 export class MapReportService {

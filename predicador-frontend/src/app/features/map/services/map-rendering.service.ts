@@ -419,12 +419,7 @@ export class MapRenderingService {
 
     for (const fl of this.allTerritoriesLayer()) {
       if (seleccionadosSet.has(fl.territorioPadre)) continue;
-
-      fl.layer.eachLayer(l => {
-        if (l instanceof L.Path) {
-          l.setStyle(STYLE_DEFAULTS.hiddenPolygon);
-        }
-      });
+      this.applyStyleToFeatureLayer(fl, STYLE_DEFAULTS.hiddenPolygon);
     }
 
     this.updateLabelsForSelection(seleccionadosSet);
@@ -438,26 +433,12 @@ export class MapRenderingService {
 
     this.queueStyleUpdate(() => {
       for (const fl of this.allTerritoriesLayer()) {
-        // Si hay territorios seleccionados y este no está en la lista, mantenerlo oculto.
         if (hayFiltroActivo && !seleccionadosSet.has(fl.territorioPadre)) {
-          fl.layer.eachLayer(l => {
-            if (l instanceof L.Path) {
-              l.setStyle(STYLE_DEFAULTS.hiddenPolygon);
-            }
-          });
+          this.applyStyleToFeatureLayer(fl, STYLE_DEFAULTS.hiddenPolygon);
           continue;
         }
 
-        const total = this.manzanaIndex().filter(m => m.territorioNumero === fl.territorioPadre).length;
-        const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === fl.territorioPadre).length;
-        const isComplete = total > 0 && marcadas >= total;
-        const baseOpacity = getTerritoryFillOpacity(isComplete);
-
-        fl.layer.eachLayer(l => {
-          if (l instanceof L.Path) {
-            l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: fl.color, weight: STYLE_DEFAULTS.polygon.weight });
-          }
-        });
+        this.applyStyleToFeatureLayer(fl, this.baseStyleForTerritorio(fl.territorioPadre, manzanasMarcadas));
       }
 
       for (const num of territoriosSeleccionados) {
@@ -475,13 +456,7 @@ export class MapRenderingService {
         }
       }
 
-      // Sólo mostrar todos los labels cuando no haya filtro activo (estado limpio).
-      // Con filtro, mantener los labels alineados a la selección.
-      if (hayFiltroActivo) {
-        this.updateLabelsForSelection(seleccionadosSet);
-      } else {
-        this.mostrarTodosLosLabels();
-      }
+      this.actualizarLabels(seleccionadosSet, hayFiltroActivo);
     });
   }
 
@@ -515,16 +490,12 @@ export class MapRenderingService {
       const isComplete = total > 0 && marcadas >= total;
       const fillOpacity = getTerritoryFillOpacity(isComplete);
 
-      featureLayer.layer.eachLayer(l => {
-        if (l instanceof L.Path) {
-          l.setStyle({
-            fillOpacity,
-            opacity: 1,
-            weight: STYLE_DEFAULTS.polygon.weight,
-            fillColor: featureLayer.color,
-            color: featureLayer.color,
-          });
-        }
+      this.applyStyleToFeatureLayer(featureLayer, {
+        fillOpacity,
+        opacity: 1,
+        weight: STYLE_DEFAULTS.polygon.weight,
+        fillColor: featureLayer.color,
+        color: featureLayer.color,
       });
 
       const marcadasLayers = manzanasMarcadas.filter(m => m.territorioNumero === num);
@@ -548,17 +519,10 @@ export class MapRenderingService {
 
     for (const fl of this.allTerritoriesLayer()) {
       if (!seleccionados.has(fl.territorioPadre)) {
-        // Ocultar completamente polígonos y etiquetas de territorios no seleccionados.
-        fl.layer.eachLayer(l => {
-          if (l instanceof L.Path) {
-            l.setStyle(STYLE_DEFAULTS.hiddenPolygon);
-          }
-        });
+        this.applyStyleToFeatureLayer(fl, STYLE_DEFAULTS.hiddenPolygon);
         continue;
       }
 
-      // En territorios seleccionados: re-estilar TODAS sus manzanas para que la foto
-      // quede consistente sin importar el estado visual previo.
       fl.layer.eachLayer(l => {
         if (l instanceof L.Path) {
           const isMarked = markedLayers.has(l as unknown as L.Path);
@@ -662,22 +626,14 @@ export class MapRenderingService {
     const seleccionados = new Set(territoriosSeleccionados);
 
     for (const fl of this.allTerritoriesLayer()) {
-      const total = this.manzanaIndex().filter(m => m.territorioNumero === fl.territorioPadre).length;
-      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === fl.territorioPadre).length;
-      const isComplete = total > 0 && marcadas >= total;
-      const baseOpacity = getTerritoryFillOpacity(isComplete);
-
       if (!seleccionados.has(fl.territorioPadre)) {
+        const baseStyle = this.baseStyleForTerritorio(fl.territorioPadre, manzanasMarcadas);
         const isVisible = modoMarcado === 'none';
-        fl.layer.eachLayer(l => {
-          if (l instanceof L.Path) {
-            l.setStyle({
-              opacity: isVisible ? 1 : 0,
-              fillOpacity: isVisible ? baseOpacity : 0,
-              color: fl.color,
-              weight: STYLE_DEFAULTS.polygon.weight,
-            });
-          }
+        this.applyStyleToFeatureLayer(fl, {
+          opacity: isVisible ? baseStyle.opacity : 0,
+          fillOpacity: isVisible ? baseStyle.fillOpacity : 0,
+          color: fl.color,
+          weight: STYLE_DEFAULTS.polygon.weight,
         });
         continue;
       }
@@ -686,7 +642,8 @@ export class MapRenderingService {
         if (l instanceof L.Path) {
           const isMarked = manzanasMarcadas.some(m => m.layer === l);
           if (!isMarked) {
-            l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: fl.color, weight: STYLE_DEFAULTS.polygon.weight });
+            const baseStyle = this.baseStyleForTerritorio(fl.territorioPadre, manzanasMarcadas);
+            l.setStyle({ opacity: baseStyle.opacity, fillOpacity: baseStyle.fillOpacity, color: fl.color, weight: STYLE_DEFAULTS.polygon.weight });
           }
         }
       });
@@ -708,27 +665,17 @@ export class MapRenderingService {
       map.fitBounds(combined, { padding: MAP_DEFAULTS.boundsPadding });
     }
 
-    // Restablecer los labels según el filtro activo (si hay selección) o mostrarlos
-    // todos si no hay selección. Coherente con el flujo post-parcial.
-    if (seleccionados.size > 0) {
-      this.updateLabelsForSelection(seleccionados);
-    } else {
-      this.mostrarTodosLosLabels();
-    }
+    this.actualizarLabels(seleccionados, seleccionados.size > 0);
   }
 
   limpiarMarcasVisuales(): void {
     for (const fl of this.allTerritoriesLayer()) {
-      fl.layer.eachLayer(l => {
-        if (l instanceof L.Path) {
-          l.setStyle({
-            fillColor: fl.color,
-            fillOpacity: STYLE_DEFAULTS.polygon.fillOpacity,
-            color: fl.color,
-            weight: STYLE_DEFAULTS.polygon.weight,
-            opacity: 1,
-          });
-        }
+      this.applyStyleToFeatureLayer(fl, {
+        fillColor: fl.color,
+        fillOpacity: STYLE_DEFAULTS.polygon.fillOpacity,
+        color: fl.color,
+        weight: STYLE_DEFAULTS.polygon.weight,
+        opacity: 1,
       });
     }
   }
@@ -946,5 +893,29 @@ export class MapRenderingService {
     this.map.set(null);
     this.tileLayer.set(null);
     this.satelliteLayer.set(null);
+  }
+
+  applyStyleToFeatureLayer(fl: FeatureLayer, style: L.PathOptions | ((fl: FeatureLayer) => L.PathOptions)): void {
+    const resolved = typeof style === 'function' ? style(fl) : style;
+    fl.layer.eachLayer(l => {
+      if (l instanceof L.Path) l.setStyle(resolved);
+    });
+  }
+
+  private baseStyleForTerritorio(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): L.PathOptions {
+    const total = this.manzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+    const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
+    const isComplete = total > 0 && marcadas >= total;
+    const fillOpacity = getTerritoryFillOpacity(isComplete);
+    const color = this.allTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
+    return { opacity: 1, fillOpacity, color, weight: STYLE_DEFAULTS.polygon.weight };
+  }
+
+  private actualizarLabels(seleccionadosSet: Set<number>, hayFiltroActivo: boolean): void {
+    if (hayFiltroActivo) {
+      this.updateLabelsForSelection(seleccionadosSet);
+    } else {
+      this.mostrarTodosLosLabels();
+    }
   }
 }

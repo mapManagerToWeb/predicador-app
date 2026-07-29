@@ -1,12 +1,18 @@
-import { ApplicationConfig, provideZonelessChangeDetection } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  isDevMode,
+  provideAppInitializer,
+  provideZonelessChangeDetection,
+} from '@angular/core';
 import { PreloadAllModules, provideRouter, withPreloading } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
-import { isDevMode } from '@angular/core';
+import { provideClientHydration } from '@angular/platform-browser';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
-import { provideClientHydration } from '@angular/platform-browser';
+import { RumService } from './core/services/rum';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -25,5 +31,10 @@ export const appConfig: ApplicationConfig = {
       registrationStrategy: 'registerWhenStable:30000',
     }),
     provideClientHydration(),
+    // RUM (Real User Monitoring): captura Core Web Vitals y los envía al
+    // backend. Se inicializa una sola vez al arrancar la app; noop en SSR.
+    provideAppInitializer(() => {
+      inject(RumService).start();
+    }),
   ],
 };

@@ -1,0 +1,28 @@
+# Auto-provisioned Grafana datasources.
+# Grafana reads this file on startup; no manual UI clicks required.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 15s
+
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    jsonData:
+      # Link traces to logs by traceId. Requires a Loki datasource; safe to
+      # leave here even without Loki — the link just won't resolve.
+      tracesToLogs:
+        datasourceUid: loki
+        tags: ['service']
+        mappedTags:
+          - key: service.name
+            value: service

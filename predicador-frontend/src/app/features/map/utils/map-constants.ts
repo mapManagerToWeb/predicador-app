@@ -1,4 +1,7 @@
-import { CAPTURE_DELAY_MS, LABEL_MIN_ZOOM, MAX_PUNTOS_PARCIAL } from './territory-colors';
+export const DEDUP_THRESHOLD_PX = 8;
+export const MAX_PUNTOS_PARCIAL = 6;
+export const LABEL_MIN_ZOOM = 14;
+export const CAPTURE_DELAY_MS = 400;
 
 export const MAP_DEFAULTS = {
   initialView: { lat: -37.4779, lng: -73.345 },
@@ -50,6 +53,8 @@ export const STYLE_DEFAULTS = {
   hiddenPolygon: {
     opacity: 0,
     fillOpacity: 0,
+    stroke: false,
+    weight: 0,
   },
   captureUnmarked: {
     opacity: 0.3,
