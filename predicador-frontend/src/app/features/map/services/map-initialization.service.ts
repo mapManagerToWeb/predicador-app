@@ -2,14 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
-import { MapRenderingService } from './map-rendering.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 
 @Injectable({ providedIn: 'root' })
 export class MapInitializationService {
-  private rendering = inject(MapRenderingService);
+  private rendering = inject(MapRenderingFacade);
   private selection = inject(MapSelectionService);
   private state = inject(MapStateService);
   private territorioService = inject(TerritorioService);

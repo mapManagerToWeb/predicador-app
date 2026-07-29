@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { MapStateService } from './map-state.service';
-import { MapRenderingService } from './map-rendering.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { getTerritoryFillOpacity } from '../utils/territory-colors';
@@ -12,7 +12,7 @@ import type { ModoMarcado } from '../types/map.types';
 @Injectable({ providedIn: 'root' })
 export class MapSelectionService {
   private state = inject(MapStateService);
-  private rendering = inject(MapRenderingService);
+  private rendering = inject(MapRenderingFacade);
   private territorioService = inject(TerritorioService);
   private toastService = inject(Toast);
 

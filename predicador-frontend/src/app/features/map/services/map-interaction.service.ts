@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { MapStateService } from './map-state.service';
-import { MapRenderingService } from './map-rendering.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import { MAX_PUNTOS_PARCIAL } from '../utils/map-constants';
 import type { SnappedPoint, ManzanaIndex } from '../types/map.types';
 import { snapToContour, pointInPolygon, projectOnSegment } from '../map-geometry';
@@ -16,7 +16,7 @@ export interface MapClickResult {
 @Injectable({ providedIn: 'root' })
 export class MapInteractionService {
   private state = inject(MapStateService);
-  private rendering = inject(MapRenderingService);
+  private rendering = inject(MapRenderingFacade);
 
   handleMapClick(e: L.LeafletMouseEvent): MapClickResult {
     const modo = this.state.modoMarcado();

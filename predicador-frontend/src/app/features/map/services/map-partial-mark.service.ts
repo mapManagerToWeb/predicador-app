@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { Toast } from '../../../core/services/toast';
-import { MapRenderingService } from './map-rendering.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import { MapInteractionService } from './map-interaction.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
@@ -11,7 +11,7 @@ import { TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
 
 @Injectable({ providedIn: 'root' })
 export class MapPartialMarkService {
-  private rendering = inject(MapRenderingService);
+  private rendering = inject(MapRenderingFacade);
   private interaction = inject(MapInteractionService);
   private selection = inject(MapSelectionService);
   private state = inject(MapStateService);

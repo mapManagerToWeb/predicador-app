@@ -9,7 +9,7 @@ import * as L from 'leaflet';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
 import { MapStateService } from './services/map-state.service';
-import { MapRenderingService } from './services/map-rendering.service';
+import { MapRenderingFacade } from './services/map-rendering.facade';
 import { MapInteractionService } from './services/map-interaction.service';
 import { MapSelectionService } from './services/map-selection.service';
 import { MapInitializationService } from './services/map-initialization.service';
@@ -27,7 +27,7 @@ import type { ModoMarcado } from './types/map.types';
 })
 export class MapPage implements OnDestroy {
   private state = inject(MapStateService);
-  private rendering = inject(MapRenderingService);
+  private rendering = inject(MapRenderingFacade);
   private interaction = inject(MapInteractionService);
   private selection = inject(MapSelectionService);
   private initialization = inject(MapInitializationService);
