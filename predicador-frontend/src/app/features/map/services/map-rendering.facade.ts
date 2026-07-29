@@ -1,0 +1,312 @@
+import { Injectable, inject } from '@angular/core';
+import * as L from 'leaflet';
+import { getTerritoryFillOpacity } from '../utils/territory-colors';
+import { MapEngineService } from './map-engine.service';
+import { MapTileLayerService } from './map-tile-layer.service';
+import { MapTerritoryLayerService, type ManzanaClickHandler } from './map-territory-layer.service';
+import { MapStyleService } from './map-style.service';
+import { MapCaptureService } from './map-capture.service';
+import { MapPartialDrawService } from './map-partial-draw.service';
+import type {
+  ManzanaIndex,
+  FeatureLayer,
+  TerritorioCacheData,
+  ManzanaMarcada,
+  SnappedPoint,
+  Edge,
+} from '../types/map.types';
+
+/**
+ * Facade that coordinates all map sub-services.
+ *
+ * <p>Replaces MapRenderingService by delegating to focused services.
+ * Maintains backward-compatible public API during migration of consumers
+ * (MapSelectionService, MapPartialMarkService, MapInitializationService,
+ * MapDataPersistenceService).</p>
+ *
+ * <p>After all consumers are migrated, this facade can be renamed to
+ * MapRenderingService if convenient.</p>
+ */
+@Injectable({ providedIn: 'root' })
+export class MapRenderingFacade {
+  private engine = inject(MapEngineService);
+  private tiles = inject(MapTileLayerService);
+  private territories = inject(MapTerritoryLayerService);
+  private styles = inject(MapStyleService);
+  private capture = inject(MapCaptureService);
+  private partialDraw = inject(MapPartialDrawService);
+
+  // ─── Engine delegation ───────────────────────────────────────────
+
+  getMap(): L.Map | null {
+    return this.engine.getMap();
+  }
+
+  initializeMap(mapElement: HTMLElement): void {
+    this.engine.initializeMap(mapElement);
+    this.tiles.initLayers();
+    this.tiles.observeThemeChanges();
+  }
+
+  // ─── Tile / satellite ────────────────────────────────────────────
+
+  isSatellite(): boolean {
+    return this.tiles.isSatellite();
+  }
+
+  toggleSatellite(): void {
+    this.tiles.toggleSatellite();
+  }
+
+  // ─── Click handler ───────────────────────────────────────────────
+
+  setManzanaClickHandler(handler: ManzanaClickHandler | null): void {
+    this.territories.setManzanaClickHandler(handler);
+  }
+
+  // ─── Territory data ──────────────────────────────────────────────
+
+  async loadAllTerritories(territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
+    await this.territories.loadAllTerritories(territorioService);
+  }
+
+  updateVisibleTerritories(): number[] {
+    return this.territories.updateVisibleTerritories();
+  }
+
+  ensureTerritoryLoaded(territorioNum: number): void {
+    this.territories.ensureTerritoryLoaded(territorioNum);
+  }
+
+  clearAllLayers(): void {
+    this.territories.clearAllLayers();
+  }
+
+  // ─── Index / data access ─────────────────────────────────────────
+
+  getManzanaIndex(): ManzanaIndex[] {
+    return this.territories.getManzanaIndex();
+  }
+
+  getAllTerritoriesLayer(): FeatureLayer[] {
+    return this.territories.getAllTerritoriesLayer();
+  }
+
+  getTerritoryDataCache(): Map<number, TerritorioCacheData> {
+    return this.territories.getTerritoryDataCache();
+  }
+
+  // ─── Style delegation ────────────────────────────────────────────
+
+  applyBaseTerritoryStyle(
+    territorioNumero: number,
+    color: string,
+    marcadasCount: number,
+    options: { total?: number; isComplete?: boolean } = {}
+  ): void {
+    this.styles.applyBaseTerritoryStyle(
+      this.territories.getAllTerritoriesLayer(),
+      this.territories.getManzanaIndex(),
+      territorioNumero,
+      color,
+      marcadasCount,
+      options
+    );
+  }
+
+  applyStyleToFeatureLayer(fl: FeatureLayer, style: L.PathOptions | ((fl: FeatureLayer) => L.PathOptions)): void {
+    this.styles.applyStyleToFeatureLayer(fl, style);
+  }
+
+  reaplicarMarcasTerritorio(manzanasMarcadas: ManzanaMarcada[], territorioNumeros: number[]): void {
+    this.styles.reaplicarMarcasTerritorio(
+      this.territories.getAllTerritoriesLayer(),
+      this.territories.getManzanaIndex(),
+      manzanasMarcadas,
+      territorioNumeros
+    );
+  }
+
+  limpiarMarcasVisuales(): void {
+    this.styles.limpiarMarcasVisuales(this.territories.getAllTerritoriesLayer());
+  }
+
+  queueStyleUpdate(fn: () => void): void {
+    this.styles.queueStyleUpdate(fn);
+  }
+
+  cancelPendingStyleUpdates(): void {
+    this.styles.cancelPendingStyleUpdates();
+  }
+
+  // ─── Labels ──────────────────────────────────────────────────────
+
+  updateLabelsVisibility(): void {
+    this.territories.updateLabelsVisibility();
+  }
+
+  updateLabelsForSelection(seleccionados: Set<number>): void {
+    this.territories.updateLabelsForSelection(seleccionados);
+  }
+
+  getTerritoryLabels(): L.Marker[] {
+    return this.territories.getTerritoryLabels();
+  }
+
+  // ─── Visibility ──────────────────────────────────────────────────
+
+  ocultarPoligonosNoSeleccionados(seleccionados: number[]): void {
+    const seleccionadosSet = new Set(seleccionados);
+
+    for (const fl of this.territories.getAllTerritoriesLayer()) {
+      if (seleccionadosSet.has(fl.territorioPadre)) continue;
+      this.styles.applyStyleToFeatureLayer(fl, { opacity: 0, fillOpacity: 0, stroke: false, weight: 0 });
+    }
+
+    this.territories.updateLabelsForSelection(seleccionadosSet);
+  }
+
+  restaurarVisibilidadPoligonos(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): void {
+    this.styles.cancelPendingStyleUpdates();
+
+    const seleccionadosSet = new Set(territoriosSeleccionados);
+    const hayFiltroActivo = seleccionadosSet.size > 0;
+
+    this.styles.queueStyleUpdate(() => {
+      for (const fl of this.territories.getAllTerritoriesLayer()) {
+        if (hayFiltroActivo && !seleccionadosSet.has(fl.territorioPadre)) {
+          this.styles.applyStyleToFeatureLayer(fl, { opacity: 0, fillOpacity: 0, stroke: false, weight: 0 });
+          continue;
+        }
+
+        this.styles.applyBaseTerritoryStyle(
+          this.territories.getAllTerritoriesLayer(),
+          this.territories.getManzanaIndex(),
+          fl.territorioPadre,
+          fl.color,
+          manzanasMarcadas.filter(m => m.territorioNumero === fl.territorioPadre).length
+        );
+      }
+
+      for (const num of territoriosSeleccionados) {
+        const featureLayer = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === num);
+        if (!featureLayer) continue;
+
+        const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num);
+        for (const m of marcadas) {
+          m.layer.setStyle({
+            fillColor: featureLayer.color,
+            fillOpacity: 0.95,
+            color: featureLayer.color,
+            weight: 4,
+          });
+        }
+      }
+
+      if (hayFiltroActivo) {
+        this.territories.updateLabelsForSelection(seleccionadosSet);
+      } else {
+        this.territories.mostrarTodosLosLabels();
+      }
+    });
+  }
+
+  // ─── Capture ─────────────────────────────────────────────────────
+
+  prepararCaptura(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
+    return this.capture.prepararCaptura(manzanasMarcadas, territoriosSeleccionados);
+  }
+
+  restaurarMapaPostCaptura(
+    manzanasMarcadas: ManzanaMarcada[],
+    territoriosSeleccionados: number[],
+    modoMarcado: string
+  ): void {
+    this.capture.restaurarMapaPostCaptura(
+      manzanasMarcadas,
+      territoriosSeleccionados,
+      modoMarcado
+    );
+  }
+
+  // ─── Partial draw ────────────────────────────────────────────────
+
+  redibujarParcial(
+    puntos: SnappedPoint[],
+    currentTerritoryColor: string,
+    manzanaEdges: Edge[],
+    onMarkerDrag: (index: number, marker: L.Marker) => void
+  ): void {
+    this.partialDraw.redibujarParcial(puntos, currentTerritoryColor, manzanaEdges, onMarkerDrag);
+  }
+
+  updatePartialPolygonLatLngs(latlngs: L.LatLngExpression[], currentTerritoryColor: string): void {
+    this.partialDraw.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
+  }
+
+  limpiarCapasParciales(): void {
+    this.partialDraw.limpiarCapasParciales();
+  }
+
+  getPoligonoParcial(): L.Polygon | null {
+    return this.partialDraw.getPoligonoParcial();
+  }
+
+  clearPoligonoParcialRef(): void {
+    this.partialDraw.clearPoligonoParcialRef();
+  }
+
+  // ─── Extra layers (used by selection/partial services) ────────────
+
+  private extraLayers: L.Layer[] = [];
+
+  addExtraLayer(layer: L.Layer): void {
+    this.extraLayers.push(layer);
+  }
+
+  removeExtraLayer(layer: L.Layer): void {
+    this.extraLayers = this.extraLayers.filter(l => l !== layer);
+    this.getMap()?.removeLayer(layer);
+  }
+
+  clearExtraLayers(): void {
+    const map = this.getMap();
+    for (const l of this.extraLayers) {
+      map?.removeLayer(l);
+    }
+    this.extraLayers = [];
+  }
+
+  // ─── Current territory color (state carrier) ─────────────────────
+
+  private _currentTerritoryColor = '';
+
+  setCurrentTerritoryColor(color: string): void {
+    this._currentTerritoryColor = color;
+  }
+
+  getCurrentTerritoryColor(): string {
+    return this._currentTerritoryColor;
+  }
+
+  // ─── Private helpers ─────────────────────────────────────────────
+
+  private baseStyleForTerritorio(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): import('leaflet').PathOptions {
+    const total = this.territories.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+    const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
+    const isComplete = total > 0 && marcadas >= total;
+    const fillOpacity = getTerritoryFillOpacity(isComplete);
+    const color = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
+    return { opacity: 1, fillOpacity, color, weight: 4 };
+  }
+
+  // ─── Destroy ─────────────────────────────────────────────────────
+
+  destroy(): void {
+    this.styles.cancelPendingStyleUpdates();
+    this.clearExtraLayers();
+    this.partialDraw.destroy();
+    this.tiles.destroy();
+    this.engine.destroy();
+  }
+}

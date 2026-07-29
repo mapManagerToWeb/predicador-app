@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { MapReportService } from '../map-report.service';
-import { MapRenderingService } from './map-rendering.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
@@ -10,7 +10,7 @@ import { TOAST_MESSAGES } from '../utils/map-constants';
 @Injectable({ providedIn: 'root' })
 export class MapDataPersistenceService {
   private state = inject(MapStateService);
-  private rendering = inject(MapRenderingService);
+  private rendering = inject(MapRenderingFacade);
   private selection = inject(MapSelectionService);
   private territorioService = inject(TerritorioService);
   private toastService = inject(Toast);
