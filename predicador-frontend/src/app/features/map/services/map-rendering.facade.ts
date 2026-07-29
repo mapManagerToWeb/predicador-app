@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
+import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { getTerritoryFillOpacity } from '../utils/territory-colors';
 import { MapEngineService } from './map-engine.service';
 import { MapTileLayerService } from './map-tile-layer.service';
@@ -179,13 +180,7 @@ export class MapRenderingFacade {
           continue;
         }
 
-        this.styles.applyBaseTerritoryStyle(
-          this.territories.getAllTerritoriesLayer(),
-          this.territories.getManzanaIndex(),
-          fl.territorioPadre,
-          fl.color,
-          manzanasMarcadas.filter(m => m.territorioNumero === fl.territorioPadre).length
-        );
+        this.styles.applyStyleToFeatureLayer(fl, this.computeBaseStyle(fl.territorioPadre, manzanasMarcadas));
       }
 
       for (const num of territoriosSeleccionados) {
@@ -196,9 +191,9 @@ export class MapRenderingFacade {
         for (const m of marcadas) {
           m.layer.setStyle({
             fillColor: featureLayer.color,
-            fillOpacity: 0.95,
+            fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
             color: featureLayer.color,
-            weight: 4,
+            weight: STYLE_DEFAULTS.polygon.weight,
           });
         }
       }
@@ -287,6 +282,15 @@ export class MapRenderingFacade {
 
   getCurrentTerritoryColor(): string {
     return this._currentTerritoryColor;
+  }
+
+  private computeBaseStyle(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): L.PathOptions {
+    const total = this.territories.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+    const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
+    const isComplete = total > 0 && marcadas >= total;
+    const fillOpacity = getTerritoryFillOpacity(isComplete);
+    const color = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
+    return { opacity: 1, fillOpacity, color, weight: STYLE_DEFAULTS.polygon.weight };
   }
 
   // ─── Private helpers ─────────────────────────────────────────────
