@@ -1,7 +1,25 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, NavigationEnd } from '@angular/router';
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type Metric } from 'web-vitals';
 import { environment } from '../../../environments/environment';
+
+/**
+ * Collapses path segments that look like IDs so we do not blow the label
+ * cardin ality on the Prometheus side.
+ *
+ * Pure function — exported for unit testing without Angular DI.
+ *
+ * @example
+ * normalizeRoute('/territories/123/color') // '/territories/:id/color'
+ * normalizeRoute('/map?q=test')            // '/map'
+ */
+export function normalizeRoute(path: string): string {
+  return path
+    .replace(/\?.*$/, '')
+    .replace(/\/\d+(?=\/|$)/g, '/:id')
+    .slice(0, 40);
+}
 
 /**
  * Real User Monitoring (RUM): captures Core Web Vitals in the browser and
@@ -11,32 +29,38 @@ import { environment } from '../../../environments/environment';
  * <p>Uses {@code navigator.sendBeacon} so the report survives page unload
  * (LCP is often reported on {@code visibilitychange = hidden}). Falls back
  * to {@code fetch(..., { keepalive: true })} when sendBeacon is unavailable
- * or refuses the payload (e.g. sync XHR blocked in some browsers).</p>
+ * or refuses the payload.</p>
  *
  * <p>The service is a no-op on the server (SSR) since {@code web-vitals}
  * touches {@code PerformanceObserver} which only exists in the browser.</p>
+ *
+ * <p>{@code start()} is strictly idempotent — safe to call multiple times.
+ * Subscriptions are cleaned up via {@code DestroyRef}.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class RumService {
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
   private endpoint = `${environment.apiUrl}/rum`;
   private currentRoute = '/';
+  private started = false;
 
   /**
    * Called once from {@code app.config.ts} or an APP_INITIALIZER. Idempotent
    * even if invoked twice by mistake; web-vitals debounces its own callbacks.
    */
   start(): void {
+    if (this.started) return;
     if (typeof window === 'undefined' || typeof PerformanceObserver === 'undefined') {
       return;
     }
+    this.started = true;
 
-    // Track the current route so we can tag each metric with it. This lets
-    // the Grafana panels break LCP/INP down by /map vs /profile vs /login.
-    this.currentRoute = this.normalizeRoute(window.location.pathname);
-    this.router.events.subscribe(event => {
+    // Track the current route so we can tag each metric with it.
+    this.currentRoute = normalizeRoute(window.location.pathname);
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
       if (event instanceof NavigationEnd) {
-        this.currentRoute = this.normalizeRoute(event.urlAfterRedirects);
+        this.currentRoute = normalizeRoute(event.urlAfterRedirects);
       }
     });
 
@@ -74,17 +98,5 @@ export class RumService {
     } catch {
       /* silent: RUM must not disrupt UX */
     }
-  }
-
-  /**
-   * Collapse path segments that look like IDs so we do not blow the label
-   * cardinality on the Prometheus side. {@code /territories/123/color} →
-   * {@code /territories/:id/color}.
-   */
-  private normalizeRoute(path: string): string {
-    return path
-      .replace(/\?.*$/, '')
-      .replace(/\/\d+(?=\/|$)/g, '/:id')
-      .slice(0, 40);
   }
 }

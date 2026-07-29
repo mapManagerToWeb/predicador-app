@@ -65,6 +65,12 @@ public class RateLimitFilter implements WebFilter, Ordered {
             .refillGreedy(20, Duration.ofMinutes(1))
             .build();
 
+    /** RUM: 30 metric submissions / minute per IP. High volume but bounded. */
+    private static final Bandwidth RUM_LIMIT = Bandwidth.builder()
+            .capacity(30)
+            .refillGreedy(30, Duration.ofMinutes(1))
+            .build();
+
     private final Cache<String, Bucket> authBuckets = Caffeine.newBuilder()
             .maximumSize(MAX_BUCKETS)
             .expireAfterAccess(BUCKET_TTL)
@@ -75,12 +81,18 @@ public class RateLimitFilter implements WebFilter, Ordered {
             .expireAfterAccess(BUCKET_TTL)
             .build();
 
+    private final Cache<String, Bucket> rumBuckets = Caffeine.newBuilder()
+            .maximumSize(MAX_BUCKETS)
+            .expireAfterAccess(BUCKET_TTL)
+            .build();
+
     private final List<Rule> rules = List.of(
             new Rule("POST", "/api/v1/auth/login", ip -> bucket(authBuckets, ip, AUTH_LIMIT)),
             new Rule("POST", "/api/v1/encargados/login", ip -> bucket(authBuckets, ip, AUTH_LIMIT)),
             new Rule("POST", "/api/v1/encargados", ip -> bucket(registerBuckets, ip, REGISTER_LIMIT)),
             new Rule("POST", "/api/v1/encargados/buscar-crear",
-                    ip -> bucket(registerBuckets, ip, REGISTER_LIMIT))
+                    ip -> bucket(registerBuckets, ip, REGISTER_LIMIT)),
+            new Rule("POST", "/api/v1/rum", ip -> bucket(rumBuckets, ip, RUM_LIMIT))
     );
 
     @Override

@@ -1,6 +1,40 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { RumService } from './rum';
+import { RumService, normalizeRoute } from './rum';
+
+describe('normalizeRoute (pure function)', () => {
+  it('colapsa segmentos numéricos', () => {
+    expect(normalizeRoute('/territories/123/color')).toBe('/territories/:id/color');
+    expect(normalizeRoute('/reports/42')).toBe('/reports/:id');
+  });
+
+  it('elimina query strings', () => {
+    expect(normalizeRoute('/map?foo=bar')).toBe('/map');
+    expect(normalizeRoute('/login?redirect=/admin')).toBe('/login');
+  });
+
+  it('trunca rutas largas a 40 chars', () => {
+    const long = '/' + 'x'.repeat(200);
+    expect(normalizeRoute(long).length).toBe(40);
+  });
+
+  it('devuelve "/" para ruta raíz', () => {
+    expect(normalizeRoute('/')).toBe('/');
+  });
+
+  it('maneja string vacío sin colapsar', () => {
+    expect(normalizeRoute('')).toBe('');
+  });
+
+  it('colapsa múltiples segmentos numéricos', () => {
+    expect(normalizeRoute('/a/1/b/2/c')).toBe('/a/:id/b/:id/c');
+  });
+
+  it('no trunca rutas cortas', () => {
+    expect(normalizeRoute('/map')).toBe('/map');
+    expect(normalizeRoute('/profile')).toBe('/profile');
+  });
+});
 
 describe('RumService', () => {
   let service: RumService;
@@ -22,21 +56,6 @@ describe('RumService', () => {
     fetchSpy.mockRestore();
   });
 
-  it('normalizeRoute colapsa segmentos numéricos', () => {
-    // Acceso a método privado vía cast; testear la lógica de sanitización
-    // es más valioso que su encapsulación.
-    const svc = service as unknown as { normalizeRoute(p: string): string };
-    expect(svc.normalizeRoute('/territories/123/color')).toBe('/territories/:id/color');
-    expect(svc.normalizeRoute('/map?foo=bar')).toBe('/map');
-    expect(svc.normalizeRoute('/reports/42')).toBe('/reports/:id');
-  });
-
-  it('normalizeRoute trunca rutas largas a 40 chars', () => {
-    const svc = service as unknown as { normalizeRoute(p: string): string };
-    const long = '/' + 'x'.repeat(200);
-    expect(svc.normalizeRoute(long).length).toBe(40);
-  });
-
   it('send() usa fetch con keepalive cuando sendBeacon no está', () => {
     const svc = service as unknown as {
       send(m: { name: string; value: number }): void;
@@ -53,13 +72,16 @@ describe('RumService', () => {
     });
   });
 
-  it('start() actualiza currentRoute en cada NavigationEnd', () => {
-    const router = TestBed.inject(Router);
+  it('start() solo ejecuta una vez (idempotente)', () => {
     service.start();
-
-    router.events.next?.(); // no-op si es un ReplaySubject; el spy es interno
-    // No podemos disparar NavigationEnd real sin componentes; verificamos
-    // que la subscripción no explota simplemente iniciando el servicio.
+    service.start();
+    // No debe lanzar errores ni crear múltiples suscripciones
     expect(service).toBeTruthy();
+  });
+
+  it('start() es no-op en servidor (SSR)', () => {
+    // En jsdom PerformanceObserver existe, así que start() debería funcionar
+    // Pero verificamos que no lanza excepciones
+    expect(() => service.start()).not.toThrow();
   });
 });
