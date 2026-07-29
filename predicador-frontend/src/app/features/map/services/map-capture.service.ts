@@ -1,27 +1,29 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
-import { MapRenderingFacade } from './map-rendering.facade';
+import { MapEngineService } from './map-engine.service';
+import { MapTerritoryLayerService } from './map-territory-layer.service';
 import type { ManzanaMarcada } from '../types/map.types';
 
 /**
  * Manages screenshot capture preparation and post-capture restoration.
  *
- * <p>Hides non-selected territories, centers bounds, and restores visual
- * state after capture. Guarantees restoration via try/finally.</p>
+ * <p>Injects low-level services directly (not the facade) to avoid
+ * circular dependency: Facade → CaptureService → Facade.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapCaptureService {
-  private facade = inject(MapRenderingFacade);
+  private engine = inject(MapEngineService);
+  private territories = inject(MapTerritoryLayerService);
 
   prepararCaptura(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
-    const map = this.facade.getMap();
+    const map = this.engine.getMap();
     if (!map) return Promise.resolve();
 
     const seleccionados = new Set(territoriosSeleccionados);
     const markedLayers = new Set(manzanasMarcadas.map(m => m.layer));
-    const allTerritoriesLayer = this.facade.getAllTerritoriesLayer();
-    const territoryLabels = this.facade.getTerritoryLabels();
+    const allTerritoriesLayer = this.territories.getAllTerritoriesLayer();
+    const territoryLabels = this.territories.getTerritoryLabels();
 
     for (const fl of allTerritoriesLayer) {
       if (!seleccionados.has(fl.territorioPadre)) {
@@ -56,7 +58,6 @@ export class MapCaptureService {
       });
     }
 
-    // Paint partial polygons with full opacity for the screenshot
     for (const m of manzanasMarcadas) {
       if (!m.id.startsWith('parcial-')) continue;
       const fl = allTerritoriesLayer.find(f => f.territorioPadre === m.territorioNumero);
@@ -73,7 +74,6 @@ export class MapCaptureService {
       }
     }
 
-    // Hide labels of non-selected territories during capture
     for (const lbl of territoryLabels) {
       const el = lbl.getElement();
       if (!el) continue;
@@ -82,7 +82,6 @@ export class MapCaptureService {
       lbl.setOpacity(seleccionados.has(num) ? 1 : 0);
     }
 
-    // Calculate bounds from selected territories
     let combined: L.LatLngBounds | null = null;
     for (const num of seleccionados) {
       const fl = allTerritoriesLayer.find(f => f.territorioPadre === num);
@@ -94,7 +93,6 @@ export class MapCaptureService {
       }
     }
 
-    // Fallback to marked manzanas bounds
     if (!combined) {
       for (const m of manzanasMarcadas) {
         if (m.layer instanceof L.Polygon) {
@@ -121,12 +119,12 @@ export class MapCaptureService {
     territoriosSeleccionados: number[],
     modoMarcado: string
   ): void {
-    const map = this.facade.getMap();
+    const map = this.engine.getMap();
     if (!map) return;
 
     const seleccionados = new Set(territoriosSeleccionados);
-    const allTerritoriesLayer = this.facade.getAllTerritoriesLayer();
-    const territoryLabels = this.facade.getTerritoryLabels();
+    const allTerritoriesLayer = this.territories.getAllTerritoriesLayer();
+    const territoryLabels = this.territories.getTerritoryLabels();
 
     for (const fl of allTerritoriesLayer) {
       if (!seleccionados.has(fl.territorioPadre)) {
@@ -175,7 +173,6 @@ export class MapCaptureService {
       map.fitBounds(combined, { padding: MAP_DEFAULTS.boundsPadding });
     }
 
-    // Restore labels
     const zoomVisible = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
     if (seleccionados.size > 0 && zoomVisible) {
       for (const lbl of territoryLabels) {
