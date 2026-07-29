@@ -1,0 +1,73 @@
+version: 2
+
+updates:
+  # Frontend npm dependencies
+  - package-ecosystem: npm
+    directory: /predicador-frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 10
+    reviewers:
+      - v1os
+    labels:
+      - dependencies
+      - frontend
+    commit-message:
+      prefix: "deps"
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "angular-*"
+      rxjs:
+        patterns:
+          - "rxjs"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+
+  # Backend Maven dependencies
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 10
+    reviewers:
+      - v1os
+    labels:
+      - dependencies
+      - backend
+    commit-message:
+      prefix: "deps"
+    groups:
+      spring:
+        patterns:
+          - "org.springframework.*"
+          - "org.springframework.cloud.*"
+      spring-boot:
+        patterns:
+          - "org.springframework.boot.*"
+      opentelemetry:
+        patterns:
+          - "io.opentelemetry.*"
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "ci"

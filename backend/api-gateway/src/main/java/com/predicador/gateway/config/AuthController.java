@@ -3,6 +3,8 @@ package com.predicador.gateway.config;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
 import java.util.Map;
 
 /**
@@ -47,14 +50,16 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
         String username = credentials.getOrDefault("username", "");
         String password = credentials.getOrDefault("password", "");
 
         if (!adminUsername.equals(username) || !passwordMatches(password)) {
-            return ResponseEntity.status(401).body(Map.of(
-                    "success", false,
-                    "message", "Credenciales incorrectas"));
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
+            problem.setTitle("Autenticación fallida");
+            problem.setType(URI.create("https://api.predicador.com/errors/auth-failed"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
         }
 
         String token = tokens.issue("admin", SessionToken.ROLE_ADMIN);

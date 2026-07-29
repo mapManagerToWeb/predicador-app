@@ -6,9 +6,12 @@ import com.predicador.reporting.dto.WhatsAppSendResponse;
 import com.predicador.reporting.service.ReportSendService;
 import com.predicador.reporting.service.ReportService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -24,13 +27,14 @@ public class ReportController {
     }
 
     @PostMapping
-    public ResponseEntity<List<ReportDto>> createReports(
+    public ResponseEntity<?> createReports(
             @RequestBody @Valid List<@Valid ReportDto> dtos) {
-        // Bean Validation cubre encargadoNombre y territorioNumero por DTO.
-        // Sólo dejamos aquí la guarda por lista vacía porque @Size/@NotEmpty
-        // sobre @RequestBody List no se propaga sin @Validated en la clase.
         if (dtos == null || dtos.isEmpty()) {
-            return ResponseEntity.badRequest().build();
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.BAD_REQUEST, "La lista de reportes no puede estar vacía");
+            problem.setTitle("Datos inválidos");
+            problem.setType(URI.create("https://api.predicador.com/errors/bad-request"));
+            return ResponseEntity.badRequest().body(problem);
         }
         return ResponseEntity.ok(reportService.createReports(dtos));
     }

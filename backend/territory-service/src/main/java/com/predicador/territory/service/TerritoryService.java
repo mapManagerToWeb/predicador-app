@@ -7,12 +7,15 @@ import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,6 +23,7 @@ public class TerritoryService {
 
     private final TerritoryRepository territoryRepository;
     private final TerritoryColorRepository colorRepository;
+    private final MeterRegistry registry;
 
     private static final String[] PALETTE = {
         "#DC143C", "#00A86B", "#007FFF", "#FF6600", "#8A2BE2",
@@ -28,9 +32,10 @@ public class TerritoryService {
         "#FF00FF", "#4169E1", "#FF69B4", "#7B68EE"
     };
 
-    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository) {
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, MeterRegistry registry) {
         this.territoryRepository = territoryRepository;
         this.colorRepository = colorRepository;
+        this.registry = registry;
     }
 
     @Cacheable(CacheConfig.CACHE_NUMBERS)
@@ -64,35 +69,44 @@ public class TerritoryService {
 
     @Cacheable(CacheConfig.CACHE_GEOJSON_ALL)
     public String getAllTerritoriesGeoJson() {
-        List<ManzanaTerritorio> allManzanas = territoryRepository.findAllGroupedByTerritorio();
-        Map<Long, String> colorMap = getAllColors();
+        long start = System.nanoTime();
+        try {
+            List<ManzanaTerritorio> allManzanas = territoryRepository.findAllGroupedByTerritorio();
+            Map<Long, String> colorMap = getAllColors();
 
-        Map<Long, List<ManzanaTerritorio>> byTerritorio = allManzanas.stream()
-                .collect(Collectors.groupingBy(ManzanaTerritorio::getTerritorioPadre, LinkedHashMap::new, Collectors.toList()));
+            Map<Long, List<ManzanaTerritorio>> byTerritorio = allManzanas.stream()
+                    .collect(Collectors.groupingBy(ManzanaTerritorio::getTerritorioPadre, LinkedHashMap::new, Collectors.toList()));
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
+            StringBuilder sb = new StringBuilder();
+            sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
 
-        boolean first = true;
-        for (Map.Entry<Long, List<ManzanaTerritorio>> entry : byTerritorio.entrySet()) {
-            Long number = entry.getKey();
-            String color = colorMap.getOrDefault(number, "#3b82f6");
+            boolean first = true;
+            for (Map.Entry<Long, List<ManzanaTerritorio>> entry : byTerritorio.entrySet()) {
+                Long number = entry.getKey();
+                String color = colorMap.getOrDefault(number, "#3b82f6");
 
-            for (ManzanaTerritorio m : entry.getValue()) {
-                double[][] coords = parseWkbHexToCoords(m.getGeometry());
-                if (coords == null || coords.length == 0) continue;
+                for (ManzanaTerritorio m : entry.getValue()) {
+                    double[][] coords = parseWkbHexToCoords(m.getGeometry());
+                    if (coords == null || coords.length == 0) continue;
 
-                if (!first) sb.append(",");
-                first = false;
+                    if (!first) sb.append(",");
+                    first = false;
 
-                appendFeature(sb, number, m.getNombreBloque(), coords);
-                injectProperty(sb, "color", escapeJson(color));
-                closeFeature(sb);
+                    appendFeature(sb, number, m.getNombreBloque(), coords);
+                    injectProperty(sb, "color", escapeJson(color));
+                    closeFeature(sb);
+                }
             }
-        }
 
-        sb.append("]}");
-        return sb.toString();
+            sb.append("]}");
+            return sb.toString();
+        } finally {
+            long elapsed = System.nanoTime() - start;
+            Timer.builder("territory.geojson.load.duration")
+                    .description("Tiempo para generar el GeoJSON completo de todos los territorios")
+                    .register(registry)
+                    .record(elapsed, TimeUnit.NANOSECONDS);
+        }
     }
 
     @Cacheable(CacheConfig.CACHE_COLORS)

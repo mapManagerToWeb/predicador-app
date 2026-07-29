@@ -5,10 +5,10 @@ import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,8 +29,12 @@ class TerritoryServiceTest {
     @Mock
     private TerritoryColorRepository colorRepository;
 
-    @InjectMocks
     private TerritoryService territoryService;
+
+    @BeforeEach
+    void setUp() {
+        territoryService = new TerritoryService(territoryRepository, colorRepository, new SimpleMeterRegistry());
+    }
 
     private ManzanaTerritorio createManzana(Long id, Long territorioPadre, String nombreBloque, String geometry) {
         ManzanaTerritorio m = new ManzanaTerritorio();

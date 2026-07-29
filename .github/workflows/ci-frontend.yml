@@ -1,0 +1,54 @@
+name: CI Frontend
+
+on:
+  push:
+    branches: [main, chore/production-quality-hardening]
+    paths:
+      - "predicador-frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "predicador-frontend/**"
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: predicador-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: predicador-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx ng build --configuration=production 2>&1 | tee /tmp/build.log
+
+      - name: Test
+        run: npm test -- --run --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: predicador-frontend/coverage/
+          retention-days: 7
+
+      - name: Build production
+        run: npm run build

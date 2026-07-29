@@ -8,6 +8,15 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
+  cache:
+    type: caffeine
+    cache-names:
+      - territory-numbers
+      - geojson-all
+      - geojson-one
+      - territory-colors
+    metrics:
+      enabled: true
   threads:
     virtual:
       enabled: true
@@ -88,3 +97,35 @@ otel:
     exporter: none
   metrics:
     exporter: none
+
+---
+# Profile: observability — enables OTLP trace export to collector.
+# Activate with SPRING_PROFILES_ACTIVE=observability or OTEL_TRACES_EXPORTER=otlp.
+spring:
+  config:
+    activate:
+      on-profile: observability
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+otel:
+  traces:
+    exporter: otlp
+
+---
+# Profile: prod — conservative sampling, stricter health details.
+spring:
+  config:
+    activate:
+      on-profile: prod
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  endpoint:
+    health:
+      show-details: never

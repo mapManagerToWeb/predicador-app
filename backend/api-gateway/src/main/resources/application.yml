@@ -73,6 +73,37 @@ otel:
   metrics:
     exporter: none
 
+---
+# Profile: observability — enables OTLP trace export to collector.
+spring:
+  config:
+    activate:
+      on-profile: observability
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+otel:
+  traces:
+    exporter: otlp
+
+---
+# Profile: prod — conservative sampling, stricter health details.
+spring:
+  config:
+    activate:
+      on-profile: prod
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  endpoint:
+    health:
+      show-details: never
+
 # Resilience4j circuit breakers y timelimiter. Nombres coinciden con los
 # usados en RouteConfig.customRouteLocator(). Umbrales conservadores para
 # no abrir el circuito con el primer error transitorio.

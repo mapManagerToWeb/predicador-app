@@ -5,9 +5,10 @@ import com.predicador.reporting.client.WhatsAppMessageClient;
 import com.predicador.reporting.config.WhatsAppProperties;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -29,7 +30,12 @@ class ReportSendServiceTest {
     @Mock private WhatsAppMessageClient messageClient;
     @Mock private WhatsAppProperties props;
 
-    @InjectMocks private ReportSendService sendService;
+    private ReportSendService sendService;
+
+    @BeforeEach
+    void setUp() {
+        sendService = new ReportSendService(messageService, mediaClient, messageClient, props, new SimpleMeterRegistry());
+    }
 
     @Test
     void sendReport_conScreenshot_territorioIncompleto() {
