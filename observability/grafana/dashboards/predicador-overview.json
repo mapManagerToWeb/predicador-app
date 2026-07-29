@@ -149,12 +149,188 @@
       "id": 20,
       "title": "CB state (0=closed, 1=open, 2=half_open)",
       "datasource": "Prometheus",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 35},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 35},
       "targets": [
         {
           "expr": "resilience4j_circuitbreaker_state",
-          "legendFormat": "{{name}} · {{state}}",
+          "legendFormat": "{{name}}",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 21,
+      "title": "CB failure rate",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 35},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
+      "targets": [
+        {
+          "expr": "resilience4j_circuitbreaker_failure_rate",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 400,
+      "title": "Business Metrics",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 43},
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "id": 30,
+      "title": "WhatsApp sends / min",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 44},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum(rate(whatsapp_send_total[5m])) * 60",
+          "legendFormat": "total",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(whatsapp_send_success_total[5m])) * 60",
+          "legendFormat": "success",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(whatsapp_send_failure_total[5m])) * 60",
+          "legendFormat": "failure",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 31,
+      "title": "WhatsApp send duration P95 (ms)",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 44},
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(whatsapp_send_duration_seconds_bucket[5m])) * 1000",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 32,
+      "title": "Report persistence duration P95 (ms)",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 44},
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(report_persistence_duration_seconds_bucket[5m])) * 1000",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 500,
+      "title": "JVM & Cache",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 52},
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "id": 40,
+      "title": "GC pause time (ms/s)",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 53},
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum by (application) (rate(jvm_gc_pause_seconds_sum[5m])) * 1000",
+          "legendFormat": "{{application}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 41,
+      "title": "JVM threads live",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 53},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum by (application) (jvm_threads_live_threads)",
+          "legendFormat": "{{application}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 42,
+      "title": "Cache hits vs misses",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 53},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum by (application, cache) (rate(cache_gets_total{result=\"hit\"}[5m]))",
+          "legendFormat": "{{application}} {{cache}} hit",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (application, cache) (rate(cache_gets_total{result=\"miss\"}[5m]))",
+          "legendFormat": "{{application}} {{cache}} miss",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 600,
+      "title": "Territory GeoJSON",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 61},
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "id": 50,
+      "title": "GeoJSON load duration P95 (ms)",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 62},
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(territory_geojson_load_duration_seconds_bucket[5m])) * 1000",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 51,
+      "title": "HikariCP active connections",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 62},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum by (application) (hikaricp_connections_active)",
+          "legendFormat": "{{application}} active",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (application) (hikaricp_connections_max)",
+          "legendFormat": "{{application}} max",
+          "refId": "B"
         }
       ]
     }

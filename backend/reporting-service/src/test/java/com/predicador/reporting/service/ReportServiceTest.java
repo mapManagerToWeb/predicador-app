@@ -3,9 +3,10 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,8 +23,12 @@ class ReportServiceTest {
     @Mock
     private ReportRepository repository;
 
-    @InjectMocks
     private ReportService reportService;
+
+    @BeforeEach
+    void setUp() {
+        reportService = new ReportService(repository, new SimpleMeterRegistry());
+    }
 
     private Report createReport(Integer id, String manzanaId, String nombre, String apellido,
                                  String sessionTime, String estado, Long territorioNumero) {

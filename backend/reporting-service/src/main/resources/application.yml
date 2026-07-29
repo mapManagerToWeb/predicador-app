@@ -77,18 +77,45 @@ otel:
     name: reporting-service
   exporter:
     otlp:
-      # Por defecto vacío → sin exporter (no spammea logs cuando el collector
-      # está caído). Set OTEL_EXPORTER_OTLP_ENDPOINT en el env para activarlo.
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
       protocol: http/protobuf
   traces:
-    # Cuando el endpoint está vacío, deshabilitamos el exporter para no
-    # generar retry storms hacia un host inexistente.
     exporter: ${OTEL_TRACES_EXPORTER:none}
   logs:
-    exporter: none  # logs van por logback JSON, no por OTLP
+    exporter: none
   metrics:
-    exporter: none  # métricas via Prometheus scrape, no via OTLP push
+    exporter: none
+
+---
+# Profile: observability — enables OTLP trace export to collector.
+spring:
+  config:
+    activate:
+      on-profile: observability
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+otel:
+  traces:
+    exporter: otlp
+
+---
+# Profile: prod — conservative sampling, stricter health details.
+spring:
+  config:
+    activate:
+      on-profile: prod
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  endpoint:
+    health:
+      show-details: never
 
 app:
   session:

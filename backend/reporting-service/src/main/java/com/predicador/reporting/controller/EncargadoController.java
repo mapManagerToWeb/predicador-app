@@ -6,9 +6,12 @@ import com.predicador.reporting.service.EncargadoService;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -45,23 +48,34 @@ public class EncargadoController {
     }
 
     @PostMapping("/buscar-crear")
-    public ResponseEntity<LoginResponse> buscarOCrear(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> buscarOCrear(@RequestBody Map<String, String> body) {
         String nombre = body.getOrDefault("nombre", "");
         String apellido = body.getOrDefault("apellido", "");
         String telefono = body.get("telefono");
-        return encargadoService.buscarOCrear(nombre, apellido, telefono)
-                .map(this::withToken)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.badRequest().build());
+        var result = encargadoService.buscarOCrear(nombre, apellido, telefono);
+        if (result.isPresent()) {
+            return ResponseEntity.ok(withToken(result.get()));
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "Nombre y apellido son requeridos");
+        problem.setTitle("Datos incompletos");
+        problem.setType(URI.create("https://api.predicador.com/errors/bad-request"));
+        return ResponseEntity.badRequest().body(problem);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         String telefono = body.get("telefono");
-        return encargadoService.buscarPorTelefono(telefono)
-                .map(this::withToken)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        var result = encargadoService.buscarPorTelefono(telefono);
+        if (result.isPresent()) {
+            return ResponseEntity.ok(withToken(result.get()));
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, "Encargado no encontrado con el teléfono proporcionado");
+        problem.setTitle("Encargado no encontrado");
+        problem.setType(URI.create("https://api.predicador.com/errors/not-found"));
+        problem.setProperty("resource", "Encargado");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
     }
 
     /**

@@ -3,27 +3,41 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
 public class ReportService {
 
     private final ReportRepository repository;
+    private final MeterRegistry registry;
 
-    public ReportService(ReportRepository repository) {
+    public ReportService(ReportRepository repository, MeterRegistry registry) {
         this.repository = repository;
+        this.registry = registry;
     }
 
     public List<ReportDto> createReports(List<ReportDto> dtos) {
-        List<Report> reports = dtos.stream().map(this::toEntity).collect(Collectors.toList());
-        List<Report> saved = repository.saveAll(reports);
-        return saved.stream().map(this::toDto).collect(Collectors.toList());
+        long start = System.nanoTime();
+        try {
+            List<Report> reports = dtos.stream().map(this::toEntity).collect(Collectors.toList());
+            List<Report> saved = repository.saveAll(reports);
+            return saved.stream().map(this::toDto).collect(Collectors.toList());
+        } finally {
+            long elapsed = System.nanoTime() - start;
+            Timer.builder("report.persistence.duration")
+                    .description("Tiempo para persistir reportes en base de datos")
+                    .register(registry)
+                    .record(elapsed, TimeUnit.NANOSECONDS);
+        }
     }
 
     public List<ReportDto> getAllReports() {
