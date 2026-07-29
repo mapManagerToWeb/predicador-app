@@ -1,0 +1,40 @@
+# Prometheus scrape config for Predicador backend services.
+#
+# Each Spring Boot service exposes /actuator/prometheus once
+# management.endpoints.web.exposure.include lists 'prometheus'.
+# Metrics are tagged with `application=<service>` via management.metrics.tags
+# so every dashboard variable can filter by service.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: predicador
+
+scrape_configs:
+  - job_name: api-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['api-gateway:8080']
+        labels:
+          application: api-gateway
+
+  - job_name: territory-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['territory-service:8081']
+        labels:
+          application: territory-service
+
+  - job_name: reporting-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['reporting-service:8082']
+        labels:
+          application: reporting-service
+
+  # Self-monitoring: Prometheus scrapes itself so we can alert on cardinality
+  # explosions or missed scrapes.
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

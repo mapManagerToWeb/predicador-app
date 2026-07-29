@@ -92,6 +92,13 @@ public class RouteConfig {
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(200), Duration.ofSeconds(1), 2, true)))
                         .uri("lb://reporting-service"))
+                // Real User Monitoring sink: público, alto volumen, sin retries
+                // (métrica idempotente pero perder una es aceptable).
+                .route("rum-sink", r -> r
+                        .path("/api/v1/rum")
+                        .filters(f -> f.circuitBreaker(c -> c.setName("reportingCB")
+                                .setFallbackUri("forward:/fallback/reporting")))
+                        .uri("lb://reporting-service"))
                 .build();
     }
 

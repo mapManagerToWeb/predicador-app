@@ -8,7 +8,6 @@ import {
 import * as L from 'leaflet';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
-import { type ManzanaMarcada, type FeatureLayer, type DatosParciales } from './map-report.service';
 import { MapStateService } from './services/map-state.service';
 import { MapRenderingService } from './services/map-rendering.service';
 import { MapInteractionService } from './services/map-interaction.service';
@@ -18,8 +17,6 @@ import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
 import { TOAST_MESSAGES } from './utils/map-constants';
 import type { ModoMarcado } from './types/map.types';
-
-export type { ManzanaMarcada, FeatureLayer, DatosParciales };
 
 @Component({
   selector: 'app-map',
@@ -193,7 +190,7 @@ export class MapPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.state.cancelPendingStyleUpdates();
+    this.rendering.cancelPendingStyleUpdates();
     this.rendering.destroy();
   }
 }

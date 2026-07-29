@@ -54,4 +54,37 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      access: unrestricted
+  metrics:
+    tags:
+      application: territory-service
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+
+otel:
+  service:
+    name: territory-service
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+      protocol: http/protobuf
+  traces:
+    exporter: ${OTEL_TRACES_EXPORTER:none}
+  logs:
+    exporter: none
+  metrics:
+    exporter: none

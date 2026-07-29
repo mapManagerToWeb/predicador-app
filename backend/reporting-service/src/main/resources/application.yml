@@ -46,7 +46,49 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # prometheus scrape endpoint + métricas granulares + info build.
+        # No exponer env/beans/heapdump en prod: filtran secretos.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      access: unrestricted
+  metrics:
+    tags:
+      application: reporting-service
+    distribution:
+      # Percentiles p50, p95, p99 en todos los timers HTTP (dashboards de RED).
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+  tracing:
+    # 100% de traces en dev/QA. En prod ajustar a 0.1 desde env.
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+
+# OpenTelemetry Java Agent-style opts (leídos por opentelemetry-spring-boot-starter).
+otel:
+  service:
+    name: reporting-service
+  exporter:
+    otlp:
+      # Por defecto vacío → sin exporter (no spammea logs cuando el collector
+      # está caído). Set OTEL_EXPORTER_OTLP_ENDPOINT en el env para activarlo.
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+      protocol: http/protobuf
+  traces:
+    # Cuando el endpoint está vacío, deshabilitamos el exporter para no
+    # generar retry storms hacia un host inexistente.
+    exporter: ${OTEL_TRACES_EXPORTER:none}
+  logs:
+    exporter: none  # logs van por logback JSON, no por OTLP
+  metrics:
+    exporter: none  # métricas via Prometheus scrape, no via OTLP push
 
 app:
   session:

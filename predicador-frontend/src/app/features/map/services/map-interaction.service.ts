@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingService } from './map-rendering.service';
-import { MAX_PUNTOS_PARCIAL } from '../utils/territory-colors';
+import { MAX_PUNTOS_PARCIAL } from '../utils/map-constants';
 import type { SnappedPoint, ManzanaIndex } from '../types/map.types';
 import { snapToContour, pointInPolygon, projectOnSegment } from '../map-geometry';
 

@@ -48,9 +48,3 @@ export interface Reporte {
   predicacion: string;
 }
 
-export interface TerritoryData {
-  number: number;
-  color: string;
-  bounds: L.LatLngBounds;
-  fc: GeoJSON.FeatureCollection;
-}

@@ -5,9 +5,8 @@ import { MapRenderingService } from './map-rendering.service';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { getTerritoryFillOpacity } from '../utils/territory-colors';
-import { TOAST_MESSAGES } from '../utils/map-constants';
+import { TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
 import { elegirUltimoReporte } from '../utils/report-utils';
-import { STYLE_DEFAULTS } from '../utils/map-constants';
 import type { ModoMarcado } from '../types/map.types';
 
 @Injectable({ providedIn: 'root' })
@@ -51,11 +50,7 @@ export class MapSelectionService {
         const isComplete = total > 0 && marcadas >= total;
         const baseOpacity = getTerritoryFillOpacity(isComplete);
 
-        featureLayer.layer.eachLayer(l => {
-          if (l instanceof L.Path) {
-            l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight });
-          }
-        });
+        this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight });
       }
 
       this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
@@ -125,11 +120,7 @@ export class MapSelectionService {
           const isComplete = total > 0 && marcadas >= total;
           const baseOpacity = getTerritoryFillOpacity(isComplete);
 
-          featureLayer.layer.eachLayer(l => {
-            if (l instanceof L.Path) {
-              l.setStyle({ opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight });
-            }
-          });
+          this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight });
         }
 
         this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
