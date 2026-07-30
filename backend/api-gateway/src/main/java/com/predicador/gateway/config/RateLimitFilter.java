@@ -14,6 +14,7 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -120,20 +121,48 @@ public class RateLimitFilter implements WebFilter, Ordered {
         return tooManyRequests(exchange);
     }
 
+    /**
+     * Extracts the client IP for rate-limit bucketing.
+     *
+     * <p>{@code X-Forwarded-For} is only trusted when the immediate remote
+     * address belongs to a private/loopback range — i.e. the request
+     * genuinely arrived through a reverse proxy on the internal network.
+     * Direct internet callers (remote address is public) can never spoof
+     * the header this way.</p>
+     */
     private static String clientIp(ServerWebExchange exchange) {
-        List<String> forwarded = exchange.getRequest().getHeaders().get("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isEmpty()) {
-            String first = forwarded.get(0);
-            int comma = first.indexOf(',');
-            String ip = (comma > 0 ? first.substring(0, comma) : first).trim();
-            if (!ip.isEmpty()) {
-                return ip;
+        InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
+        String socketIp = remote != null && remote.getAddress() != null
+                ? remote.getAddress().getHostAddress()
+                : null;
+
+        // Only honour X-Forwarded-For when the immediate peer is a trusted
+        // reverse proxy (private or loopback address).  A public remote
+        // address means the caller reached the gateway directly and must
+        // not be allowed to forge a different identity.
+        if (socketIp != null && isTrustedProxy(socketIp)) {
+            List<String> forwarded = exchange.getRequest().getHeaders().get("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isEmpty()) {
+                String first = forwarded.get(0);
+                int comma = first.indexOf(',');
+                String ip = (comma > 0 ? first.substring(0, comma) : first).trim();
+                if (!ip.isEmpty()) {
+                    return ip;
+                }
             }
         }
-        InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
-        return remote != null && remote.getAddress() != null
-                ? remote.getAddress().getHostAddress()
-                : "unknown";
+
+        return socketIp != null ? socketIp : "unknown";
+    }
+
+    /** Returns true if the address is loopback or RFC 1918 / RFC 4193 private. */
+    private static boolean isTrustedProxy(String ip) {
+        try {
+            InetAddress addr = InetAddress.getByName(ip);
+            return addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static Bucket bucket(Cache<String, Bucket> store, String key, Bandwidth limit) {
