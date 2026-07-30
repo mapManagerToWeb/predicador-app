@@ -1,19 +1,14 @@
+# Local development defaults. When config-server is running it overrides
+# most of these values via the remote api-gateway.yml.
 spring:
   application:
     name: api-gateway
-  codec:
-    max-in-memory-size: 10MB
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: false
 
 app:
   admin:
     username: ${ADMIN_USERNAME:admin}
-    # Preferir ADMIN_PASSWORD_BCRYPT en producción. ADMIN_PASSWORD queda como
-    # fallback plano sólo para desarrollo local.
+    # Preferir ADMIN_PASSWORD_BCRYPT en produccion. ADMIN_PASSWORD queda como
+    # fallback plano solo para desarrollo local.
     password: ${ADMIN_PASSWORD:}
     password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
   cors:
@@ -35,47 +30,6 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,gateway,circuitbreakers,metrics,prometheus
-  endpoint:
-    health:
-      show-details: when-authorized
-    prometheus:
-      access: restricted
-  metrics:
-    tags:
-      application: api-gateway
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-        spring.cloud.gateway.requests: true
-      percentiles:
-        http.server.requests: 0.5, 0.95, 0.99
-        spring.cloud.gateway.requests: 0.5, 0.95, 0.99
-  tracing:
-    sampling:
-      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
-  otlp:
-    tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
-
-otel:
-  service:
-    name: api-gateway
-  exporter:
-    otlp:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
-      protocol: http/protobuf
-  traces:
-    exporter: ${OTEL_TRACES_EXPORTER:none}
-  logs:
-    exporter: none
-  metrics:
-    exporter: none
 
 ---
 # Profile: observability — enables OTLP trace export to collector.
@@ -107,36 +61,3 @@ management:
   endpoint:
     health:
       show-details: never
-
-# Resilience4j circuit breakers y timelimiter. Nombres coinciden con los
-# usados en RouteConfig.customRouteLocator(). Umbrales conservadores para
-# no abrir el circuito con el primer error transitorio.
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        sliding-window-type: COUNT_BASED
-        sliding-window-size: 20
-        minimum-number-of-calls: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 15s
-        permitted-number-of-calls-in-half-open-state: 3
-        automatic-transition-from-open-to-half-open-enabled: true
-    instances:
-      territoryCB:
-        base-config: default
-      reportingCB:
-        base-config: default
-  timelimiter:
-    configs:
-      default:
-        timeout-duration: 5s
-        cancel-running-future: true
-    instances:
-      territoryCB:
-        base-config: default
-      reportingCB:
-        # El endpoint de enviar reporte llama a la Graph API de Meta y sube
-        # una imagen; tolera timeouts más largos.
-        timeout-duration: 20s
-        cancel-running-future: true
