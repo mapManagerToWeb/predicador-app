@@ -17,7 +17,6 @@ spring:
   jpa:
     defer-datasource-initialization: true
     hibernate:
-      # Ver comentario en territory-service: Hibernate gestiona el schema.
       ddl-auto: update
     show-sql: false
     properties:
@@ -37,21 +36,9 @@ server:
 management:
   server:
     port: 8092
-
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
-  instance:
-    prefer-ip-address: true
-    health-check-url-path: /actuator/health
-
-management:
   endpoints:
     web:
       exposure:
-        # prometheus scrape endpoint + métricas granulares + info build.
-        # No exponer env/beans/heapdump en prod: filtran secretos.
         include: health,info,metrics,prometheus
   endpoint:
     health:
@@ -62,26 +49,31 @@ management:
     tags:
       application: reporting-service
     distribution:
-      # Percentiles p50, p95, p99 en todos los timers HTTP (dashboards de RED).
       percentiles-histogram:
         http.server.requests: true
       percentiles:
         http.server.requests: 0.5, 0.95, 0.99
   tracing:
-    # 100% de traces en dev/QA. En prod ajustar a 0.1 desde env.
     sampling:
       probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
   otlp:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
 
-# OpenTelemetry Java Agent-style opts (leídos por opentelemetry-spring-boot-starter).
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    health-check-url-path: /actuator/health
+
 otel:
   service:
     name: reporting-service
   exporter:
     otlp:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}
       protocol: http/protobuf
   traces:
     exporter: ${OTEL_TRACES_EXPORTER:none}
@@ -123,8 +115,6 @@ management:
 
 app:
   session:
-    # Debe ser >= 32 bytes de entropía real. Si queda vacío, los tokens
-    # no se emiten (modo compatibilidad hacia atrás durante despliegue).
     secret: ${SESSION_SECRET:}
     ttl-hours: ${SESSION_TTL_HOURS:12}
 
@@ -132,7 +122,7 @@ whatsapp:
   api-version: "v21.0"
   base-url: "https://graph.facebook.com"
   phone-number-id: ${WHATSAPP_PHONE_ID:}
-  access-token: ${WHATSAPP_ACCESS_TOKEN:}
-  template-name: ${WHATSAPP_TEMPLATE:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:-}
+  template-name: ${WHATSAPP_TEMPLATE:-asignacion_territorio}
   language-code: ${WHATSAPP_LANG:es_CL}
-  destination-number: ${WHATSAPP_DESTINATION:}
+  destination-number: ${WHATSAPP_DESTINATION:-56936577203}
