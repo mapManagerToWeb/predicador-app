@@ -25,6 +25,10 @@ app:
 server:
   port: 8080
 
+management:
+  server:
+    port: 8090
+
 eureka:
   client:
     service-url:
@@ -41,7 +45,7 @@ management:
     health:
       show-details: when-authorized
     prometheus:
-      access: unrestricted
+      access: restricted
   metrics:
     tags:
       application: api-gateway

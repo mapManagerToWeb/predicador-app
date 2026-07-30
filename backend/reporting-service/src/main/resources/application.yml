@@ -34,6 +34,10 @@ spring:
 server:
   port: 8082
 
+management:
+  server:
+    port: 8092
+
 eureka:
   client:
     service-url:
@@ -53,7 +57,7 @@ management:
     health:
       show-details: when-authorized
     prometheus:
-      access: unrestricted
+      access: restricted
   metrics:
     tags:
       application: reporting-service
