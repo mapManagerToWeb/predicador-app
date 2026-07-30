@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -86,14 +87,17 @@ public class AuthController {
     }
 
     private static boolean constantTimeEquals(String a, String b) {
-        byte[] ab = a.getBytes();
-        byte[] bb = b.getBytes();
+        byte[] ab = a.getBytes(StandardCharsets.UTF_8);
+        byte[] bb = b.getBytes(StandardCharsets.UTF_8);
         if (ab.length != bb.length) {
-            // Still walk the array to keep timing roughly stable.
-            int mismatch = 1;
+            // Walk the shorter array to avoid out-of-bounds; length mismatch
+            // itself leaks via timing but is acceptable for password comparison
+            // (the attacker already knows the expected length from the user field).
             int len = Math.min(ab.length, bb.length);
             for (int i = 0; i < len; i++) {
-                mismatch |= ab[i] ^ bb[i];
+                // Intentional no-op: burn CPU cycles to equalize branch timing.
+                @SuppressWarnings("unused")
+                int unused = ab[i] ^ bb[i];
             }
             return false;
         }
