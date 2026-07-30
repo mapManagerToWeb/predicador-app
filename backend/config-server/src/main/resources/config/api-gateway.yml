@@ -30,7 +30,7 @@ management:
     health:
       show-details: when-authorized
     prometheus:
-      access: restricted
+      access: unrestricted
   metrics:
     tags:
       application: api-gateway
