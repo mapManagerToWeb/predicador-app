@@ -67,14 +67,11 @@ services:
       # Si queda vacío, los tokens no se emiten (modo compatibilidad hacia atrás durante despliegue).
       - SESSION_SECRET=${SESSION_SECRET:-}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
-      # OpenTelemetry: si OTEL_EXPORTER_OTLP_ENDPOINT queda vacío, el exporter
-      # se deshabilita solo (sin retry storms hacia un collector caído). Para
-      # activarlo con el perfil observability, exportar en el shell:
+      # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
+      # Para activar tracing con el colector, levantar con el perfil observability
+      # y exportar en el shell del host:
       #   export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       #   export OTEL_TRACES_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
-      - OTEL_TRACES_EXPORTER=${OTEL_TRACES_EXPORTER:-none}
-      - OTEL_SAMPLING_PROBABILITY=${OTEL_SAMPLING_PROBABILITY:-1.0}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8090/actuator/health || exit 1"]
       interval: 10s
@@ -104,9 +101,6 @@ services:
       # secret para poder verificar los tokens que emiten los otros servicios.
       - SESSION_SECRET=${SESSION_SECRET:-}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
-      - OTEL_TRACES_EXPORTER=${OTEL_TRACES_EXPORTER:-none}
-      - OTEL_SAMPLING_PROBABILITY=${OTEL_SAMPLING_PROBABILITY:-1.0}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/actuator/health || exit 1"]
       interval: 10s
@@ -140,9 +134,6 @@ services:
       # sean verificables aquí cuando activemos enforcement server-side.
       - SESSION_SECRET=${SESSION_SECRET:-}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
-      - OTEL_TRACES_EXPORTER=${OTEL_TRACES_EXPORTER:-none}
-      - OTEL_SAMPLING_PROBABILITY=${OTEL_SAMPLING_PROBABILITY:-1.0}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
       interval: 10s
