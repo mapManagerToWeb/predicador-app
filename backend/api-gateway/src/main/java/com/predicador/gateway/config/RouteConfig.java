@@ -5,7 +5,6 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.cors.CorsConfiguration;
@@ -43,7 +42,6 @@ public class RouteConfig {
                 .route("territory-colors", r -> r
                         .path("/api/v1/territories/colors")
                         .filters(f -> f
-                                .setResponseHeader(HttpHeaders.CACHE_CONTROL, "max-age=600")
                                 .circuitBreaker(c -> c.setName("territoryCB")
                                         .setFallbackUri("forward:/fallback/territory"))
                                 .retry(config -> config
@@ -54,7 +52,6 @@ public class RouteConfig {
                 .route("territory-geojson-all", r -> r
                         .path("/api/v1/territories/all/geojson")
                         .filters(f -> f
-                                .setResponseHeader(HttpHeaders.CACHE_CONTROL, "max-age=300")
                                 .circuitBreaker(c -> c.setName("territoryCB")
                                         .setFallbackUri("forward:/fallback/territory"))
                                 .retry(config -> config
