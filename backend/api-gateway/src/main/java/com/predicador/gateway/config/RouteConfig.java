@@ -14,7 +14,6 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Gateway routing configuration.
@@ -33,9 +32,6 @@ public class RouteConfig {
 
     @Value("${app.cors.allowed-origins:http://localhost:4200}")
     private String allowedOrigins;
-
-    private static final Set<HttpMethod> IDEMPOTENT = Set.of(
-            HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS);
 
     @Bean
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
@@ -117,11 +113,6 @@ public class RouteConfig {
         source.registerCorsConfiguration("/**", config);
 
         return new CorsWebFilter(source);
-    }
-
-    /** Marker exposed so tests / metrics can see which HTTP verbs are idempotent. */
-    public static Set<HttpMethod> idempotentMethods() {
-        return IDEMPOTENT;
     }
 
     /** Marker for the fallback controller in case the enum value is needed. */
