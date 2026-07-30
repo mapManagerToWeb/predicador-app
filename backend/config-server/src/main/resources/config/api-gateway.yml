@@ -3,6 +3,11 @@ spring:
     name: api-gateway
   codec:
     max-in-memory-size: 10MB
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
 
 server:
   port: 8080
@@ -15,13 +20,27 @@ eureka:
     prefer-ip-address: true
 
 management:
+  server:
+    port: 8090
   endpoints:
     web:
       exposure:
         include: health,info,gateway,circuitbreakers,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      access: restricted
   metrics:
     tags:
       application: api-gateway
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        spring.cloud.gateway.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        spring.cloud.gateway.requests: 0.5, 0.95, 0.99
   tracing:
     sampling:
       probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
@@ -61,8 +80,10 @@ resilience4j:
     configs:
       default:
         timeout-duration: 5s
+        cancel-running-future: true
     instances:
       territoryCB:
         base-config: default
       reportingCB:
         timeout-duration: 20s
+        cancel-running-future: true
