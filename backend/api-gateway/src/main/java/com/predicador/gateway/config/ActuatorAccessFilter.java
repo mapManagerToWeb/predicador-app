@@ -8,8 +8,6 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-import java.util.Set;
-
 /**
  * Blocks external access to sensitive Actuator endpoints.
  *
@@ -20,7 +18,9 @@ import java.util.Set;
  *
  * <p>Endpoints explicitly allowed through the gateway:
  * <ul>
- *   <li>{@code /actuator/health} — required by container orchestrators and load balancers</li>
+ *   <li>{@code /actuator/health} and subpaths ({@code /actuator/health/liveness},
+ *       {@code /actuator/health/readiness}) — required by container orchestrators
+ *       and load balancers</li>
  * </ul>
  *
  * <p>All other actuator endpoints (env, beans, configprops, heapdump, threaddump,
@@ -30,7 +30,7 @@ import java.util.Set;
 public class ActuatorAccessFilter implements WebFilter, Ordered {
 
     private static final String ACTUATOR_PREFIX = "/actuator";
-    private static final Set<String> ALLOWED_PATHS = Set.of("/actuator/health", "/actuator/health/**");
+    private static final String HEALTH_PREFIX = "/actuator/health";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -44,8 +44,17 @@ public class ActuatorAccessFilter implements WebFilter, Ordered {
         return chain.filter(exchange);
     }
 
+    /**
+     * Allows {@code /actuator/health} exactly and any subpath under it
+     * ({@code /actuator/health/liveness}, {@code /actuator/health/readiness}).
+     * Everything else under {@code /actuator} is blocked.
+     */
     private static boolean isAllowed(String path) {
-        return ALLOWED_PATHS.stream().anyMatch(path::startsWith);
+        if (path.equals(HEALTH_PREFIX)) {
+            return true;
+        }
+        // /actuator/health/* or /actuator/health/** — any subpath
+        return path.startsWith(HEALTH_PREFIX + "/");
     }
 
     @Override
