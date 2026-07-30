@@ -22,9 +22,6 @@ spring:
       enabled: true
   jpa:
     hibernate:
-      # Hibernate sigue gestionando el schema hoy. Flyway se encarga sólo de
-      # migraciones incrementales versionadas (índices, etc.). Migrar a
-      # ddl-auto: validate + un V1__baseline.sql real es un paso posterior.
       ddl-auto: update
     show-sql: false
     properties:
@@ -33,12 +30,9 @@ spring:
         format_sql: true
   flyway:
     enabled: true
-    # Permite adoptar Flyway sobre una base que ya existe (Hibernate creó el
-    # schema previamente). Con baseline-version=0 los V1 actuales se aplican.
     baseline-on-migrate: true
     baseline-version: 0
     locations: classpath:db/migration
-    # Compatibilidad con Postgres 16+: fuerza el driver moderno de Flyway.
     validate-on-migrate: true
 
 server:
@@ -47,23 +41,6 @@ server:
 management:
   server:
     port: 8091
-
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
-  instance:
-    prefer-ip-address: true
-    health-check-url-path: /actuator/health
-
-app:
-  session:
-    # Debe coincidir con api-gateway y reporting-service. Si queda vacío,
-    # SessionAuthFilter arranca en modo compatibilidad (no aplica enforcement).
-    secret: ${SESSION_SECRET:}
-    ttl-hours: ${SESSION_TTL_HOURS:12}
-
-management:
   endpoints:
     web:
       exposure:
@@ -88,12 +65,25 @@ management:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
 
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    health-check-url-path: /actuator/health
+
+app:
+  session:
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+
 otel:
   service:
     name: territory-service
   exporter:
     otlp:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}
       protocol: http/protobuf
   traces:
     exporter: ${OTEL_TRACES_EXPORTER:none}
@@ -104,7 +94,6 @@ otel:
 
 ---
 # Profile: observability — enables OTLP trace export to collector.
-# Activate with SPRING_PROFILES_ACTIVE=observability or OTEL_TRACES_EXPORTER=otlp.
 spring:
   config:
     activate:
