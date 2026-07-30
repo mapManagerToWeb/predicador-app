@@ -6,7 +6,7 @@ COPY discovery-server/pom.xml discovery-server/
 COPY api-gateway/pom.xml api-gateway/
 COPY territory-service/pom.xml territory-service/
 COPY reporting-service/pom.xml reporting-service/
-RUN mvn dependency:go-offline -pl territory-service -am -B || true
+RUN mvn dependency:go-offline -pl territory-service -am -B
 COPY . .
 RUN mvn clean package -pl territory-service -am -DskipTests -B
 
