@@ -24,6 +24,14 @@ management:
   server:
     port: 8090
 
+otel:
+  traces:
+    exporter: none
+  metrics:
+    exporter: none
+  logs:
+    exporter: none
+
 eureka:
   client:
     service-url:

@@ -81,12 +81,8 @@ app:
 otel:
   service:
     name: territory-service
-  exporter:
-    otlp:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}
-      protocol: http/protobuf
   traces:
-    exporter: ${OTEL_TRACES_EXPORTER:none}
+    exporter: none
   logs:
     exporter: none
   metrics:
@@ -106,6 +102,10 @@ management:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
 otel:
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}
+      protocol: http/protobuf
   traces:
     exporter: otlp
 
