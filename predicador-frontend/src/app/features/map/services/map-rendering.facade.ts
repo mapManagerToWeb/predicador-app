@@ -8,6 +8,7 @@ import { MapTerritoryLayerService, type ManzanaClickHandler } from './map-territ
 import { MapStyleService } from './map-style.service';
 import { MapCaptureService } from './map-capture.service';
 import { MapPartialDrawService } from './map-partial-draw.service';
+import { MapStateService } from './map-state.service';
 import type {
   ManzanaIndex,
   FeatureLayer,
@@ -36,6 +37,7 @@ export class MapRenderingFacade {
   private styles = inject(MapStyleService);
   private capture = inject(MapCaptureService);
   private partialDraw = inject(MapPartialDrawService);
+  private state = inject(MapStateService);
 
   // ─── Engine delegation ───────────────────────────────────────────
 
@@ -252,37 +254,28 @@ export class MapRenderingFacade {
     this.partialDraw.clearPoligonoParcialRef();
   }
 
-  // ─── Extra layers (used by selection/partial services) ────────────
-
-  private extraLayers: L.Layer[] = [];
+  // ─── Extra layers (delegated to territory-layer) ─────────────────
 
   addExtraLayer(layer: L.Layer): void {
-    this.extraLayers.push(layer);
+    this.territories.addExtraLayer(layer);
   }
 
   removeExtraLayer(layer: L.Layer): void {
-    this.extraLayers = this.extraLayers.filter(l => l !== layer);
-    this.getMap()?.removeLayer(layer);
+    this.territories.removeExtraLayer(layer);
   }
 
   clearExtraLayers(): void {
-    const map = this.getMap();
-    for (const l of this.extraLayers) {
-      map?.removeLayer(l);
-    }
-    this.extraLayers = [];
+    this.territories.clearExtraLayers();
   }
 
-  // ─── Current territory color (state carrier) ─────────────────────
-
-  private _currentTerritoryColor = '';
+  // ─── Current territory color (delegated to state) ───────────────
 
   setCurrentTerritoryColor(color: string): void {
-    this._currentTerritoryColor = color;
+    this.state.currentTerritoryColor.set(color);
   }
 
   getCurrentTerritoryColor(): string {
-    return this._currentTerritoryColor;
+    return this.state.currentTerritoryColor();
   }
 
   private computeBaseStyle(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): L.PathOptions {
@@ -295,15 +288,6 @@ export class MapRenderingFacade {
   }
 
   // ─── Private helpers ─────────────────────────────────────────────
-
-  private baseStyleForTerritorio(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): import('leaflet').PathOptions {
-    const total = this.territories.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
-    const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
-    const isComplete = total > 0 && marcadas >= total;
-    const fillOpacity = getTerritoryFillOpacity(isComplete);
-    const color = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
-    return { opacity: 1, fillOpacity, color, weight: 4 };
-  }
 
   // ─── Destroy ─────────────────────────────────────────────────────
 
