@@ -22,6 +22,7 @@ export class MapStateService {
   isSatellite = signal(false);
   predicacion = signal<string>('tarde');
   screenshotPreview = signal<string | null>(null);
+  currentTerritoryColor = signal('');
 
   private _datosParcialesGuardados: Map<number, { puntos: SnappedPoint[]; geometria: string }> = new Map();
   private _manzanaSeleccionada: L.Polygon | null = null;
@@ -73,6 +74,7 @@ export class MapStateService {
     this.isLoading.set(false);
     this.isSatellite.set(false);
     this.screenshotPreview.set(null);
+    this.currentTerritoryColor.set('');
     this._datosParcialesGuardados = new Map();
     this._manzanaSeleccionada = null;
     this._manzanaSeleccionadaColor = '';

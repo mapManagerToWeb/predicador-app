@@ -28,6 +28,7 @@ export class MapTerritoryLayerService {
   private territoryLabels = signal<L.Marker[]>([]);
   private territoryDataCache = signal<Map<number, TerritorioCacheData>>(new Map());
   private manzanaClickHandler: ManzanaClickHandler | null = null;
+  private extraLayers: L.Layer[] = [];
 
   constructor(private engine: MapEngineService) {}
 
@@ -159,6 +160,23 @@ export class MapTerritoryLayerService {
 
   getTerritoryLabels(): L.Marker[] {
     return this.territoryLabels();
+  }
+
+  addExtraLayer(layer: L.Layer): void {
+    this.extraLayers.push(layer);
+  }
+
+  removeExtraLayer(layer: L.Layer): void {
+    this.extraLayers = this.extraLayers.filter(l => l !== layer);
+    this.engine.getMap()?.removeLayer(layer);
+  }
+
+  clearExtraLayers(): void {
+    const map = this.engine.getMap();
+    for (const l of this.extraLayers) {
+      map?.removeLayer(l);
+    }
+    this.extraLayers = [];
   }
 
   getManzanaCountByTerritorio(territorioNum: number): number {
