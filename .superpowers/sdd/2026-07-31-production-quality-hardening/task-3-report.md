@@ -50,3 +50,18 @@
 
 - V3 can only classify legacy V2 rows from the fields V2 stored; rows left by a crash before this fix are conservatively terminal failures rather than silently reported successes.
 - The V1.1 cleanup keeps the lowest encargado ID and deletes normalized duplicates; deployments should verify that no external process depends on duplicate IDs before migration.
+
+## Re-review Fixes
+
+### Coverage
+
+- `V1_1__deduplicate_encargado_identity.sql` now computes the lowest retained ID, remaps every `registro_predicacion.encargado_id` reference, deletes only duplicate rows, and creates the normalized unique index afterward.
+- `ReportSendService.reserve()` now has one bounded duplicate-race resolution path. Persistent/non-duplicate database failures are mapped to a controlled 503 integration failure instead of recursive retry.
+- `WhatsAppDeliveryRepository.claimStale()` is explicitly `@Transactional`; the hardening test verifies the annotation and the stale reservation test exercises the service call path.
+
+### Verification
+
+- Red: `mvn -pl reporting-service -Dtest=Task3MigrationTest,Task3HardeningTest test -q` reproduced the missing migration remap, recursive `StackOverflowError`, and missing transaction annotation.
+- Green focused: `mvn -pl reporting-service -Dtest=Task3MigrationTest,Task3HardeningTest test -q` exited 0.
+- Required suite: `mvn -pl reporting-service,territory-service test -q` exited 0.
+- No live PostgreSQL migration runner was available; migration ordering and SQL reference-remapping order are covered by the migration test.
