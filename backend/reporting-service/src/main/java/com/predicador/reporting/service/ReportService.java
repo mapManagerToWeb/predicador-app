@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
@@ -10,7 +11,9 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -19,13 +22,16 @@ public class ReportService {
 
     private final ReportRepository repository;
     private final MeterRegistry registry;
+    private final AuthorizationService authorization;
 
-    public ReportService(ReportRepository repository, MeterRegistry registry) {
+    public ReportService(ReportRepository repository, MeterRegistry registry, AuthorizationService authorization) {
         this.repository = repository;
         this.registry = registry;
+        this.authorization = authorization;
     }
 
-    public List<ReportDto> createReports(List<ReportDto> dtos) {
+    public List<ReportDto> createReports(List<ReportDto> dtos, SessionToken token) {
+        dtos.forEach(dto -> authorization.authorizeOwner(token, dto.encargadoId()));
         long start = System.nanoTime();
         try {
             List<Report> reports = dtos.stream().map(this::toEntity).collect(Collectors.toList());
@@ -40,14 +46,16 @@ public class ReportService {
         }
     }
 
-    public List<ReportDto> getAllReports() {
+    public List<ReportDto> getAllReports(SessionToken token) {
+        authorization.requireAdmin(token);
         return repository.findAllByOrderByFechaDesc()
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    public List<ReportDto> getReportsForToday() {
+    public List<ReportDto> getReportsForToday(SessionToken token) {
+        authorization.requireAdmin(token);
         LocalDate hoy = LocalDate.now(ZoneOffset.UTC);
         Instant inicio = hoy.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant fin = hoy.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
@@ -57,18 +65,29 @@ public class ReportService {
                 .collect(Collectors.toList());
     }
 
-    public List<ReportDto> getReportsByTerritorio(Long territorioNumero) {
+    public List<ReportDto> getReportsByTerritorio(Long territorioNumero, SessionToken token) {
+        authorization.requireAdmin(token);
         return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero)
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    public List<ReportDto> getReportsByEncargado(Long encargadoId) {
+    public List<ReportDto> getReportsByEncargado(Long encargadoId, SessionToken token) {
+        authorization.authorizeOwner(token, encargadoId);
         return repository.findByEncargadoIdOrderByFechaDesc(encargadoId)
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    public Map<Long, List<ReportDto>> getReportsByMultipleTerritorios(Collection<Long> territorioNumeros,
+                                                                       SessionToken token) {
+        authorization.requireAdmin(token);
+        return repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(territorioNumeros)
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.groupingBy(ReportDto::territorioNumero));
     }
 
     private Report toEntity(ReportDto dto) {

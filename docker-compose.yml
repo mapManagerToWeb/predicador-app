@@ -4,8 +4,8 @@ services:
       context: ./backend
       dockerfile: config-server/Dockerfile
     container_name: config-server
-    ports:
-      - "8888:8888"
+    expose:
+      - "8888"
     environment:
       - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
       - DB_USERNAME=${DB_USERNAME:-postgres}
@@ -34,8 +34,8 @@ services:
       context: ./backend
       dockerfile: discovery-server/Dockerfile
     container_name: discovery-server
-    ports:
-      - "8761:8761"
+    expose:
+      - "8761"
     depends_on:
       config-server:
         condition: service_healthy
@@ -88,9 +88,8 @@ services:
       context: ./backend
       dockerfile: territory-service/Dockerfile
     container_name: territory-service
-    ports:
-      - "8081:8081"
     expose:
+      - "8081"
       - "8091"
     depends_on:
       discovery-server:
@@ -118,9 +117,8 @@ services:
       context: ./backend
       dockerfile: reporting-service/Dockerfile
     container_name: reporting-service
-    ports:
-      - "8082:8082"
     expose:
+      - "8082"
       - "8092"
     depends_on:
       discovery-server:

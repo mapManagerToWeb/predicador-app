@@ -2,6 +2,7 @@ package com.predicador.reporting.service;
 
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.shared.exception.ResourceNotFoundException;
+import com.predicador.shared.security.SessionToken;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import org.springframework.stereotype.Service;
@@ -14,12 +15,15 @@ import java.util.stream.Collectors;
 public class EncargadoService {
 
     private final EncargadoRepository repository;
+    private final AuthorizationService authorization;
 
-    public EncargadoService(EncargadoRepository repository) {
+    public EncargadoService(EncargadoRepository repository, AuthorizationService authorization) {
         this.repository = repository;
+        this.authorization = authorization;
     }
 
-    public List<EncargadoDto> listarActivos() {
+    public List<EncargadoDto> listarActivos(SessionToken token) {
+        authorization.requireAdmin(token);
         return repository.findByActivoTrueOrderByNombreAsc()
                 .stream()
                 .map(this::toDto)
@@ -65,7 +69,8 @@ public class EncargadoService {
         return toDto(saved);
     }
 
-    public EncargadoDto actualizar(Long id, EncargadoDto dto) {
+    public EncargadoDto actualizar(Long id, EncargadoDto dto, SessionToken token) {
+        authorization.authorizeOwner(token, id);
         Encargado encargado = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Encargado", id));
         encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : encargado.getNombre());
@@ -77,7 +82,8 @@ public class EncargadoService {
         return toDto(saved);
     }
 
-    public List<EncargadoDto> buscarPorNombre(String nombre) {
+    public List<EncargadoDto> buscarPorNombre(String nombre, SessionToken token) {
+        authorization.requireAdmin(token);
         return repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(nombre, nombre)
                 .stream()
                 .map(this::toDto)

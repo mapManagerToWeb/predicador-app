@@ -3,6 +3,8 @@ package com.predicador.reporting.controller;
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.service.EncargadoService;
 import com.predicador.shared.security.SessionTokenService;
+import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +21,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -35,6 +39,8 @@ class EncargadoControllerTest {
 
     private EncargadoController encargadoController;
 
+    private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
+
     @BeforeEach
     void setUp() {
         encargadoController = new EncargadoController(encargadoService, tokens);
@@ -50,9 +56,9 @@ class EncargadoControllerTest {
         EncargadoDto dto1 = createDto(1L, "Daniel", "Uribe");
         EncargadoDto dto2 = createDto(2L, "Maria", "Lopez");
 
-        when(encargadoService.listarActivos()).thenReturn(List.of(dto1, dto2));
+        when(encargadoService.listarActivos(admin)).thenReturn(List.of(dto1, dto2));
 
-        mockMvc.perform(get("/api/v1/encargados"))
+        mockMvc.perform(get("/api/v1/encargados").requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].nombre").value("Daniel"))
             .andExpect(jsonPath("$[1].nombre").value("Maria"));
@@ -76,10 +82,12 @@ class EncargadoControllerTest {
     void actualizar_shouldReturn200() throws Exception {
         EncargadoDto updated = createDto(1L, "Daniel", "Updated");
 
-        when(encargadoService.actualizar(anyLong(), any(EncargadoDto.class))).thenReturn(updated);
+        when(encargadoService.actualizar(anyLong(), any(EncargadoDto.class), any(SessionToken.class)))
+                .thenReturn(updated);
 
         mockMvc.perform(put("/api/v1/encargados/1")
                 .contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin)
                 .content("{\"nombre\":\"Daniel\",\"apellido\":\"Updated\",\"avatar\":1}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.apellido").value("Updated"));
@@ -89,9 +97,10 @@ class EncargadoControllerTest {
     void buscar_shouldReturn200() throws Exception {
         EncargadoDto dto = createDto(1L, "Daniel", "Uribe");
 
-        when(encargadoService.buscarPorNombre(anyString())).thenReturn(List.of(dto));
+        when(encargadoService.buscarPorNombre(anyString(), any(SessionToken.class))).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/v1/encargados/buscar").param("nombre", "Daniel"))
+        mockMvc.perform(get("/api/v1/encargados/buscar").param("nombre", "Daniel")
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].nombre").value("Daniel"));
     }
@@ -136,5 +145,21 @@ class EncargadoControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"telefono\":\"56900000000\"}"))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void actualizarOtroOwner_shouldReturn403ProblemDetail() throws Exception {
+        SessionToken owner = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "No tiene permisos"))
+                .when(encargadoService).actualizar(eq(8L), any(EncargadoDto.class), eq(owner));
+
+        mockMvc.perform(put("/api/v1/encargados/8")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"Daniel\",\"apellido\":\"Updated\",\"avatar\":1}")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.title").value("Acceso denegado"));
     }
 }

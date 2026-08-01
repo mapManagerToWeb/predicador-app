@@ -25,9 +25,9 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     /**
-     * Matches any authenticated principal (encargado or admin). The service
-     * does not draw a role distinction internally — encargados manage their
-     * own reports, admins are unrestricted.
+     * Matches any authenticated principal (encargado or admin). Fine-grained
+     * owner/admin authorization is enforced by the reporting services after
+     * the filter attaches the validated token.
      */
     private static final String ROLE_ANY = null;
 

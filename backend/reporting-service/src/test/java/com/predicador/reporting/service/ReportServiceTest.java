@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,11 +24,16 @@ class ReportServiceTest {
     @Mock
     private ReportRepository repository;
 
+    @Mock
+    private AuthorizationService authorization;
+
     private ReportService reportService;
+
+    private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
     @BeforeEach
     void setUp() {
-        reportService = new ReportService(repository, new SimpleMeterRegistry());
+        reportService = new ReportService(repository, new SimpleMeterRegistry(), authorization);
     }
 
     private Report createReport(Integer id, String manzanaId, String nombre, String apellido,
@@ -51,7 +57,7 @@ class ReportServiceTest {
 
         when(repository.saveAll(anyList())).thenReturn(List.of(saved));
 
-        List<ReportDto> result = reportService.createReports(List.of(dto));
+        List<ReportDto> result = reportService.createReports(List.of(dto), admin);
 
         assertEquals(1, result.size());
         assertEquals("Daniel", result.get(0).encargadoNombre());
@@ -72,7 +78,7 @@ class ReportServiceTest {
 
         when(repository.saveAll(anyList())).thenReturn(List.of(saved1, saved2));
 
-        List<ReportDto> result = reportService.createReports(List.of(dto1, dto2));
+        List<ReportDto> result = reportService.createReports(List.of(dto1, dto2), admin);
 
         assertEquals(2, result.size());
         verify(repository, times(1)).saveAll(anyList());
@@ -85,7 +91,7 @@ class ReportServiceTest {
 
         when(repository.saveAll(anyList())).thenReturn(List.of(saved));
 
-        List<ReportDto> result = reportService.createReports(List.of(dto));
+        List<ReportDto> result = reportService.createReports(List.of(dto), admin);
 
         assertEquals(1, result.size());
         assertNotNull(result.get(0).fecha());
@@ -98,7 +104,7 @@ class ReportServiceTest {
 
         when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of(r1, r2));
 
-        List<ReportDto> result = reportService.getAllReports();
+        List<ReportDto> result = reportService.getAllReports(admin);
 
         assertEquals(2, result.size());
         assertEquals("Daniel", result.get(0).encargadoNombre());
@@ -109,7 +115,7 @@ class ReportServiceTest {
     void getAllReports_shouldReturnEmptyList() {
         when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of());
 
-        List<ReportDto> result = reportService.getAllReports();
+        List<ReportDto> result = reportService.getAllReports(admin);
 
         assertTrue(result.isEmpty());
     }
@@ -120,7 +126,7 @@ class ReportServiceTest {
 
         when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of(r1));
 
-        List<ReportDto> result = reportService.getReportsForToday();
+        List<ReportDto> result = reportService.getReportsForToday(admin);
 
         assertEquals(1, result.size());
         assertEquals("Daniel", result.get(0).encargadoNombre());
@@ -131,8 +137,42 @@ class ReportServiceTest {
     void getReportsForToday_shouldReturnEmptyWhenNoReports() {
         when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of());
 
-        List<ReportDto> result = reportService.getReportsForToday();
+        List<ReportDto> result = reportService.getReportsForToday(admin);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void createReports_shouldRejectReportOwnedByAnotherEncargado() {
+        ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
+                8L, null, null, null, null, null, null);
+        SessionToken token = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "forbidden"))
+                .when(authorization).authorizeOwner(token, 8L);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.createReports(List.of(dto), token));
+        verify(repository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void getReportsByEncargado_shouldAuthorizeRequestedOwner() {
+        SessionToken token = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "forbidden"))
+                .when(authorization).authorizeOwner(token, 8L);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportsByEncargado(8L, token));
+        verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L);
+    }
+
+    @Test
+    void getAllReports_shouldAllowAdminGlobalOperation() {
+        SessionToken token = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
+        when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of());
+
+        assertTrue(reportService.getAllReports(token).isEmpty());
     }
 }

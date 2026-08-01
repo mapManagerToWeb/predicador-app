@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
+import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,8 +23,13 @@ class EncargadoServiceTest {
     @Mock
     private EncargadoRepository repository;
 
+    @Mock
+    private AuthorizationService authorization;
+
     @InjectMocks
     private EncargadoService encargadoService;
+
+    private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
     private Encargado createEncargado(Long id, String nombre, String apellido, Integer avatar, String telefono, Boolean activo) {
         Encargado encargado = new Encargado();
@@ -43,7 +49,7 @@ class EncargadoServiceTest {
 
         when(repository.findByActivoTrueOrderByNombreAsc()).thenReturn(List.of(e1, e2));
 
-        List<EncargadoDto> result = encargadoService.listarActivos();
+        List<EncargadoDto> result = encargadoService.listarActivos(admin);
 
         assertEquals(2, result.size());
         assertEquals("Daniel", result.get(0).nombre());
@@ -56,7 +62,7 @@ class EncargadoServiceTest {
     void listarActivos_shouldReturnEmptyList() {
         when(repository.findByActivoTrueOrderByNombreAsc()).thenReturn(List.of());
 
-        List<EncargadoDto> result = encargadoService.listarActivos();
+        List<EncargadoDto> result = encargadoService.listarActivos(admin);
 
         assertTrue(result.isEmpty());
     }
@@ -99,7 +105,7 @@ class EncargadoServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(repository.save(any(Encargado.class))).thenReturn(updated);
 
-        EncargadoDto result = encargadoService.actualizar(1L, dto);
+        EncargadoDto result = encargadoService.actualizar(1L, dto, admin);
 
         assertEquals("Uribe", result.apellido());
         assertEquals(2, result.avatar());
@@ -114,7 +120,20 @@ class EncargadoServiceTest {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(com.predicador.shared.exception.ResourceNotFoundException.class,
-                () -> encargadoService.actualizar(99L, dto));
+                () -> encargadoService.actualizar(99L, dto, admin));
+    }
+
+    @Test
+    void actualizar_shouldRejectAnotherOwnersRecord() {
+        EncargadoDto dto = new EncargadoDto(null, "Daniel", "Uribe", 1, null, true);
+        SessionToken token = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "forbidden"))
+                .when(authorization).authorizeOwner(token, 8L);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> encargadoService.actualizar(8L, dto, token));
+        verify(repository, never()).findById(8L);
     }
 
     @Test
@@ -130,8 +149,9 @@ class EncargadoServiceTest {
         Optional<EncargadoDto> result = encargadoService.buscarOCrear("Daniel", "Uribe", "56912345678");
 
         assertTrue(result.isPresent());
-        assertEquals("Daniel", result.get().nombre());
-        assertEquals("56912345678", result.get().telefono());
+        EncargadoDto encargado = result.orElseThrow();
+        assertEquals("Daniel", encargado.nombre());
+        assertEquals("56912345678", encargado.telefono());
     }
 
     @Test
@@ -146,7 +166,8 @@ class EncargadoServiceTest {
         Optional<EncargadoDto> result = encargadoService.buscarOCrear("Daniel", "Uribe", "56912345678");
 
         assertTrue(result.isPresent());
-        assertEquals("Daniel", result.get().nombre());
+        EncargadoDto encargado = result.orElseThrow();
+        assertEquals("Daniel", encargado.nombre());
     }
 
     @Test
@@ -156,7 +177,7 @@ class EncargadoServiceTest {
         when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("Daniel", "Daniel"))
                 .thenReturn(List.of(e1));
 
-        List<EncargadoDto> result = encargadoService.buscarPorNombre("Daniel");
+        List<EncargadoDto> result = encargadoService.buscarPorNombre("Daniel", admin);
 
         assertEquals(1, result.size());
         assertEquals("Daniel", result.get(0).nombre());
@@ -167,7 +188,7 @@ class EncargadoServiceTest {
         when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("XYZ", "XYZ"))
                 .thenReturn(List.of());
 
-        List<EncargadoDto> result = encargadoService.buscarPorNombre("XYZ");
+        List<EncargadoDto> result = encargadoService.buscarPorNombre("XYZ", admin);
 
         assertTrue(result.isEmpty());
     }

@@ -3,6 +3,7 @@ package com.predicador.reporting.controller;
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.dto.LoginResponse;
 import com.predicador.reporting.service.EncargadoService;
+import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import jakarta.validation.Valid;
@@ -10,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
 import java.util.List;
@@ -28,8 +31,8 @@ public class EncargadoController {
     }
 
     @GetMapping
-    public ResponseEntity<List<EncargadoDto>> listarActivos() {
-        return ResponseEntity.ok(encargadoService.listarActivos());
+    public ResponseEntity<List<EncargadoDto>> listarActivos(HttpServletRequest request) {
+        return ResponseEntity.ok(encargadoService.listarActivos(token(request)));
     }
 
     @PostMapping
@@ -38,13 +41,14 @@ public class EncargadoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EncargadoDto> actualizar(@PathVariable Long id, @Valid @RequestBody EncargadoDto dto) {
-        return ResponseEntity.ok(encargadoService.actualizar(id, dto));
+    public ResponseEntity<EncargadoDto> actualizar(@PathVariable Long id, @Valid @RequestBody EncargadoDto dto,
+                                                   HttpServletRequest request) {
+        return ResponseEntity.ok(encargadoService.actualizar(id, dto, token(request)));
     }
 
     @GetMapping("/buscar")
-    public ResponseEntity<List<EncargadoDto>> buscar(@RequestParam String nombre) {
-        return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre));
+    public ResponseEntity<List<EncargadoDto>> buscar(@RequestParam String nombre, HttpServletRequest request) {
+        return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre, token(request)));
     }
 
     @PostMapping("/buscar-crear")
@@ -90,5 +94,18 @@ public class EncargadoController {
             token = tokens.issue(String.valueOf(dto.id()), SessionToken.ROLE_ENCARGADO);
         }
         return new LoginResponse(dto, token);
+    }
+
+    private SessionToken token(HttpServletRequest request) {
+        return (SessionToken) request.getAttribute(SessionAuthFilter.ATTR_TOKEN);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    ProblemDetail handleAuthorization(ResponseStatusException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                exception.getStatusCode(), exception.getReason());
+        problem.setTitle("Acceso denegado");
+        problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
+        return problem;
     }
 }
