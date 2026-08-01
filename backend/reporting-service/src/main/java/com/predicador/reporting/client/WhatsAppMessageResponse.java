@@ -8,7 +8,7 @@ public record WhatsAppMessageResponse(List<Message> messages,
     public record Message(String id) {}
 
     public String stableMessageId() {
-        if (messages != null && !messages.isEmpty()) return messages.get(0).id();
+        if (messages != null && !messages.isEmpty()) return messages.getFirst().id();
         return messageId;
     }
 }

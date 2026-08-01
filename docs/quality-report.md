@@ -100,7 +100,7 @@ Backend: BUILD SUCCESS
 - ✅ SpringDoc 2.8.6 compatible
 - ✅ No migration needed
 
-### Java 21
+### Java 25
 - ✅ Virtual threads enabled (benefit unverified under load)
 - ✅ LTS version
 

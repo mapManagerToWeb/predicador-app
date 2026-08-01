@@ -24,7 +24,7 @@
 | Spring Boot | 4.0.0 | ✅ Already on latest |
 | Spring Cloud | 2025.1.0 | ✅ Compatible with Boot 4 |
 | SpringDoc | 2.8.6 | ✅ Compatible with Boot 4 |
-| Java | 21 LTS | ✅ |
+| Java | 25 LTS | ✅ |
 | Angular | 22.0.x | ✅ |
 | TypeScript | 6.0.x | ✅ |
 | Vitest | 4.1.x | ✅ |
@@ -122,7 +122,7 @@ features/map/services/
 - [x] JaCoCo added to backend POM as `coverage` profile (`mvn verify -Pcoverage`)
 - [x] GitHub Actions workflows:
   - `ci-frontend.yml` — lint, type-check, test, build (Node 22)
-  - `ci-backend.yml` — build, test with Testcontainers PostgreSQL (Java 21)
+  - `ci-backend.yml` — build, test with Testcontainers PostgreSQL (Java 25)
   - `security.yml` — Gitleaks, OWASP dependency-check, Trivy Docker scan
   - `docker.yml` — multi-service Docker build & push to GHCR
 - [x] Dependabot configuration for npm, Maven, and GitHub Actions
