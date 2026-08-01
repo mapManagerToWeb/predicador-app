@@ -154,6 +154,28 @@ class EncargadoControllerTest {
     }
 
     @Test
+    void login_setsCsrfCookieAlongsideSessionCookie() throws Exception {
+        EncargadoDto dto = createDto(7L, "Ana", "Perez");
+
+        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
+        when(tokens.isConfigured()).thenReturn(true);
+        when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
+
+        var result = mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefono\":\"56911111111\"}"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        java.util.List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders.get(0))
+                .contains("XSRF-TOKEN=").contains("SameSite=Lax");
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders.get(1))
+                .contains("predicador_session=").contains("HttpOnly").contains("SameSite=Lax");
+    }
+
+    @Test
     void login_shouldReturn404_siNoExiste() throws Exception {
         when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.empty());
 

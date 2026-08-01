@@ -18,6 +18,8 @@ import org.springframework.data.domain.Sort;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -108,13 +110,23 @@ public class EncargadoController {
             return ResponseEntity.ok(response);
         }
         return ResponseEntity.ok()
-                .header("Set-Cookie", sessionCookie(response.token(), 12 * 60 * 60))
+                .header("Set-Cookie", csrfCookie(), sessionCookie(response.token(), 12 * 60 * 60))
                 .body(new LoginResponse(response.encargado(), null));
     }
 
     private String sessionCookie(String value, long maxAge) {
         return "%s=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
                 .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge,
+                        sessionCookieSecure ? " Secure;" : "");
+    }
+
+    private static final SecureRandom CSRF_RANDOM = new SecureRandom();
+
+    private String csrfCookie() {
+        byte[] bytes = new byte[32];
+        CSRF_RANDOM.nextBytes(bytes);
+        return "XSRF-TOKEN=%s; Path=/; HttpOnly=false;%s SameSite=Lax"
+                .formatted(HexFormat.of().formatHex(bytes),
                         sessionCookieSecure ? " Secure;" : "");
     }
 
