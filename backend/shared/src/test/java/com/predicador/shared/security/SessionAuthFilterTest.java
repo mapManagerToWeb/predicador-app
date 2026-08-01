@@ -107,7 +107,7 @@ class SessionAuthFilterTest {
 
     @Test
     void unconfiguredSecret_passesThroughEverything() throws Exception {
-        SessionTokenService disabled = new SessionTokenService("", 1, false);
+        SessionTokenService disabled = new SessionTokenService("", 1, false, "local");
         SessionAuthFilter filter = new SessionAuthFilter(disabled, List.of(
                 SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
 

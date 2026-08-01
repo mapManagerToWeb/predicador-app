@@ -16,6 +16,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_STRICT=${SESSION_STRICT:-true}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # Igual con las credenciales admin, que hoy se resuelven al arrancar el
       # gateway pero el config-server también las sirve como overlay opcional.
       - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
@@ -60,14 +61,16 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
-      # Preferir ADMIN_PASSWORD_BCRYPT en producción; ADMIN_PASSWORD sólo es local.
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      # BCrypt es obligatorio fuera de local; plaintext sólo se usa con perfil local.
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # HMAC secret compartido con reporting-service para emitir/verificar tokens.
       # El secret es obligatorio para evitar iniciar servicios sin enforcement.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
       # Para activar tracing con el colector, levantar con el perfil observability
       # y exportar en el shell del host:
@@ -102,6 +105,7 @@ services:
       # secret para poder verificar los tokens que emiten los otros servicios.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/actuator/health || exit 1"]
       interval: 10s

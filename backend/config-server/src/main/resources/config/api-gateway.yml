@@ -15,7 +15,7 @@ server:
 app:
   admin:
     username: ${ADMIN_USERNAME}
-    password: ${ADMIN_PASSWORD}
+    password: ${ADMIN_PASSWORD:}
     password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
   session:
     secret: ${SESSION_SECRET}

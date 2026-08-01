@@ -46,18 +46,35 @@ public class SessionTokenService {
     public SessionTokenService(
             @Value("${app.session.secret:}") String secret,
             @Value("${app.session.ttl-hours:12}") long ttlHours,
-            @Value("${app.session.strict:true}") boolean strict) {
+            @Value("${app.session.strict:true}") boolean strict,
+            @Value("${spring.profiles.active:}") String activeProfiles) {
         this.secret = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
         this.ttl = Duration.ofHours(Math.max(1, ttlHours));
-        this.strict = strict;
-        if (strict && this.secret.length < 32) {
+        this.strict = strict || !hasLocalProfile(activeProfiles);
+        if (this.strict && this.secret.length < 32) {
             throw new IllegalArgumentException("app.session.secret debe tener al menos 32 bytes UTF-8");
         }
     }
 
     /** Strict constructor used by callers that do not use Spring injection. */
     public SessionTokenService(String secret, long ttlHours) {
-        this(secret, ttlHours, true);
+        this(secret, ttlHours, true, "");
+    }
+
+    public SessionTokenService(String secret, long ttlHours, boolean strict) {
+        this(secret, ttlHours, strict, "");
+    }
+
+    private static boolean hasLocalProfile(String activeProfiles) {
+        if (activeProfiles == null) {
+            return false;
+        }
+        for (String profile : activeProfiles.split(",")) {
+            if ("local".equals(profile.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
