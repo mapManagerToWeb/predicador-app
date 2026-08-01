@@ -6,6 +6,9 @@ import com.predicador.shared.security.SessionToken;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,19 +33,18 @@ public class EncargadoService {
                 .collect(Collectors.toList());
     }
 
+    public Page<EncargadoDto> listarActivos(Pageable pageable, SessionToken token) {
+        authorization.requireAdmin(token);
+        return repository.findByActivoTrueOrderByNombreAsc(pageable).map(this::toDto);
+    }
+
     public Optional<EncargadoDto> buscarOCrear(String nombre, String apellido, String telefono) {
         String nombreLimpio = nombre != null ? nombre.trim() : "";
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
         String telefonoLimpio = normalizePhone(telefono);
 
-        List<Encargado> existentes = repository
-                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
-                        nombreLimpio, apellidoLimpio);
-
-        Optional<Encargado> encontrado = existentes.stream()
-                .filter(e -> e.getNombre().equalsIgnoreCase(nombreLimpio)
-                        && e.getApellido().equalsIgnoreCase(apellidoLimpio))
-                .findFirst();
+        Optional<Encargado> encontrado = repository.findByNombreIgnoreCaseAndApellidoIgnoreCase(
+                nombreLimpio, apellidoLimpio);
 
         if (encontrado.isPresent()) {
             Encargado encargado = encontrado.get();
@@ -53,7 +55,12 @@ public class EncargadoService {
         }
 
         EncargadoDto dto = new EncargadoDto(null, nombreLimpio, apellidoLimpio, 1, telefonoLimpio, true);
-        return Optional.of(crear(dto));
+        try {
+            return Optional.of(crear(dto));
+        } catch (DataIntegrityViolationException collision) {
+            return repository.findByNombreIgnoreCaseAndApellidoIgnoreCase(nombreLimpio, apellidoLimpio)
+                    .map(this::toDto);
+        }
     }
 
     public EncargadoDto crear(EncargadoDto dto) {
@@ -65,7 +72,7 @@ public class EncargadoService {
         // formato E.164 chileno que buscarOCrear/buscarPorTelefono.
         encargado.setTelefono(normalizePhone(dto.telefono()));
         encargado.setActivo(true);
-        Encargado saved = repository.save(encargado);
+        Encargado saved = repository.saveAndFlush(encargado);
         return toDto(saved);
     }
 
@@ -88,6 +95,12 @@ public class EncargadoService {
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    public Page<EncargadoDto> buscarPorNombre(String nombre, Pageable pageable, SessionToken token) {
+        authorization.requireAdmin(token);
+        return repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
+                nombre, nombre, pageable).map(this::toDto);
     }
 
     public Optional<EncargadoDto> buscarPorTelefono(String telefono) {

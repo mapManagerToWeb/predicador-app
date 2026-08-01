@@ -7,6 +7,8 @@ import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,6 +21,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class ReportService {
+
+    public static final int MAX_BATCH_SIZE = 100;
 
     private final ReportRepository repository;
     private final MeterRegistry registry;
@@ -54,6 +58,11 @@ public class ReportService {
                 .collect(Collectors.toList());
     }
 
+    public Page<ReportDto> getAllReports(Pageable pageable, SessionToken token) {
+        authorization.requireAdmin(token);
+        return repository.findAllByOrderByFechaDesc(pageable).map(this::toDto);
+    }
+
     public List<ReportDto> getReportsForToday(SessionToken token) {
         authorization.requireAdmin(token);
         LocalDate hoy = LocalDate.now(ZoneOffset.UTC);
@@ -65,12 +74,25 @@ public class ReportService {
                 .collect(Collectors.toList());
     }
 
+    public Page<ReportDto> getReportsForToday(Pageable pageable, SessionToken token) {
+        authorization.requireAdmin(token);
+        LocalDate hoy = LocalDate.now(ZoneOffset.UTC);
+        Instant inicio = hoy.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant fin = hoy.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        return repository.findByFechaRange(inicio, fin, pageable).map(this::toDto);
+    }
+
     public List<ReportDto> getReportsByTerritorio(Long territorioNumero, SessionToken token) {
         authorization.requireAdmin(token);
         return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero)
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    public Page<ReportDto> getReportsByTerritorio(Long territorioNumero, Pageable pageable, SessionToken token) {
+        authorization.requireAdmin(token);
+        return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero, pageable).map(this::toDto);
     }
 
     public List<ReportDto> getReportsByEncargado(Long encargadoId, SessionToken token) {
@@ -81,13 +103,31 @@ public class ReportService {
                 .collect(Collectors.toList());
     }
 
+    public Page<ReportDto> getReportsByEncargado(Long encargadoId, Pageable pageable, SessionToken token) {
+        authorization.authorizeOwner(token, encargadoId);
+        return repository.findByEncargadoIdOrderByFechaDesc(encargadoId, pageable).map(this::toDto);
+    }
+
     public Map<Long, List<ReportDto>> getReportsByMultipleTerritorios(Collection<Long> territorioNumeros,
                                                                        SessionToken token) {
         authorization.requireAdmin(token);
+        if (territorioNumeros == null || territorioNumeros.size() > MAX_BATCH_SIZE) {
+            throw new IllegalArgumentException("El lote de territorios no puede superar " + MAX_BATCH_SIZE);
+        }
         return repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(territorioNumeros)
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.groupingBy(ReportDto::territorioNumero));
+    }
+
+    public Page<ReportDto> getReportsByMultipleTerritorios(Collection<Long> territorioNumeros, Pageable pageable,
+                                                            SessionToken token) {
+        authorization.requireAdmin(token);
+        if (territorioNumeros == null || territorioNumeros.size() > MAX_BATCH_SIZE) {
+            throw new IllegalArgumentException("El lote de territorios no puede superar " + MAX_BATCH_SIZE);
+        }
+        return repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(territorioNumeros, pageable)
+                .map(this::toDto);
     }
 
     private Report toEntity(ReportDto dto) {

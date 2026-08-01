@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
@@ -57,7 +59,8 @@ class ReportControllerTest {
         ReportDto dto1 = createDto(1, "Daniel", "Uribe", 1L);
         ReportDto dto2 = createDto(2, "Maria", "Lopez", 2L);
 
-        when(reportService.getAllReports(admin)).thenReturn(List.of(dto1, dto2));
+        when(reportService.getAllReports(any(), eq(admin)))
+                .thenReturn(new PageImpl<>(List.of(dto1, dto2), PageRequest.of(0, 50), 2));
 
         mockMvc.perform(get("/api/v1/reports").requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
@@ -69,7 +72,8 @@ class ReportControllerTest {
     void getTodayReports_shouldReturn200() throws Exception {
         ReportDto dto = createDto(1, "Daniel", "Uribe", 1L);
 
-        when(reportService.getReportsForToday(admin)).thenReturn(List.of(dto));
+        when(reportService.getReportsForToday(any(), eq(admin)))
+                .thenReturn(new PageImpl<>(List.of(dto), PageRequest.of(0, 50), 1));
 
         mockMvc.perform(get("/api/v1/reports/today").requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
@@ -96,7 +100,7 @@ class ReportControllerTest {
         SessionToken owner = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
         doThrow(new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.FORBIDDEN, "No tiene permisos"))
-                .when(reportService).getReportsByEncargado(eq(8L), eq(owner));
+                .when(reportService).getReportsByEncargado(eq(8L), any(), eq(owner));
 
         mockMvc.perform(get("/api/v1/reports").param("encargadoId", "8")
                         .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner))
