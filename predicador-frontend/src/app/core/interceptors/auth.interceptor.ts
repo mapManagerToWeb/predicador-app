@@ -1,12 +1,10 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 
 /**
- * Attaches the HMAC session token as {@code X-Session-Token} on every request
- * that hits our own API. Endpoints that mint tokens (login/register) are
- * excluded to avoid stamping stale tokens on a re-authentication attempt.
- *
- * <p>Requests to third-party origins (tile servers) are ignored so we do not
- * leak credentials.</p>
+ * Carries session credentials on every request that hits our own API by
+ * enabling {@code withCredentials}, so the browser sends the HttpOnly HMAC
+ * session cookie established by the gateway. Requests to third-party origins
+ * (tile servers) are ignored so credentials are never leaked.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // Only attach to relative URLs (our backend is proxied through /api). Fully

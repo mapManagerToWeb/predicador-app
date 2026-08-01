@@ -39,7 +39,7 @@ describe('authInterceptor', () => {
   });
 
   it('does not send a browser-held session token header', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
 
     http.get('/api/v1/reports').subscribe();
     const req = httpMock.expectOne('/api/v1/reports');
@@ -49,7 +49,7 @@ describe('authInterceptor', () => {
   });
 
   it('sends credentials to login without a session token header', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
 
     http.post('/api/v1/encargados/login', {}).subscribe();
     const req = httpMock.expectOne('/api/v1/encargados/login');
@@ -59,7 +59,7 @@ describe('authInterceptor', () => {
   });
 
   it('no envía token a URLs de otros orígenes (tiles/media)', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
 
     http.get('https://tile.openstreetmap.org/0/0/0.png').subscribe();
     const req = httpMock.expectOne('https://tile.openstreetmap.org/0/0/0.png');

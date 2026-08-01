@@ -12,12 +12,11 @@ export class AuthTokenService {
   // eslint-disable-next-line @angular-eslint/prefer-inject
   constructor(@Optional() private http?: HttpClient) {}
 
-  readonly token = signal<string | null>(null).asReadonly();
   readonly role = this.roleSignal.asReadonly();
   readonly hasToken = computed(() => this.roleSignal() !== null);
   readonly isAdmin = computed(() => this.roleSignal() === 'admin');
 
-  set(_token: string | null, role: SessionRole): void {
+  set(role: SessionRole): void {
     this.roleSignal.set(role);
   }
 
