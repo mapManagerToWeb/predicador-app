@@ -24,6 +24,10 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
+      # Protege los documentos de configuración. Si se definen, el config-server
+      # exige HTTP Basic auth y los servicios downstream deben enviarlos.
+      - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/actuator/health || exit 1"]
       interval: 10s
@@ -108,6 +112,9 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
+      # Si el config-server exige auth, enviar las mismas credenciales.
+      - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/actuator/health || exit 1"]
       interval: 10s
@@ -132,15 +139,18 @@ services:
       - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
       - DB_USERNAME=${DB_USERNAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-}
-      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-1194956653707331}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-asignacion_territorio}
-      - WHATSAPP_DESTINATION=${WHATSAPP_DESTINATION:-56936577203}
+      - WHATSAPP_DESTINATION=${WHATSAPP_DESTINATION:-}
       # Debe coincidir con el api-gateway para que los tokens que éste emite
       # sean verificables aquí cuando activemos enforcement server-side.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      # Si el config-server exige auth, enviar las mismas credenciales.
+      - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
       interval: 10s

@@ -15,21 +15,14 @@ import java.util.List;
 @Repository
 public interface ReportRepository extends JpaRepository<Report, Integer> {
 
-    List<Report> findAllByOrderByFechaDesc();
     Page<Report> findAllByOrderByFechaDesc(Pageable pageable);
 
-    List<Report> findByTerritorioNumeroOrderByFechaDesc(Long territorioNumero);
     Page<Report> findByTerritorioNumeroOrderByFechaDesc(Long territorioNumero, Pageable pageable);
 
-    List<Report> findByEncargadoIdOrderByFechaDesc(Long encargadoId);
     Page<Report> findByEncargadoIdOrderByFechaDesc(Long encargadoId, Pageable pageable);
 
     List<Report> findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(Collection<Long> territorioNumeros);
-    Page<Report> findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(
-            Collection<Long> territorioNumeros, Pageable pageable);
 
-    @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin ORDER BY r.fecha DESC")
-    List<Report> findByFechaRange(@Param("inicio") Instant inicio, @Param("fin") Instant fin);
     @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin ORDER BY r.fecha DESC")
     Page<Report> findByFechaRange(@Param("inicio") Instant inicio, @Param("fin") Instant fin, Pageable pageable);
 }

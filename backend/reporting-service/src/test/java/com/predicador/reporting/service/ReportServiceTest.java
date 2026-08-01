@@ -14,6 +14,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -29,6 +34,8 @@ class ReportServiceTest {
     private final AuthorizationService authorization = new AuthorizationService();
 
     private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
+
+    private final PageRequest pageable = PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "fecha"));
 
     @BeforeEach
     void setUp() {
@@ -101,9 +108,9 @@ class ReportServiceTest {
         Report r1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
         Report r2 = createReport(2, "2-B", "Maria", "Lopez", "afternoon", "incomplete", 2L);
 
-        when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of(r1, r2));
+        when(repository.findAllByOrderByFechaDesc(pageable)).thenReturn(new PageImpl<>(List.of(r1, r2)));
 
-        List<ReportDto> result = reportService.getAllReports(admin);
+        List<ReportDto> result = reportService.getAllReports(pageable, admin).getContent();
 
         assertEquals(2, result.size());
         assertEquals("Daniel", result.get(0).encargadoNombre());
@@ -112,9 +119,9 @@ class ReportServiceTest {
 
     @Test
     void getAllReports_shouldReturnEmptyList() {
-        when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of());
+        when(repository.findAllByOrderByFechaDesc(pageable)).thenReturn(Page.empty());
 
-        List<ReportDto> result = reportService.getAllReports(admin);
+        List<ReportDto> result = reportService.getAllReports(pageable, admin).getContent();
 
         assertTrue(result.isEmpty());
     }
@@ -123,20 +130,20 @@ class ReportServiceTest {
     void getReportsForToday_shouldReturnTodayReports() {
         Report r1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
 
-        when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of(r1));
+        when(repository.findByFechaRange(any(Instant.class), any(Instant.class), any())).thenReturn(new PageImpl<>(List.of(r1)));
 
-        List<ReportDto> result = reportService.getReportsForToday(admin);
+        List<ReportDto> result = reportService.getReportsForToday(pageable, admin).getContent();
 
         assertEquals(1, result.size());
         assertEquals("Daniel", result.get(0).encargadoNombre());
-        verify(repository).findByFechaRange(any(Instant.class), any(Instant.class));
+        verify(repository).findByFechaRange(any(Instant.class), any(Instant.class), any());
     }
 
     @Test
     void getReportsForToday_shouldReturnEmptyWhenNoReports() {
-        when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of());
+        when(repository.findByFechaRange(any(Instant.class), any(Instant.class), any())).thenReturn(Page.empty());
 
-        List<ReportDto> result = reportService.getReportsForToday(admin);
+        List<ReportDto> result = reportService.getReportsForToday(pageable, admin).getContent();
 
         assertTrue(result.isEmpty());
     }
@@ -166,44 +173,44 @@ class ReportServiceTest {
 
     @Test
     void getReportsByEncargado_shouldAllowMatchingOwner() {
-        when(repository.findByEncargadoIdOrderByFechaDesc(7L)).thenReturn(List.of());
+        when(repository.findByEncargadoIdOrderByFechaDesc(7L, pageable)).thenReturn(Page.empty());
 
-        assertTrue(reportService.getReportsByEncargado(7L, encargado("7")).isEmpty());
-        verify(repository).findByEncargadoIdOrderByFechaDesc(7L);
+        assertTrue(reportService.getReportsByEncargado(7L, pageable, encargado("7")).getContent().isEmpty());
+        verify(repository).findByEncargadoIdOrderByFechaDesc(7L, pageable);
     }
 
     @Test
     void getReportsByEncargado_shouldRejectAnotherOwner() {
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.getReportsByEncargado(8L, encargado("7")));
-        verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L);
+                () -> reportService.getReportsByEncargado(8L, pageable, encargado("7")));
+        verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L, pageable);
     }
 
     @Test
     void getAllReports_shouldAllowAdminGlobalOperation() {
         SessionToken token = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
-        when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of());
+        when(repository.findAllByOrderByFechaDesc(pageable)).thenReturn(Page.empty());
 
-        assertTrue(reportService.getAllReports(token).isEmpty());
+        assertTrue(reportService.getAllReports(pageable, token).getContent().isEmpty());
     }
 
     @Test
     void getReportsForToday_shouldRejectOwnerAndAllowAdmin() {
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.getReportsForToday(encargado("7")));
+                () -> reportService.getReportsForToday(pageable, encargado("7")));
 
-        when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of());
-        assertTrue(reportService.getReportsForToday(admin).isEmpty());
+        when(repository.findByFechaRange(any(Instant.class), any(Instant.class), any())).thenReturn(Page.empty());
+        assertTrue(reportService.getReportsForToday(pageable, admin).getContent().isEmpty());
     }
 
     @Test
     void getReportsByTerritorio_shouldRejectOwnerAndAllowAdmin() {
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.getReportsByTerritorio(12L, encargado("7")));
+                () -> reportService.getReportsByTerritorio(12L, pageable, encargado("7")));
 
-        when(repository.findByTerritorioNumeroOrderByFechaDesc(12L)).thenReturn(List.of());
-        assertTrue(reportService.getReportsByTerritorio(12L, admin).isEmpty());
+        when(repository.findByTerritorioNumeroOrderByFechaDesc(12L, pageable)).thenReturn(Page.empty());
+        assertTrue(reportService.getReportsByTerritorio(12L, pageable, admin).getContent().isEmpty());
     }
 
     @Test

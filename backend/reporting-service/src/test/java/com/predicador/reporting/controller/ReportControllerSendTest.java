@@ -43,7 +43,9 @@ class ReportControllerSendTest {
     @BeforeEach
     void setUp() {
         reportController = new ReportController(reportService, reportSendService, new AuthorizationService());
-        mockMvc = MockMvcBuilders.standaloneSetup(reportController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(reportController)
+                .setControllerAdvice(new com.predicador.shared.exception.GlobalExceptionHandler())
+                .build();
     }
 
     @Test

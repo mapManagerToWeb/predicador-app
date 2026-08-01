@@ -17,8 +17,6 @@ public interface EncargadoRepository extends JpaRepository<Encargado, Long> {
     List<Encargado> findByActivoTrueOrderByNombreAsc();
     Page<Encargado> findByActivoTrueOrderByNombreAsc(Pageable pageable);
 
-    List<Encargado> findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
-            String nombre, String apellido);
     Page<Encargado> findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
             String nombre, String apellido, Pageable pageable);
 

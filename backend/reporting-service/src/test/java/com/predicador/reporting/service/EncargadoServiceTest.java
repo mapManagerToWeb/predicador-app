@@ -12,6 +12,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -33,6 +38,8 @@ class EncargadoServiceTest {
 
     private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
+    private final PageRequest pageable = PageRequest.of(0, 50, Sort.by("nombre"));
+
     private Encargado createEncargado(Long id, String nombre, String apellido, Integer avatar, String telefono, Boolean activo) {
         Encargado encargado = new Encargado();
         encargado.setId(id);
@@ -49,9 +56,9 @@ class EncargadoServiceTest {
         Encargado e1 = createEncargado(1L, "Daniel", "Uribe", 1, "56912345678", true);
         Encargado e2 = createEncargado(2L, "Maria", "Lopez", 2, null, true);
 
-        when(repository.findByActivoTrueOrderByNombreAsc()).thenReturn(List.of(e1, e2));
+        when(repository.findByActivoTrueOrderByNombreAsc(pageable)).thenReturn(new PageImpl<>(List.of(e1, e2)));
 
-        List<EncargadoDto> result = encargadoService.listarActivos(admin);
+        List<EncargadoDto> result = encargadoService.listarActivos(pageable, admin).getContent();
 
         assertEquals(2, result.size());
         assertEquals("Daniel", result.get(0).nombre());
@@ -62,9 +69,9 @@ class EncargadoServiceTest {
 
     @Test
     void listarActivos_shouldReturnEmptyList() {
-        when(repository.findByActivoTrueOrderByNombreAsc()).thenReturn(List.of());
+        when(repository.findByActivoTrueOrderByNombreAsc(pageable)).thenReturn(Page.empty());
 
-        List<EncargadoDto> result = encargadoService.listarActivos(admin);
+        List<EncargadoDto> result = encargadoService.listarActivos(pageable, admin).getContent();
 
         assertTrue(result.isEmpty());
     }
@@ -181,10 +188,10 @@ class EncargadoServiceTest {
     void buscarPorNombre_shouldReturnMatchingEncargados() {
         Encargado e1 = createEncargado(1L, "Daniel", "Uribe", 1, null, true);
 
-        when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("Daniel", "Daniel"))
-                .thenReturn(List.of(e1));
+        when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
+                "Daniel", "Daniel", pageable)).thenReturn(new PageImpl<>(List.of(e1)));
 
-        List<EncargadoDto> result = encargadoService.buscarPorNombre("Daniel", admin);
+        List<EncargadoDto> result = encargadoService.buscarPorNombre("Daniel", pageable, admin).getContent();
 
         assertEquals(1, result.size());
         assertEquals("Daniel", result.get(0).nombre());
@@ -192,10 +199,10 @@ class EncargadoServiceTest {
 
     @Test
     void buscarPorNombre_shouldReturnEmptyWhenNoMatch() {
-        when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("XYZ", "XYZ"))
-                .thenReturn(List.of());
+        when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
+                "XYZ", "XYZ", pageable)).thenReturn(Page.empty());
 
-        List<EncargadoDto> result = encargadoService.buscarPorNombre("XYZ", admin);
+        List<EncargadoDto> result = encargadoService.buscarPorNombre("XYZ", pageable, admin).getContent();
 
         assertTrue(result.isEmpty());
     }
@@ -203,16 +210,16 @@ class EncargadoServiceTest {
     @Test
     void listarActivos_shouldRejectOwner() {
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> encargadoService.listarActivos(encargado("7")));
-        verify(repository, never()).findByActivoTrueOrderByNombreAsc();
+                () -> encargadoService.listarActivos(pageable, encargado("7")));
+        verify(repository, never()).findByActivoTrueOrderByNombreAsc(pageable);
     }
 
     @Test
     void buscarPorNombre_shouldRejectOwner() {
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> encargadoService.buscarPorNombre("Daniel", encargado("7")));
+                () -> encargadoService.buscarPorNombre("Daniel", pageable, encargado("7")));
         verify(repository, never())
-                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("Daniel", "Daniel");
+                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("Daniel", "Daniel", pageable);
     }
 
     private SessionToken encargado(String subject) {

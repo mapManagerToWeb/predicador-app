@@ -46,7 +46,9 @@ class EncargadoControllerTest {
     @BeforeEach
     void setUp() {
         encargadoController = new EncargadoController(encargadoService, tokens, true);
-        mockMvc = MockMvcBuilders.standaloneSetup(encargadoController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(encargadoController)
+                .setControllerAdvice(new com.predicador.shared.exception.GlobalExceptionHandler())
+                .build();
     }
 
     private EncargadoDto createDto(Long id, String nombre, String apellido) {

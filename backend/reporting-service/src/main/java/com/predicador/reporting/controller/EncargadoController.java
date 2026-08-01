@@ -147,13 +147,4 @@ public class EncargadoController {
     private SessionToken token(HttpServletRequest request) {
         return (SessionToken) request.getAttribute(SessionAuthFilter.ATTR_TOKEN);
     }
-
-    @ExceptionHandler(ResponseStatusException.class)
-    ProblemDetail handleAuthorization(ResponseStatusException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                exception.getStatusCode(), exception.getReason());
-        problem.setTitle("Acceso denegado");
-        problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
-        return problem;
-    }
 }

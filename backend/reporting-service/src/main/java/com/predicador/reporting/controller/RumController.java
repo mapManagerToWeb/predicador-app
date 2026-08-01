@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Real User Monitoring (RUM) sink for Core Web Vitals reported by the SPA.
@@ -68,6 +69,10 @@ public class RumController {
 
     private final MeterRegistry registry;
 
+    /** Cached meters keyed by "metric" and "metric|route" to avoid re-registering per request. */
+    private final ConcurrentHashMap<String, Timer> timers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, DistributionSummary> summaries = new ConcurrentHashMap<>();
+
     public RumController(MeterRegistry registry) {
         this.registry = registry;
     }
@@ -99,20 +104,20 @@ public class RumController {
         // 6. Record metric
         switch (name) {
             case "LCP", "INP", "FCP", "TTFB" -> {
-                Timer timer = Timer.builder("web.vitals")
+                Timer timer = timers.computeIfAbsent(name + "|" + route, key -> Timer.builder("web.vitals")
                         .description("Core Web Vitals timing metric (ms)")
                         .tag("metric", name)
                         .tag("route", route)
                         .publishPercentiles(0.5, 0.75, 0.95)
-                        .register(registry);
+                        .register(registry));
                 timer.record(Duration.ofNanos((long) (cappedValue * 1_000_000)));
             }
             case "CLS" -> {
-                DistributionSummary summary = DistributionSummary.builder("web.vitals.cls")
+                DistributionSummary summary = summaries.computeIfAbsent(route, key -> DistributionSummary.builder("web.vitals.cls")
                         .description("Cumulative Layout Shift (unitless)")
                         .tag("route", route)
                         .publishPercentiles(0.5, 0.75, 0.95)
-                        .register(registry);
+                        .register(registry));
                 summary.record(cappedValue);
             }
             default -> {

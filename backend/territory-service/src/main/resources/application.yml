@@ -3,6 +3,10 @@ spring:
     name: territory-service
   config:
     import: "optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}"
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USERNAME:}
+      password: ${CONFIG_SERVER_PASSWORD:}
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/predicador}
     driver-class-name: org.postgresql.Driver
