@@ -6,7 +6,6 @@ import com.predicador.reporting.repository.EncargadoRepository;
 import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,11 +22,14 @@ class EncargadoServiceTest {
     @Mock
     private EncargadoRepository repository;
 
-    @Mock
-    private AuthorizationService authorization;
-
-    @InjectMocks
     private EncargadoService encargadoService;
+
+    private final AuthorizationService authorization = new AuthorizationService();
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        encargadoService = new EncargadoService(repository, authorization);
+    }
 
     private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
@@ -124,15 +126,22 @@ class EncargadoServiceTest {
     }
 
     @Test
+    void actualizar_shouldAllowMatchingOwner() {
+        EncargadoDto dto = new EncargadoDto(null, "Daniel", "Uribe", 1, null, true);
+        Encargado existing = createEncargado(7L, "Daniel", "Old", 1, null, true);
+        when(repository.findById(7L)).thenReturn(Optional.of(existing));
+        when(repository.save(any(Encargado.class))).thenReturn(existing);
+
+        assertEquals("Daniel", encargadoService.actualizar(7L, dto, encargado("7")).nombre());
+        verify(repository).save(existing);
+    }
+
+    @Test
     void actualizar_shouldRejectAnotherOwnersRecord() {
         EncargadoDto dto = new EncargadoDto(null, "Daniel", "Uribe", 1, null, true);
-        SessionToken token = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
-        doThrow(new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN, "forbidden"))
-                .when(authorization).authorizeOwner(token, 8L);
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> encargadoService.actualizar(8L, dto, token));
+                () -> encargadoService.actualizar(8L, dto, encargado("7")));
         verify(repository, never()).findById(8L);
     }
 
@@ -191,5 +200,24 @@ class EncargadoServiceTest {
         List<EncargadoDto> result = encargadoService.buscarPorNombre("XYZ", admin);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void listarActivos_shouldRejectOwner() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> encargadoService.listarActivos(encargado("7")));
+        verify(repository, never()).findByActivoTrueOrderByNombreAsc();
+    }
+
+    @Test
+    void buscarPorNombre_shouldRejectOwner() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> encargadoService.buscarPorNombre("Daniel", encargado("7")));
+        verify(repository, never())
+                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("Daniel", "Daniel");
+    }
+
+    private SessionToken encargado(String subject) {
+        return new SessionToken(subject, SessionToken.ROLE_ENCARGADO, 1L, 2L);
     }
 }

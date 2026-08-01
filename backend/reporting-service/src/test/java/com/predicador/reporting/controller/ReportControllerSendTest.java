@@ -5,10 +5,11 @@ import com.predicador.reporting.dto.WhatsAppSendResponse;
 import com.predicador.reporting.service.ReportSendService;
 import com.predicador.reporting.service.ReportService;
 import com.predicador.reporting.service.AuthorizationService;
+import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -16,6 +17,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -31,14 +34,13 @@ class ReportControllerSendTest {
     @Mock
     private ReportService reportService;
 
-    @Mock
-    private AuthorizationService authorizationService;
-
-    @InjectMocks
     private ReportController reportController;
+
+    private final SessionToken owner = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
 
     @BeforeEach
     void setUp() {
+        reportController = new ReportController(reportService, reportSendService, new AuthorizationService());
         mockMvc = MockMvcBuilders.standaloneSetup(reportController).build();
     }
 
@@ -49,6 +51,7 @@ class ReportControllerSendTest {
 
         mockMvc.perform(post("/api/v1/reports/send")
                 .contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
                 .content("""
                     {
                       "encargadoNombre": "Daniel",
@@ -67,12 +70,31 @@ class ReportControllerSendTest {
     }
 
     @Test
+    void sendWhatsAppReport_withoutToken_shouldReturn403ProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/v1/reports/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "encargadoNombre": "Daniel",
+                      "fechaRegistro": "21-07-2026",
+                      "territorios": [{"numero": 1, "finalizado": true, "totalManzanas": 12, "manzanasMarcadas": 12}]
+                    }
+                    """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.title").value("Acceso denegado"));
+
+        verify(reportSendService, never()).sendReport(any(WhatsAppSendRequest.class));
+    }
+
+    @Test
     void sendWhatsAppReport_shouldHandleError() throws Exception {
         WhatsAppSendResponse response = new WhatsAppSendResponse(false, null, "Token invalido");
         when(reportSendService.sendReport(any(WhatsAppSendRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/reports/send")
                 .contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
                 .content("""
                     {
                       "encargadoNombre": "Daniel",
