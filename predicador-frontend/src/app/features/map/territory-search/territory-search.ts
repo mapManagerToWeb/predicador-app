@@ -105,7 +105,7 @@ export class TerritorySearch implements OnInit {
 
   logout(): void {
     this.profileService.clear();
-    this.authToken.clear();
+    this.authToken.logout();
     void this.router.navigate(['/login']);
   }
 

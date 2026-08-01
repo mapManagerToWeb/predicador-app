@@ -16,6 +16,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_STRICT=${SESSION_STRICT:-true}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # Igual con las credenciales admin, que hoy se resuelven al arrancar el
       # gateway pero el config-server también las sirve como overlay opcional.

@@ -17,16 +17,16 @@ describe('AuthTokenService', () => {
     expect(svc.isAdmin()).toBe(false);
   });
 
-  it('set() persists to localStorage and updates signals', () => {
+  it('set() updates reactive role state without persisting the session token', () => {
     const svc = new AuthTokenService();
     svc.set('abc.def', 'encargado');
 
-    expect(svc.token()).toBe('abc.def');
+    expect(svc.token()).toBeNull();
     expect(svc.role()).toBe('encargado');
     expect(svc.hasToken()).toBe(true);
     expect(svc.isAdmin()).toBe(false);
-    expect(localStorage.getItem('predicador_session_token')).toBe('abc.def');
-    expect(localStorage.getItem('predicador_session_role')).toBe('encargado');
+    expect(localStorage.getItem('predicador_session_token')).toBeNull();
+    expect(localStorage.getItem('predicador_session_role')).toBeNull();
   });
 
   it('isAdmin true when role is admin', () => {
@@ -35,7 +35,7 @@ describe('AuthTokenService', () => {
     expect(svc.isAdmin()).toBe(true);
   });
 
-  it('clear() wipes signals and localStorage', () => {
+  it('clear() wipes signals without touching session storage', () => {
     const svc = new AuthTokenService();
     svc.set('abc.def', 'admin');
     svc.clear();
@@ -43,18 +43,17 @@ describe('AuthTokenService', () => {
     expect(svc.token()).toBeNull();
     expect(svc.role()).toBeNull();
     expect(svc.hasToken()).toBe(false);
-    expect(localStorage.getItem('predicador_session_token')).toBeNull();
-    expect(localStorage.getItem('predicador_session_role')).toBeNull();
+    expect(localStorage.length).toBe(0);
   });
 
-  it('rehydrates from localStorage when a fresh instance is created', () => {
+  it('does not rehydrate a session from localStorage', () => {
     localStorage.setItem('predicador_session_token', 'stored.token');
     localStorage.setItem('predicador_session_role', 'admin');
 
     const svc = new AuthTokenService();
-    expect(svc.token()).toBe('stored.token');
-    expect(svc.role()).toBe('admin');
-    expect(svc.isAdmin()).toBe(true);
+    expect(svc.token()).toBeNull();
+    expect(svc.role()).toBeNull();
+    expect(svc.isAdmin()).toBe(false);
   });
 
   it('does not consider an empty persisted token an active session', () => {

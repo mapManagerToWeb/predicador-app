@@ -12,6 +12,7 @@ import { provideClientHydration } from '@angular/platform-browser';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
+import { csrfInterceptor } from './core/interceptors/csrf.interceptor';
 import { RumService } from './core/services/rum';
 
 export const appConfig: ApplicationConfig = {
@@ -22,7 +23,7 @@ export const appConfig: ApplicationConfig = {
     // Orden importa: authInterceptor mete el header antes de que errorInterceptor
     // observe la respuesta. Si el token expira y el backend devuelve 401,
     // errorInterceptor lo puede convertir en toast.
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+     provideHttpClient(withInterceptors([authInterceptor, csrfInterceptor, errorInterceptor])),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

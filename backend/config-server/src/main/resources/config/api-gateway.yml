@@ -13,6 +13,8 @@ server:
   port: 8080
 
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
   admin:
     username: ${ADMIN_USERNAME}
     password: ${ADMIN_PASSWORD:}
@@ -21,6 +23,8 @@ app:
     secret: ${SESSION_SECRET}
     ttl-hours: ${SESSION_TTL_HOURS:12}
     strict: ${SESSION_STRICT:true}
+  csrf:
+    cookie-secure: ${CSRF_COOKIE_SECURE:true}
 
 eureka:
   client:
