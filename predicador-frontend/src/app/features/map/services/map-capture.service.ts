@@ -30,9 +30,14 @@ export class MapCaptureService {
     this.updateLabelVisibility(territoryLabels, seleccionados);
     this.fitBoundsToSelection(map, seleccionados, manzanasMarcadas, allTerritoriesLayer);
 
-    return new Promise(resolve =>
-      requestAnimationFrame(() => setTimeout(resolve, MAP_DEFAULTS.captureDelayMs))
-    );
+     return new Promise(resolve => {
+       const complete = () => setTimeout(resolve, MAP_DEFAULTS.captureDelayMs);
+       if (typeof requestAnimationFrame === 'function') {
+         requestAnimationFrame(complete);
+       } else {
+         complete();
+       }
+     });
   }
 
   restaurarMapaPostCaptura(

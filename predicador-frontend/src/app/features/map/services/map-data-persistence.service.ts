@@ -32,20 +32,20 @@ export class MapDataPersistenceService {
     if (this.state.enviando()) return;
     this.state.enviando.set(true);
 
-    const registros = this.reportService.buildRegistros(
-      marcadas,
-      this.rendering.getAllTerritoriesLayer(),
-      this.state.territoriosSeleccionados(),
-      this.state.datosParcialesGuardados
-    );
-
-    const previousMarcadas = [...marcadas];
-    const previousDatosParciales = new Map(this.state.datosParcialesGuardados);
-
-    this.toastService.show(TOAST_MESSAGES.saving);
-    this.state.clearDatosParciales();
-
+    let previousMarcadas: typeof marcadas | null = null;
+    let previousDatosParciales: typeof this.state.datosParcialesGuardados | null = null;
     try {
+      const registros = this.reportService.buildRegistros(
+        marcadas,
+        this.rendering.getAllTerritoriesLayer(),
+        this.state.territoriosSeleccionados(),
+        this.state.datosParcialesGuardados
+      );
+
+      previousMarcadas = [...marcadas];
+      previousDatosParciales = new Map(this.state.datosParcialesGuardados);
+      this.toastService.show(TOAST_MESSAGES.saving);
+      this.state.clearDatosParciales();
       await this.reportService.saveToDatabase(registros);
 
       for (const num of this.state.territoriosSeleccionados()) {
@@ -62,8 +62,10 @@ export class MapDataPersistenceService {
       this.state.manzanasMarcadas.set([]);
       this.state.totalManzanas.set(0);
     } catch {
-      this.state.manzanasMarcadas.set(previousMarcadas);
-      this.state.datosParcialesGuardados = previousDatosParciales;
+      if (previousMarcadas && previousDatosParciales) {
+        this.state.manzanasMarcadas.set(previousMarcadas);
+        this.state.datosParcialesGuardados = previousDatosParciales;
+      }
       this.toastService.show(TOAST_MESSAGES.saveError);
     } finally {
       this.state.enviando.set(false);
@@ -86,11 +88,10 @@ export class MapDataPersistenceService {
     if (this.state.enviando()) return;
     this.state.enviando.set(true);
 
-    const territorios = this.reportService.buildTerritoriosEnvio(marcadas, this.rendering.getAllTerritoriesLayer());
-    const requiereScreenshot = territorios.some(t => !t.finalizado);
-
     let whatsappSent = false;
     try {
+      const territorios = this.reportService.buildTerritoriosEnvio(marcadas, this.rendering.getAllTerritoriesLayer());
+      const requiereScreenshot = territorios.some(t => !t.finalizado);
       let screenshotBase64: string | null = null;
       if (requiereScreenshot) {
         screenshotBase64 = await this.reportService.captureScreenshot(
