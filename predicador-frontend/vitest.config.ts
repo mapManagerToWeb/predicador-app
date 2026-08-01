@@ -23,8 +23,8 @@ export default defineConfig({
     exclude: ['node_modules/**', 'dist/**'],
     setupFiles: ['src/test-setup.ts'],
     // Coverage con V8 (nativo del runtime, sin instrumentation). Umbrales
-    // conservadores para no bloquear CI mientras se agrega cobertura al
-    // resto del código. Subir gradualmente conforme se añadan specs.
+    // elevados tras cubrir los flujos críticos (login, perfil, reportes,
+    // geometría/estado del mapa). Subir gradualmente conforme se añadan specs.
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
@@ -36,10 +36,10 @@ export default defineConfig({
         'src/**/environment*.ts',
       ],
       thresholds: {
-        lines: 20,
-        statements: 20,
-        functions: 20,
-        branches: 10,
+        lines: 30,
+        statements: 30,
+        functions: 30,
+        branches: 20,
       },
     },
   },
