@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { AuthTokenService } from './auth-token';
 
 describe('AuthTokenService', () => {
@@ -91,7 +92,7 @@ describe('AuthTokenService', () => {
 
   it('logout() clears role state and calls auth endpoint', () => {
     const postSpy = vi.fn().mockReturnValue({ subscribe: vi.fn() });
-    const svc = new AuthTokenService({ post: postSpy } as any);
+    const svc = new AuthTokenService({ post: postSpy } as unknown as HttpClient);
     svc.set('token.sig', 'admin');
     svc.logout();
 
