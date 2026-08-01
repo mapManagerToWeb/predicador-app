@@ -78,14 +78,15 @@ export class MapTileLayerService implements OnDestroy {
   }
 
   destroy(): void {
-    this.ngOnDestroy();
+    this.themeObserver?.disconnect();
+    this.themeObserver = null;
     this.tileLayer.set(null);
     this.satelliteLayer.set(null);
     this.isSatelliteView = false;
   }
 
   private getCurrentTheme(): 'light' | 'dark' {
-    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    return document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light';
   }
 
   private getTileLayerUrl(theme: 'light' | 'dark'): string {

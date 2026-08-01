@@ -76,8 +76,12 @@ export class TerritorySearch implements OnInit {
 
   territorySelected = output<number[]>();
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
     this.applyTheme();
+    void this.loadTerritorios();
+  }
+
+  async loadTerritorios(): Promise<void> {
     try {
       const numeros = await this.territorioService.getNumerosTerritorios();
       this.todosLosNumeros.set(numeros);

@@ -8,13 +8,14 @@ import { getTerritoryFillOpacity } from '../utils/territory-colors';
 import { TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
 import { elegirUltimoReporte } from '../utils/report-utils';
 import type { ModoMarcado } from '../types/map.types';
+import type { Reporte } from '../../../core/models/models';
 
 @Injectable({ providedIn: 'root' })
 export class MapSelectionService {
-  private state = inject(MapStateService);
-  private rendering = inject(MapRenderingFacade);
-  private territorioService = inject(TerritorioService);
-  private toastService = inject(Toast);
+  private readonly state = inject(MapStateService);
+  private readonly rendering = inject(MapRenderingFacade);
+  private readonly territorioService = inject(TerritorioService);
+  private readonly toastService = inject(Toast);
 
   seleccionarManzana(polygon: L.Polygon, color: string, nombreBloque: string, territorioNumero: number): void {
     this.restaurarManzanaAnterior();
@@ -92,45 +93,76 @@ export class MapSelectionService {
     const idx = current.findIndex(m => m.id === id);
 
     if (idx >= 0) {
-      current.splice(idx, 1);
-      const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
-      const marcadas = current.filter(m => m.territorioNumero === territorioNumero).length;
-      const isComplete = total > 0 && marcadas >= total;
-      const baseOpacity = getTerritoryFillOpacity(isComplete);
-      layer.setStyle({ fillColor: color, fillOpacity: baseOpacity, color, weight: STYLE_DEFAULTS.polygon.weight });
+      this.desmarcarManzana(current, idx, territorioNumero, color, layer);
     } else {
-      current.push({ id, nombreBloque, layer, territorioNumero });
-      layer.setStyle({
-        fillColor: color,
-        fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
-        color,
-        weight: STYLE_DEFAULTS.polygon.weight,
-      });
-
-      if (!this.state.territoriosSeleccionados().includes(territorioNumero)) {
-        this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
-        this.state.territorioSeleccionado.set(
-          this.state.territoriosSeleccionados().length === 1 ? territorioNumero : null
-        );
-
-        const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero);
-        if (featureLayer) {
-          const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
-          const marcadas = current.filter(m => m.territorioNumero === territorioNumero).length;
-          const isComplete = total > 0 && marcadas >= total;
-          const baseOpacity = getTerritoryFillOpacity(isComplete);
-
-          this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
-        }
-
-        this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-      }
+      this.marcarManzana(current, id, nombreBloque, layer, color, territorioNumero);
     }
 
     this.state.manzanasMarcadas.set(current);
     this.state.totalManzanas.set(
       this.rendering.getManzanaIndex().filter(m => this.state.territoriosSeleccionados().includes(m.territorioNumero)).length
     );
+  }
+
+  private calcularCompletitudTerritorio(
+    territorioNumero: number,
+    marcadasList: { territorioNumero: number }[]
+  ): { total: number; marcadas: number; isComplete: boolean; baseOpacity: number } {
+    const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+    const marcadas = marcadasList.filter(m => m.territorioNumero === territorioNumero).length;
+    const isComplete = total > 0 && marcadas >= total;
+    const baseOpacity = getTerritoryFillOpacity(isComplete);
+    return { total, marcadas, isComplete, baseOpacity };
+  }
+
+  private desmarcarManzana(
+    current: { id: string; nombreBloque: string; layer: L.Path; territorioNumero: number }[],
+    idx: number,
+    territorioNumero: number,
+    color: string,
+    layer: L.Path
+  ): void {
+    current.splice(idx, 1);
+    const { baseOpacity, marcadas } = this.calcularCompletitudTerritorio(territorioNumero, current);
+    layer.setStyle({ fillColor: color, fillOpacity: baseOpacity, color, weight: STYLE_DEFAULTS.polygon.weight });
+
+    if (marcadas === 0) {
+      this.state.territoriosSeleccionados.update(nums => nums.filter(n => n !== territorioNumero));
+      const seleccionados = this.state.territoriosSeleccionados();
+      this.state.territorioSeleccionado.set(seleccionados.length === 1 ? seleccionados[0] : null);
+      this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
+    }
+  }
+
+  private marcarManzana(
+    current: { id: string; nombreBloque: string; layer: L.Path; territorioNumero: number }[],
+    id: string,
+    nombreBloque: string,
+    layer: L.Path,
+    color: string,
+    territorioNumero: number
+  ): void {
+    current.push({ id, nombreBloque, layer, territorioNumero });
+    layer.setStyle({
+      fillColor: color,
+      fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
+      color,
+      weight: STYLE_DEFAULTS.polygon.weight,
+    });
+
+    if (this.state.territoriosSeleccionados().includes(territorioNumero)) return;
+
+    this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
+    const seleccionados = this.state.territoriosSeleccionados();
+    this.state.territorioSeleccionado.set(seleccionados.length === 1 ? territorioNumero : null);
+
+    const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero);
+    if (featureLayer) {
+      const { baseOpacity } = this.calcularCompletitudTerritorio(territorioNumero, current);
+      this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
+    }
+
+    this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
   }
 
   prepareTerritorioSeleccionado(numeros: number[]): number[] {
@@ -217,6 +249,19 @@ export class MapSelectionService {
   ): Promise<void> {
     try {
       const reportes = await this.territorioService.getReportesPorTerritorio(territorioNumero);
+      this.restaurarMarcadoConReportes(territorioNumero, reportes, colorOverride, options);
+    } catch {
+      this.toastService.show(TOAST_MESSAGES.restoreError);
+    }
+  }
+
+  restaurarMarcadoConReportes(
+    territorioNumero: number,
+    reportes: Reporte[],
+    colorOverride?: string,
+    options: { actualizarEstadoMarcado?: boolean } = {}
+  ): void {
+    try {
       // Preferir SIEMPRE el color específico del featureLayer del territorio para no
       // arrastrar el color global (`currentTerritoryColor`) del último territorio activo.
       const featureLayerColor = this.rendering
