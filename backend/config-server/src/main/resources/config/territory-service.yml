@@ -34,8 +34,20 @@ eureka:
 
 app:
   session:
-    secret: ${SESSION_SECRET:}
+    secret: ${SESSION_SECRET}
     ttl-hours: ${SESSION_TTL_HOURS:12}
+    strict: ${SESSION_STRICT:true}
+
+---
+# Profile: local — explicitly permits an unset session secret for local-only use.
+spring:
+  config:
+    activate:
+      on-profile: local
+app:
+  session:
+    secret: ${SESSION_SECRET:}
+    strict: false
 
 management:
   endpoints:

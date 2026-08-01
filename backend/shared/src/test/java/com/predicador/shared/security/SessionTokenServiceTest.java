@@ -18,9 +18,10 @@ class SessionTokenServiceTest {
         Optional<SessionToken> parsed = svc.verify(token);
 
         assertTrue(parsed.isPresent());
-        assertEquals("42", parsed.get().subject());
-        assertEquals(SessionToken.ROLE_ENCARGADO, parsed.get().role());
-        assertFalse(parsed.get().isExpired(parsed.get().issuedAt()));
+        SessionToken tokenParsed = parsed.orElseThrow();
+        assertEquals("42", tokenParsed.subject());
+        assertEquals(SessionToken.ROLE_ENCARGADO, tokenParsed.role());
+        assertFalse(tokenParsed.isExpired(tokenParsed.issuedAt()));
     }
 
     @Test
@@ -66,10 +67,22 @@ class SessionTokenServiceTest {
 
     @Test
     void issue_failsWhenSecretMissing() {
-        SessionTokenService svc = new SessionTokenService("", 1);
-        assertFalse(svc.isConfigured());
-        assertThrows(IllegalStateException.class,
-                () -> svc.issue("42", SessionToken.ROLE_ENCARGADO));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SessionTokenService("", 1));
+    }
+
+    @Test
+    void construction_rejectsSecretShorterThan32Bytes() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new SessionTokenService("short-secret", 1));
+    }
+
+    @Test
+    void construction_accepts32ByteSecretAndRoundTripsInStrictMode() {
+        SessionTokenService svc = new SessionTokenService("12345678901234567890123456789012", 1);
+
+        assertTrue(svc.isConfigured());
+        assertTrue(svc.verify(svc.issue("42", SessionToken.ROLE_ENCARGADO)).isPresent());
     }
 
     @Test

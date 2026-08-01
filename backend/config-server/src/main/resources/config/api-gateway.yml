@@ -12,6 +12,16 @@ spring:
 server:
   port: 8080
 
+app:
+  admin:
+    username: ${ADMIN_USERNAME}
+    password: ${ADMIN_PASSWORD}
+    password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
+  session:
+    secret: ${SESSION_SECRET}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+    strict: ${SESSION_STRICT:true}
+
 eureka:
   client:
     service-url:
@@ -117,3 +127,18 @@ management:
   endpoint:
     health:
       show-details: never
+
+---
+# Profile: local — explicitly permits an unset session secret for local-only use.
+spring:
+  config:
+    activate:
+      on-profile: local
+app:
+  admin:
+    username: ${ADMIN_USERNAME:}
+    password: ${ADMIN_PASSWORD:}
+    password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
+  session:
+    secret: ${SESSION_SECRET:}
+    strict: false

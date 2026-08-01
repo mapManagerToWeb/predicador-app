@@ -25,12 +25,8 @@ import java.util.regex.Pattern;
  * rule's regex. Non-matching requests pass through unchanged (public
  * endpoints); matching requests without a valid token get {@code 401}.</p>
  *
- * <p><strong>Soft rollout:</strong> if {@link SessionTokenService#isConfigured()}
- * returns {@code false} (empty {@code app.session.secret}), the filter
- * disables itself completely. This lets us ship the enforcement code before
- * setting the secret in production, and roll back by clearing the env var if
- * needed. Deployment order becomes: (1) release with filter installed, (2)
- * set secret env, (3) verify logs, (4) hard-fail if secret disappears.</p>
+ * <p>Only an explicitly non-strict local configuration may disable enforcement.
+ * Strict mode rejects missing or undersized secrets during service construction.</p>
  *
  * <p>The extracted subject is attached to the request via {@link #ATTR_SUBJECT}
  * so downstream controllers can inspect the authenticated principal without
@@ -59,10 +55,7 @@ public class SessionAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
 
-        // Fail-open when tokens are not configured yet. Warned only once at
-        // startup by the config class that builds this filter; do not spam
-        // the logs here per-request.
-        if (!tokens.isConfigured()) {
+        if (!tokens.isConfigured() && !tokens.isStrict()) {
             chain.doFilter(req, res);
             return;
         }

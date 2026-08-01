@@ -103,11 +103,11 @@ class SessionAuthFilterTest {
         assertEquals(200, res.getStatus());
     }
 
-    // -- soft rollout -------------------------------------------------------
+    // -- local-only rollout --------------------------------------------------
 
     @Test
     void unconfiguredSecret_passesThroughEverything() throws Exception {
-        SessionTokenService disabled = new SessionTokenService("", 1);
+        SessionTokenService disabled = new SessionTokenService("", 1, false);
         SessionAuthFilter filter = new SessionAuthFilter(disabled, List.of(
                 SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
 
