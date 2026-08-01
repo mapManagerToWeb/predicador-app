@@ -1,12 +1,12 @@
 import { inject } from '@angular/core';
 import { Router, CanActivateFn } from '@angular/router';
-import { Profile } from '../services/profile';
+import { AuthTokenService } from '../services/auth-token';
 
 export const profileGuard: CanActivateFn = () => {
-  const profileService = inject(Profile);
+  const authToken = inject(AuthTokenService);
   const router = inject(Router);
 
-  if (profileService.hasProfile()) {
+  if (authToken.hasToken()) {
     return true;
   }
 

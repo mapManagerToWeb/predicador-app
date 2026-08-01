@@ -1,4 +1,4 @@
-export const DEDUP_THRESHOLD_PX = 8;
+export const DEDUP_THRESHOLD_PX = 2;
 export const MAX_PUNTOS_PARCIAL = 6;
 export const LABEL_MIN_ZOOM = 14;
 export const CAPTURE_DELAY_MS = 400;
@@ -14,10 +14,7 @@ export const MAP_DEFAULTS = {
   captureDelayMs: CAPTURE_DELAY_MS,
 } as const;
 
-// Aristas más anchas (weight=4) para compensar el fillOpacity=0.05 de los
-// polígonos incompletos y mantenerlos visibles a distancia sin sacrificar la
-// diferencia visual con los completos (fillOpacity=0.85). Cambio validado
-// contra el flujo de marcado descrito en AGENTS.md del frontend.
+
 export const STYLE_DEFAULTS = {
   polygon: {
     weight: 4,

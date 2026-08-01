@@ -8,7 +8,7 @@ import { Injectable, computed, signal } from '@angular/core';
  * every request). We only need to remember two things:</p>
  * <ul>
  *   <li>The token string, sent as {@code X-Session-Token} by the auth interceptor.</li>
- *   <li>The role ({@code encargado} or {@code admin}), used by route guards.</li>
+ *   <li>The role ({@code encargado} or {@code admin}), used only for local UI state.</li>
  * </ul>
  *
  * <p>Storing tokens in {@code localStorage} is a known XSS footgun. It is an

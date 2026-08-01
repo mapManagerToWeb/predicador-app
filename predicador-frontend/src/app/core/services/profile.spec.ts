@@ -69,5 +69,36 @@ describe('Profile', () => {
       const newService = new Profile();
       expect(newService.currentUser()).toBeNull();
     });
+
+    it('clears malformed JSON instead of throwing', () => {
+      localStorage.setItem('predicador_profile', '{not-json');
+
+      const newService = new Profile();
+
+      expect(newService.currentUser()).toBeNull();
+      expect(localStorage.getItem('predicador_profile')).toBeNull();
+    });
+
+    it.each([
+      {},
+      { name: 'Daniel', lastName: 'Uribe' },
+      { name: 'Daniel', lastName: 'Uribe', avatar: '0' },
+      { name: '', lastName: 'Uribe', avatar: 0 },
+    ])('clears a profile with invalid required fields: %j', invalidProfile => {
+      localStorage.setItem('predicador_profile', JSON.stringify(invalidProfile));
+
+      const newService = new Profile();
+
+      expect(newService.currentUser()).toBeNull();
+      expect(localStorage.getItem('predicador_profile')).toBeNull();
+    });
+
+    it('does not access browser storage during SSR', () => {
+      vi.stubGlobal('localStorage', undefined);
+
+      expect(new Profile().currentUser()).toBeNull();
+
+      vi.unstubAllGlobals();
+    });
   });
 });

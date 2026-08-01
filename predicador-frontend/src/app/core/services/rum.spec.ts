@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { RumService, normalizeRoute } from './rum';
 
 describe('normalizeRoute (pure function)', () => {
