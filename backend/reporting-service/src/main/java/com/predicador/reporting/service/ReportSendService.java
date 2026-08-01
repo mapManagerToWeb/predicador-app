@@ -2,9 +2,12 @@ package com.predicador.reporting.service;
 
 import com.predicador.reporting.client.WhatsAppMediaClient;
 import com.predicador.reporting.client.WhatsAppMessageClient;
+import com.predicador.reporting.client.WhatsAppMessageResponse;
 import com.predicador.reporting.config.WhatsAppProperties;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
+import com.predicador.reporting.model.WhatsAppDelivery;
+import com.predicador.reporting.repository.WhatsAppDeliveryRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -29,6 +33,7 @@ public class ReportSendService {
     private final WhatsAppMessageClient messageClient;
     private final WhatsAppProperties props;
     private final MeterRegistry registry;
+    private final WhatsAppDeliveryRepository deliveryRepository;
 
     public ReportSendService(
             ReportMessageService messageService,
@@ -36,18 +41,41 @@ public class ReportSendService {
             WhatsAppMessageClient messageClient,
             WhatsAppProperties props,
             MeterRegistry registry) {
+        this(messageService, mediaClient, messageClient, props, registry, null);
+    }
+
+    public ReportSendService(
+            ReportMessageService messageService,
+            WhatsAppMediaClient mediaClient,
+            WhatsAppMessageClient messageClient,
+            WhatsAppProperties props,
+            MeterRegistry registry,
+            WhatsAppDeliveryRepository deliveryRepository) {
         this.messageService = messageService;
         this.mediaClient = mediaClient;
         this.messageClient = messageClient;
         this.props = props;
         this.registry = registry;
+        this.deliveryRepository = deliveryRepository;
     }
 
     public WhatsAppSendResponse sendReport(WhatsAppSendRequest request) {
+        return sendReport(request, null);
+    }
+
+    public WhatsAppSendResponse sendReport(WhatsAppSendRequest request, String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank() && deliveryRepository != null) {
+            Optional<WhatsAppDelivery> previous = deliveryRepository.findById(idempotencyKey);
+            if (previous.isPresent()) return toResponse(previous.get());
+            try {
+                deliveryRepository.saveAndFlush(new WhatsAppDelivery(idempotencyKey));
+            } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
+                return deliveryRepository.findById(idempotencyKey).map(this::toResponse).orElseThrow();
+            }
+        }
         long start = System.nanoTime();
         try {
             Map<String, String> templateParams = messageService.generarParametrosTemplate(request);
-            log.info("Parámetros generados: {}", templateParams);
 
             List<Map<String, Object>> components = new ArrayList<>();
 
@@ -93,11 +121,11 @@ public class ReportSendService {
                 ? normalizePhone(request.destinationNumber())
                 : props.destinationNumber();
 
-            Map<String, Object> response = messageClient.sendTemplateMessage(
-                destination, props.templateName(), props.languageCode(), components);
+            WhatsAppMessageResponse response = messageClient.sendTemplateMessage(
+                    destination, props.templateName(), props.languageCode(), components);
 
-            String messageId = extractMessageId(response);
-            log.info("Mensaje enviado exitosamente, message_id: {}", messageId);
+            String messageId = response.stableMessageId();
+            log.info("WhatsApp delivery outcome=success message_id_hash={}", Integer.toHexString(messageId.hashCode()));
 
             Counter.builder("whatsapp.send.total")
                     .description("Total de mensajes WhatsApp enviados")
@@ -108,10 +136,11 @@ public class ReportSendService {
                     .register(registry)
                     .increment();
 
-            return new WhatsAppSendResponse(true, messageId, null);
+            WhatsAppSendResponse result = new WhatsAppSendResponse(true, messageId, null);
+            persistResult(idempotencyKey, result);
+            return result;
 
-        } catch (Exception e) {
-            log.error("Error enviando reporte por WhatsApp: {}", e.getMessage());
+        } catch (com.predicador.reporting.client.WhatsAppIntegrationException e) {
             Counter.builder("whatsapp.send.total")
                     .description("Total de mensajes WhatsApp enviados")
                     .register(registry)
@@ -120,7 +149,9 @@ public class ReportSendService {
                     .description("Mensajes WhatsApp con error")
                     .register(registry)
                     .increment();
-            return new WhatsAppSendResponse(false, null, e.getMessage());
+            WhatsAppSendResponse result = new WhatsAppSendResponse(false, null, e.getMessage());
+            persistResult(idempotencyKey, result);
+            throw e;
         } finally {
             long elapsed = System.nanoTime() - start;
             Timer.builder("whatsapp.send.duration")
@@ -130,16 +161,17 @@ public class ReportSendService {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private String extractMessageId(Map<String, Object> response) {
-        Object messages = response.get("messages");
-        if (messages instanceof List<?> list && !list.isEmpty()) {
-            Object first = list.get(0);
-            if (first instanceof Map<?, ?> map) {
-                return (String) map.get("id");
-            }
-        }
-        return (String) response.get("message_id");
+    private void persistResult(String idempotencyKey, WhatsAppSendResponse result) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || deliveryRepository == null) return;
+        WhatsAppDelivery delivery = deliveryRepository.findById(idempotencyKey).orElseThrow();
+        delivery.setSuccess(result.success());
+        delivery.setMessageId(result.messageId());
+        delivery.setError(result.error());
+        deliveryRepository.save(delivery);
+    }
+
+    private WhatsAppSendResponse toResponse(WhatsAppDelivery delivery) {
+        return new WhatsAppSendResponse(delivery.isSuccess(), delivery.getMessageId(), delivery.getError());
     }
 
     private String normalizePhone(String phone) {

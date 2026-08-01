@@ -12,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
@@ -56,7 +58,8 @@ class EncargadoControllerTest {
         EncargadoDto dto1 = createDto(1L, "Daniel", "Uribe");
         EncargadoDto dto2 = createDto(2L, "Maria", "Lopez");
 
-        when(encargadoService.listarActivos(admin)).thenReturn(List.of(dto1, dto2));
+        when(encargadoService.listarActivos(any(), eq(admin)))
+                .thenReturn(new PageImpl<>(List.of(dto1, dto2), PageRequest.of(0, 50), 2));
 
         mockMvc.perform(get("/api/v1/encargados").requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
@@ -97,7 +100,8 @@ class EncargadoControllerTest {
     void buscar_shouldReturn200() throws Exception {
         EncargadoDto dto = createDto(1L, "Daniel", "Uribe");
 
-        when(encargadoService.buscarPorNombre(anyString(), any(SessionToken.class))).thenReturn(List.of(dto));
+        when(encargadoService.buscarPorNombre(anyString(), any(), any(SessionToken.class)))
+                .thenReturn(new PageImpl<>(List.of(dto), PageRequest.of(0, 50), 1));
 
         mockMvc.perform(get("/api/v1/encargados/buscar").param("nombre", "Daniel")
                 .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))

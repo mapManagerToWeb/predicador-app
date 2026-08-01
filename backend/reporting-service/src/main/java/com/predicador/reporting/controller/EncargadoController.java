@@ -12,6 +12,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
@@ -31,8 +33,15 @@ public class EncargadoController {
     }
 
     @GetMapping
-    public ResponseEntity<List<EncargadoDto>> listarActivos(HttpServletRequest request) {
-        return ResponseEntity.ok(encargadoService.listarActivos(token(request)));
+    public ResponseEntity<List<EncargadoDto>> listarActivos(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            HttpServletRequest request) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
+        }
+        return ResponseEntity.ok(encargadoService.listarActivos(
+                PageRequest.of(page, size, Sort.by("nombre").ascending()), token(request)).getContent());
     }
 
     @PostMapping
@@ -47,8 +56,15 @@ public class EncargadoController {
     }
 
     @GetMapping("/buscar")
-    public ResponseEntity<List<EncargadoDto>> buscar(@RequestParam String nombre, HttpServletRequest request) {
-        return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre, token(request)));
+    public ResponseEntity<List<EncargadoDto>> buscar(@RequestParam String nombre,
+                                                     @RequestParam(defaultValue = "0") int page,
+                                                     @RequestParam(defaultValue = "50") int size,
+                                                     HttpServletRequest request) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
+        }
+        return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre,
+                PageRequest.of(page, size, Sort.by("nombre").ascending()), token(request)).getContent());
     }
 
     @PostMapping("/buscar-crear")
