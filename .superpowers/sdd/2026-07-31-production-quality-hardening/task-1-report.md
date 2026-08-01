@@ -73,3 +73,51 @@ The tests were written and run red before the production implementation, then pa
 ## Commit
 
 - `6091c63 security: fail closed session and admin configuration`
+
+## Review Fix Report
+
+### Findings Addressed
+
+- `docker-compose.yml` no longer requires `ADMIN_PASSWORD` when BCrypt is configured. The plaintext variable is optional and has no insecure default; strict startup requires a BCrypt hash.
+- `SESSION_STRICT=false` is effective only when `local` is an active Spring profile. Missing or short secrets remain rejected in every other profile.
+- `AuthController` accepts plaintext credentials only when the effective session mode is local, and strict mode rejects startup without `ADMIN_PASSWORD_BCRYPT`.
+- Admin credentials are constructor-bound with explicit property defaults, and tests cover strict plaintext rejection, local plaintext acceptance, BCrypt success, blank credentials, and the literal `admin/admin` fallback.
+
+### Tests and Commands
+
+Command, run from `backend/`:
+
+```text
+mvn -pl shared,api-gateway test
+```
+
+Output summary:
+
+```text
+SessionTokenServiceTest: Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
+SessionAuthFilterTest:   Tests run: 8,  Failures: 0, Errors: 0, Skipped: 0
+AuthControllerTest:      Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+BCrypt-only Compose validation, with `ADMIN_PASSWORD` absent:
+
+```text
+env -u ADMIN_PASSWORD SESSION_SECRET=12345678901234567890123456789012 ADMIN_USERNAME=operator ADMIN_PASSWORD_BCRYPT='$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy' docker compose config --quiet
+```
+
+Result: successful with no output.
+
+Explicit local-profile Compose validation:
+
+```text
+SESSION_SECRET=12345678901234567890123456789012 ADMIN_USERNAME=operator ADMIN_PASSWORD=local-password ADMIN_PASSWORD_BCRYPT= SPRING_PROFILES_ACTIVE=local docker compose config --quiet
+```
+
+Result: successful with no output.
+
+### Review Fix Commit
+
+- `59a7f66 security: enforce local-only fallback modes`
+
+Unrelated pre-existing modifications remain unstaged and unchanged.
