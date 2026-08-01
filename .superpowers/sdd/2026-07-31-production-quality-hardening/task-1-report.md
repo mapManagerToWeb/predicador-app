@@ -121,3 +121,39 @@ Result: successful with no output.
 - `59a7f66 security: enforce local-only fallback modes`
 
 Unrelated pre-existing modifications remain unstaged and unchanged.
+
+## Remaining Re-Review Fix Report
+
+### Findings Addressed
+
+- Removed the config-server `ADMIN_PASSWORD` Compose requirement. `ADMIN_PASSWORD` now defaults only to an empty value, while strict gateway startup still rejects missing `ADMIN_PASSWORD_BCRYPT`.
+- Added `springBinding_rejectsMissingAdminPropertiesInsteadOfUsingInsecureDefaults`, an `ApplicationContextRunner` test that imports the real `AuthController` and resolves its constructor `@Value` parameters. With admin properties omitted, context startup fails due to strict BCrypt validation.
+
+### Verification
+
+Command, run from `backend/`:
+
+```text
+mvn -pl shared,api-gateway test
+```
+
+Output summary:
+
+```text
+SessionTokenServiceTest: Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
+SessionAuthFilterTest:   Tests run: 8,  Failures: 0, Errors: 0, Skipped: 0
+AuthControllerTest:      Tests run: 6,  Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+BCrypt-only Compose validation with `ADMIN_PASSWORD` unset:
+
+```text
+env -u ADMIN_PASSWORD SESSION_SECRET=12345678901234567890123456789012 ADMIN_USERNAME=operator ADMIN_PASSWORD_BCRYPT='$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy' docker compose config --quiet
+```
+
+Result: successful with no output.
+
+### Re-Review Fix Commit
+
+- `70d11b6 test: cover bound admin defaults and bcrypt compose`
