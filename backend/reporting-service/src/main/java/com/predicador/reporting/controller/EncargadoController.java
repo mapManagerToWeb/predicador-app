@@ -41,7 +41,7 @@ public class EncargadoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
         }
         return ResponseEntity.ok(encargadoService.listarActivos(
-                PageRequest.of(page, size, Sort.by("nombre").ascending()), token(request)).getContent());
+                PageRequest.of(page, size, Sort.by("nombre").ascending().and(Sort.by("id").ascending())), token(request)).getContent());
     }
 
     @PostMapping
@@ -64,7 +64,7 @@ public class EncargadoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
         }
         return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre,
-                PageRequest.of(page, size, Sort.by("nombre").ascending()), token(request)).getContent());
+                PageRequest.of(page, size, Sort.by("nombre").ascending().and(Sort.by("id").ascending())), token(request)).getContent());
     }
 
     @PostMapping("/buscar-crear")

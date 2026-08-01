@@ -108,4 +108,12 @@ class ReportControllerTest {
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.title").value("Acceso denegado"));
     }
+
+    @Test
+    void malformedPageParameterReturnsBadRequestProblemDetail() throws Exception {
+        mockMvc.perform(get("/api/v1/reports").param("page", "not-a-number")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
 }

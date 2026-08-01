@@ -28,3 +28,25 @@
 - The migration's expression index assumes existing encargado rows do not already contain duplicate normalized name/apellido pairs; deployment should check duplicates before applying it.
 - A process crash after idempotency reservation but before delivery completion leaves a stable incomplete result; operational cleanup/retry policy may be needed if this failure mode must be recoverable.
 - Maven output includes the existing Mockito/Byte Buddy dynamic-agent warnings; tests still exit successfully.
+
+## Review Fixes
+
+### Coverage
+
+- Replaced the optional constructor with one deterministic Spring constructor that requires `WhatsAppDeliveryRepository`; added an application-context bean construction test.
+- Added explicit `IN_PROGRESS`, `SUCCEEDED`, and `FAILED` delivery states, five-minute leases, an atomic stale-claim update, and terminal failure replay through `WhatsAppIntegrationException`.
+- Added response-ID validation for message/media responses and removed phone-derived log identifiers.
+- Added normalized natural-identity lookup and a deterministic `V1_1` deduplication migration before the unique index migration; delivery lease/status columns use a new V3 migration.
+- Added stable ID pagination tiebreakers and `ProblemDetail` handling for malformed page/size values.
+
+### Commands And Output
+
+- Red: `mvn -pl reporting-service -Dtest=Task3HardeningTest,Task3WhatsAppClientTest,ReportControllerTest test -q` failed because `claimStale`, explicit delivery states, and response validation were not yet implemented.
+- Green focused: `mvn -pl reporting-service -Dtest=Task3HardeningTest,Task3WhatsAppClientTest,ReportControllerTest,ReportSendServiceTest,EncargadoServiceTest test -q` exited 0.
+- Required suite: `mvn -pl reporting-service,territory-service test -q` exited 0.
+- No PostgreSQL migration/integration test infrastructure was available in this worktree; SQL migrations were reviewed for ordering and schema compatibility.
+
+### Remaining Concerns
+
+- V3 can only classify legacy V2 rows from the fields V2 stored; rows left by a crash before this fix are conservatively terminal failures rather than silently reported successes.
+- The V1.1 cleanup keeps the lowest encargado ID and deletes normalized duplicates; deployments should verify that no external process depends on duplicate IDs before migration.

@@ -6,6 +6,7 @@ import com.predicador.reporting.client.WhatsAppMessageResponse;
 import com.predicador.reporting.config.WhatsAppProperties;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
+import com.predicador.reporting.repository.WhatsAppDeliveryRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,12 +31,14 @@ class ReportSendServiceTest {
     @Mock private WhatsAppMediaClient mediaClient;
     @Mock private WhatsAppMessageClient messageClient;
     @Mock private WhatsAppProperties props;
+    @Mock private WhatsAppDeliveryRepository deliveryRepository;
 
     private ReportSendService sendService;
 
     @BeforeEach
     void setUp() {
-        sendService = new ReportSendService(messageService, mediaClient, messageClient, props, new SimpleMeterRegistry());
+        sendService = new ReportSendService(messageService, mediaClient, messageClient, props,
+                new SimpleMeterRegistry(), deliveryRepository);
     }
 
     @Test
