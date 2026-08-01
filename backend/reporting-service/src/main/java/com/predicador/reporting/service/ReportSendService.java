@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.time.Duration;
 import java.time.Instant;
+import org.springframework.dao.DataAccessException;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -156,28 +157,54 @@ public class ReportSendService {
     private Reservation reserve(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) return new Reservation(null, null);
         Instant now = Instant.now();
-        Optional<WhatsAppDelivery> previous = deliveryRepository.findById(idempotencyKey);
+        Optional<WhatsAppDelivery> previous;
+        try {
+            previous = deliveryRepository.findById(idempotencyKey);
+        } catch (DataAccessException exception) {
+            throw databaseFailure(exception);
+        }
         if (previous.isPresent()) {
-            WhatsAppDelivery delivery = previous.get();
-            if (delivery.isCompleted()) return new Reservation(delivery, replay(delivery));
-            if (delivery.isLeaseActive(now)) {
-                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
-                        "El envío con esta clave está en progreso", 409, null);
+            return resolveExisting(idempotencyKey, previous.get(), now);
+        }
+        try {
+            return new Reservation(deliveryRepository.saveAndFlush(new WhatsAppDelivery(idempotencyKey)), null);
+        } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
+            Optional<WhatsAppDelivery> raced;
+            try {
+                raced = deliveryRepository.findById(idempotencyKey);
+            } catch (DataAccessException exception) {
+                throw databaseFailure(exception);
             }
+            if (raced.isEmpty()) throw databaseFailure(duplicate);
+            return resolveExisting(idempotencyKey, raced.get(), now);
+        } catch (DataAccessException exception) {
+            throw databaseFailure(exception);
+        }
+    }
+
+    private Reservation resolveExisting(String idempotencyKey, WhatsAppDelivery delivery, Instant now) {
+        if (delivery.isCompleted()) return new Reservation(delivery, replay(delivery));
+        if (delivery.isLeaseActive(now)) {
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    "El envío con esta clave está en progreso", 409, null);
+        }
+        try {
             if (deliveryRepository.claimStale(idempotencyKey,
                     com.predicador.reporting.model.WhatsAppDeliveryStatus.IN_PROGRESS,
                     now, now.plus(DELIVERY_LEASE)) != 1) {
                 throw new com.predicador.reporting.client.WhatsAppIntegrationException(
                         "No se pudo reservar el envío", 409, null);
             }
-            delivery.renewLease(now.plus(DELIVERY_LEASE));
-            return new Reservation(delivery, null);
+        } catch (DataAccessException exception) {
+            throw databaseFailure(exception);
         }
-        try {
-            return new Reservation(deliveryRepository.saveAndFlush(new WhatsAppDelivery(idempotencyKey)), null);
-        } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
-            return reserve(idempotencyKey);
-        }
+        delivery.renewLease(now.plus(DELIVERY_LEASE));
+        return new Reservation(delivery, null);
+    }
+
+    private com.predicador.reporting.client.WhatsAppIntegrationException databaseFailure(Exception exception) {
+        return new com.predicador.reporting.client.WhatsAppIntegrationException(
+                "No se pudo reservar el envío por un error de persistencia", 503, exception);
     }
 
     private void persistSuccess(WhatsAppDelivery delivery, WhatsAppSendResponse result) {
