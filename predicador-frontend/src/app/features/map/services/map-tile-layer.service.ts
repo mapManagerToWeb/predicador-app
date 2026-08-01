@@ -1,4 +1,4 @@
-import { Injectable, signal, OnDestroy } from '@angular/core';
+import { Injectable, inject, signal, OnDestroy } from '@angular/core';
 import * as L from 'leaflet';
 import { MAP_DEFAULTS, TILE_LAYERS, ATTRIBUTIONS } from '../utils/map-constants';
 import { MapEngineService } from './map-engine.service';
@@ -16,7 +16,7 @@ export class MapTileLayerService implements OnDestroy {
   private themeObserver: MutationObserver | null = null;
   private isSatelliteView = false;
 
-  constructor(private engine: MapEngineService) {}
+  private readonly engine = inject(MapEngineService);
 
   initLayers(): void {
     const map = this.engine.getMap();

@@ -147,8 +147,10 @@ class ReportSendServiceTest {
     @SuppressWarnings("unchecked")
     @Test
     void reserve_raceCondition_usesSeparateTransactionForRecovery() {
-        WhatsAppDelivery existing = new WhatsAppDelivery("idempotent-key");
+        WhatsAppDelivery existing = com.predicador.reporting.model.WhatsAppDelivery.stale("idempotent-key");
 
+        when(deliveryRepository.findById("idempotent-key"))
+            .thenReturn(Optional.empty(), Optional.of(existing));
         when(deliveryRepository.saveAndFlush(any(WhatsAppDelivery.class)))
             .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
         when(txTemplate.execute(any(org.springframework.transaction.support.TransactionCallback.class)))
@@ -156,12 +158,11 @@ class ReportSendServiceTest {
                 org.springframework.transaction.support.TransactionCallback<?> callback = invocation.getArgument(0);
                 return callback.doInTransaction(null);
             });
-        when(deliveryRepository.findById("idempotent-key"))
-            .thenReturn(Optional.of(existing));
+        when(deliveryRepository.claimStale(eq("idempotent-key"), any(), any(), any())).thenReturn(1);
 
         sendService.reserve("idempotent-key");
 
         verify(txTemplate).execute(any(org.springframework.transaction.support.TransactionCallback.class));
-        verify(deliveryRepository).findById("idempotent-key");
+        verify(deliveryRepository, times(2)).findById("idempotent-key");
     }
 }

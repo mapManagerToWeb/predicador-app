@@ -41,9 +41,6 @@ public class ReportSendService {
     private final WhatsAppDeliveryRepository deliveryRepository;
     private final TransactionTemplate txTemplate;
 
-    @Autowired
-    public ReportSendService(
-
     public ReportSendService(
             ReportMessageService messageService,
             WhatsAppMediaClient mediaClient,
