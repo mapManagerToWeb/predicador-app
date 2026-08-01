@@ -46,7 +46,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 
 | Componente | Tecnología |
 |---|---|
-| Runtime | Java 21 (virtual threads) |
+| Runtime | Java 25 (virtual threads) |
 | Framework | Spring Boot 4.0 |
 | Microservicios | Spring Cloud 2025.1 |
 | Gateway | Spring Cloud Gateway (WebFlux) |
@@ -126,7 +126,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **WhatsApp**: Integración Meta Graph API v21.0 con templates, normalización telefónica chilena
 - **PostGIS**: Almacenamiento y consulta de geometrías espaciales
 - **Flyway**: Migraciones de base de datos versionadas
-- **Virtual Threads**: Java 21 virtual threads para mejor concurrencia
+- **Virtual Threads**: Java 25 virtual threads para mejor concurrencia
 - **Observability**: OpenTelemetry tracing, Prometheus metrics, Grafana dashboards
 - **Validación**: Bean Validation en todos los DTOs con respuestas ProblemDetail (RFC 7807)
 - **CORS**: Configurable por variable de entorno
@@ -155,7 +155,7 @@ docker-compose --profile observability up -d
 ### Desarrollo local
 
 **Prerequisitos:**
-- Java 21
+- Java 25
 - Node.js 22
 - Maven 3.9
 - PostgreSQL 16 + PostGIS
