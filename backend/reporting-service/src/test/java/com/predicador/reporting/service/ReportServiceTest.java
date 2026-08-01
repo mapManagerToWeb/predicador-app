@@ -24,10 +24,9 @@ class ReportServiceTest {
     @Mock
     private ReportRepository repository;
 
-    @Mock
-    private AuthorizationService authorization;
-
     private ReportService reportService;
+
+    private final AuthorizationService authorization = new AuthorizationService();
 
     private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
@@ -143,28 +142,41 @@ class ReportServiceTest {
     }
 
     @Test
+    void createReports_shouldAllowMatchingOwner() {
+        ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
+                7L, null, null, null, null, null, null);
+        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
+
+        List<ReportDto> result = reportService.createReports(List.of(dto), encargado("7"));
+
+        assertEquals(1, result.size());
+        verify(repository).saveAll(anyList());
+    }
+
+    @Test
     void createReports_shouldRejectReportOwnedByAnotherEncargado() {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
                 8L, null, null, null, null, null, null);
-        SessionToken token = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
-        doThrow(new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN, "forbidden"))
-                .when(authorization).authorizeOwner(token, 8L);
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.createReports(List.of(dto), token));
+                () -> reportService.createReports(List.of(dto), encargado("7")));
         verify(repository, never()).saveAll(anyList());
     }
 
     @Test
-    void getReportsByEncargado_shouldAuthorizeRequestedOwner() {
-        SessionToken token = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
-        doThrow(new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN, "forbidden"))
-                .when(authorization).authorizeOwner(token, 8L);
+    void getReportsByEncargado_shouldAllowMatchingOwner() {
+        when(repository.findByEncargadoIdOrderByFechaDesc(7L)).thenReturn(List.of());
+
+        assertTrue(reportService.getReportsByEncargado(7L, encargado("7")).isEmpty());
+        verify(repository).findByEncargadoIdOrderByFechaDesc(7L);
+    }
+
+    @Test
+    void getReportsByEncargado_shouldRejectAnotherOwner() {
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.getReportsByEncargado(8L, token));
+                () -> reportService.getReportsByEncargado(8L, encargado("7")));
         verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L);
     }
 
@@ -174,5 +186,37 @@ class ReportServiceTest {
         when(repository.findAllByOrderByFechaDesc()).thenReturn(List.of());
 
         assertTrue(reportService.getAllReports(token).isEmpty());
+    }
+
+    @Test
+    void getReportsForToday_shouldRejectOwnerAndAllowAdmin() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportsForToday(encargado("7")));
+
+        when(repository.findByFechaRange(any(Instant.class), any(Instant.class))).thenReturn(List.of());
+        assertTrue(reportService.getReportsForToday(admin).isEmpty());
+    }
+
+    @Test
+    void getReportsByTerritorio_shouldRejectOwnerAndAllowAdmin() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportsByTerritorio(12L, encargado("7")));
+
+        when(repository.findByTerritorioNumeroOrderByFechaDesc(12L)).thenReturn(List.of());
+        assertTrue(reportService.getReportsByTerritorio(12L, admin).isEmpty());
+    }
+
+    @Test
+    void getReportsByMultipleTerritorios_shouldRejectOwnerAndAllowAdmin() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportsByMultipleTerritorios(List.of(12L), encargado("7")));
+
+        when(repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(List.of(12L)))
+                .thenReturn(List.of());
+        assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), admin).isEmpty());
+    }
+
+    private SessionToken encargado(String subject) {
+        return new SessionToken(subject, SessionToken.ROLE_ENCARGADO, 1L, 2L);
     }
 }

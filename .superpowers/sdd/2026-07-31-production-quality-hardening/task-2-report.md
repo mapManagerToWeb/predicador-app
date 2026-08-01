@@ -36,3 +36,45 @@
 - Maven tests emit the repository's existing Mockito dynamic-agent/JDK warnings; they do not fail the build.
 - The full Docker Compose stack was not started; image build and configuration validation were run successfully.
 - Existing edits in Task 2-listed files were preserved and are included at file granularity when the Task 2 commit is staged.
+
+## Review Fixes
+
+Review findings were addressed with test/support changes only. Production files and behavior were unchanged.
+
+- `ReportControllerSendTest` constructs `ReportController` with the concrete `AuthorizationService`, sends authenticated requests with a matching encargado token, verifies successful WhatsApp handling, and verifies unauthenticated requests return `403` `ProblemDetail` without calling the send service.
+- `ReportServiceTest` constructs `ReportService` with the concrete helper and covers matching-owner creation/read, mismatched-owner rejection, admin bypass, and today/territory/batch owner/admin boundaries.
+- `EncargadoServiceTest` constructs `EncargadoService` with the concrete helper and covers matching-owner update, mismatched-owner rejection, admin update/list/search access, and owner rejection for global list/search operations.
+
+## Review Fix Verification
+
+Focused command:
+
+```text
+mvn -pl reporting-service -Dtest=ReportControllerSendTest,ReportServiceTest,EncargadoServiceTest,AuthorizationServiceTest test -B
+```
+
+Exact result:
+
+```text
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- ReportControllerSendTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- AuthorizationServiceTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0 -- ReportServiceTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0 -- EncargadoServiceTest
+[INFO] Tests run: 35, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Required full command:
+
+```text
+mvn -pl reporting-service test -B
+```
+
+Exact result:
+
+```text
+[INFO] Tests run: 92, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+The test run still prints the existing Mockito/JDK dynamic-agent warning and expected validation-test warning logs; neither affects the result.
