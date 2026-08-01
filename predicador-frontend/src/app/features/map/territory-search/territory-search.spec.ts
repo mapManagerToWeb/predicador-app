@@ -30,7 +30,7 @@ describe('TerritorySearch', () => {
 
   describe('ngOnInit', () => {
     it('should load territory numbers', async () => {
-      const promise = component.ngOnInit();
+      const promise = component.loadTerritorios();
 
       const req = httpMock.expectOne(`${environment.apiUrl}/territories`);
       req.flush([1, 2, 3, 4, 5]);
@@ -41,7 +41,7 @@ describe('TerritorySearch', () => {
     });
 
     it('should set loading to false on error', async () => {
-      const promise = component.ngOnInit();
+      const promise = component.loadTerritorios();
 
       const req = httpMock.expectOne(`${environment.apiUrl}/territories`);
       req.error(new ProgressEvent('error'));

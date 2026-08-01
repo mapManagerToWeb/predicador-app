@@ -15,8 +15,8 @@ export interface MapClickResult {
 
 @Injectable({ providedIn: 'root' })
 export class MapInteractionService {
-  private state = inject(MapStateService);
-  private rendering = inject(MapRenderingFacade);
+  private readonly state = inject(MapStateService);
+  private readonly rendering = inject(MapRenderingFacade);
 
   handleMapClick(e: L.LeafletMouseEvent): MapClickResult {
     const modo = this.state.modoMarcado();

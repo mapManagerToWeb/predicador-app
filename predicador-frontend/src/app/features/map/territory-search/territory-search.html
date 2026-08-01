@@ -6,9 +6,11 @@
         <path d="m21 21-4.35-4.35"/>
       </svg>
       <input
+        id="territory-search"
         type="text"
         class="search-input"
         placeholder="Buscar territorio..."
+        aria-label="Buscar territorio"
         [value]="consultaBusqueda()"
         (input)="onInput($event)"
         (focus)="onFocus()"

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import * as L from 'leaflet';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { getTerritoryFillOpacity } from '../utils/territory-colors';
@@ -47,20 +47,18 @@ export function getSelectedManzanaStyle(color: string): L.PathOptions {
  * batching DOM-heavy style operations to avoid layout thrashing.</p>
  */
 @Injectable({ providedIn: 'root' })
-export class MapStyleService {
+export class MapStyleService implements OnDestroy {
   private pendingStyleFrame: number | null = null;
   private pendingStyleQueue: Array<() => void> = [];
 
   queueStyleUpdate(fn: () => void): void {
     this.pendingStyleQueue.push(fn);
-    if (this.pendingStyleFrame === null) {
-      this.pendingStyleFrame = requestAnimationFrame(() => {
-        this.pendingStyleFrame = null;
-        const queue = this.pendingStyleQueue;
-        this.pendingStyleQueue = [];
-        for (const fn of queue) fn();
-      });
-    }
+    this.pendingStyleFrame ??= requestAnimationFrame(() => {
+      this.pendingStyleFrame = null;
+      const queue = this.pendingStyleQueue;
+      this.pendingStyleQueue = [];
+      for (const task of queue) task();
+    });
   }
 
   cancelPendingStyleUpdates(): void {
