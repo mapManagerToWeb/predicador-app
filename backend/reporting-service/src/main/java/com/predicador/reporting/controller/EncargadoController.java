@@ -74,7 +74,8 @@ public class EncargadoController {
         String telefono = body.get("telefono");
         var result = encargadoService.buscarOCrear(nombre, apellido, telefono);
         if (result.isPresent()) {
-            return ResponseEntity.ok(withToken(result.get()));
+            LoginResponse response = withToken(result.get());
+            return withSessionCookie(response);
         }
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "Nombre y apellido son requeridos");
@@ -88,7 +89,7 @@ public class EncargadoController {
         String telefono = body.get("telefono");
         var result = encargadoService.buscarPorTelefono(telefono);
         if (result.isPresent()) {
-            return ResponseEntity.ok(withToken(result.get()));
+            return withSessionCookie(withToken(result.get()));
         }
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "Encargado no encontrado con el teléfono proporcionado");
@@ -96,6 +97,20 @@ public class EncargadoController {
         problem.setType(URI.create("https://api.predicador.com/errors/not-found"));
         problem.setProperty("resource", "Encargado");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
+    }
+
+    private ResponseEntity<LoginResponse> withSessionCookie(LoginResponse response) {
+        if (response.token() == null) {
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.ok()
+                .header("Set-Cookie", sessionCookie(response.token(), 12 * 60 * 60))
+                .body(new LoginResponse(response.encargado(), null));
+    }
+
+    private static String sessionCookie(String value, long maxAge) {
+        return "%s=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=Lax"
+                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge);
     }
 
     /**

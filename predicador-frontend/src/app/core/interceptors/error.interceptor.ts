@@ -26,7 +26,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       // Limpiar credenciales locales y forzar re-login. No aplicamos esta
       // lógica a los propios endpoints de login (evita loop y sobrescribir
       // el mensaje del formulario).
-      if (error.status === 401 && !isAuthRequest) {
+      if ((error.status === 401 || error.status === 403) && !isAuthRequest) {
         authToken.clear();
         profile.clear();
         if (typeof localStorage !== 'undefined') {

@@ -2,10 +2,12 @@ package com.predicador.gateway.config;
 
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
+import com.predicador.shared.security.SessionAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -68,11 +70,24 @@ public class AuthController {
         }
 
         String token = tokens.issue("admin", SessionToken.ROLE_ADMIN);
-        return ResponseEntity.ok(Map.of(
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, sessionCookie(token, 12 * 60 * 60))
+                .body(Map.of(
                 "success", true,
                 "message", "Autenticación exitosa",
-                "token", token,
                 "role", SessionToken.ROLE_ADMIN));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, sessionCookie("", 0))
+                .build();
+    }
+
+    private static String sessionCookie(String value, long maxAge) {
+        return "%s=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=Lax"
+                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge);
     }
 
     private boolean passwordMatches(String provided) {

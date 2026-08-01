@@ -1,57 +1,35 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, Optional, computed, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
-/**
- * Persists the HMAC session token minted by the backend on successful login.
- *
- * <p>The token is opaque to the frontend: we do not decode the payload
- * (there is nothing sensitive we would trust anyway — the backend re-verifies
- * every request). We only need to remember two things:</p>
- * <ul>
- *   <li>The token string, sent as {@code X-Session-Token} by the auth interceptor.</li>
- *   <li>The role ({@code encargado} or {@code admin}), used only for local UI state.</li>
- * </ul>
- *
- * <p>Storing tokens in {@code localStorage} is a known XSS footgun. It is an
- * acceptable trade-off here because the app has no third-party scripts and
- * Angular's built-in sanitization covers the DOM sinks in use. Moving to
- * {@code httpOnly} cookies is planned but requires cross-origin CORS with
- * credentials which is out of scope for this pass.</p>
- */
+/** Tracks only reactive UI auth state; the HMAC is held by an HttpOnly cookie. */
 export type SessionRole = 'encargado' | 'admin';
-
-const TOKEN_KEY = 'predicador_session_token';
-const ROLE_KEY = 'predicador_session_role';
 
 @Injectable({ providedIn: 'root' })
 export class AuthTokenService {
-  private tokenSignal = signal<string | null>(this.readInitial(TOKEN_KEY));
-  private roleSignal = signal<SessionRole | null>(
-    this.readInitial(ROLE_KEY) as SessionRole | null,
-  );
+  private roleSignal = signal<SessionRole | null>(null);
 
-  readonly token = this.tokenSignal.asReadonly();
+  // Optional keeps this state service directly constructible in SSR/unit tests.
+  // eslint-disable-next-line @angular-eslint/prefer-inject
+  constructor(@Optional() private http?: HttpClient) {}
+
+  readonly token = signal<string | null>(null).asReadonly();
   readonly role = this.roleSignal.asReadonly();
-  readonly hasToken = computed(() => Boolean(this.tokenSignal()?.trim()));
+  readonly hasToken = computed(() => this.roleSignal() !== null);
   readonly isAdmin = computed(() => this.roleSignal() === 'admin');
 
-  set(token: string, role: SessionRole): void {
-    this.tokenSignal.set(token);
+  set(_token: string | null, role: SessionRole): void {
     this.roleSignal.set(role);
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(ROLE_KEY, role);
   }
 
   clear(): void {
-    this.tokenSignal.set(null);
     this.roleSignal.set(null);
-    if (typeof localStorage === 'undefined') return;
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(ROLE_KEY);
   }
 
-  private readInitial(key: string): string | null {
-    if (typeof localStorage === 'undefined') return null;
-    return localStorage.getItem(key);
+  logout(): void {
+    this.clear();
+    this.http?.post('/api/v1/auth/logout', {}).subscribe({
+      error: () => undefined,
+      complete: () => undefined,
+    });
   }
 }

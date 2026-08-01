@@ -30,28 +30,31 @@ describe('authInterceptor', () => {
     localStorage.clear();
   });
 
-  it('no envía header si no hay token', () => {
+  it('sends credentials without exposing a session token header', () => {
     http.get('/api/v1/territories').subscribe();
     const req = httpMock.expectOne('/api/v1/territories');
     expect(req.request.headers.has('X-Session-Token')).toBe(false);
+    expect(req.request.withCredentials).toBe(true);
     req.flush({});
   });
 
-  it('envía X-Session-Token cuando hay token', () => {
+  it('does not send a browser-held session token header', () => {
     authToken.set('abc.def', 'encargado');
 
     http.get('/api/v1/reports').subscribe();
     const req = httpMock.expectOne('/api/v1/reports');
-    expect(req.request.headers.get('X-Session-Token')).toBe('abc.def');
+    expect(req.request.headers.has('X-Session-Token')).toBe(false);
+    expect(req.request.withCredentials).toBe(true);
     req.flush({});
   });
 
-  it('no envía token a rutas de login (evita stamping)', () => {
+  it('sends credentials to login without a session token header', () => {
     authToken.set('abc.def', 'encargado');
 
     http.post('/api/v1/encargados/login', {}).subscribe();
     const req = httpMock.expectOne('/api/v1/encargados/login');
     expect(req.request.headers.has('X-Session-Token')).toBe(false);
+    expect(req.request.withCredentials).toBe(true);
     req.flush({});
   });
 

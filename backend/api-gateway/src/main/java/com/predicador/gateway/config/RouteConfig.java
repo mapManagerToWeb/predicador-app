@@ -98,13 +98,13 @@ public class RouteConfig {
 
     @Bean
     public CorsWebFilter corsWebFilter() {
-        CorsConfiguration config = new CorsConfiguration();
+        CorsConfiguration config = corsConfiguration();
         config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
         config.setExposedHeaders(List.of("ETag", "Location"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
@@ -113,6 +113,20 @@ public class RouteConfig {
         source.registerCorsConfiguration("/**", config);
 
         return new CorsWebFilter(source);
+    }
+
+    CorsConfiguration corsConfiguration() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList());
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
+        config.setExposedHeaders(List.of("ETag", "Location"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        return config;
     }
 
     /** Marker for the fallback controller in case the enum value is needed. */

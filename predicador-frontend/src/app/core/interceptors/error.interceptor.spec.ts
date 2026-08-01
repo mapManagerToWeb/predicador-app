@@ -61,7 +61,7 @@ describe('errorInterceptor', () => {
     const req = httpMock.expectOne('/api/v1/encargados/login');
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
-    expect(authToken.token()).toBe('abc.def');
+    expect(authToken.token()).toBeNull();
     expect(navSpy).not.toHaveBeenCalled();
   });
 
