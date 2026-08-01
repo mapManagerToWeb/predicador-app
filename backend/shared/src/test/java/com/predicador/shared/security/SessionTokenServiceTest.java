@@ -86,6 +86,20 @@ class SessionTokenServiceTest {
     }
 
     @Test
+    void insecureMode_requiresLocalProfile() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new SessionTokenService("", 1, false));
+    }
+
+    @Test
+    void insecureMode_isAllowedOnlyWithLocalProfile() {
+        SessionTokenService svc = new SessionTokenService("", 1, false, "local");
+
+        assertFalse(svc.isStrict());
+        assertFalse(svc.isConfigured());
+    }
+
+    @Test
     void hasRole_matchesExactString() {
         SessionToken t = new SessionToken("42", SessionToken.ROLE_ADMIN, 1L, 2L);
         assertTrue(t.hasRole(SessionToken.ROLE_ADMIN));

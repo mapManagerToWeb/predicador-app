@@ -35,19 +35,23 @@ import java.util.Map;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    @Value("${app.admin.username:}")
-    private String adminUsername;
-
-    @Value("${app.admin.password:}")
-    private String adminPassword;
-
-    @Value("${app.admin.password-bcrypt:}")
-    private String adminPasswordBcrypt;
-
+    private final String adminUsername;
+    private final String adminPassword;
+    private final String adminPasswordBcrypt;
     private final SessionTokenService tokens;
 
-    public AuthController(SessionTokenService tokens) {
+    public AuthController(
+            SessionTokenService tokens,
+            @Value("${app.admin.username:}") String adminUsername,
+            @Value("${app.admin.password:}") String adminPassword,
+            @Value("${app.admin.password-bcrypt:}") String adminPasswordBcrypt) {
         this.tokens = tokens;
+        this.adminUsername = adminUsername;
+        this.adminPassword = adminPassword;
+        this.adminPasswordBcrypt = adminPasswordBcrypt;
+        if (tokens.isStrict() && (adminPasswordBcrypt == null || adminPasswordBcrypt.isBlank())) {
+            throw new IllegalArgumentException("app.admin.password-bcrypt es obligatorio fuera del perfil local");
+        }
     }
 
     @PostMapping("/login")
@@ -80,7 +84,7 @@ public class AuthController {
                 return false;
             }
         }
-        if (adminPassword == null || adminPassword.isBlank()) {
+        if (tokens.isStrict() || adminPassword == null || adminPassword.isBlank()) {
             return false;
         }
         return constantTimeEquals(adminPassword, provided);
