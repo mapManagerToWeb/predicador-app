@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.transaction.annotation.Transactional;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import java.util.List;
@@ -140,6 +141,29 @@ class Task3HardeningTest {
                 () -> service.sendReport(null, "delivery-failed"));
         assertEquals(422, exception.status());
         verifyNoInteractions(messageClient);
+    }
+
+    @Test
+    void persistentReservationDatabaseFailureBecomesControlledIntegrationFailure() {
+        when(deliveryRepository.findById("delivery-db-error")).thenReturn(Optional.empty());
+        when(deliveryRepository.saveAndFlush(any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("database unavailable"));
+        var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
+                new SimpleMeterRegistry(), deliveryRepository);
+
+        var exception = assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
+                () -> service.sendReport(null, "delivery-db-error"));
+        assertEquals(503, exception.status());
+        verify(deliveryRepository, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    void staleClaimRepositoryMethodIsTransactional() throws Exception {
+        var method = com.predicador.reporting.repository.WhatsAppDeliveryRepository.class
+                .getMethod("claimStale", String.class,
+                        com.predicador.reporting.model.WhatsAppDeliveryStatus.class,
+                        java.time.Instant.class, java.time.Instant.class);
+        assertNotNull(method.getAnnotation(Transactional.class));
     }
 
     @Configuration
