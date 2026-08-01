@@ -77,4 +77,66 @@ describe('errorInterceptor', () => {
 
     expect(capturedStatus).toBe(500);
   });
+
+  it('en 403 fuera de rutas de auth: limpia token/profile y navega a /login', () => {
+    authToken.set('abc.def', 'encargado');
+    profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/reports').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/reports');
+    req.flush({}, { status: 403, statusText: 'Forbidden' });
+
+    expect(authToken.hasToken()).toBe(false);
+    expect(profile.currentUser()).toBeNull();
+    expect(navSpy).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('en 404 no redirige ni limpia sesión', () => {
+    authToken.set('abc.def', 'encargado');
+    profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/reports').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/reports');
+    req.flush({}, { status: 404, statusText: 'Not Found' });
+
+    expect(authToken.hasToken()).toBe(true);
+    expect(profile.currentUser()).not.toBeNull();
+    expect(navSpy).not.toHaveBeenCalled();
+  });
+
+  it('en 429 no redirige ni limpia sesión', () => {
+    authToken.set('abc.def', 'encargado');
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/reports').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/reports');
+    req.flush({}, { status: 429, statusText: 'Too Many Requests' });
+
+    expect(authToken.hasToken()).toBe(true);
+    expect(navSpy).not.toHaveBeenCalled();
+  });
+
+  it('en error de red (status 0) no redirige', () => {
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/reports').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/reports');
+    req.error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+    expect(navSpy).not.toHaveBeenCalled();
+  });
+
+  it('en 401 sobre buscar-crear: NO limpia token ni redirige', () => {
+    authToken.set('abc.def', 'encargado');
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.post('/api/v1/encargados/buscar-crear', {}).subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/encargados/buscar-crear');
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(authToken.hasToken()).toBe(true);
+    expect(navSpy).not.toHaveBeenCalled();
+  });
 });
