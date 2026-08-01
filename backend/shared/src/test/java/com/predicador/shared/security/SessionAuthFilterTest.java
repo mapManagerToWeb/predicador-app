@@ -55,6 +55,34 @@ class SessionAuthFilterTest {
     }
 
     @Test
+    void protectedRoute_withValidSessionCookie_passesWithoutHeader() throws Exception {
+        SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
+                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
+        req.setCookies(new jakarta.servlet.http.Cookie(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken));
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        filter.doFilter(req, res, new MockFilterChain());
+
+        assertEquals(200, res.getStatus());
+        assertEquals("42", req.getAttribute(SessionAuthFilter.ATTR_SUBJECT));
+    }
+
+    @Test
+    void invalidSessionCookie_doesNotFallBackToHeader() throws Exception {
+        SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
+                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
+        req.setCookies(new jakarta.servlet.http.Cookie(SessionAuthFilter.SESSION_COOKIE_NAME, "invalid"));
+        req.addHeader(SessionAuthFilter.HEADER_NAME, encargadoToken);
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        filter.doFilter(req, res, new MockFilterChain());
+
+        assertEquals(401, res.getStatus());
+    }
+
+    @Test
     void protectedRoute_withoutToken_returns401() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
                 SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));

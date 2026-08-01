@@ -47,7 +47,27 @@ class AuthControllerTest {
         var response = controller.login(Map.of("username", "operator", "password", "password"));
 
         assertEquals(200, response.getStatusCode().value());
-        assertFalse(((Map<?, ?>) response.getBody()).get("token").toString().isBlank());
+        assertFalse(((Map<?, ?>) response.getBody()).containsKey("token"));
+        assertThat(response.getHeaders().getFirst("Set-Cookie"))
+                .contains("predicador_session=")
+                .contains("HttpOnly")
+                .contains("Secure")
+                .contains("SameSite=Lax");
+    }
+
+    @Test
+    void logout_expiresSessionCookie() {
+        AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
+                BCrypt.hashpw("password", BCrypt.gensalt()));
+
+        var response = controller.logout();
+
+        assertEquals(204, response.getStatusCode().value());
+        assertThat(response.getHeaders().getFirst("Set-Cookie"))
+                .contains("predicador_session=")
+                .contains("Max-Age=0")
+                .contains("HttpOnly")
+                .contains("Secure");
     }
 
     @Test

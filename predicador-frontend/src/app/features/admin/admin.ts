@@ -68,9 +68,7 @@ export class AdminPage implements OnInit {
         })
       );
       if (response.success) {
-        if (response.token) {
-          this.authToken.set(response.token, 'admin');
-        }
+        this.authToken.set(null, 'admin');
         this.isLoggedIn.set(true);
         void this.cargarDatos();
       } else {
@@ -85,7 +83,7 @@ export class AdminPage implements OnInit {
 
   logout(): void {
     localStorage.removeItem('isAdmin');
-    this.authToken.clear();
+    this.authToken.logout();
     this.profileService.clear();
     this.isLoggedIn.set(false);
     this.username.set('');

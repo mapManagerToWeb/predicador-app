@@ -15,9 +15,8 @@ export interface EncargadoDto {
 
 /**
  * Backend response shape after Fase 1 backend changes. The DTO is wrapped and
- * a session token may be returned. Older backends (without the token feature
- * deployed yet) still return the bare {@link EncargadoDto}; both shapes are
- * accepted so a partial rollout does not brick the client.
+ * The session is established by the HttpOnly cookie; the token is never
+ * persisted or read by the frontend.
  */
 interface LoginResponse {
   encargado?: EncargadoDto;
@@ -58,9 +57,7 @@ export class EncargadoService {
    */
   private extract(response: LoginResponse | EncargadoDto): EncargadoDto {
     if (this.isLoginResponse(response)) {
-      if (response.token) {
-        this.authToken.set(response.token, 'encargado');
-      }
+      this.authToken.set(null, 'encargado');
       // encargado is guaranteed present when isLoginResponse returns true.
       return response.encargado as EncargadoDto;
     }

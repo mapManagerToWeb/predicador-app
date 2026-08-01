@@ -38,7 +38,9 @@ public class SessionAuthFilter extends OncePerRequestFilter {
     public static final String ATTR_TOKEN = "predicador.session.token";
     /** Request attribute shortcut for {@code token.subject()}. */
     public static final String ATTR_SUBJECT = "predicador.session.subject";
-    /** Request header the client MUST send with the token value. */
+    /** HttpOnly cookie used by browser clients for the session token. */
+    public static final String SESSION_COOKIE_NAME = "predicador_session";
+    /** Legacy service-to-service header; browser clients do not use it. */
     public static final String HEADER_NAME = "X-Session-Token";
 
     private static final Logger log = LoggerFactory.getLogger(SessionAuthFilter.class);
@@ -66,8 +68,15 @@ public class SessionAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String header = req.getHeader(HEADER_NAME);
-        Optional<SessionToken> parsed = tokens.verify(header);
+        String cookie = Optional.ofNullable(req.getCookies())
+                .stream()
+                .flatMap(java.util.Arrays::stream)
+                .filter(c -> SESSION_COOKIE_NAME.equals(c.getName()))
+                .map(jakarta.servlet.http.Cookie::getValue)
+                .findFirst()
+                .orElse(null);
+        String presented = cookie != null ? cookie : req.getHeader(HEADER_NAME);
+        Optional<SessionToken> parsed = tokens.verify(presented);
         if (parsed.isEmpty()) {
             writeUnauthorized(res, "Token de sesión ausente o inválido.");
             return;

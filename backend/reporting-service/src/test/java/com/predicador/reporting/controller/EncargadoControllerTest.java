@@ -110,7 +110,7 @@ class EncargadoControllerTest {
     }
 
     @Test
-    void buscarOCrear_shouldReturn200_conTokenCuandoConfigurado() throws Exception {
+    void buscarOCrear_shouldReturn200_conCookieCuandoConfigurado() throws Exception {
         EncargadoDto dto = createDto(1L, "Daniel", "Uribe");
 
         when(encargadoService.buscarOCrear(anyString(), anyString(), any()))
@@ -123,7 +123,12 @@ class EncargadoControllerTest {
                 .content("{\"nombre\":\"Daniel\",\"apellido\":\"Uribe\",\"telefono\":\"56912345678\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.encargado.nombre").value("Daniel"))
-            .andExpect(jsonPath("$.token").value("fake.token"));
+            .andExpect(jsonPath("$.token").doesNotExist())
+            .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
+                    org.hamcrest.Matchers.containsString("predicador_session="),
+                    org.hamcrest.Matchers.containsString("HttpOnly"),
+                    org.hamcrest.Matchers.containsString("Secure"),
+                    org.hamcrest.Matchers.containsString("SameSite=Lax"))));
     }
 
     @Test
@@ -131,14 +136,21 @@ class EncargadoControllerTest {
         EncargadoDto dto = createDto(7L, "Ana", "Perez");
 
         when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
-        when(tokens.isConfigured()).thenReturn(false);
+        when(tokens.isConfigured()).thenReturn(true);
+        when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 
         mockMvc.perform(post("/api/v1/encargados/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"telefono\":\"56911111111\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.encargado.id").value(7))
-            .andExpect(jsonPath("$.encargado.nombre").value("Ana"));
+            .andExpect(jsonPath("$.encargado.nombre").value("Ana"))
+            .andExpect(jsonPath("$.token").doesNotExist())
+            .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
+                    org.hamcrest.Matchers.containsString("predicador_session="),
+                    org.hamcrest.Matchers.containsString("HttpOnly"),
+                    org.hamcrest.Matchers.containsString("Secure"),
+                    org.hamcrest.Matchers.containsString("SameSite=Lax"))));
     }
 
     @Test
