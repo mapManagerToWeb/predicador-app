@@ -2,6 +2,9 @@ package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.service.ReportService;
+import com.predicador.reporting.service.ReportSendService;
+import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +19,9 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -29,8 +35,13 @@ class ReportControllerTest {
     @Mock
     private ReportService reportService;
 
+    @Mock
+    private ReportSendService reportSendService;
+
     @InjectMocks
     private ReportController reportController;
+
+    private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
     @BeforeEach
     void setUp() {
@@ -46,9 +57,9 @@ class ReportControllerTest {
         ReportDto dto1 = createDto(1, "Daniel", "Uribe", 1L);
         ReportDto dto2 = createDto(2, "Maria", "Lopez", 2L);
 
-        when(reportService.getAllReports()).thenReturn(List.of(dto1, dto2));
+        when(reportService.getAllReports(admin)).thenReturn(List.of(dto1, dto2));
 
-        mockMvc.perform(get("/api/v1/reports"))
+        mockMvc.perform(get("/api/v1/reports").requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].encargadoNombre").value("Daniel"))
             .andExpect(jsonPath("$[1].encargadoNombre").value("Maria"));
@@ -58,9 +69,9 @@ class ReportControllerTest {
     void getTodayReports_shouldReturn200() throws Exception {
         ReportDto dto = createDto(1, "Daniel", "Uribe", 1L);
 
-        when(reportService.getReportsForToday()).thenReturn(List.of(dto));
+        when(reportService.getReportsForToday(admin)).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/v1/reports/today"))
+        mockMvc.perform(get("/api/v1/reports/today").requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].encargadoNombre").value("Daniel"));
     }
@@ -69,13 +80,28 @@ class ReportControllerTest {
     void createReports_shouldReturn200() throws Exception {
         ReportDto saved = createDto(1, "Daniel", "Uribe", 1L);
 
-        when(reportService.createReports(anyList())).thenReturn(List.of(saved));
+        when(reportService.createReports(anyList(), any(SessionToken.class))).thenReturn(List.of(saved));
 
         mockMvc.perform(post("/api/v1/reports")
                 .contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin)
                 .content("[{\"manzanaId\":\"1-A\",\"encargadoNombre\":\"Daniel\",\"encargadoApellido\":\"Uribe\",\"sessionTime\":\"morning\",\"estado\":\"completed\",\"territorioNumero\":1}]"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(1))
             .andExpect(jsonPath("$[0].encargadoNombre").value("Daniel"));
+    }
+
+    @Test
+    void getReportsByAnotherOwner_shouldReturn403ProblemDetail() throws Exception {
+        SessionToken owner = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "No tiene permisos"))
+                .when(reportService).getReportsByEncargado(eq(8L), eq(owner));
+
+        mockMvc.perform(get("/api/v1/reports").param("encargadoId", "8")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.title").value("Acceso denegado"));
     }
 }

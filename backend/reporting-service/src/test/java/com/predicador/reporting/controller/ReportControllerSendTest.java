@@ -3,6 +3,8 @@ package com.predicador.reporting.controller;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
 import com.predicador.reporting.service.ReportSendService;
+import com.predicador.reporting.service.ReportService;
+import com.predicador.reporting.service.AuthorizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,12 @@ class ReportControllerSendTest {
 
     @Mock
     private ReportSendService reportSendService;
+
+    @Mock
+    private ReportService reportService;
+
+    @Mock
+    private AuthorizationService authorizationService;
 
     @InjectMocks
     private ReportController reportController;
