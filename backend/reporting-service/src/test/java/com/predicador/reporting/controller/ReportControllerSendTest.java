@@ -4,6 +4,7 @@ import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
 import com.predicador.reporting.service.ReportSendService;
 import com.predicador.reporting.service.ReportService;
+import com.predicador.reporting.client.WhatsAppIntegrationException;
 import com.predicador.reporting.service.AuthorizationService;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
@@ -17,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -47,7 +49,7 @@ class ReportControllerSendTest {
     @Test
     void sendWhatsAppReport_shouldReturn200() throws Exception {
         WhatsAppSendResponse response = new WhatsAppSendResponse(true, "msg_123", null);
-        when(reportSendService.sendReport(any(WhatsAppSendRequest.class))).thenReturn(response);
+        when(reportSendService.sendReport(any(WhatsAppSendRequest.class), isNull())).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/reports/send")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -84,13 +86,13 @@ class ReportControllerSendTest {
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.title").value("Acceso denegado"));
 
-        verify(reportSendService, never()).sendReport(any(WhatsAppSendRequest.class));
+        verify(reportSendService, never()).sendReport(any(WhatsAppSendRequest.class), any());
     }
 
     @Test
     void sendWhatsAppReport_shouldHandleError() throws Exception {
-        WhatsAppSendResponse response = new WhatsAppSendResponse(false, null, "Token invalido");
-        when(reportSendService.sendReport(any(WhatsAppSendRequest.class))).thenReturn(response);
+        when(reportSendService.sendReport(any(WhatsAppSendRequest.class), isNull()))
+                .thenThrow(new WhatsAppIntegrationException("Token invalido", 502, null));
 
         mockMvc.perform(post("/api/v1/reports/send")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -107,8 +109,7 @@ class ReportControllerSendTest {
                       "destinationNumber": null
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error").value("Token invalido"));
+            .andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.title").value("Fallo en la integración WhatsApp"));
     }
 }

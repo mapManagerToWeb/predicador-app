@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
@@ -22,8 +24,7 @@ public class WhatsAppMessageClient {
         this.props = props;
     }
 
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> sendTemplateMessage(
+    public WhatsAppMessageResponse sendTemplateMessage(
             String destinationNumber,
             String templateName,
             String languageCode,
@@ -49,9 +50,15 @@ public class WhatsAppMessageClient {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
-        log.info("Enviando mensaje WhatsApp a {}", destinationNumber);
-
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, request, Map.class);
-        return response.getBody();
+        log.info("Enviando mensaje WhatsApp outcome=pending destination_hash={}", Integer.toHexString(destinationNumber.hashCode()));
+        try {
+            ResponseEntity<WhatsAppMessageResponse> response = restTemplate.exchange(
+                    url, HttpMethod.POST, request, WhatsAppMessageResponse.class);
+            return response.getBody();
+        } catch (RestClientResponseException exception) {
+            throw new WhatsAppIntegrationException("WhatsApp respondió con error", exception.getStatusCode().value(), exception);
+        } catch (ResourceAccessException exception) {
+            throw new WhatsAppIntegrationException("Timeout al contactar WhatsApp", 504, exception);
+        }
     }
 }

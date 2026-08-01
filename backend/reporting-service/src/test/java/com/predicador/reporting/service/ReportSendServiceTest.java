@@ -2,6 +2,7 @@ package com.predicador.reporting.service;
 
 import com.predicador.reporting.client.WhatsAppMediaClient;
 import com.predicador.reporting.client.WhatsAppMessageClient;
+import com.predicador.reporting.client.WhatsAppMessageResponse;
 import com.predicador.reporting.config.WhatsAppProperties;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
@@ -63,7 +64,7 @@ class ReportSendServiceTest {
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
-            .thenReturn(Map.of("message_id", "msg_456"));
+            .thenReturn(new WhatsAppMessageResponse(null, "msg_456"));
 
         WhatsAppSendResponse response = sendService.sendReport(request);
 
@@ -94,7 +95,7 @@ class ReportSendServiceTest {
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
-            .thenReturn(Map.of("message_id", "msg_default"));
+            .thenReturn(new WhatsAppMessageResponse(null, "msg_default"));
 
         WhatsAppSendResponse response = sendService.sendReport(request);
 
@@ -128,10 +129,7 @@ class ReportSendServiceTest {
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenThrow(new RuntimeException("Meta API error"));
 
-        WhatsAppSendResponse response = sendService.sendReport(request);
-
-        assertFalse(response.success());
-        assertEquals("Meta API error", response.error());
+        assertThrows(RuntimeException.class, () -> sendService.sendReport(request));
     }
 
     @Test
@@ -156,7 +154,7 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
-            .thenReturn(Map.of("message_id", "msg_custom"));
+            .thenReturn(new WhatsAppMessageResponse(null, "msg_custom"));
 
         WhatsAppSendResponse response = sendService.sendReport(request);
 

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Base64;
 import java.util.Map;
@@ -25,7 +27,6 @@ public class WhatsAppMediaClient {
         this.props = props;
     }
 
-    @SuppressWarnings("unchecked")
     public String uploadImage(String base64Image, String mimeType) {
         String url = String.format("%s/%s/%s/media",
                 props.baseUrl(), props.apiVersion(), props.phoneNumberId());
@@ -49,14 +50,16 @@ public class WhatsAppMediaClient {
         HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, request, Map.class);
-            Map<String, Object> responseBody = response.getBody();
-            String mediaId = (String) responseBody.get("id");
-            log.info("Screenshot subido a Meta, media_id: {}", mediaId);
+            ResponseEntity<WhatsAppMediaResponse> response = restTemplate.exchange(
+                    url, HttpMethod.POST, request, WhatsAppMediaResponse.class);
+            String mediaId = response.getBody().id();
+            log.info("Screenshot upload outcome=success media_id_hash={}", Integer.toHexString(mediaId.hashCode()));
             return mediaId;
-        } catch (Exception e) {
-            log.error("Error subiendo screenshot a Meta: {}", e.getMessage());
-            throw new RuntimeException("Error subiendo imagen a Meta", e);
+        } catch (RestClientResponseException exception) {
+            throw new WhatsAppIntegrationException("WhatsApp respondió con error al subir imagen",
+                    exception.getStatusCode().value(), exception);
+        } catch (ResourceAccessException exception) {
+            throw new WhatsAppIntegrationException("Timeout al subir imagen a WhatsApp", 504, exception);
         }
     }
 }

@@ -74,7 +74,7 @@ class EncargadoServiceTest {
         EncargadoDto dto = new EncargadoDto(null, "Daniel", "Uribe", 1, "56912345678", null);
         Encargado saved = createEncargado(1L, "Daniel", "Uribe", 1, "56912345678", true);
 
-        when(repository.save(any(Encargado.class))).thenReturn(saved);
+        when(repository.saveAndFlush(any(Encargado.class))).thenReturn(saved);
 
         EncargadoDto result = encargadoService.crear(dto);
 
@@ -83,7 +83,7 @@ class EncargadoServiceTest {
         assertEquals(1, result.avatar());
         assertEquals("56912345678", result.telefono());
         assertTrue(result.activo());
-        verify(repository, times(1)).save(any(Encargado.class));
+        verify(repository, times(1)).saveAndFlush(any(Encargado.class));
     }
 
     @Test
@@ -91,7 +91,7 @@ class EncargadoServiceTest {
         EncargadoDto dto = new EncargadoDto(null, "Daniel", "Uribe", null, null, null);
         Encargado saved = createEncargado(1L, "Daniel", "Uribe", 1, null, true);
 
-        when(repository.save(any(Encargado.class))).thenReturn(saved);
+        when(repository.saveAndFlush(any(Encargado.class))).thenReturn(saved);
 
         EncargadoDto result = encargadoService.crear(dto);
 
@@ -150,9 +150,8 @@ class EncargadoServiceTest {
         Encargado existing = createEncargado(1L, "Daniel", "Uribe", 1, null, true);
         Encargado saved = createEncargado(1L, "Daniel", "Uribe", 1, "56912345678", true);
 
-        when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
-                anyString(), anyString()))
-                .thenReturn(List.of(existing));
+        when(repository.findByNombreIgnoreCaseAndApellidoIgnoreCase("Daniel", "Uribe"))
+                .thenReturn(Optional.of(existing));
         when(repository.save(any(Encargado.class))).thenReturn(saved);
 
         Optional<EncargadoDto> result = encargadoService.buscarOCrear("Daniel", "Uribe", "56912345678");
@@ -167,10 +166,9 @@ class EncargadoServiceTest {
     void buscarOCrear_shouldCreateNewWhenNotFound() {
         Encargado saved = createEncargado(1L, "Daniel", "Uribe", 1, "56912345678", true);
 
-        when(repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
-                anyString(), anyString()))
-                .thenReturn(List.of());
-        when(repository.save(any(Encargado.class))).thenReturn(saved);
+        when(repository.findByNombreIgnoreCaseAndApellidoIgnoreCase("Daniel", "Uribe"))
+                .thenReturn(Optional.empty());
+        when(repository.saveAndFlush(any(Encargado.class))).thenReturn(saved);
 
         Optional<EncargadoDto> result = encargadoService.buscarOCrear("Daniel", "Uribe", "56912345678");
 
