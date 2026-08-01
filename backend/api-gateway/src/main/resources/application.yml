@@ -6,7 +6,7 @@ spring:
 
 app:
   admin:
-    username: ${ADMIN_USERNAME:admin}
+    username: ${ADMIN_USERNAME:}
     # Preferir ADMIN_PASSWORD_BCRYPT en produccion. ADMIN_PASSWORD queda como
     # fallback plano solo para desarrollo local.
     password: ${ADMIN_PASSWORD:}
@@ -16,6 +16,7 @@ app:
   session:
     secret: ${SESSION_SECRET:}
     ttl-hours: ${SESSION_TTL_HOURS:12}
+    strict: ${SESSION_STRICT:true}
 
 server:
   port: 8080

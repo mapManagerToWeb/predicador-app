@@ -35,7 +35,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    @Value("${app.admin.username:admin}")
+    @Value("${app.admin.username:}")
     private String adminUsername;
 
     @Value("${app.admin.password:}")
@@ -55,7 +55,7 @@ public class AuthController {
         String username = credentials.getOrDefault("username", "");
         String password = credentials.getOrDefault("password", "");
 
-        if (!adminUsername.equals(username) || !passwordMatches(password)) {
+        if (adminUsername == null || !adminUsername.equals(username) || !passwordMatches(password)) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
             problem.setTitle("Autenticación fallida");

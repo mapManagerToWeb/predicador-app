@@ -1,6 +1,7 @@
 package com.predicador.shared.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
@@ -38,12 +39,25 @@ public class SessionTokenService {
 
     private final byte[] secret;
     private final Duration ttl;
+    private final boolean strict;
 
+    /** Spring constructor; strict mode is the secure default. */
+    @Autowired
     public SessionTokenService(
             @Value("${app.session.secret:}") String secret,
-            @Value("${app.session.ttl-hours:12}") long ttlHours) {
+            @Value("${app.session.ttl-hours:12}") long ttlHours,
+            @Value("${app.session.strict:true}") boolean strict) {
         this.secret = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
         this.ttl = Duration.ofHours(Math.max(1, ttlHours));
+        this.strict = strict;
+        if (strict && this.secret.length < 32) {
+            throw new IllegalArgumentException("app.session.secret debe tener al menos 32 bytes UTF-8");
+        }
+    }
+
+    /** Strict constructor used by callers that do not use Spring injection. */
+    public SessionTokenService(String secret, long ttlHours) {
+        this(secret, ttlHours, true);
     }
 
     /**
@@ -118,6 +132,10 @@ public class SessionTokenService {
     /** Exposed so admin login controller can bail out early if not configured. */
     public boolean isConfigured() {
         return secret.length > 0;
+    }
+
+    public boolean isStrict() {
+        return strict;
     }
 
     private void requireSecret() {

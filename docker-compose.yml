@@ -10,15 +10,16 @@ services:
       - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
       - DB_USERNAME=${DB_USERNAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-}
-      # El config-server materializa placeholders como ${SESSION_SECRET:} en
+      # El config-server materializa placeholders como ${SESSION_SECRET} en
       # los YAML servidos. Pasar el valor aquí es lo que hace que los servicios
       # downstream (gateway, reporting, territory) reciban el secret propagado.
-      - SESSION_SECRET=${SESSION_SECRET:-}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_STRICT=${SESSION_STRICT:-true}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       # Igual con las credenciales admin, que hoy se resuelven al arrancar el
       # gateway pero el config-server también las sirve como overlay opcional.
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/actuator/health || exit 1"]
@@ -58,14 +59,14 @@ services:
         condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      # Preferir ADMIN_PASSWORD_BCRYPT en producción; ADMIN_PASSWORD es fallback plano.
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      # Preferir ADMIN_PASSWORD_BCRYPT en producción; ADMIN_PASSWORD sólo es local.
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
       # HMAC secret compartido con reporting-service para emitir/verificar tokens.
-      # Si queda vacío, los tokens no se emiten (modo compatibilidad hacia atrás durante despliegue).
-      - SESSION_SECRET=${SESSION_SECRET:-}
+      # El secret es obligatorio para evitar iniciar servicios sin enforcement.
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
       # Para activar tracing con el colector, levantar con el perfil observability
@@ -99,7 +100,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-}
       # Debe coincidir con el api-gateway y reporting-service: mismo HMAC
       # secret para poder verificar los tokens que emiten los otros servicios.
-      - SESSION_SECRET=${SESSION_SECRET:-}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/actuator/health || exit 1"]
@@ -132,7 +133,7 @@ services:
       - WHATSAPP_DESTINATION=${WHATSAPP_DESTINATION:-56936577203}
       # Debe coincidir con el api-gateway para que los tokens que éste emite
       # sean verificables aquí cuando activemos enforcement server-side.
-      - SESSION_SECRET=${SESSION_SECRET:-}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
