@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface EncargadoRepository extends JpaRepository<Encargado, Long> {
@@ -20,7 +22,9 @@ public interface EncargadoRepository extends JpaRepository<Encargado, Long> {
     Page<Encargado> findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(
             String nombre, String apellido, Pageable pageable);
 
-    Optional<Encargado> findByNombreIgnoreCaseAndApellidoIgnoreCase(String nombre, String apellido);
+    @Query("select e from Encargado e where lower(trim(e.nombre)) = lower(trim(:nombre)) "
+            + "and lower(trim(e.apellido)) = lower(trim(:apellido))")
+    Optional<Encargado> findByNaturalIdentity(@Param("nombre") String nombre, @Param("apellido") String apellido);
 
     Optional<Encargado> findByTelefono(String telefono);
 }

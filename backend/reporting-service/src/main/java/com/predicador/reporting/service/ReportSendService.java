@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -27,6 +29,7 @@ public class ReportSendService {
     private static final Logger log = LoggerFactory.getLogger(ReportSendService.class);
     private static final String DEFAULT_IMAGE_URL =
         "https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png";
+    private static final Duration DELIVERY_LEASE = Duration.ofMinutes(5);
 
     private final ReportMessageService messageService;
     private final WhatsAppMediaClient mediaClient;
@@ -34,15 +37,6 @@ public class ReportSendService {
     private final WhatsAppProperties props;
     private final MeterRegistry registry;
     private final WhatsAppDeliveryRepository deliveryRepository;
-
-    public ReportSendService(
-            ReportMessageService messageService,
-            WhatsAppMediaClient mediaClient,
-            WhatsAppMessageClient messageClient,
-            WhatsAppProperties props,
-            MeterRegistry registry) {
-        this(messageService, mediaClient, messageClient, props, registry, null);
-    }
 
     public ReportSendService(
             ReportMessageService messageService,
@@ -64,15 +58,9 @@ public class ReportSendService {
     }
 
     public WhatsAppSendResponse sendReport(WhatsAppSendRequest request, String idempotencyKey) {
-        if (idempotencyKey != null && !idempotencyKey.isBlank() && deliveryRepository != null) {
-            Optional<WhatsAppDelivery> previous = deliveryRepository.findById(idempotencyKey);
-            if (previous.isPresent()) return toResponse(previous.get());
-            try {
-                deliveryRepository.saveAndFlush(new WhatsAppDelivery(idempotencyKey));
-            } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
-                return deliveryRepository.findById(idempotencyKey).map(this::toResponse).orElseThrow();
-            }
-        }
+        Reservation reservation = reserve(idempotencyKey);
+        if (reservation.replay() != null) return reservation.replay();
+        WhatsAppDelivery delivery = reservation.delivery();
         long start = System.nanoTime();
         try {
             Map<String, String> templateParams = messageService.generarParametrosTemplate(request);
@@ -124,8 +112,12 @@ public class ReportSendService {
             WhatsAppMessageResponse response = messageClient.sendTemplateMessage(
                     destination, props.templateName(), props.languageCode(), components);
 
+            if (response == null || response.stableMessageId() == null || response.stableMessageId().isBlank()) {
+                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                        "WhatsApp devolvió una respuesta sin message id", 502, null);
+            }
             String messageId = response.stableMessageId();
-            log.info("WhatsApp delivery outcome=success message_id_hash={}", Integer.toHexString(messageId.hashCode()));
+            log.info("WhatsApp delivery outcome=success");
 
             Counter.builder("whatsapp.send.total")
                     .description("Total de mensajes WhatsApp enviados")
@@ -137,7 +129,7 @@ public class ReportSendService {
                     .increment();
 
             WhatsAppSendResponse result = new WhatsAppSendResponse(true, messageId, null);
-            persistResult(idempotencyKey, result);
+            persistSuccess(delivery, result);
             return result;
 
         } catch (com.predicador.reporting.client.WhatsAppIntegrationException e) {
@@ -150,7 +142,7 @@ public class ReportSendService {
                     .register(registry)
                     .increment();
             WhatsAppSendResponse result = new WhatsAppSendResponse(false, null, e.getMessage());
-            persistResult(idempotencyKey, result);
+            persistFailure(delivery, result, e.status());
             throw e;
         } finally {
             long elapsed = System.nanoTime() - start;
@@ -161,18 +153,54 @@ public class ReportSendService {
         }
     }
 
-    private void persistResult(String idempotencyKey, WhatsAppSendResponse result) {
-        if (idempotencyKey == null || idempotencyKey.isBlank() || deliveryRepository == null) return;
-        WhatsAppDelivery delivery = deliveryRepository.findById(idempotencyKey).orElseThrow();
-        delivery.setSuccess(result.success());
-        delivery.setMessageId(result.messageId());
-        delivery.setError(result.error());
+    private Reservation reserve(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) return new Reservation(null, null);
+        Instant now = Instant.now();
+        Optional<WhatsAppDelivery> previous = deliveryRepository.findById(idempotencyKey);
+        if (previous.isPresent()) {
+            WhatsAppDelivery delivery = previous.get();
+            if (delivery.isCompleted()) return new Reservation(delivery, replay(delivery));
+            if (delivery.isLeaseActive(now)) {
+                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                        "El envío con esta clave está en progreso", 409, null);
+            }
+            if (deliveryRepository.claimStale(idempotencyKey,
+                    com.predicador.reporting.model.WhatsAppDeliveryStatus.IN_PROGRESS,
+                    now, now.plus(DELIVERY_LEASE)) != 1) {
+                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                        "No se pudo reservar el envío", 409, null);
+            }
+            delivery.renewLease(now.plus(DELIVERY_LEASE));
+            return new Reservation(delivery, null);
+        }
+        try {
+            return new Reservation(deliveryRepository.saveAndFlush(new WhatsAppDelivery(idempotencyKey)), null);
+        } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
+            return reserve(idempotencyKey);
+        }
+    }
+
+    private void persistSuccess(WhatsAppDelivery delivery, WhatsAppSendResponse result) {
+        if (delivery == null) return;
+        delivery.markSucceeded(result.messageId());
         deliveryRepository.save(delivery);
     }
 
-    private WhatsAppSendResponse toResponse(WhatsAppDelivery delivery) {
-        return new WhatsAppSendResponse(delivery.isSuccess(), delivery.getMessageId(), delivery.getError());
+    private void persistFailure(WhatsAppDelivery delivery, WhatsAppSendResponse result, int status) {
+        if (delivery == null) return;
+        delivery.markFailed(result.error(), status);
+        deliveryRepository.save(delivery);
     }
+
+    private WhatsAppSendResponse replay(WhatsAppDelivery delivery) {
+        if (delivery.getStatus() == com.predicador.reporting.model.WhatsAppDeliveryStatus.FAILED) {
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    delivery.getError(), delivery.getStatusCode() == null ? 502 : delivery.getStatusCode(), null);
+        }
+        return new WhatsAppSendResponse(true, delivery.getMessageId(), null);
+    }
+
+    private record Reservation(WhatsAppDelivery delivery, WhatsAppSendResponse replay) {}
 
     private String normalizePhone(String phone) {
         String digits = phone.replaceAll("[^0-9]", "");

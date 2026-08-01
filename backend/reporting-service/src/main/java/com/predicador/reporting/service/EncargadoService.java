@@ -43,7 +43,7 @@ public class EncargadoService {
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
         String telefonoLimpio = normalizePhone(telefono);
 
-        Optional<Encargado> encontrado = repository.findByNombreIgnoreCaseAndApellidoIgnoreCase(
+        Optional<Encargado> encontrado = repository.findByNaturalIdentity(
                 nombreLimpio, apellidoLimpio);
 
         if (encontrado.isPresent()) {
@@ -58,7 +58,7 @@ public class EncargadoService {
         try {
             return Optional.of(crear(dto));
         } catch (DataIntegrityViolationException collision) {
-            return repository.findByNombreIgnoreCaseAndApellidoIgnoreCase(nombreLimpio, apellidoLimpio)
+            return repository.findByNaturalIdentity(nombreLimpio, apellidoLimpio)
                     .map(this::toDto);
         }
     }

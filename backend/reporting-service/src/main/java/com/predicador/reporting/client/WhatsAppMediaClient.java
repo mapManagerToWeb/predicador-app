@@ -52,8 +52,12 @@ public class WhatsAppMediaClient {
         try {
             ResponseEntity<WhatsAppMediaResponse> response = restTemplate.exchange(
                     url, HttpMethod.POST, request, WhatsAppMediaResponse.class);
-            String mediaId = response.getBody().id();
-            log.info("Screenshot upload outcome=success media_id_hash={}", Integer.toHexString(mediaId.hashCode()));
+            WhatsAppMediaResponse responseBody = response.getBody();
+            if (responseBody == null || responseBody.id() == null || responseBody.id().isBlank()) {
+                throw new WhatsAppIntegrationException("WhatsApp devolvió una respuesta sin media id", 502, null);
+            }
+            String mediaId = responseBody.id();
+            log.info("Screenshot upload outcome=success");
             return mediaId;
         } catch (RestClientResponseException exception) {
             throw new WhatsAppIntegrationException("WhatsApp respondió con error al subir imagen",

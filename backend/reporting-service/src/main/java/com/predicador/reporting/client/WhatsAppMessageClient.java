@@ -50,11 +50,15 @@ public class WhatsAppMessageClient {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
-        log.info("Enviando mensaje WhatsApp outcome=pending destination_hash={}", Integer.toHexString(destinationNumber.hashCode()));
+        log.info("Enviando mensaje WhatsApp outcome=pending");
         try {
             ResponseEntity<WhatsAppMessageResponse> response = restTemplate.exchange(
                     url, HttpMethod.POST, request, WhatsAppMessageResponse.class);
-            return response.getBody();
+            WhatsAppMessageResponse body = response.getBody();
+            if (body == null || body.stableMessageId() == null || body.stableMessageId().isBlank()) {
+                throw new WhatsAppIntegrationException("WhatsApp devolvió una respuesta sin message id", 502, null);
+            }
+            return body;
         } catch (RestClientResponseException exception) {
             throw new WhatsAppIntegrationException("WhatsApp respondió con error", exception.getStatusCode().value(), exception);
         } catch (ResourceAccessException exception) {

@@ -56,7 +56,8 @@ public class ReportController {
             @RequestParam(required = false) Long territorioNumero,
             @RequestParam(required = false) Long encargadoId, HttpServletRequest request) {
         var pageable = PageRequest.of(boundedPage(request.getParameter("page")),
-                boundedSize(request.getParameter("size")), Sort.by(Sort.Direction.DESC, "fecha"));
+                boundedSize(request.getParameter("size")), Sort.by(Sort.Direction.DESC, "fecha")
+                        .and(Sort.by(Sort.Direction.DESC, "id")));
         if (territorioNumero != null) {
             return ResponseEntity.ok(reportService.getReportsByTerritorio(territorioNumero, pageable, token(request)).getContent());
         }
@@ -69,7 +70,8 @@ public class ReportController {
     @GetMapping("/today")
     public ResponseEntity<List<ReportDto>> getTodayReports(HttpServletRequest request) {
         var pageable = PageRequest.of(boundedPage(request.getParameter("page")),
-                boundedSize(request.getParameter("size")), Sort.by(Sort.Direction.DESC, "fecha"));
+                boundedSize(request.getParameter("size")), Sort.by(Sort.Direction.DESC, "fecha")
+                        .and(Sort.by(Sort.Direction.DESC, "id")));
         return ResponseEntity.ok(reportService.getReportsForToday(pageable, token(request)).getContent());
     }
 
@@ -116,6 +118,11 @@ public class ReportController {
         problem.setTitle("Acceso denegado");
         problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
         return problem;
+    }
+
+    @ExceptionHandler(NumberFormatException.class)
+    ProblemDetail handleMalformedPage(NumberFormatException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "page y size deben ser números válidos");
     }
 
     @ExceptionHandler(WhatsAppIntegrationException.class)
