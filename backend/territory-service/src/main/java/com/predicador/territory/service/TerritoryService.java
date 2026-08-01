@@ -9,10 +9,12 @@ import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -23,7 +25,8 @@ public class TerritoryService {
 
     private final TerritoryRepository territoryRepository;
     private final TerritoryColorRepository colorRepository;
-    private final MeterRegistry registry;
+    private final ObjectProvider<TerritoryService> self;
+    private final Timer geojsonLoadTimer;
 
     private static final String[] PALETTE = {
         "#DC143C", "#00A86B", "#007FFF", "#FF6600", "#8A2BE2",
@@ -33,9 +36,27 @@ public class TerritoryService {
     };
 
     public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, MeterRegistry registry) {
+        this(territoryRepository, colorRepository, registry, null);
+    }
+
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, MeterRegistry registry,
+                            ObjectProvider<TerritoryService> self) {
         this.territoryRepository = territoryRepository;
         this.colorRepository = colorRepository;
-        this.registry = registry;
+        this.self = self;
+        this.geojsonLoadTimer = Timer.builder("territory.geojson.load.duration")
+                .description("Tiempo para generar el GeoJSON completo de todos los territorios")
+                .register(registry);
+    }
+
+    /**
+     * Returns the Spring proxy of this bean when available so that
+     * {@code @Cacheable} annotations are honored even on internal calls
+     * (self-invocation would otherwise bypass the cache). Falls back to
+     * {@code this} for direct construction in unit tests.
+     */
+    private TerritoryService self() {
+        return self == null ? this : self.getObject();
     }
 
     @Cacheable(CacheConfig.CACHE_NUMBERS)
@@ -72,7 +93,7 @@ public class TerritoryService {
         long start = System.nanoTime();
         try {
             List<ManzanaTerritorio> allManzanas = territoryRepository.findAllGroupedByTerritorio();
-            Map<Long, String> colorMap = getAllColors();
+            Map<Long, String> colorMap = self().getAllColors();
 
             Map<Long, List<ManzanaTerritorio>> byTerritorio = allManzanas.stream()
                     .collect(Collectors.groupingBy(ManzanaTerritorio::getTerritorioPadre, LinkedHashMap::new, Collectors.toList()));
@@ -102,10 +123,7 @@ public class TerritoryService {
             return sb.toString();
         } finally {
             long elapsed = System.nanoTime() - start;
-            Timer.builder("territory.geojson.load.duration")
-                    .description("Tiempo para generar el GeoJSON completo de todos los territorios")
-                    .register(registry)
-                    .record(elapsed, TimeUnit.NANOSECONDS);
+            geojsonLoadTimer.record(elapsed, TimeUnit.NANOSECONDS);
         }
     }
 
@@ -128,6 +146,7 @@ public class TerritoryService {
      * Persists a color assignment and invalidates every derived cache so the
      * change is visible immediately to the frontend (admin panel flow).
      */
+    @Transactional
     @Caching(evict = {
         @CacheEvict(value = CacheConfig.CACHE_COLORS, allEntries = true),
         @CacheEvict(value = CacheConfig.CACHE_GEOJSON_ALL, allEntries = true),
@@ -144,7 +163,7 @@ public class TerritoryService {
     private String getColorForTerritory(Long number) {
         TerritoryColor tc = colorRepository.findById(number).orElse(null);
         if (tc != null) return tc.getColor();
-        List<Long> numbers = getTerritoryNumbers();
+        List<Long> numbers = self().getTerritoryNumbers();
         int idx = numbers.indexOf(number);
         return PALETTE[Math.max(0, idx) % PALETTE.length];
     }
@@ -153,12 +172,13 @@ public class TerritoryService {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
 
-        for (int i = 0; i < manzanas.size(); i++) {
-            ManzanaTerritorio m = manzanas.get(i);
-            if (i > 0) sb.append(",");
-
+        boolean first = true;
+        for (ManzanaTerritorio m : manzanas) {
             double[][] coords = parseWkbHexToCoords(m.getGeometry());
             if (coords == null || coords.length == 0) continue;
+
+            if (!first) sb.append(",");
+            first = false;
 
             appendFeature(sb, territorioPadre, m.getNombreBloque(), coords);
             closeFeature(sb);

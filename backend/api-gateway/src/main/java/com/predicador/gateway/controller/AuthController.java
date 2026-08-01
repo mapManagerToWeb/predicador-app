@@ -1,4 +1,4 @@
-package com.predicador.gateway.config;
+package com.predicador.gateway.controller;
 
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;

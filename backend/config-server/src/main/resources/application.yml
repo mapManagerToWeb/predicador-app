@@ -10,6 +10,13 @@ server:
 spring.cloud.config.server.native:
   search-locations: classpath:/config
 
+# Credenciales opcionales para proteger los documentos de configuración.
+# Si no se definen, el config-server sigue abierto (uso local).
+app:
+  config:
+    username: ${CONFIG_SERVER_USERNAME:}
+    password: ${CONFIG_SERVER_PASSWORD:}
+
 management:
   endpoints:
     web:

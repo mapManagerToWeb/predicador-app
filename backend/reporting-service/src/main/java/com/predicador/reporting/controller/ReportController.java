@@ -111,20 +111,6 @@ public class ReportController {
         return size;
     }
 
-    @ExceptionHandler(ResponseStatusException.class)
-    ProblemDetail handleAuthorization(ResponseStatusException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                exception.getStatusCode(), exception.getReason());
-        problem.setTitle("Acceso denegado");
-        problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
-        return problem;
-    }
-
-    @ExceptionHandler(NumberFormatException.class)
-    ProblemDetail handleMalformedPage(NumberFormatException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "page y size deben ser números válidos");
-    }
-
     @ExceptionHandler(WhatsAppIntegrationException.class)
     ResponseEntity<ProblemDetail> handleWhatsAppFailure(WhatsAppIntegrationException exception) {
         HttpStatus status = HttpStatus.resolve(exception.status());

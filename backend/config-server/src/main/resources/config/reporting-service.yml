@@ -19,8 +19,6 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: true
-  profiles:
-    active: default
 
 server:
   port: 8082
@@ -67,6 +65,15 @@ app:
     strict: ${SESSION_STRICT:true}
     cookie-secure: ${SESSION_COOKIE_SECURE:true}
 
+whatsapp:
+  api-version: "v21.0"
+  base-url: "https://graph.facebook.com"
+  phone-number-id: ${WHATSAPP_PHONE_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  template-name: ${WHATSAPP_TEMPLATE:}
+  language-code: ${WHATSAPP_LANG:es_CL}
+  destination-number: ${WHATSAPP_DESTINATION:}
+
 ---
 # Profile: local — explicitly permits an unset session secret for local-only use.
 spring:
@@ -78,12 +85,3 @@ app:
     secret: ${SESSION_SECRET:}
     strict: false
     cookie-secure: ${SESSION_COOKIE_SECURE:true}
-
-whatsapp:
-  api-version: "v21.0"
-  base-url: "https://graph.facebook.com"
-  phone-number-id: ${WHATSAPP_PHONE_ID:}
-  access-token: ${WHATSAPP_ACCESS_TOKEN:}
-  template-name: ${WHATSAPP_TEMPLATE:}
-  language-code: ${WHATSAPP_LANG:es_CL}
-  destination-number: ${WHATSAPP_DESTINATION:}

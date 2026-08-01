@@ -1,4 +1,4 @@
-package com.predicador.gateway.config;
+package com.predicador.gateway.controller;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;

@@ -19,8 +19,6 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: true
-  profiles:
-    active: default
 
 server:
   port: 8081
@@ -38,17 +36,6 @@ app:
     secret: ${SESSION_SECRET}
     ttl-hours: ${SESSION_TTL_HOURS:12}
     strict: ${SESSION_STRICT:true}
-
----
-# Profile: local — explicitly permits an unset session secret for local-only use.
-spring:
-  config:
-    activate:
-      on-profile: local
-app:
-  session:
-    secret: ${SESSION_SECRET:}
-    strict: false
 
 management:
   endpoints:
@@ -76,3 +63,14 @@ otel:
     exporter: none
   metrics:
     exporter: none
+
+---
+# Profile: local — explicitly permits an unset session secret for local-only use.
+spring:
+  config:
+    activate:
+      on-profile: local
+app:
+  session:
+    secret: ${SESSION_SECRET:}
+    strict: false
