@@ -185,6 +185,36 @@ class TerritoryServiceTest {
         assertFalse(result.contains("Feature,"));
     }
 
+    @Test
+    void getTerritoryGeoJson_shouldNotProduceDoubleCommaWhenMiddleGeometryInvalid() {
+        ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
+        ManzanaTerritorio m2 = createManzana(2L, 1L, "1.b", null);
+        ManzanaTerritorio m3 = createManzana(3L, 1L, "1.c", createSimplePolygonHex());
+
+        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m1, m2, m3));
+
+        String result = territoryService.getTerritoryGeoJson(1L);
+
+        assertFalse(result.contains(",,"), "Las features deben separarse con una sola coma");
+        assertTrue(result.contains("1.a"));
+        assertTrue(result.contains("1.c"));
+        assertFalse(result.contains("1.b"));
+    }
+
+    @Test
+    void getTerritoryGeoJson_shouldNotProduceTrailingCommaWhenLastGeometryInvalid() throws Exception {
+        ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
+        ManzanaTerritorio m2 = createManzana(2L, 1L, "1.b", null);
+
+        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m1, m2));
+
+        String result = territoryService.getTerritoryGeoJson(1L);
+
+        assertFalse(result.contains(",]}"), "No debe quedar una coma final antes de cerrar el arreglo");
+        com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result);
+        assertEquals(1, json.get("features").size());
+    }
+
     private String createSimplePolygonHex() {
         byte[] bytes = new byte[]{
             0x01,                                           // byteOrder: little-endian

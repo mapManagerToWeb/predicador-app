@@ -43,8 +43,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleBadRequest(IllegalArgumentException ex) {
+        log.warn("Solicitud inválida: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, ex.getMessage());
+                HttpStatus.BAD_REQUEST, ex.getMessage() != null ? ex.getMessage() : "Solicitud inválida");
         problem.setTitle("Solicitud inválida");
         problem.setType(URI.create("https://api.predicador.com/errors/bad-request"));
         return problem;
@@ -52,12 +53,32 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
-        log.warn("Illegal state: {}", ex.getMessage());
+        // Un IllegalStateException indica un estado interno inconsistente (p.ej.
+        // secret no configurado), no una indisponibilidad transitoria. Se loguea
+        // el detalle y se devuelve 500 genérico sin filtrar el mensaje interno.
+        log.error("Estado ilegal del servidor", ex);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
-        problem.setTitle("Servicio no disponible");
-        problem.setType(URI.create("https://api.predicador.com/errors/service-unavailable"));
+                HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");
+        problem.setTitle("Error interno");
+        problem.setType(URI.create("https://api.predicador.com/errors/internal"));
         return problem;
+    }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ProblemDetail handleResponseStatus(org.springframework.web.server.ResponseStatusException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                ex.getStatusCode(), ex.getReason() != null ? ex.getReason() : "Error");
+        problem.setType(URI.create("https://api.predicador.com/errors/http-status"));
+        if (ex.getStatusCode().value() == 403) {
+            problem.setTitle("Acceso denegado");
+            problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
+        }
+        return problem;
+    }
+
+    @ExceptionHandler(NumberFormatException.class)
+    public ProblemDetail handleNumberFormat(NumberFormatException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Valores numéricos inválidos");
     }
 
     @ExceptionHandler(Exception.class)

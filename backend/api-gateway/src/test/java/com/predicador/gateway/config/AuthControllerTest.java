@@ -1,5 +1,6 @@
 package com.predicador.gateway.config;
 
+import com.predicador.gateway.controller.AuthController;
 import com.predicador.shared.security.SessionTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;

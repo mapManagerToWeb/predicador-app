@@ -76,9 +76,11 @@ public class ActuatorAccessFilter implements WebFilter, Ordered {
                 || method == HttpMethod.OPTIONS) {
             return false;
         }
+        // Only pure login endpoints are exempt. /encargados/buscar-crear also
+        // mints a session cookie, so it must NOT be exempt: an exempted
+        // account-creating endpoint is a login-CSRF vector.
         return !path.equals("/api/v1/auth/login")
-                && !path.equals("/api/v1/encargados/login")
-                && !path.equals("/api/v1/encargados/buscar-crear");
+                && !path.equals("/api/v1/encargados/login");
     }
 
     private static boolean hasMatchingCsrfToken(ServerWebExchange exchange) {

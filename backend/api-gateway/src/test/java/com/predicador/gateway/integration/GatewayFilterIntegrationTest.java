@@ -1,8 +1,8 @@
 package com.predicador.gateway.integration;
 
 import com.predicador.gateway.config.ActuatorAccessFilter;
-import com.predicador.gateway.config.FallbackController;
 import com.predicador.gateway.config.SecurityHeadersFilter;
+import com.predicador.gateway.controller.FallbackController;
 import com.predicador.shared.security.SessionTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ class GatewayFilterIntegrationTest {
 
         var tokenService = new SessionTokenService(SECRET, 12);
 
-        var authController = new com.predicador.gateway.config.AuthController(
+        var authController = new com.predicador.gateway.controller.AuthController(
                 tokenService, "admin", "password",
                 org.springframework.security.crypto.bcrypt.BCrypt.hashpw("password",
                         org.springframework.security.crypto.bcrypt.BCrypt.gensalt()),
@@ -164,5 +164,27 @@ class GatewayFilterIntegrationTest {
                 .uri("/api/v1/auth/logout")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void encargadosBuscarCrear_withoutCsrfToken_returns403() {
+        webTestClient.post()
+                .uri("/api/v1/encargados/buscar-crear")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("nombre", "A", "apellido", "B", "telefono", "56912345678"))
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void encargadosBuscarCrear_withCsrfToken_passesCsrfCheck() {
+        webTestClient.post()
+                .uri("/api/v1/encargados/buscar-crear")
+                .cookie("XSRF-TOKEN", "valid-csrf-token")
+                .header("X-XSRF-TOKEN", "valid-csrf-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("nombre", "A", "apellido", "B", "telefono", "56912345678"))
+                .exchange()
+                .expectStatus().isNotFound();
     }
 }

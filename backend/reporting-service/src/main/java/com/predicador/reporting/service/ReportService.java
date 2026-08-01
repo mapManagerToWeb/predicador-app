@@ -7,6 +7,7 @@ import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -25,15 +26,18 @@ public class ReportService {
     public static final int MAX_BATCH_SIZE = 100;
 
     private final ReportRepository repository;
-    private final MeterRegistry registry;
     private final AuthorizationService authorization;
+    private final Timer persistenceTimer;
 
     public ReportService(ReportRepository repository, MeterRegistry registry, AuthorizationService authorization) {
         this.repository = repository;
-        this.registry = registry;
         this.authorization = authorization;
+        this.persistenceTimer = Timer.builder("report.persistence.duration")
+                .description("Tiempo para persistir reportes en base de datos")
+                .register(registry);
     }
 
+    @Transactional
     public List<ReportDto> createReports(List<ReportDto> dtos, SessionToken token) {
         dtos.forEach(dto -> authorization.authorizeOwner(token, dto.encargadoId()));
         long start = System.nanoTime();
@@ -43,35 +47,13 @@ public class ReportService {
             return saved.stream().map(this::toDto).collect(Collectors.toList());
         } finally {
             long elapsed = System.nanoTime() - start;
-            Timer.builder("report.persistence.duration")
-                    .description("Tiempo para persistir reportes en base de datos")
-                    .register(registry)
-                    .record(elapsed, TimeUnit.NANOSECONDS);
+            persistenceTimer.record(elapsed, TimeUnit.NANOSECONDS);
         }
-    }
-
-    public List<ReportDto> getAllReports(SessionToken token) {
-        authorization.requireAdmin(token);
-        return repository.findAllByOrderByFechaDesc()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
     }
 
     public Page<ReportDto> getAllReports(Pageable pageable, SessionToken token) {
         authorization.requireAdmin(token);
         return repository.findAllByOrderByFechaDesc(pageable).map(this::toDto);
-    }
-
-    public List<ReportDto> getReportsForToday(SessionToken token) {
-        authorization.requireAdmin(token);
-        LocalDate hoy = LocalDate.now(ZoneOffset.UTC);
-        Instant inicio = hoy.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant fin = hoy.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return repository.findByFechaRange(inicio, fin)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
     }
 
     public Page<ReportDto> getReportsForToday(Pageable pageable, SessionToken token) {
@@ -82,25 +64,9 @@ public class ReportService {
         return repository.findByFechaRange(inicio, fin, pageable).map(this::toDto);
     }
 
-    public List<ReportDto> getReportsByTerritorio(Long territorioNumero, SessionToken token) {
-        authorization.requireAdmin(token);
-        return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-    }
-
     public Page<ReportDto> getReportsByTerritorio(Long territorioNumero, Pageable pageable, SessionToken token) {
         authorization.requireAdmin(token);
         return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero, pageable).map(this::toDto);
-    }
-
-    public List<ReportDto> getReportsByEncargado(Long encargadoId, SessionToken token) {
-        authorization.authorizeOwner(token, encargadoId);
-        return repository.findByEncargadoIdOrderByFechaDesc(encargadoId)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
     }
 
     public Page<ReportDto> getReportsByEncargado(Long encargadoId, Pageable pageable, SessionToken token) {
@@ -118,16 +84,6 @@ public class ReportService {
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.groupingBy(ReportDto::territorioNumero));
-    }
-
-    public Page<ReportDto> getReportsByMultipleTerritorios(Collection<Long> territorioNumeros, Pageable pageable,
-                                                            SessionToken token) {
-        authorization.requireAdmin(token);
-        if (territorioNumeros == null || territorioNumeros.size() > MAX_BATCH_SIZE) {
-            throw new IllegalArgumentException("El lote de territorios no puede superar " + MAX_BATCH_SIZE);
-        }
-        return repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(territorioNumeros, pageable)
-                .map(this::toDto);
     }
 
     private Report toEntity(ReportDto dto) {

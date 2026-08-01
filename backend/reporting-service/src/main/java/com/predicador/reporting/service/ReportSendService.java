@@ -37,9 +37,12 @@ public class ReportSendService {
     private final WhatsAppMediaClient mediaClient;
     private final WhatsAppMessageClient messageClient;
     private final WhatsAppProperties props;
-    private final MeterRegistry registry;
     private final WhatsAppDeliveryRepository deliveryRepository;
     private final TransactionTemplate txTemplate;
+    private final Counter sendTotal;
+    private final Counter sendSuccess;
+    private final Counter sendFailure;
+    private final Timer sendTimer;
 
     public ReportSendService(
             ReportMessageService messageService,
@@ -53,9 +56,20 @@ public class ReportSendService {
         this.mediaClient = mediaClient;
         this.messageClient = messageClient;
         this.props = props;
-        this.registry = registry;
         this.deliveryRepository = deliveryRepository;
         this.txTemplate = txTemplate;
+        this.sendTotal = Counter.builder("whatsapp.send.total")
+                .description("Total de mensajes WhatsApp enviados")
+                .register(registry);
+        this.sendSuccess = Counter.builder("whatsapp.send.success")
+                .description("Mensajes WhatsApp enviados exitosamente")
+                .register(registry);
+        this.sendFailure = Counter.builder("whatsapp.send.failure")
+                .description("Mensajes WhatsApp con error")
+                .register(registry);
+        this.sendTimer = Timer.builder("whatsapp.send.duration")
+                .description("Tiempo total de envío WhatsApp")
+                .register(registry);
     }
 
     public WhatsAppSendResponse sendReport(WhatsAppSendRequest request) {
@@ -124,37 +138,22 @@ public class ReportSendService {
             String messageId = response.stableMessageId();
             log.info("WhatsApp delivery outcome=success");
 
-            Counter.builder("whatsapp.send.total")
-                    .description("Total de mensajes WhatsApp enviados")
-                    .register(registry)
-                    .increment();
-            Counter.builder("whatsapp.send.success")
-                    .description("Mensajes WhatsApp enviados exitosamente")
-                    .register(registry)
-                    .increment();
+            sendTotal.increment();
+            sendSuccess.increment();
 
             WhatsAppSendResponse result = new WhatsAppSendResponse(true, messageId, null);
             persistSuccess(delivery, result);
             return result;
 
         } catch (com.predicador.reporting.client.WhatsAppIntegrationException e) {
-            Counter.builder("whatsapp.send.total")
-                    .description("Total de mensajes WhatsApp enviados")
-                    .register(registry)
-                    .increment();
-            Counter.builder("whatsapp.send.failure")
-                    .description("Mensajes WhatsApp con error")
-                    .register(registry)
-                    .increment();
+            sendTotal.increment();
+            sendFailure.increment();
             WhatsAppSendResponse result = new WhatsAppSendResponse(false, null, e.getMessage());
             persistFailure(delivery, result, e.status());
             throw e;
         } finally {
             long elapsed = System.nanoTime() - start;
-            Timer.builder("whatsapp.send.duration")
-                    .description("Tiempo total de envío WhatsApp")
-                    .register(registry)
-                    .record(elapsed, TimeUnit.NANOSECONDS);
+            sendTimer.record(elapsed, TimeUnit.NANOSECONDS);
         }
     }
 

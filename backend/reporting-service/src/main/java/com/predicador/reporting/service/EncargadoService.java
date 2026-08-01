@@ -6,6 +6,7 @@ import com.predicador.shared.security.SessionToken;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,19 +26,12 @@ public class EncargadoService {
         this.authorization = authorization;
     }
 
-    public List<EncargadoDto> listarActivos(SessionToken token) {
-        authorization.requireAdmin(token);
-        return repository.findByActivoTrueOrderByNombreAsc()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-    }
-
     public Page<EncargadoDto> listarActivos(Pageable pageable, SessionToken token) {
         authorization.requireAdmin(token);
         return repository.findByActivoTrueOrderByNombreAsc(pageable).map(this::toDto);
     }
 
+    @Transactional
     public Optional<EncargadoDto> buscarOCrear(String nombre, String apellido, String telefono) {
         String nombreLimpio = nombre != null ? nombre.trim() : "";
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
@@ -63,6 +57,7 @@ public class EncargadoService {
         }
     }
 
+    @Transactional
     public EncargadoDto crear(EncargadoDto dto) {
         Encargado encargado = new Encargado();
         encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : "");
@@ -76,6 +71,7 @@ public class EncargadoService {
         return toDto(saved);
     }
 
+    @Transactional
     public EncargadoDto actualizar(Long id, EncargadoDto dto, SessionToken token) {
         authorization.authorizeOwner(token, id);
         Encargado encargado = repository.findById(id)
@@ -87,14 +83,6 @@ public class EncargadoService {
         if (dto.activo() != null) encargado.setActivo(dto.activo());
         Encargado saved = repository.save(encargado);
         return toDto(saved);
-    }
-
-    public List<EncargadoDto> buscarPorNombre(String nombre, SessionToken token) {
-        authorization.requireAdmin(token);
-        return repository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc(nombre, nombre)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
     }
 
     public Page<EncargadoDto> buscarPorNombre(String nombre, Pageable pageable, SessionToken token) {

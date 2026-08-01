@@ -47,7 +47,9 @@ class ReportControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(reportController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(reportController)
+                .setControllerAdvice(new com.predicador.shared.exception.GlobalExceptionHandler())
+                .build();
     }
 
     private ReportDto createDto(Integer id, String nombre, String apellido, Long territorioNumero) {
