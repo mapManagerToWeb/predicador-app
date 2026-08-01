@@ -14,6 +14,7 @@ import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,10 @@ public class ReportSendService {
     private final WhatsAppProperties props;
     private final MeterRegistry registry;
     private final WhatsAppDeliveryRepository deliveryRepository;
+    private final TransactionTemplate txTemplate;
+
+    @Autowired
+    public ReportSendService(
 
     public ReportSendService(
             ReportMessageService messageService,
@@ -45,13 +50,15 @@ public class ReportSendService {
             WhatsAppMessageClient messageClient,
             WhatsAppProperties props,
             MeterRegistry registry,
-            WhatsAppDeliveryRepository deliveryRepository) {
+            WhatsAppDeliveryRepository deliveryRepository,
+            TransactionTemplate txTemplate) {
         this.messageService = messageService;
         this.mediaClient = mediaClient;
         this.messageClient = messageClient;
         this.props = props;
         this.registry = registry;
         this.deliveryRepository = deliveryRepository;
+        this.txTemplate = txTemplate;
     }
 
     public WhatsAppSendResponse sendReport(WhatsAppSendRequest request) {
@@ -154,7 +161,7 @@ public class ReportSendService {
         }
     }
 
-    private Reservation reserve(String idempotencyKey) {
+    Reservation reserve(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) return new Reservation(null, null);
         Instant now = Instant.now();
         Optional<WhatsAppDelivery> previous;
@@ -171,7 +178,7 @@ public class ReportSendService {
         } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
             Optional<WhatsAppDelivery> raced;
             try {
-                raced = deliveryRepository.findById(idempotencyKey);
+                raced = txTemplate.execute(status -> deliveryRepository.findById(idempotencyKey));
             } catch (DataAccessException exception) {
                 throw databaseFailure(exception);
             }

@@ -82,7 +82,6 @@ export class AdminPage implements OnInit {
   }
 
   logout(): void {
-    localStorage.removeItem('isAdmin');
     this.authToken.logout();
     this.profileService.clear();
     this.isLoggedIn.set(false);

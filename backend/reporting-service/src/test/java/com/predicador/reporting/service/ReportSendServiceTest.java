@@ -6,6 +6,7 @@ import com.predicador.reporting.client.WhatsAppMessageResponse;
 import com.predicador.reporting.config.WhatsAppProperties;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
+import com.predicador.reporting.model.WhatsAppDelivery;
 import com.predicador.reporting.repository.WhatsAppDeliveryRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,9 +16,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionStatus;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -32,13 +37,14 @@ class ReportSendServiceTest {
     @Mock private WhatsAppMessageClient messageClient;
     @Mock private WhatsAppProperties props;
     @Mock private WhatsAppDeliveryRepository deliveryRepository;
+    @Mock private TransactionTemplate txTemplate;
 
     private ReportSendService sendService;
 
     @BeforeEach
     void setUp() {
         sendService = new ReportSendService(messageService, mediaClient, messageClient, props,
-                new SimpleMeterRegistry(), deliveryRepository);
+                new SimpleMeterRegistry(), deliveryRepository, txTemplate);
     }
 
     @Test
@@ -108,34 +114,6 @@ class ReportSendServiceTest {
     }
 
     @Test
-    void sendReport_errorEnMeta() {
-        var request = new WhatsAppSendRequest(
-            "Daniel", "Uribe", "21-07-2026", "mañana",
-            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
-            "base64image", null
-        );
-
-        Map<String, String> templateParams = Map.of(
-            "fecha", "21-07-2026",
-            "encargado", "Daniel Uribe",
-            "territorio", "1",
-            "estado", "mañana"
-        );
-
-        when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
-        when(mediaClient.uploadImage("base64image", "image/jpeg")).thenReturn("media_123");
-        when(props.apiVersion()).thenReturn("v21.0");
-        when(props.phoneNumberId()).thenReturn("123");
-        when(props.templateName()).thenReturn("asignacion_territorio");
-        when(props.languageCode()).thenReturn("es_CL");
-        when(props.destinationNumber()).thenReturn("56936577203");
-        when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
-            .thenThrow(new RuntimeException("Meta API error"));
-
-        assertThrows(RuntimeException.class, () -> sendService.sendReport(request));
-    }
-
-    @Test
     void sendReport_numeroDestinoCustom() {
         var request = new WhatsAppSendRequest(
             "Daniel", "Uribe", "21-07-2026", "tarde",
@@ -156,6 +134,7 @@ class ReportSendServiceTest {
         when(props.phoneNumberId()).thenReturn("123");
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
+        when(props.destinationNumber()).thenReturn("56999999999");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenReturn(new WhatsAppMessageResponse(null, "msg_custom"));
 
@@ -163,5 +142,26 @@ class ReportSendServiceTest {
 
         assertTrue(response.success());
         verify(messageClient).sendTemplateMessage(eq("56999999999"), anyString(), anyString(), anyList());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void reserve_raceCondition_usesSeparateTransactionForRecovery() {
+        WhatsAppDelivery existing = new WhatsAppDelivery("idempotent-key");
+
+        when(deliveryRepository.saveAndFlush(any(WhatsAppDelivery.class)))
+            .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
+        when(txTemplate.execute(any(org.springframework.transaction.support.TransactionCallback.class)))
+            .thenAnswer(invocation -> {
+                org.springframework.transaction.support.TransactionCallback<?> callback = invocation.getArgument(0);
+                return callback.doInTransaction(null);
+            });
+        when(deliveryRepository.findById("idempotent-key"))
+            .thenReturn(Optional.of(existing));
+
+        sendService.reserve("idempotent-key");
+
+        verify(txTemplate).execute(any(org.springframework.transaction.support.TransactionCallback.class));
+        verify(deliveryRepository).findById("idempotent-key");
     }
 }

@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 import java.util.Map;
 
 /**
@@ -74,7 +76,7 @@ public class AuthController {
 
         String token = tokens.issue("admin", SessionToken.ROLE_ADMIN);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, sessionCookie(token, 12 * 60 * 60))
+                .header(HttpHeaders.SET_COOKIE, csrfCookie(), sessionCookie(token, 12 * 60 * 60))
                 .body(Map.of(
                 "success", true,
                 "message", "Autenticación exitosa",
@@ -88,9 +90,19 @@ public class AuthController {
                 .build();
     }
 
-    private String sessionCookie(String value, long maxAge) {
-        return "%s=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
-                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge,
+private String sessionCookie(String value, long maxAge) {
+        return SessionAuthFilter.SESSION_COOKIE_NAME + "=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
+                .formatted(value, maxAge,
+                        sessionCookieSecure ? " Secure;" : "");
+    }
+
+    private static final SecureRandom CSRF_RANDOM = new SecureRandom();
+
+    private String csrfCookie() {
+        byte[] bytes = new byte[32];
+        CSRF_RANDOM.nextBytes(bytes);
+        return "XSRF-TOKEN=%s; Path=/; HttpOnly=false;%s SameSite=Lax"
+                .formatted(HexFormat.of().formatHex(bytes),
                         sessionCookieSecure ? " Secure;" : "");
     }
 

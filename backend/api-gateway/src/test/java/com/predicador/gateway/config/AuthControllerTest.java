@@ -48,11 +48,9 @@ class AuthControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertFalse(((Map<?, ?>) response.getBody()).containsKey("token"));
-        assertThat(response.getHeaders().getFirst("Set-Cookie"))
-                .contains("predicador_session=")
-                .contains("HttpOnly")
-                .contains("Secure")
-                .contains("SameSite=Lax");
+        java.util.List<String> cookies = response.getHeaders().get("Set-Cookie");
+        assertThat(cookies).hasSize(2);
+        assertThat(cookies).anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("Secure") && c.contains("SameSite=Lax"));
     }
 
     @Test
@@ -63,11 +61,8 @@ class AuthControllerTest {
         var response = controller.logout();
 
         assertEquals(204, response.getStatusCode().value());
-        assertThat(response.getHeaders().getFirst("Set-Cookie"))
-                .contains("predicador_session=")
-                .contains("Max-Age=0")
-                .contains("HttpOnly")
-                .contains("Secure");
+        java.util.List<String> cookies = response.getHeaders().get("Set-Cookie");
+        assertThat(cookies).anyMatch(c -> c.contains("predicador_session=") && c.contains("Max-Age=0") && c.contains("HttpOnly") && c.contains("Secure"));
     }
 
     @Test
@@ -94,6 +89,19 @@ class AuthControllerTest {
         var response = controller.login(Map.of("username", "operator", "password", "password"));
 
         assertThat(response.getHeaders().getFirst("Set-Cookie")).doesNotContain("Secure");
+    }
+
+    @Test
+    void login_setsCsrfCookieAlongsideSessionCookie() {
+        AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
+                BCrypt.hashpw("password", BCrypt.gensalt()), true);
+
+        var response = controller.login(Map.of("username", "operator", "password", "password"));
+
+        java.util.List<String> setCookieHeaders = response.getHeaders().get("Set-Cookie");
+        assertThat(setCookieHeaders).hasSize(2);
+        assertThat(setCookieHeaders.get(0)).contains("XSRF-TOKEN=").contains("SameSite=Lax");
+        assertThat(setCookieHeaders.get(1)).contains("predicador_session=").contains("HttpOnly").contains("SameSite=Lax");
     }
 
     @Test
