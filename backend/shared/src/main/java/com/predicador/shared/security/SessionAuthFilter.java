@@ -47,10 +47,16 @@ public class SessionAuthFilter extends OncePerRequestFilter {
 
     private final SessionTokenService tokens;
     private final List<Rule> rules;
+    private final boolean allowHeaderAuth;
 
     public SessionAuthFilter(SessionTokenService tokens, List<Rule> rules) {
+        this(tokens, rules, false);
+    }
+
+    public SessionAuthFilter(SessionTokenService tokens, List<Rule> rules, boolean allowHeaderAuth) {
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.rules = List.copyOf(rules);
+        this.allowHeaderAuth = allowHeaderAuth;
     }
 
     @Override
@@ -75,7 +81,9 @@ public class SessionAuthFilter extends OncePerRequestFilter {
                 .map(jakarta.servlet.http.Cookie::getValue)
                 .findFirst()
                 .orElse(null);
-        String presented = cookie != null ? cookie : req.getHeader(HEADER_NAME);
+        String presented = cookie != null
+                ? cookie
+                : (allowHeaderAuth ? req.getHeader(HEADER_NAME) : null);
         Optional<SessionToken> parsed = tokens.verify(presented);
         if (parsed.isEmpty()) {
             writeUnauthorized(res, "Token de sesión ausente o inválido.");
