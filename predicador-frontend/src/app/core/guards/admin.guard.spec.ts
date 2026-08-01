@@ -14,7 +14,7 @@ describe('adminGuard', () => {
   });
 
   it('allows navigation when admin role is set', () => {
-    TestBed.inject(AuthTokenService).set('admin-token', 'admin');
+      TestBed.inject(AuthTokenService).set('admin');
 
     const result = TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
 

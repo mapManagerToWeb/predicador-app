@@ -112,7 +112,7 @@ describe('AdminPage', () => {
     });
 
     it('should auto-login with an admin session role', () => {
-      TestBed.inject(AuthTokenService).set('admin-token', 'admin');
+      TestBed.inject(AuthTokenService).set('admin');
       component.ngOnInit();
 
       expect(component.isLoggedIn()).toBeTruthy();

@@ -68,7 +68,7 @@ export class AdminPage implements OnInit {
         })
       );
       if (response.success) {
-        this.authToken.set(null, 'admin');
+        this.authToken.set('admin');
         this.isLoggedIn.set(true);
         void this.cargarDatos();
       } else {
