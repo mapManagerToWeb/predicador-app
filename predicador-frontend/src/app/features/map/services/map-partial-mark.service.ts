@@ -5,17 +5,17 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapInteractionService } from './map-interaction.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
-import { DEDUP_THRESHOLD_PX, latLngDist } from '../map-geometry';
+import { latLngDist } from '../map-geometry';
 import type { SnappedPoint } from '../map-geometry';
-import { TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
+import { DEDUP_THRESHOLD_PX, TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
 
 @Injectable({ providedIn: 'root' })
 export class MapPartialMarkService {
-  private rendering = inject(MapRenderingFacade);
-  private interaction = inject(MapInteractionService);
-  private selection = inject(MapSelectionService);
-  private state = inject(MapStateService);
-  private toastService = inject(Toast);
+  private readonly rendering = inject(MapRenderingFacade);
+  private readonly interaction = inject(MapInteractionService);
+  private readonly selection = inject(MapSelectionService);
+  private readonly state = inject(MapStateService);
+  private readonly toastService = inject(Toast);
 
   agregarPunto(punto: SnappedPoint): void {
     const actuales = this.state.puntosParciales();

@@ -1,6 +1,4 @@
-import { inject } from '@angular/core';
 import { CanActivateFn } from '@angular/router';
-import { AuthTokenService } from '../services/auth-token';
 
 /**
  * Route guard for the admin surface.
@@ -16,9 +14,5 @@ import { AuthTokenService } from '../services/auth-token';
  * body with a real check is a one-line change.</p>
  */
 export const adminGuard: CanActivateFn = () => {
-  const authToken = inject(AuthTokenService);
-  // Touch the signal so DevTools show the current admin auth state next to
-  // the route; still non-blocking.
-  void authToken.isAdmin();
   return true;
 };
