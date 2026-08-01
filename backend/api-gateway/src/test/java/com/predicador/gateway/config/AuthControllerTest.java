@@ -22,7 +22,7 @@ class AuthControllerTest {
     @Test
     void login_rejectsBlankCredentialsWithoutConfiguredAdmin() {
         AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
-                BCrypt.hashpw("password", BCrypt.gensalt()));
+                BCrypt.hashpw("password", BCrypt.gensalt()), true);
 
         var response = controller.login(Map.of("username", "", "password", ""));
 
@@ -32,7 +32,7 @@ class AuthControllerTest {
     @Test
     void login_rejectsLiteralAdminDefaults() {
         AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
-                BCrypt.hashpw("password", BCrypt.gensalt()));
+                BCrypt.hashpw("password", BCrypt.gensalt()), true);
 
         var response = controller.login(Map.of("username", "admin", "password", "admin"));
 
@@ -42,7 +42,7 @@ class AuthControllerTest {
     @Test
     void login_acceptsConfiguredBcryptHash() {
         AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
-                BCrypt.hashpw("password", BCrypt.gensalt()));
+                BCrypt.hashpw("password", BCrypt.gensalt()), true);
 
         var response = controller.login(Map.of("username", "operator", "password", "password"));
 
@@ -58,7 +58,7 @@ class AuthControllerTest {
     @Test
     void logout_expiresSessionCookie() {
         AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
-                BCrypt.hashpw("password", BCrypt.gensalt()));
+                BCrypt.hashpw("password", BCrypt.gensalt()), true);
 
         var response = controller.logout();
 
@@ -73,17 +73,27 @@ class AuthControllerTest {
     @Test
     void strictMode_rejectsPlaintextOnlyConfiguration() {
         assertThrows(IllegalArgumentException.class,
-                () -> new AuthController(new SessionTokenService(SECRET, 1), "operator", "password", ""));
+                () -> new AuthController(new SessionTokenService(SECRET, 1), "operator", "password", "", true));
     }
 
     @Test
     void localMode_acceptsExplicitPlaintextConfiguration() {
         SessionTokenService localTokens = new SessionTokenService(SECRET, 1, false, "local");
-        AuthController controller = new AuthController(localTokens, "operator", "password", "");
+        AuthController controller = new AuthController(localTokens, "operator", "password", "", false);
 
         var response = controller.login(Map.of("username", "operator", "password", "password"));
 
         assertEquals(200, response.getStatusCode().value());
+    }
+
+    @Test
+    void localHttpOverride_omitsSecureAttribute() {
+        AuthController controller = new AuthController(new SessionTokenService(SECRET, 1), "operator", "",
+                BCrypt.hashpw("password", BCrypt.gensalt()), false);
+
+        var response = controller.login(Map.of("username", "operator", "password", "password"));
+
+        assertThat(response.getHeaders().getFirst("Set-Cookie")).doesNotContain("Secure");
     }
 
     @Test

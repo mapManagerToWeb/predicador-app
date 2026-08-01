@@ -41,16 +41,19 @@ public class AuthController {
     private final String adminPassword;
     private final String adminPasswordBcrypt;
     private final SessionTokenService tokens;
+    private final boolean sessionCookieSecure;
 
     public AuthController(
             SessionTokenService tokens,
             @Value("${app.admin.username:}") String adminUsername,
             @Value("${app.admin.password:}") String adminPassword,
-            @Value("${app.admin.password-bcrypt:}") String adminPasswordBcrypt) {
+            @Value("${app.admin.password-bcrypt:}") String adminPasswordBcrypt,
+            @Value("${app.session.cookie-secure:true}") boolean sessionCookieSecure) {
         this.tokens = tokens;
         this.adminUsername = adminUsername;
         this.adminPassword = adminPassword;
         this.adminPasswordBcrypt = adminPasswordBcrypt;
+        this.sessionCookieSecure = sessionCookieSecure;
         if (tokens.isStrict() && (adminPasswordBcrypt == null || adminPasswordBcrypt.isBlank())) {
             throw new IllegalArgumentException("app.admin.password-bcrypt es obligatorio fuera del perfil local");
         }
@@ -85,9 +88,10 @@ public class AuthController {
                 .build();
     }
 
-    private static String sessionCookie(String value, long maxAge) {
-        return "%s=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=Lax"
-                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge);
+    private String sessionCookie(String value, long maxAge) {
+        return "%s=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
+                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge,
+                        sessionCookieSecure ? " Secure;" : "");
     }
 
     private boolean passwordMatches(String provided) {

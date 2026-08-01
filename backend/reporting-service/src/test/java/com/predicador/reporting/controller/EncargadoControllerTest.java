@@ -45,7 +45,7 @@ class EncargadoControllerTest {
 
     @BeforeEach
     void setUp() {
-        encargadoController = new EncargadoController(encargadoService, tokens);
+        encargadoController = new EncargadoController(encargadoService, tokens, true);
         mockMvc = MockMvcBuilders.standaloneSetup(encargadoController).build();
     }
 
@@ -177,5 +177,22 @@ class EncargadoControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.title").value("Acceso denegado"));
+    }
+
+    @Test
+    void localHttpOverride_omitsSecureAttribute() throws Exception {
+        EncargadoController localController = new EncargadoController(encargadoService, tokens, false);
+        EncargadoDto dto = createDto(7L, "Ana", "Perez");
+        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
+        when(tokens.isConfigured()).thenReturn(true);
+        when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
+
+        MockMvcBuilders.standaloneSetup(localController).build()
+                .perform(post("/api/v1/encargados/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"telefono\":\"56911111111\"}"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Secure"))));
     }
 }

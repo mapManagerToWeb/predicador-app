@@ -7,6 +7,7 @@ import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -26,10 +27,13 @@ public class EncargadoController {
 
     private final EncargadoService encargadoService;
     private final SessionTokenService tokens;
+    private final boolean sessionCookieSecure;
 
-    public EncargadoController(EncargadoService encargadoService, SessionTokenService tokens) {
+    public EncargadoController(EncargadoService encargadoService, SessionTokenService tokens,
+            @Value("${app.session.cookie-secure:true}") boolean sessionCookieSecure) {
         this.encargadoService = encargadoService;
         this.tokens = tokens;
+        this.sessionCookieSecure = sessionCookieSecure;
     }
 
     @GetMapping
@@ -108,9 +112,10 @@ public class EncargadoController {
                 .body(new LoginResponse(response.encargado(), null));
     }
 
-    private static String sessionCookie(String value, long maxAge) {
-        return "%s=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=Lax"
-                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge);
+    private String sessionCookie(String value, long maxAge) {
+        return "%s=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
+                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge,
+                        sessionCookieSecure ? " Secure;" : "");
     }
 
     /**

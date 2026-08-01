@@ -17,6 +17,7 @@ services:
       - SESSION_STRICT=${SESSION_STRICT:-true}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # Igual con las credenciales admin, que hoy se resuelven al arrancar el
       # gateway pero el config-server también las sirve como overlay opcional.
@@ -71,6 +72,7 @@ services:
       # El secret es obligatorio para evitar iniciar servicios sin enforcement.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
       # Para activar tracing con el colector, levantar con el perfil observability
@@ -138,6 +140,7 @@ services:
       # sean verificables aquí cuando activemos enforcement server-side.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
       interval: 10s
