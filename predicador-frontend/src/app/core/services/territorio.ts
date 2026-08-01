@@ -56,6 +56,26 @@ export class TerritorioService {
     return reportes;
   }
 
+  async getReportesPorTerritorios(territorios: number[]): Promise<Map<number, Reporte[]>> {
+    const uncached = territorios.filter(n => !this.reportCache.has(n));
+
+    if (uncached.length > 0) {
+      const params = uncached.map(n => `territorios=${n}`).join('&');
+      const response = await firstValueFrom(
+        this.http.get<Record<number, Reporte[]>>(`${this.reportesUrl}/batch?${params}`)
+      );
+      for (const [key, reports] of Object.entries(response)) {
+        this.reportCache.set(Number(key), reports);
+      }
+    }
+
+    const result = new Map<number, Reporte[]>();
+    for (const n of territorios) {
+      result.set(n, this.reportCache.get(n) ?? []);
+    }
+    return result;
+  }
+
   invalidateReportCache(territorioNumero?: number): void {
     if (territorioNumero !== undefined) {
       this.reportCache.delete(territorioNumero);

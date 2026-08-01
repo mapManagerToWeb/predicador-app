@@ -36,6 +36,10 @@ export class MapTerritoryLayerService {
     this.manzanaClickHandler = handler;
   }
 
+  getManzanaClickHandler(): ManzanaClickHandler | null {
+    return this.manzanaClickHandler;
+  }
+
   getManzanaIndex(): ManzanaIndex[] {
     return this.manzanaIndex();
   }
@@ -54,15 +58,24 @@ export class MapTerritoryLayerService {
     const geoJsonText = await territorioService.getAllGeoJson();
     const geoJson = JSON.parse(geoJsonText) as GeoJSON.FeatureCollection;
 
-    const byTerritorio = new Map<number, GeoJSON.Feature[]>();
-    for (const feature of geoJson.features) {
-      const num = feature.properties?.['territorio_padre'];
-      if (num) {
-        if (!byTerritorio.has(num)) byTerritorio.set(num, []);
-        byTerritorio.get(num)!.push(feature);
-      }
-    }
+    const byTerritorio = this.groupFeaturesByTerritorio(geoJson.features);
+    const cache = this.buildTerritorioCache(byTerritorio);
 
+    this.territoryDataCache.set(cache);
+  }
+
+  private groupFeaturesByTerritorio(features: GeoJSON.Feature[]): Map<number, GeoJSON.Feature[]> {
+    const byTerritorio = new Map<number, GeoJSON.Feature[]>();
+    for (const feature of features) {
+      const num = feature.properties?.['territorio_padre'];
+      if (!num) continue;
+      if (!byTerritorio.has(num)) byTerritorio.set(num, []);
+      byTerritorio.get(num)!.push(feature);
+    }
+    return byTerritorio;
+  }
+
+  private buildTerritorioCache(byTerritorio: Map<number, GeoJSON.Feature[]>): Map<number, TerritorioCacheData> {
     const cache = new Map<number, TerritorioCacheData>();
     for (const [territorioNum, features] of byTerritorio) {
       const rawColor = features[0]?.properties?.['color'] ?? null;
@@ -71,8 +84,7 @@ export class MapTerritoryLayerService {
       const bounds = this.computeBoundsFromFeatures(features);
       cache.set(territorioNum, { fc, color, bounds });
     }
-
-    this.territoryDataCache.set(cache);
+    return cache;
   }
 
   updateVisibleTerritories(): number[] {
@@ -139,11 +151,7 @@ export class MapTerritoryLayerService {
       const el = lbl.getElement();
       if (!el) continue;
       const text = el.querySelector('.territory-label__text')?.textContent;
-      if (text && seleccionados.has(Number(text))) {
-        lbl.setOpacity(1);
-      } else {
-        lbl.setOpacity(0);
-      }
+      lbl.setOpacity(text && seleccionados.has(Number(text)) ? 1 : 0);
     }
   }
 
@@ -191,49 +199,8 @@ export class MapTerritoryLayerService {
     const newEntries: ManzanaIndex[] = [];
 
     const layer = L.geoJSON(fc, {
-      style: () => ({
-        fillColor: color,
-        fillOpacity: getTerritoryFillOpacity(false),
-        opacity: 1,
-        color,
-        weight: STYLE_DEFAULTS.polygon.weight,
-        smoothFactor: STYLE_DEFAULTS.polygon.smoothFactor,
-      }),
-      onEachFeature: (feature, l) => {
-        if (l instanceof L.Polygon) {
-          const id = String(feature.properties?.['id'] ?? '');
-          const nombreBloque = String(feature.properties?.['nombre_bloque'] ?? '');
-
-          const rings = l.getLatLngs();
-          const outer = rings[0] as L.LatLng[];
-          let minLat = Infinity;
-          let maxLat = -Infinity;
-          let minLng = Infinity;
-          let maxLng = -Infinity;
-          if (outer) {
-            for (const pt of outer) {
-              if (pt.lat < minLat) minLat = pt.lat;
-              if (pt.lat > maxLat) maxLat = pt.lat;
-              if (pt.lng < minLng) minLng = pt.lng;
-              if (pt.lng > maxLng) maxLng = pt.lng;
-            }
-          }
-          const bbox = { minLat, maxLat, minLng, maxLng };
-
-          newEntries.push({
-            polygon: l,
-            id,
-            nombreBloque,
-            color,
-            territorioNumero: territorioNum,
-            bbox,
-          });
-
-          l.on('click', (e: L.LeafletMouseEvent) => {
-            this.manzanaClickHandler?.(id, nombreBloque, l, color, territorioNum, e);
-          });
-        }
-      },
+      style: () => this.getTerritoryStyle(color),
+      onEachFeature: (feature, l) => this.onEachFeature(feature, l, territorioNum, color, newEntries),
     });
 
     if (newEntries.length > 0) {
@@ -243,21 +210,82 @@ export class MapTerritoryLayerService {
     layer.addTo(map);
 
     if (bounds.isValid()) {
-      const center = bounds.getCenter();
-      const label = L.marker(center, {
-        icon: L.divIcon({
-          className: STYLE_DEFAULTS.label.className,
-          html: `<span class="territory-label__text">${territorioNum}</span>`,
-          iconSize: [...STYLE_DEFAULTS.label.iconSize],
-          iconAnchor: [...STYLE_DEFAULTS.label.iconAnchor],
-        }),
-        interactive: false,
-        keyboard: false,
-      }).addTo(map);
-      this.territoryLabels.update(labels => [...labels, label]);
+      this.addTerritoryLabel(map, territorioNum, bounds);
     }
 
     this.allTerritoriesLayer.update(layers => [...layers, { territorioPadre: territorioNum, color, layer }]);
+  }
+
+  private getTerritoryStyle(color: string): L.PathOptions {
+    return {
+      fillColor: color,
+      fillOpacity: getTerritoryFillOpacity(false),
+      opacity: 1,
+      color,
+      weight: STYLE_DEFAULTS.polygon.weight,
+    };
+  }
+
+  private onEachFeature(
+    feature: GeoJSON.Feature,
+    l: L.Layer,
+    territorioNum: number,
+    color: string,
+    newEntries: ManzanaIndex[]
+  ): void {
+    if (!(l instanceof L.Polygon)) return;
+
+    const id = String(feature.properties?.['id'] ?? '');
+    const nombreBloque = String(feature.properties?.['nombre_bloque'] ?? '');
+    const bbox = this.computePolygonBBox(l);
+
+    newEntries.push({
+      polygon: l,
+      id,
+      nombreBloque,
+      color,
+      territorioNumero: territorioNum,
+      bbox,
+    });
+
+    l.on('click', (e: L.LeafletMouseEvent) => {
+      this.manzanaClickHandler?.(id, nombreBloque, l, color, territorioNum, e);
+    });
+  }
+
+  private computePolygonBBox(polygon: L.Polygon): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+    const rings = polygon.getLatLngs();
+    const outer = rings[0] as L.LatLng[];
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+
+    if (outer) {
+      for (const pt of outer) {
+        if (pt.lat < minLat) minLat = pt.lat;
+        if (pt.lat > maxLat) maxLat = pt.lat;
+        if (pt.lng < minLng) minLng = pt.lng;
+        if (pt.lng > maxLng) maxLng = pt.lng;
+      }
+    }
+
+    return { minLat, maxLat, minLng, maxLng };
+  }
+
+  private addTerritoryLabel(map: L.Map, territorioNum: number, bounds: L.LatLngBounds): void {
+    const center = bounds.getCenter();
+    const label = L.marker(center, {
+      icon: L.divIcon({
+        className: STYLE_DEFAULTS.label.className,
+        html: `<span class="territory-label__text">${territorioNum}</span>`,
+        iconSize: [...STYLE_DEFAULTS.label.iconSize],
+        iconAnchor: [...STYLE_DEFAULTS.label.iconAnchor],
+      }),
+      interactive: false,
+      keyboard: false,
+    }).addTo(map);
+    this.territoryLabels.update(labels => [...labels, label]);
   }
 
   private removeTerritoryLayer(territorioNum: number): void {
@@ -268,6 +296,11 @@ export class MapTerritoryLayerService {
     fl.layer.remove();
     this.allTerritoriesLayer.update(layers => layers.filter((_, i) => i !== idx));
 
+    this.removeTerritoryLabel(territorioNum);
+    this.manzanaIndex.update(index => index.filter(m => m.territorioNumero !== territorioNum));
+  }
+
+  private removeTerritoryLabel(territorioNum: number): void {
     const labelIdx = this.territoryLabels().findIndex(lbl => {
       const el = lbl.getElement();
       if (!el) return false;
@@ -278,8 +311,6 @@ export class MapTerritoryLayerService {
       this.territoryLabels()[labelIdx].remove();
       this.territoryLabels.update(labels => labels.filter((_, i) => i !== labelIdx));
     }
-
-    this.manzanaIndex.update(index => index.filter(m => m.territorioNumero !== territorioNum));
   }
 
   private computeBoundsFromFeatures(features: GeoJSON.Feature[]): L.LatLngBounds {
@@ -309,27 +340,48 @@ export class MapTerritoryLayerService {
     if (!geom) return { minLat, maxLat, minLng, maxLng };
 
     if (geom.type === 'Polygon') {
-      for (const ring of (geom as GeoJSON.Polygon).coordinates) {
-        for (const [lng, lat] of ring) {
-          if (lat < minLat) minLat = lat;
-          if (lat > maxLat) maxLat = lat;
-          if (lng < minLng) minLng = lng;
-          if (lng > maxLng) maxLng = lng;
-        }
-      }
-    } else if (geom.type === 'MultiPolygon') {
-      for (const poly of (geom as GeoJSON.MultiPolygon).coordinates) {
-        for (const ring of poly) {
-          for (const [lng, lat] of ring) {
-            if (lat < minLat) minLat = lat;
-            if (lat > maxLat) maxLat = lat;
-            if (lng < minLng) minLng = lng;
-            if (lng > maxLng) maxLng = lng;
-          }
-        }
-      }
+      return this.extendBoundsFromPolygon((geom as GeoJSON.Polygon).coordinates, minLat, maxLat, minLng, maxLng);
     }
 
+    if (geom.type === 'MultiPolygon') {
+      return this.extendBoundsFromMultiPolygon((geom as GeoJSON.MultiPolygon).coordinates, minLat, maxLat, minLng, maxLng);
+    }
+
+    return { minLat, maxLat, minLng, maxLng };
+  }
+
+  private extendBoundsFromPolygon(
+    coordinates: number[][][],
+    minLat: number,
+    maxLat: number,
+    minLng: number,
+    maxLng: number
+  ): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+    for (const ring of coordinates) {
+      for (const [lng, lat] of ring) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+    }
+    return { minLat, maxLat, minLng, maxLng };
+  }
+
+  private extendBoundsFromMultiPolygon(
+    coordinates: number[][][][],
+    minLat: number,
+    maxLat: number,
+    minLng: number,
+    maxLng: number
+  ): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+    for (const poly of coordinates) {
+      const result = this.extendBoundsFromPolygon(poly, minLat, maxLat, minLng, maxLng);
+      minLat = result.minLat;
+      maxLat = result.maxLat;
+      minLng = result.minLng;
+      maxLng = result.maxLng;
+    }
     return { minLat, maxLat, minLng, maxLng };
   }
 }

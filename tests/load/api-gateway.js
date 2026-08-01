@@ -29,7 +29,7 @@ export const options = {
   },
 };
 
-export default function () {
+export default function apiGatewayTest() {
   // 1. Health check
   const healthRes = http.get(`${BASE_URL}/actuator/health`);
   check(healthRes, {
@@ -84,7 +84,7 @@ export default function () {
     `${BASE_URL}/api/v1/rum`,
     JSON.stringify({
       name: "LCP",
-      value: Math.random() * 3000,
+      value: ((__VU * 1000 + __ITER * 7 + Date.now()) % 3000),
       route: "/map",
     }),
     { headers: { "Content-Type": "application/json" } }

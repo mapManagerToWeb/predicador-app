@@ -64,17 +64,16 @@ describe('MapTerritoryLayerService', () => {
 
       service.addExtraLayer(layer1);
       service.addExtraLayer(layer2);
-
-      service.removeExtraLayer(layer1);
-      service.clearExtraLayers();
+      expect(() => service.removeExtraLayer(layer1)).not.toThrow();
+      expect(() => service.clearExtraLayers()).not.toThrow();
     });
   });
 
   describe('manzana click handler', () => {
     it('should accept and clear click handler', () => {
       const handler = vi.fn();
-      service.setManzanaClickHandler(handler);
-      service.setManzanaClickHandler(null);
+      expect(() => service.setManzanaClickHandler(handler)).not.toThrow();
+      expect(() => service.setManzanaClickHandler(null)).not.toThrow();
     });
   });
 });

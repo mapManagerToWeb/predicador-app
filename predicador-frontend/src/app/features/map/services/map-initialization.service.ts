@@ -9,11 +9,11 @@ import { TOAST_MESSAGES } from '../utils/map-constants';
 
 @Injectable({ providedIn: 'root' })
 export class MapInitializationService {
-  private rendering = inject(MapRenderingFacade);
-  private selection = inject(MapSelectionService);
-  private state = inject(MapStateService);
-  private territorioService = inject(TerritorioService);
-  private toastService = inject(Toast);
+  private readonly rendering = inject(MapRenderingFacade);
+  private readonly selection = inject(MapSelectionService);
+  private readonly state = inject(MapStateService);
+  private readonly territorioService = inject(TerritorioService);
+  private readonly toastService = inject(Toast);
 
   async initialize(el: HTMLElement, onMapClick: (e: L.LeafletMouseEvent) => void): Promise<void> {
     this.rendering.initializeMap(el);
@@ -65,16 +65,16 @@ export class MapInitializationService {
   }
 
   private async restoreAllMarks(): Promise<void> {
-    const BATCH_SIZE = 4;
     const layers = this.rendering.getAllTerritoriesLayer();
+    const territorios = layers.map(fl => fl.territorioPadre);
 
-    for (let i = 0; i < layers.length; i += BATCH_SIZE) {
-      const batch = layers.slice(i, i + BATCH_SIZE);
-      await Promise.all(
-        batch.map(fl =>
-          this.selection.restaurarMarcadoDesdeDB(fl.territorioPadre, fl.color, { actualizarEstadoMarcado: false })
-        )
-      );
+    if (territorios.length === 0) return;
+
+    const reportesPorTerritorio = await this.territorioService.getReportesPorTerritorios(territorios);
+
+    for (const fl of layers) {
+      const reportes = reportesPorTerritorio.get(fl.territorioPadre) ?? [];
+      this.selection.restaurarMarcadoConReportes(fl.territorioPadre, reportes, fl.color, { actualizarEstadoMarcado: false });
     }
   }
 

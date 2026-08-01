@@ -30,7 +30,11 @@ import java.util.List;
 @Configuration
 public class RouteConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:4200}")
+    private static final String REPORTING_CB = "reportingCB";
+    private static final String REPORTING_FALLBACK = "forward:/fallback/reporting";
+    private static final String REPORTING_SERVICE_URI = "lb://reporting-service";
+
+    @Value("${app.cors.allowed-origins:}")
     private String allowedOrigins;
 
     @Bean
@@ -69,30 +73,30 @@ public class RouteConfig {
                 .route("reporting-service", r -> r
                         .path("/api/v1/reports/**")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName("reportingCB")
-                                        .setFallbackUri("forward:/fallback/reporting"))
+                                .circuitBreaker(c -> c.setName(REPORTING_CB)
+                                        .setFallbackUri(REPORTING_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(1)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(200), Duration.ofSeconds(1), 2, true)))
-                        .uri("lb://reporting-service"))
+                        .uri(REPORTING_SERVICE_URI))
                 .route("encargados-service", r -> r
                         .path("/api/v1/encargados/**")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName("reportingCB")
-                                        .setFallbackUri("forward:/fallback/reporting"))
+                                .circuitBreaker(c -> c.setName(REPORTING_CB)
+                                        .setFallbackUri(REPORTING_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(1)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(200), Duration.ofSeconds(1), 2, true)))
-                        .uri("lb://reporting-service"))
+                        .uri(REPORTING_SERVICE_URI))
                 // Real User Monitoring sink: público, alto volumen, sin retries
                 // (métrica idempotente pero perder una es aceptable).
                 .route("rum-sink", r -> r
                         .path("/api/v1/rum")
-                        .filters(f -> f.circuitBreaker(c -> c.setName("reportingCB")
-                                .setFallbackUri("forward:/fallback/reporting")))
-                        .uri("lb://reporting-service"))
+                        .filters(f -> f.circuitBreaker(c -> c.setName(REPORTING_CB)
+                                .setFallbackUri(REPORTING_FALLBACK)))
+                        .uri(REPORTING_SERVICE_URI))
                 .build();
     }
 

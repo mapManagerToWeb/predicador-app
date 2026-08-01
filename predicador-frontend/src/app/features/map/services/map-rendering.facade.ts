@@ -31,13 +31,13 @@ import type {
  */
 @Injectable({ providedIn: 'root' })
 export class MapRenderingFacade {
-  private engine = inject(MapEngineService);
-  private tiles = inject(MapTileLayerService);
-  private territories = inject(MapTerritoryLayerService);
-  private styles = inject(MapStyleService);
-  private capture = inject(MapCaptureService);
-  private partialDraw = inject(MapPartialDrawService);
-  private state = inject(MapStateService);
+  private readonly engine = inject(MapEngineService);
+  private readonly tiles = inject(MapTileLayerService);
+  private readonly territories = inject(MapTerritoryLayerService);
+  private readonly styles = inject(MapStyleService);
+  private readonly capture = inject(MapCaptureService);
+  private readonly partialDraw = inject(MapPartialDrawService);
+  private readonly state = inject(MapStateService);
 
   // ─── Engine delegation ───────────────────────────────────────────
 

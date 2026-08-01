@@ -16,7 +16,7 @@ import { environment } from '../../../environments/environment';
  */
 export function normalizeRoute(path: string): string {
   return path
-    .replace(/\?.*$/, '')
+    .split('?')[0]
     .replace(/\/\d+(?=\/|$)/g, '/:id')
     .slice(0, 40);
 }
@@ -39,8 +39,8 @@ export function normalizeRoute(path: string): string {
  */
 @Injectable({ providedIn: 'root' })
 export class RumService {
-  private router = inject(Router);
-  private destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   private endpoint = `${environment.apiUrl}/rum`;
   private currentRoute = '/';
   private started = false;

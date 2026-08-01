@@ -26,14 +26,14 @@ import type { ModoMarcado } from './types/map.types';
   styleUrl: './map.css',
 })
 export class MapPage implements OnDestroy {
-  private state = inject(MapStateService);
-  private rendering = inject(MapRenderingFacade);
-  private interaction = inject(MapInteractionService);
-  private selection = inject(MapSelectionService);
-  private initialization = inject(MapInitializationService);
-  private partialMark = inject(MapPartialMarkService);
-  private dataPersistence = inject(MapDataPersistenceService);
-  private toastService = inject(Toast);
+  private readonly state = inject(MapStateService);
+  private readonly rendering = inject(MapRenderingFacade);
+  private readonly interaction = inject(MapInteractionService);
+  private readonly selection = inject(MapSelectionService);
+  private readonly initialization = inject(MapInitializationService);
+  private readonly partialMark = inject(MapPartialMarkService);
+  private readonly dataPersistence = inject(MapDataPersistenceService);
+  private readonly toastService = inject(Toast);
 
   manzanasMarcadas = this.state.manzanasMarcadas;
   manzanasCount = this.state.manzanasCount;
@@ -148,6 +148,10 @@ export class MapPage implements OnDestroy {
     this.selection.setModoMarcado(modo);
   }
 
+  toggleModoCompleto(): void {
+    this.setModoMarcado(this.modoMarcado() === 'completa' ? 'none' : 'completa');
+  }
+
   deshacerPunto(): void {
     this.partialMark.deshacerPunto();
   }
@@ -181,6 +185,11 @@ export class MapPage implements OnDestroy {
   }
 
   limpiarTodo(): void {
+    if (this.modoMarcado() !== 'none') {
+      this.setModoMarcado('none');
+      return;
+    }
+
     const hasData = this.state.manzanasMarcadas().length > 0 || this.state.territoriosSeleccionados().length > 0;
     this.limpiarMarcas();
 

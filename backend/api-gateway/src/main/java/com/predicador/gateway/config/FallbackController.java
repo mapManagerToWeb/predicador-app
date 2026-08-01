@@ -3,9 +3,8 @@ package com.predicador.gateway.config;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
@@ -20,14 +19,14 @@ import static com.predicador.gateway.config.RouteConfig.circuitOpenStatus;
 @RequestMapping("/fallback")
 public class FallbackController {
 
-    @GetMapping(value = "/territory", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PostMapping(value = "/territory", produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/territory", method = {RequestMethod.GET, RequestMethod.POST},
+            produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<ProblemDetail>> territoryFallback() {
         return Mono.just(problem("territory-service", "El servicio de territorios no está disponible."));
     }
 
-    @GetMapping(value = "/reporting", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PostMapping(value = "/reporting", produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/reporting", method = {RequestMethod.GET, RequestMethod.POST},
+            produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<ProblemDetail>> reportingFallback() {
         return Mono.just(problem("reporting-service", "El servicio de reportes no está disponible."));
     }
