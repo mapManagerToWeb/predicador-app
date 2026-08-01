@@ -3,6 +3,7 @@ import {
   inject,
   isDevMode,
   provideAppInitializer,
+  provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideRouter } from '@angular/router';
@@ -29,6 +30,9 @@ export const appConfig: ApplicationConfig = {
       registrationStrategy: 'registerWhenStable:30000',
     }),
     provideClientHydration(),
+    // Route `error` and `unhandledrejection` global events through the
+    // ErrorHandler so unexpected client-side failures are not lost.
+    provideBrowserGlobalErrorListeners(),
     // RUM (Real User Monitoring): captura Core Web Vitals y los envía al
     // backend. Se inicializa una sola vez al arrancar la app; noop en SSR.
     provideAppInitializer(() => {

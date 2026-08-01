@@ -24,7 +24,7 @@ describe('profileGuard', () => {
   });
 
   it('allows a route when a session token exists', () => {
-    TestBed.inject(AuthTokenService).set('session-token', 'encargado');
+    TestBed.inject(AuthTokenService).set('encargado');
 
     const result = TestBed.runInInjectionContext(() => profileGuard({} as never, {} as never));
 

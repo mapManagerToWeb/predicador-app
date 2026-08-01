@@ -57,7 +57,7 @@ export class EncargadoService {
    */
   private extract(response: LoginResponse | EncargadoDto): EncargadoDto {
     if (this.isLoginResponse(response)) {
-      this.authToken.set(null, 'encargado');
+      this.authToken.set('encargado');
       // encargado is guaranteed present when isLoginResponse returns true.
       return response.encargado as EncargadoDto;
     }

@@ -38,7 +38,7 @@ describe('errorInterceptor', () => {
   });
 
   it('en 401 fuera de rutas de auth: limpia token/profile y navega a /login', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
     profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
     localStorage.setItem('isAdmin', 'true');
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -47,21 +47,21 @@ describe('errorInterceptor', () => {
     const req = httpMock.expectOne('/api/v1/reports');
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
-    expect(authToken.token()).toBeNull();
+    expect(authToken.role()).toBeNull();
     expect(profile.currentUser()).toBeNull();
     expect(localStorage.getItem('isAdmin')).toBeNull();
     expect(navSpy).toHaveBeenCalledWith(['/login']);
   });
 
   it('en 401 sobre rutas de login: NO limpia token ni redirige', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     http.post('/api/v1/encargados/login', {}).subscribe({ error: () => void 0 });
     const req = httpMock.expectOne('/api/v1/encargados/login');
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
-    expect(authToken.token()).toBeNull();
+    expect(authToken.role()).toBeNull();
     expect(navSpy).not.toHaveBeenCalled();
   });
 
@@ -79,7 +79,7 @@ describe('errorInterceptor', () => {
   });
 
   it('en 403 fuera de rutas de auth: limpia token/profile y navega a /login', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
     profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
@@ -93,7 +93,7 @@ describe('errorInterceptor', () => {
   });
 
   it('en 404 no redirige ni limpia sesión', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
     profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
@@ -107,7 +107,7 @@ describe('errorInterceptor', () => {
   });
 
   it('en 429 no redirige ni limpia sesión', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     http.get('/api/v1/reports').subscribe({ error: () => void 0 });
@@ -129,7 +129,7 @@ describe('errorInterceptor', () => {
   });
 
   it('en 401 sobre buscar-crear: NO limpia token ni redirige', () => {
-    authToken.set('abc.def', 'encargado');
+    authToken.set('encargado');
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     http.post('/api/v1/encargados/buscar-crear', {}).subscribe({ error: () => void 0 });
