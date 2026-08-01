@@ -118,17 +118,18 @@ class EncargadoControllerTest {
         when(tokens.isConfigured()).thenReturn(true);
         when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 
-        mockMvc.perform(post("/api/v1/encargados/buscar-crear")
+        var result = mockMvc.perform(post("/api/v1/encargados/buscar-crear")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"nombre\":\"Daniel\",\"apellido\":\"Uribe\",\"telefono\":\"56912345678\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.encargado.nombre").value("Daniel"))
             .andExpect(jsonPath("$.token").doesNotExist())
-            .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
-                    org.hamcrest.Matchers.containsString("predicador_session="),
-                    org.hamcrest.Matchers.containsString("HttpOnly"),
-                    org.hamcrest.Matchers.containsString("Secure"),
-                    org.hamcrest.Matchers.containsString("SameSite=Lax"))));
+            .andReturn();
+
+        java.util.List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders)
+                .anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("Secure") && c.contains("SameSite=Lax"));
     }
 
     @Test
@@ -139,18 +140,19 @@ class EncargadoControllerTest {
         when(tokens.isConfigured()).thenReturn(true);
         when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 
-        mockMvc.perform(post("/api/v1/encargados/login")
+        var result = mockMvc.perform(post("/api/v1/encargados/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"telefono\":\"56911111111\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.encargado.id").value(7))
             .andExpect(jsonPath("$.encargado.nombre").value("Ana"))
             .andExpect(jsonPath("$.token").doesNotExist())
-            .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
-                    org.hamcrest.Matchers.containsString("predicador_session="),
-                    org.hamcrest.Matchers.containsString("HttpOnly"),
-                    org.hamcrest.Matchers.containsString("Secure"),
-                    org.hamcrest.Matchers.containsString("SameSite=Lax"))));
+            .andReturn();
+
+        java.util.List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders)
+                .anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("Secure") && c.contains("SameSite=Lax"));
     }
 
     @Test

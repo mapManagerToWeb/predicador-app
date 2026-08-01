@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import * as L from 'leaflet';
 import * as GeoJSON from 'geojson';
 import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
@@ -30,7 +30,7 @@ export class MapTerritoryLayerService {
   private manzanaClickHandler: ManzanaClickHandler | null = null;
   private extraLayers: L.Layer[] = [];
 
-  constructor(private engine: MapEngineService) {}
+  private engine = inject(MapEngineService);
 
   setManzanaClickHandler(handler: ManzanaClickHandler | null): void {
     this.manzanaClickHandler = handler;

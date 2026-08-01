@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import java.util.List;
@@ -38,6 +39,7 @@ class Task3HardeningTest {
     @Mock WhatsAppMessageClient messageClient;
     @Mock WhatsAppProperties properties;
     @Mock com.predicador.reporting.repository.WhatsAppDeliveryRepository deliveryRepository;
+    @Mock TransactionTemplate txTemplate;
 
     private final SessionToken admin = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
@@ -94,7 +96,7 @@ class Task3HardeningTest {
         when(deliveryRepository.saveAndFlush(any())).thenReturn(delivery);
 
         var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
-                new SimpleMeterRegistry(), deliveryRepository);
+                new SimpleMeterRegistry(), deliveryRepository, txTemplate);
 
         assertNotNull(service.sendReport(request, "delivery-1"));
         assertNotNull(service.sendReport(request, "delivery-1"));
@@ -125,7 +127,7 @@ class Task3HardeningTest {
                 .thenReturn(new com.predicador.reporting.client.WhatsAppMessageResponse(null, "message-1"));
 
         var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
-                new SimpleMeterRegistry(), deliveryRepository);
+                new SimpleMeterRegistry(), deliveryRepository, txTemplate);
 
         assertTrue(service.sendReport(request, "delivery-stale").success());
     }
@@ -135,7 +137,7 @@ class Task3HardeningTest {
         var failed = WhatsAppDelivery.failed("delivery-failed", "Meta rejected", 422);
         when(deliveryRepository.findById("delivery-failed")).thenReturn(Optional.of(failed));
         var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
-                new SimpleMeterRegistry(), deliveryRepository);
+                new SimpleMeterRegistry(), deliveryRepository, txTemplate);
 
         var exception = assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
                 () -> service.sendReport(null, "delivery-failed"));
@@ -148,8 +150,9 @@ class Task3HardeningTest {
         when(deliveryRepository.findById("delivery-db-error")).thenReturn(Optional.empty());
         when(deliveryRepository.saveAndFlush(any()))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("database unavailable"));
+        when(txTemplate.execute(any())).thenReturn(Optional.empty());
         var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
-                new SimpleMeterRegistry(), deliveryRepository);
+                new SimpleMeterRegistry(), deliveryRepository, txTemplate);
 
         var exception = assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
                 () -> service.sendReport(null, "delivery-db-error"));
@@ -176,13 +179,15 @@ class Task3HardeningTest {
         @Bean com.predicador.reporting.repository.WhatsAppDeliveryRepository deliveryRepository() {
             return mock(com.predicador.reporting.repository.WhatsAppDeliveryRepository.class);
         }
+        @Bean TransactionTemplate txTemplate() { return mock(TransactionTemplate.class); }
         @Bean ReportSendService reportSendService(ReportMessageService messageService,
                 com.predicador.reporting.client.WhatsAppMediaClient mediaClient,
                 WhatsAppMessageClient messageClient, WhatsAppProperties properties,
                 MeterRegistry registry,
-                com.predicador.reporting.repository.WhatsAppDeliveryRepository deliveryRepository) {
+                com.predicador.reporting.repository.WhatsAppDeliveryRepository deliveryRepository,
+                TransactionTemplate txTemplate) {
             return new ReportSendService(messageService, mediaClient, messageClient, properties, registry,
-                    deliveryRepository);
+                    deliveryRepository, txTemplate);
         }
     }
 }
