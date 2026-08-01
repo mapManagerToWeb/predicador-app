@@ -2,6 +2,10 @@ package com.predicador.gateway.config;
 
 import com.predicador.shared.security.SessionTokenService;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import java.util.Map;
@@ -9,6 +13,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthControllerTest {
 
@@ -59,5 +64,25 @@ class AuthControllerTest {
         var response = controller.login(Map.of("username", "operator", "password", "password"));
 
         assertEquals(200, response.getStatusCode().value());
+    }
+
+    @Test
+    void springBinding_rejectsMissingAdminPropertiesInsteadOfUsingInsecureDefaults() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertyBindingConfiguration.class)
+                .withPropertyValues("app.session.secret=" + SECRET)
+                .run(context -> assertThat(context.getStartupFailure())
+                        .isNotNull()
+                        .hasRootCauseInstanceOf(IllegalArgumentException.class));
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import(AuthController.class)
+    static class PropertyBindingConfiguration {
+
+        @Bean
+        SessionTokenService sessionTokenService() {
+            return new SessionTokenService(SECRET, 1);
+        }
     }
 }

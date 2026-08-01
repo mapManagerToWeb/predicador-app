@@ -20,7 +20,7 @@ services:
       # Igual con las credenciales admin, que hoy se resuelven al arrancar el
       # gateway pero el config-server también las sirve como overlay opcional.
       - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/actuator/health || exit 1"]
