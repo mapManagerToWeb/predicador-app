@@ -38,6 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Add Docker socket to Testcontainers
+        run: |
+          echo "unix:///var/run/docker.sock" > $HOME/.testcontainers.properties 2>/dev/null || true
+          mkdir -p $HOME/.testcontainers && echo "ryuk.container.image=ghcr.io/testcontainers/ryuk:0.11.0" >> $HOME/.testcontainers.properties
+
       - uses: actions/setup-java@v4
         with:
           java-version: "21"
@@ -49,6 +54,8 @@ jobs:
           DB_URL: jdbc:postgresql://localhost:5432/predicador_test
           DB_USERNAME: predicador
           DB_PASSWORD: test
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+          DOCKER_HOST: unix:///var/run/docker.sock
         run: mvn verify -B
 
       - name: Upload JaCoCo reports

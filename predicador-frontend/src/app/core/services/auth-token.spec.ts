@@ -63,4 +63,50 @@ describe('AuthTokenService', () => {
 
     expect(svc.hasToken()).toBe(false);
   });
+
+  it('set() with admin role makes isAdmin true', () => {
+    const svc = new AuthTokenService();
+    svc.set('token.sig', 'admin');
+    expect(svc.isAdmin()).toBe(true);
+    expect(svc.role()).toBe('admin');
+    expect(svc.hasToken()).toBe(true);
+  });
+
+  it('set() with encargado role makes isAdmin false', () => {
+    const svc = new AuthTokenService();
+    svc.set('token.sig', 'encargado');
+    expect(svc.isAdmin()).toBe(false);
+    expect(svc.role()).toBe('encargado');
+  });
+
+  it('clear() then set() restores role state', () => {
+    const svc = new AuthTokenService();
+    svc.set('first', 'admin');
+    svc.clear();
+    expect(svc.hasToken()).toBe(false);
+    svc.set('second', 'encargado');
+    expect(svc.role()).toBe('encargado');
+    expect(svc.hasToken()).toBe(true);
+  });
+
+  it('logout() clears role state and calls auth endpoint', () => {
+    const postSpy = vi.fn().mockReturnValue({ subscribe: vi.fn() });
+    const svc = new AuthTokenService({ post: postSpy } as any);
+    svc.set('token.sig', 'admin');
+    svc.logout();
+
+    expect(svc.token()).toBeNull();
+    expect(svc.role()).toBeNull();
+    expect(svc.hasToken()).toBe(false);
+    expect(postSpy).toHaveBeenCalledWith('/api/v1/auth/logout', {});
+  });
+
+  it('logout() clears role even when http is not available', () => {
+    const svc = new AuthTokenService();
+    svc.set('token.sig', 'encargado');
+    svc.logout();
+
+    expect(svc.hasToken()).toBe(false);
+    expect(svc.role()).toBeNull();
+  });
 });
