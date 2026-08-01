@@ -79,7 +79,8 @@ Backend: BUILD SUCCESS
 - Trivy: fails on CRITICAL/HIGH vulnerabilities (unfixed only)
 
 ### Remaining Risks
-- Admin credentials must be explicitly set (no defaults) — enforced via `:?` syntax
+- `ADMIN_USERNAME`, `SESSION_SECRET`, `DB_PASSWORD` enforced via `:?` (no defaults)
+- Grafana credentials default to `admin/admin` — development only, must override via `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` in production
 
 ## Coverage
 

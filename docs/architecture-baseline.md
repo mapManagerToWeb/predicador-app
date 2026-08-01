@@ -143,7 +143,7 @@ src/app/
 - **Actuator endpoints**: health, info, metrics, prometheus exposed on all services
 - **Prometheus access**: `unrestricted` on all services — network-isolated via Docker internal network
 - **Network-level isolation**: observability ports bound to 127.0.0.1 (localhost only)
-- **Admin credentials**: require explicit env vars (`ADMIN_USERNAME`, `SESSION_SECRET`) — no defaults
+- **Admin credentials**: `ADMIN_USERNAME`, `SESSION_SECRET`, `DB_PASSWORD` use `:?` enforcement (no defaults); Grafana defaults to `admin/admin` (development only, override via `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` in production)
 - **Secrets**: SESSION_SECRET, DB_PASSWORD, WHATSAPP_ACCESS_TOKEN via env vars (not hardcoded)
 - **Docker images**: non-root user (`appuser`) in all runtime stages
 - **Security scans**: Gitleaks (secret detection), OWASP Dependency-Check (CVSS ≥ 7 fails), Trivy (CRITICAL/HIGH fails)
