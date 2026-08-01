@@ -12,7 +12,10 @@ COPY . .
 RUN mvn clean package -pl territory-service -am -DskipTests -B
 
 FROM eclipse-temurin:21-jre-alpine
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=build /workspace/territory-service/target/*.jar app.jar
+RUN chown appuser:appgroup app.jar
+USER appuser
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]

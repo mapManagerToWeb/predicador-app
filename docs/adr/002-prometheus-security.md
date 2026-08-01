@@ -26,6 +26,7 @@ All Spring Boot services expose `/actuator/prometheus` with `access: unrestricte
 
 ### 4. Prometheus configuration
 - No authentication on Prometheus itself (internal network only)
+- `--web.enable-lifecycle` removed — no unauthenticated reload endpoint
 - Alert rules configured to detect scrape failures and cardinality anomalies
 
 ## Implementation
