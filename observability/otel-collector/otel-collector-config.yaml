@@ -28,13 +28,10 @@ exporters:
     endpoint: jaeger:4317
     tls:
       insecure: true
-  # Debug output while wiring the pipeline. Comment out once stable.
-  debug:
-    verbosity: basic
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlp/jaeger, debug]
+      exporters: [otlp/jaeger]
