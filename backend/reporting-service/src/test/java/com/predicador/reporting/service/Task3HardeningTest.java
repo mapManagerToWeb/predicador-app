@@ -5,6 +5,7 @@ import com.predicador.reporting.config.WhatsAppProperties;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.repository.ReportRepository;
 import com.predicador.reporting.repository.EncargadoRepository;
+import com.predicador.reporting.model.WhatsAppDelivery;
 import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.util.List;
 import java.util.Optional;
@@ -63,7 +68,7 @@ class Task3HardeningTest {
         existing.setNombre("Daniel");
         existing.setApellido("Uribe");
         existing.setActivo(true);
-        when(encargadoRepository.findByNombreIgnoreCaseAndApellidoIgnoreCase("Daniel", "Uribe"))
+        when(encargadoRepository.findByNaturalIdentity("Daniel", "Uribe"))
                 .thenReturn(Optional.empty(), Optional.of(existing));
         when(encargadoRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
 
@@ -85,6 +90,7 @@ class Task3HardeningTest {
                 .thenReturn(new com.predicador.reporting.client.WhatsAppMessageResponse(null, "message-1"));
         var delivery = new com.predicador.reporting.model.WhatsAppDelivery("delivery-1");
         when(deliveryRepository.findById("delivery-1")).thenReturn(Optional.empty(), Optional.of(delivery));
+        when(deliveryRepository.saveAndFlush(any())).thenReturn(delivery);
 
         var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
                 new SimpleMeterRegistry(), deliveryRepository);
@@ -92,5 +98,67 @@ class Task3HardeningTest {
         assertNotNull(service.sendReport(request, "delivery-1"));
         assertNotNull(service.sendReport(request, "delivery-1"));
         verify(messageClient, times(1)).sendTemplateMessage(anyString(), anyString(), anyString(), anyList());
+    }
+
+    @Test
+    void reportSendServiceHasOneConstructorAndSpringWiresDeliveryRepository() {
+        assertEquals(1, ReportSendService.class.getDeclaredConstructors().length);
+        try (var context = new AnnotationConfigApplicationContext(BeanConfig.class)) {
+            assertNotNull(context.getBean(ReportSendService.class));
+        }
+    }
+
+    @Test
+    void staleReservationCanBeReclaimed() {
+        var request = new WhatsAppSendRequest("Daniel", "Uribe", "31-07-2026", "tarde",
+                List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 1, 1)), null, null);
+        var stale = WhatsAppDelivery.stale("delivery-stale");
+        when(deliveryRepository.findById("delivery-stale")).thenReturn(Optional.of(stale));
+        when(deliveryRepository.claimStale(eq("delivery-stale"), any(), any(), any())).thenReturn(1);
+        when(messageService.generarParametrosTemplate(request)).thenReturn(java.util.Map.of(
+                "fecha", "31-07-2026", "encargado", "Daniel Uribe", "territorio", "1", "estado", "tarde"));
+        when(properties.templateName()).thenReturn("template");
+        when(properties.languageCode()).thenReturn("es_CL");
+        when(properties.destinationNumber()).thenReturn("56912345678");
+        when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
+                .thenReturn(new com.predicador.reporting.client.WhatsAppMessageResponse(null, "message-1"));
+
+        var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
+                new SimpleMeterRegistry(), deliveryRepository);
+
+        assertTrue(service.sendReport(request, "delivery-stale").success());
+    }
+
+    @Test
+    void replayedFailedDeliveryRaisesIntegrationFailure() {
+        var failed = WhatsAppDelivery.failed("delivery-failed", "Meta rejected", 422);
+        when(deliveryRepository.findById("delivery-failed")).thenReturn(Optional.of(failed));
+        var service = new ReportSendService(messageService, mediaClient, messageClient, properties,
+                new SimpleMeterRegistry(), deliveryRepository);
+
+        var exception = assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
+                () -> service.sendReport(null, "delivery-failed"));
+        assertEquals(422, exception.status());
+        verifyNoInteractions(messageClient);
+    }
+
+    @Configuration
+    static class BeanConfig {
+        @Bean ReportMessageService messageService() { return mock(ReportMessageService.class); }
+        @Bean com.predicador.reporting.client.WhatsAppMediaClient mediaClient() { return mock(com.predicador.reporting.client.WhatsAppMediaClient.class); }
+        @Bean WhatsAppMessageClient messageClient() { return mock(WhatsAppMessageClient.class); }
+        @Bean WhatsAppProperties properties() { return mock(WhatsAppProperties.class); }
+        @Bean MeterRegistry registry() { return new SimpleMeterRegistry(); }
+        @Bean com.predicador.reporting.repository.WhatsAppDeliveryRepository deliveryRepository() {
+            return mock(com.predicador.reporting.repository.WhatsAppDeliveryRepository.class);
+        }
+        @Bean ReportSendService reportSendService(ReportMessageService messageService,
+                com.predicador.reporting.client.WhatsAppMediaClient mediaClient,
+                WhatsAppMessageClient messageClient, WhatsAppProperties properties,
+                MeterRegistry registry,
+                com.predicador.reporting.repository.WhatsAppDeliveryRepository deliveryRepository) {
+            return new ReportSendService(messageService, mediaClient, messageClient, properties, registry,
+                    deliveryRepository);
+        }
     }
 }

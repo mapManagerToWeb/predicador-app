@@ -150,7 +150,7 @@ class EncargadoServiceTest {
         Encargado existing = createEncargado(1L, "Daniel", "Uribe", 1, null, true);
         Encargado saved = createEncargado(1L, "Daniel", "Uribe", 1, "56912345678", true);
 
-        when(repository.findByNombreIgnoreCaseAndApellidoIgnoreCase("Daniel", "Uribe"))
+        when(repository.findByNaturalIdentity("Daniel", "Uribe"))
                 .thenReturn(Optional.of(existing));
         when(repository.save(any(Encargado.class))).thenReturn(saved);
 
@@ -166,7 +166,7 @@ class EncargadoServiceTest {
     void buscarOCrear_shouldCreateNewWhenNotFound() {
         Encargado saved = createEncargado(1L, "Daniel", "Uribe", 1, "56912345678", true);
 
-        when(repository.findByNombreIgnoreCaseAndApellidoIgnoreCase("Daniel", "Uribe"))
+        when(repository.findByNaturalIdentity("Daniel", "Uribe"))
                 .thenReturn(Optional.empty());
         when(repository.saveAndFlush(any(Encargado.class))).thenReturn(saved);
 
