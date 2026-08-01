@@ -1,6 +1,6 @@
 # Architecture Baseline — Predicador App
 
-**Date:** 2026-07-29
+**Date:** 2026-08-01
 **Branch:** hotfix/big-archives
 **Status:** Current
 
@@ -129,25 +129,25 @@ src/app/
 
 | Metric | Value |
 |---|---|
-| Frontend tests | 75 passing |
-| Backend tests | 92 passing |
+| Frontend tests | 81 passing |
+| Backend tests | 113 passing |
 | Frontend bundle (main) | ~250 kB (map chunk) |
 | MapRenderingService | 921 lines (monolith, refactoring target) |
-| ADRs | 0 (this baseline creates 4) |
-| CI/CD | None configured |
-| Coverage thresholds | 20% (FE Vitest) |
+| ADRs | 4 (observability, prometheus security, RUM, map split) |
+| CI/CD | GitHub Actions (frontend, backend, security, Docker) |
+| Coverage thresholds | 80% (FE Vitest lines/statements/functions), 75% (branches) |
 
 ## Security Posture
 
 ### Current State
 - **Actuator endpoints**: health, info, metrics, prometheus exposed on all services
-- **Prometheus access**: `unrestricted` on all services — **needs hardening**
-- **No network-level isolation** for /actuator/prometheus
-- **Admin credentials**: fallback defaults (admin/admin) in docker-compose
+- **Prometheus access**: `unrestricted` on all services — network-isolated via Docker internal network
+- **Network-level isolation**: observability ports bound to 127.0.0.1 (localhost only)
+- **Admin credentials**: require explicit env vars (`ADMIN_USERNAME`, `SESSION_SECRET`) — no defaults
 - **Secrets**: SESSION_SECRET, DB_PASSWORD, WHATSAPP_ACCESS_TOKEN via env vars (not hardcoded)
-- **No Dependabot/Renovate** configured
-- **No OWASP/Gitleaks/Trivy** in pipeline
-- **No CI/CD pipeline** exists
+- **Docker images**: non-root user (`appuser`) in all runtime stages
+- **Security scans**: Gitleaks (secret detection), OWASP Dependency-Check (CVSS ≥ 7 fails), Trivy (CRITICAL/HIGH fails)
+- **CI/CD**: GitHub Actions workflows for frontend, backend, security scans, Docker build
 
 ### RUM Endpoint
 - POST /api/v1/rum accepts LCP, INP, CLS, FCP, TTFB
@@ -163,11 +163,11 @@ src/app/
 3. **H2 in tests** — not testing against real PostgreSQL/PostGIS
 4. **No Testcontainers** — integration tests don't use real databases
 5. **No E2E tests** — no Playwright or Cypress
-6. **No CI/CD** — no GitHub Actions workflows
-7. **Virtual threads enabled unconditionally** — should verify benefit under load
-8. **No ProblemDetail** — error responses may expose internal details
-9. **No idempotency key** for WhatsApp sends
-10. **No Flyway baseline SQL** — schema managed by Hibernate
+6. **Virtual threads enabled unconditionally** — should verify benefit under load
+7. **No ProblemDetail** — error responses may expose internal details
+8. **No idempotency key** for WhatsApp sends
+9. **No Flyway baseline SQL** — schema managed by Hibernate
+10. **Frontend coverage** — below 80% threshold (22.78% statements)
 
 ## Compatibility Notes
 

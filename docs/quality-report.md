@@ -1,6 +1,6 @@
 # Quality Report — Production Quality Hardening
 
-**Date:** 2026-07-29
+**Date:** 2026-08-01
 **Branch:** `chore/production-quality-hardening`
 
 ## Changes Applied
@@ -51,7 +51,7 @@ Duration    1.66s
 
 ### Backend (Maven)
 ```
-Tests run: 91, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 113, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -68,21 +68,28 @@ Backend: BUILD SUCCESS
 - `/actuator/env`, `/actuator/heapdump`, etc. blocked
 - RUM endpoint hardened against cardinality explosion
 - RUM rate limiting prevents abuse
+- Docker images run as non-root user (`appuser`)
+- Observability ports bound to localhost only
+- Prometheus lifecycle endpoint disabled
+- OTel debug exporter removed from production pipeline
+
+### Security Scans (CI)
+- Gitleaks: secret detection on push/PR
+- OWASP Dependency-Check: fails on CVSS ≥ 7
+- Trivy: fails on CRITICAL/HIGH vulnerabilities (unfixed only)
 
 ### Remaining Risks
-- No OWASP Dependency-Check in CI yet
-- No Gitleaks secret scanning in CI yet
-- No Trivy Docker image scanning in CI yet
-- Admin credentials default to admin/admin in docker-compose
+- Admin credentials must be explicitly set (no defaults) — enforced via `:?` syntax
 
 ## Coverage
 
 ### Frontend
 - **Threshold**: 80% lines/statements/functions, 75% branches
-- **Current**: Coverage report generation configured, actual % TBD after full test run
+- **Current**: 22.78% statements, 12.51% branches (below threshold — tech debt)
 
 ### Backend
-- **No JaCoCo configured yet** — planned for Phase F
+- **JaCoCo**: configured via `coverage` profile (`mvn verify -Pcoverage`)
+- **All 113 tests pass**
 
 ## Compatibility
 
@@ -102,20 +109,23 @@ Backend: BUILD SUCCESS
 - MapRenderingService monolith → split into 7 focused services
 - RUM endpoint exposed to cardinality attacks → allowlisted and rate-limited
 - Actuator endpoints publicly accessible → gateway-level blocking
+- No CI/CD pipeline → GitHub Actions workflows added
+- No Dependabot → configured for npm, Maven, GitHub Actions
+- Docker images running as root → non-root `appuser` in all services
+- Observability ports exposed to all interfaces → localhost-only binding
+- Prometheus lifecycle endpoint unauthenticated → disabled
 
-### Pending
-| Risk | Severity | Phase |
-|---|---|---|
-| No CI/CD pipeline | High | F |
-| No E2E tests | High | F |
-| ddl-auto: update in production | Medium | D |
-| H2 in tests (not PostGIS) | Medium | D |
-| No idempotency key for WhatsApp | Medium | D |
-| No business metrics (Micrometer) | Medium | D |
-| No Prometheus alert rules | Medium | E |
-| No Grafana dashboard updates | Medium | E |
-| No Dependabot/Renovate | Medium | F |
-| Virtual threads benefit unverified | Low | D |
+### Deferred (max 10)
+| # | Risk | Impact | Effort |
+|---:|---|---|---|
+| 1 | Frontend coverage below 80% threshold | High | M |
+| 2 | ddl-auto: update in production | High | S |
+| 3 | H2 in tests (not PostGIS) | Medium | M |
+| 4 | No E2E tests (Playwright) | High | L |
+| 5 | No idempotency key for WhatsApp | Medium | S |
+| 6 | Virtual threads benefit unverified | Low | M |
+| 7 | No Flyway baseline SQL | Medium | S |
+| 8 | MapRenderingService still 921 lines | Medium | L |
 
 ## Manual Deployment Steps
 

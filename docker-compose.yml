@@ -168,8 +168,8 @@ services:
     volumes:
       - ./observability/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC (opcional para clientes externos)
-      - "4318:4318"   # OTLP HTTP (usado por los servicios Spring Boot)
+      - "127.0.0.1:4317:4317"   # OTLP gRPC — localhost only
+      - "127.0.0.1:4318:4318"   # OTLP HTTP — localhost only
     depends_on:
       - jaeger
 
@@ -180,8 +180,8 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
-      - "16686:16686"  # UI
-      - "14268:14268"  # legacy thrift receiver (no lo usamos, sólo por compat)
+      - "127.0.0.1:16686:16686"  # UI — localhost only
+      - "127.0.0.1:14268:14268"  # legacy thrift receiver — localhost only
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -190,12 +190,11 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
-      - --web.enable-lifecycle
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
   grafana:
     image: grafana/grafana:11.3.0
@@ -211,7 +210,7 @@ services:
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - prometheus
 

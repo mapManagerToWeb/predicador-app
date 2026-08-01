@@ -2,7 +2,7 @@
 
 **Branch:** `chore/production-quality-hardening`
 **Base:** `hotfix/big-archives`
-**Date:** 2026-07-29
+**Date:** 2026-08-01
 
 ## Phase A — Audit & Baseline ✅
 
@@ -128,3 +128,18 @@ features/map/services/
 - [x] Dependabot configuration for npm, Maven, and GitHub Actions
 - [x] Lighthouse CI configuration at `predicador-frontend/lighthouserc.json`
 - [x] k6 load test script at `tests/load/api-gateway.js`
+
+## Phase G — Infrastructure Hardening ✅
+
+### Completed
+- [x] Non-root Docker user (`appuser`) in all 5 service Dockerfiles
+- [x] Observability ports bound to `127.0.0.1` (localhost only) in docker-compose.yml
+- [x] Prometheus `--web.enable-lifecycle` removed (no unauthenticated reload endpoint)
+- [x] OTel Collector debug exporter removed from production pipeline
+- [x] Grafana datasource provisioning cleaned (removed stale loki reference)
+- [x] Trivy scan step fixed to use correct multi-stage build context (`backend/` root)
+- [x] Docker Compose config validated (`docker compose config`)
+- [x] Docker image build verified (config-server: non-root user confirmed)
+- [x] Frontend verification: lint (0 errors), production build, tests (81 passing), npm build
+- [x] Backend verification: `mvn verify -B` — 113 tests, BUILD SUCCESS
+- [x] Quality documents reconciled (baseline, implementation plan, quality report, roadmap, ADRs)

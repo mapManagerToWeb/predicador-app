@@ -17,12 +17,3 @@ datasources:
     access: proxy
     url: http://jaeger:16686
     editable: true
-    jsonData:
-      # Link traces to logs by traceId. Requires a Loki datasource; safe to
-      # leave here even without Loki — the link just won't resolve.
-      tracesToLogs:
-        datasourceUid: loki
-        tags: ['service']
-        mappedTags:
-          - key: service.name
-            value: service
