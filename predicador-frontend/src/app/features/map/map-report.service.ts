@@ -113,9 +113,9 @@ export class MapReportService {
     prepararCaptura: () => Promise<void>,
     restaurarMapaPostCaptura: () => void
   ): Promise<string | null> {
-    await prepararCaptura();
     try {
-      const mapElement = document.getElementById('map');
+      await prepararCaptura();
+      const mapElement = typeof document === 'undefined' ? null : document.getElementById('map');
       if (!mapElement) return null;
 
       const html2canvas = (await import('html2canvas')).default;
@@ -128,7 +128,11 @@ export class MapReportService {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
       return dataUrl.split(',')[1];
     } finally {
-      restaurarMapaPostCaptura();
+      try {
+        restaurarMapaPostCaptura();
+      } catch {
+        // Cleanup must not replace the original capture or preparation error.
+      }
     }
   }
 

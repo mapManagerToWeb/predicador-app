@@ -31,4 +31,13 @@ describe('profileGuard', () => {
     expect(result).toBe(true);
     expect(router.navigate).not.toHaveBeenCalled();
   });
+
+  it('redirects when the persisted session token is empty', () => {
+    localStorage.setItem('predicador_session_token', '');
+
+    const result = TestBed.runInInjectionContext(() => profileGuard({} as never, {} as never));
+
+    expect(result).toBe(false);
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+  });
 });

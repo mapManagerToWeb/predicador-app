@@ -56,4 +56,12 @@ describe('AuthTokenService', () => {
     expect(svc.role()).toBe('admin');
     expect(svc.isAdmin()).toBe(true);
   });
+
+  it('does not consider an empty persisted token an active session', () => {
+    localStorage.setItem('predicador_session_token', '');
+
+    const svc = new AuthTokenService();
+
+    expect(svc.hasToken()).toBe(false);
+  });
 });

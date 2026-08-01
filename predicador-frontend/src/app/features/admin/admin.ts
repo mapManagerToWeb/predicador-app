@@ -43,10 +43,7 @@ export class AdminPage implements OnInit {
   guardando = signal(false);
 
   ngOnInit(): void {
-    // Prefer a real admin token when present; the legacy `isAdmin` flag remains
-    // as a fallback so users mid-rollout are not locked out until they refresh
-    // credentials. Both are cleared together on logout.
-    if (this.authToken.isAdmin() || localStorage.getItem('isAdmin') === 'true') {
+    if (this.authToken.isAdmin()) {
       this.isLoggedIn.set(true);
       void this.cargarDatos();
     }
@@ -71,7 +68,6 @@ export class AdminPage implements OnInit {
         })
       );
       if (response.success) {
-        localStorage.setItem('isAdmin', 'true');
         if (response.token) {
           this.authToken.set(response.token, 'admin');
         }

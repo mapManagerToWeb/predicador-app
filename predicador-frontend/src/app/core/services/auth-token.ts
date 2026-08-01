@@ -31,7 +31,7 @@ export class AuthTokenService {
 
   readonly token = this.tokenSignal.asReadonly();
   readonly role = this.roleSignal.asReadonly();
-  readonly hasToken = computed(() => this.tokenSignal() !== null);
+  readonly hasToken = computed(() => Boolean(this.tokenSignal()?.trim()));
   readonly isAdmin = computed(() => this.roleSignal() === 'admin');
 
   set(token: string, role: SessionRole): void {
