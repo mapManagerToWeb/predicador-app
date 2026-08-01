@@ -114,19 +114,22 @@ export class MapReportService {
     restaurarMapaPostCaptura: () => void
   ): Promise<string | null> {
     await prepararCaptura();
-    const mapElement = document.getElementById('map');
-    if (!mapElement) return null;
+    try {
+      const mapElement = document.getElementById('map');
+      if (!mapElement) return null;
 
-    const html2canvas = (await import('html2canvas')).default;
-    const canvas = await html2canvas(mapElement, {
-      useCORS: true,
-      scale: 1,
-      backgroundColor: null,
-      logging: false
-    });
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-    restaurarMapaPostCaptura();
-    return dataUrl.split(',')[1];
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(mapElement, {
+        useCORS: true,
+        scale: 1,
+        backgroundColor: null,
+        logging: false
+      });
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      return dataUrl.split(',')[1];
+    } finally {
+      restaurarMapaPostCaptura();
+    }
   }
 
   buildWhatsAppRequest(

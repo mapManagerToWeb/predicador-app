@@ -9,12 +9,12 @@ import { TOAST_MESSAGES } from '../utils/map-constants';
 
 @Injectable({ providedIn: 'root' })
 export class MapDataPersistenceService {
-  private state = inject(MapStateService);
-  private rendering = inject(MapRenderingFacade);
-  private selection = inject(MapSelectionService);
-  private territorioService = inject(TerritorioService);
-  private toastService = inject(Toast);
-  private reportService = inject(MapReportService);
+  private readonly state = inject(MapStateService);
+  private readonly rendering = inject(MapRenderingFacade);
+  private readonly selection = inject(MapSelectionService);
+  private readonly territorioService = inject(TerritorioService);
+  private readonly toastService = inject(Toast);
+  private readonly reportService = inject(MapReportService);
 
   async guardarEnBaseDeDatos(): Promise<void> {
     const perfil = this.reportService.getProfile();
@@ -89,22 +89,23 @@ export class MapDataPersistenceService {
     const territorios = this.reportService.buildTerritoriosEnvio(marcadas, this.rendering.getAllTerritoriesLayer());
     const requiereScreenshot = territorios.some(t => !t.finalizado);
 
-    let screenshotBase64: string | null = null;
-    if (requiereScreenshot) {
-      screenshotBase64 = await this.reportService.captureScreenshot(
-        () => this.prepararCaptura(),
-        () => this.restaurarMapaPostCaptura()
-      );
-    }
-
-    const request = this.reportService.buildWhatsAppRequest(
-      perfil,
-      territorios,
-      screenshotBase64,
-      this.state.predicacion()
-    );
-
+    let whatsappSent = false;
     try {
+      let screenshotBase64: string | null = null;
+      if (requiereScreenshot) {
+        screenshotBase64 = await this.reportService.captureScreenshot(
+          () => this.prepararCaptura(),
+          () => this.restaurarMapaPostCaptura()
+        );
+      }
+
+      const request = this.reportService.buildWhatsAppRequest(
+        perfil,
+        territorios,
+        screenshotBase64,
+        this.state.predicacion()
+      );
+
       const registros = this.reportService.buildRegistros(
         this.state.manzanasMarcadas(),
         this.rendering.getAllTerritoriesLayer(),
@@ -121,6 +122,7 @@ export class MapDataPersistenceService {
       this.selection.reaplicarMarcasSeleccionadas();
 
       const success = await this.reportService.sendWhatsApp(request);
+      whatsappSent = success;
 
       if (success) {
         const mensajes = territorios.map(t => {
@@ -139,7 +141,16 @@ export class MapDataPersistenceService {
         this.toastService.show(TOAST_MESSAGES.sendError);
       }
     } catch {
-      this.toastService.show(TOAST_MESSAGES.processError);
+      if (!whatsappSent) {
+        this.toastService.show(TOAST_MESSAGES.processError);
+      } else {
+        this.toastService.show(TOAST_MESSAGES.saveSuccess);
+        this.state.clearDatosParciales();
+        this.state.territoriosSeleccionados.set([]);
+        this.state.territorioSeleccionado.set(null);
+        this.state.manzanasMarcadas.set([]);
+        this.state.totalManzanas.set(0);
+      }
     } finally {
       this.state.enviando.set(false);
       this.state.screenshotPreview.set(null);
