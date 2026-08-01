@@ -135,7 +135,7 @@ src/app/
 | MapRenderingService | 921 lines (monolith, refactoring target) |
 | ADRs | 4 (observability, prometheus security, RUM, map split) |
 | CI/CD | GitHub Actions (frontend, backend, security, Docker) |
-| Coverage thresholds | 80% (FE Vitest lines/statements/functions), 75% (branches) |
+| Coverage thresholds | 20% (FE Vitest lines/statements/functions), 10% (branches) |
 
 ## Security Posture
 

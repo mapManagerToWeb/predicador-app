@@ -116,11 +116,10 @@ class GatewayFilterIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody().returnResult();
 
-        String setCookie = result.getResponseHeaders().getFirst("Set-Cookie");
-        assertThat(setCookie).isNotNull();
-        assertThat(setCookie).contains("predicador_session=");
-        assertThat(setCookie).contains("HttpOnly");
-        assertThat(setCookie).contains("SameSite=Lax");
+        java.util.List<String> cookies = result.getResponseHeaders().get("Set-Cookie");
+        assertThat(cookies).isNotNull();
+        assertThat(cookies).hasSize(2);
+        assertThat(cookies).anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("SameSite=Lax"));
     }
 
     @Test

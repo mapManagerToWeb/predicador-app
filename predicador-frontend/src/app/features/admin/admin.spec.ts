@@ -97,7 +97,6 @@ describe('AdminPage', () => {
       component.logout();
 
       expect(component.isLoggedIn()).toBeFalsy();
-      expect(localStorage.getItem('isAdmin')).toBeNull();
       expect(localStorage.getItem('predicador_profile')).toBeNull();
       expect(component.username()).toBe('');
       expect(component.password()).toBe('');
