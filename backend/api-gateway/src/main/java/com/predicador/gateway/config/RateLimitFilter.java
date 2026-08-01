@@ -143,7 +143,7 @@ public class RateLimitFilter implements WebFilter, Ordered {
         if (socketIp != null && isTrustedProxy(socketIp)) {
             List<String> forwarded = exchange.getRequest().getHeaders().get("X-Forwarded-For");
             if (forwarded != null && !forwarded.isEmpty()) {
-                String first = forwarded.get(0);
+                String first = forwarded.getFirst();
                 int comma = first.indexOf(',');
                 String ip = (comma > 0 ? first.substring(0, comma) : first).trim();
                 if (!ip.isEmpty()) {

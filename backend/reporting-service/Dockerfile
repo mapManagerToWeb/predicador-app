@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /workspace
 COPY pom.xml ./
 COPY shared/pom.xml shared/
@@ -11,7 +11,7 @@ RUN mvn dependency:go-offline -pl reporting-service -am -B
 COPY . .
 RUN mvn clean package -pl reporting-service -am -DskipTests -B
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=build /workspace/reporting-service/target/*.jar app.jar
