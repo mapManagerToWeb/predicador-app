@@ -28,3 +28,30 @@
 
 - Existing map specs still emit six `no-explicit-any` warnings; they do not fail lint.
 - The capture regression test covers restoration when the map element is absent; the same `finally` also covers dynamic screenshot failures at runtime.
+
+## Review Fixes
+
+- `MapReportService.captureScreenshot()` now includes preparation in the cleanup scope, restores safely after preparation or rendering failure, and guards `document` for SSR.
+- `MapDataPersistenceService` now performs report construction inside the loading cleanup scope for both save paths.
+- Legacy `isAdmin` storage is no longer used to restore admin UI state and is cleared on logout or unauthorized responses.
+- `AuthTokenService.hasToken()` rejects empty or whitespace-only tokens.
+- `MapCaptureService` falls back to a timeout when `requestAnimationFrame` is unavailable.
+- Added regressions for preparation failure, screenshot failure, both persistence construction failures, legacy admin state, empty tokens, and SSR document access behavior.
+
+## Review Fix Verification
+
+Command: `npm test -- --run src/app/core/services/profile.spec.ts src/app/core/guards/profile.guard.spec.ts src/app/core/services/auth-token.spec.ts src/app/core/interceptors/error.interceptor.spec.ts src/app/features/admin/admin.spec.ts src/app/features/map/map-report.service.spec.ts src/app/features/map/services/map-data-persistence.service.spec.ts`
+
+Output: `Test Files 7 passed (7)`; `Tests 44 passed (44)`; exit code `0`.
+
+Command: `npm run lint`
+
+Output: exit code `0`; `0 errors, 6 warnings` from existing `no-explicit-any` usages in map specs.
+
+Command: `npx tsc -p tsconfig.app.json --noEmit`
+
+Output: no output; exit code `0`.
+
+Command: `npm run build`
+
+Output: `Application bundle generation complete`; `Prerendered 1 static route`; exit code `0`.

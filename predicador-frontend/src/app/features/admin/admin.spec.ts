@@ -5,6 +5,7 @@ import { AdminPage } from './admin';
 import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
+import { AuthTokenService } from '../../core/services/auth-token';
 import { environment } from '../../../environments/environment';
 
 describe('AdminPage', () => {
@@ -53,7 +54,7 @@ describe('AdminPage', () => {
       await loginPromise;
 
       expect(component.isLoggedIn()).toBeTruthy();
-      expect(localStorage.getItem('isAdmin')).toBe('true');
+       expect(localStorage.getItem('isAdmin')).toBeNull();
     });
 
     it('should show error with wrong credentials', async () => {
@@ -104,17 +105,18 @@ describe('AdminPage', () => {
   });
 
   describe('ngOnInit', () => {
-    it('should auto-login if isAdmin is stored', () => {
+    it('should not auto-login if only the legacy isAdmin flag is stored', () => {
       localStorage.setItem('isAdmin', 'true');
       component.ngOnInit();
 
-      expect(component.isLoggedIn()).toBeTruthy();
+      expect(component.isLoggedIn()).toBeFalsy();
     });
 
-    it('should not auto-login if isAdmin is not stored', () => {
+    it('should auto-login with an admin session role', () => {
+      TestBed.inject(AuthTokenService).set('admin-token', 'admin');
       component.ngOnInit();
 
-      expect(component.isLoggedIn()).toBeFalsy();
+      expect(component.isLoggedIn()).toBeTruthy();
     });
   });
 

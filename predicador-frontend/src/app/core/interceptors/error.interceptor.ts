@@ -29,6 +29,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       if (error.status === 401 && !isAuthRequest) {
         authToken.clear();
         profile.clear();
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('isAdmin');
+        }
         toastService.show('Sesión expirada. Iniciá sesión nuevamente.', 4000, 'warning');
         void router.navigate(['/login']);
         return throwError(() => error);

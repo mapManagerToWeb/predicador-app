@@ -40,6 +40,7 @@ describe('errorInterceptor', () => {
   it('en 401 fuera de rutas de auth: limpia token/profile y navega a /login', () => {
     authToken.set('abc.def', 'encargado');
     profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
+    localStorage.setItem('isAdmin', 'true');
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     http.get('/api/v1/reports').subscribe({ error: () => void 0 });
@@ -48,6 +49,7 @@ describe('errorInterceptor', () => {
 
     expect(authToken.token()).toBeNull();
     expect(profile.currentUser()).toBeNull();
+    expect(localStorage.getItem('isAdmin')).toBeNull();
     expect(navSpy).toHaveBeenCalledWith(['/login']);
   });
 
