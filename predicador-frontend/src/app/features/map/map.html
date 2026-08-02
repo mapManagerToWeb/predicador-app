@@ -74,7 +74,7 @@
             id="predicacion-select"
             class="predicacion-select"
             [value]="predicacion()"
-            (change)="predicacion.set($any($event.target).value)"
+            (change)="onPredicacionChange($event)"
           >
             <option value="tarde">Tarde</option>
             <option value="mañana">Mañana</option>

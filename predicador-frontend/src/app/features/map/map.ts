@@ -144,6 +144,10 @@ export class MapPage implements OnDestroy {
     this.state.isSatellite.set(this.rendering.isSatellite());
   }
 
+  onPredicacionChange(event: Event): void {
+    this.state.predicacion.set((event.target as HTMLSelectElement).value);
+  }
+
   setModoMarcado(modo: ModoMarcado): void {
     this.selection.setModoMarcado(modo);
   }
