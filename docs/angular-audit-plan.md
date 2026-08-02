@@ -130,4 +130,6 @@ zoneless — ya aplicado —, cambio de builder): el proyecto no los justifica h
 
 **Resueltos en esta pasada:** C1 (red de seguridad del marcado), C2 (leaflet local/offline), A1, A3, A2, M7, L7 + 8 specs nuevos, `try/catch` en storage, y **bug real** corregido en `map-partial-mark.eliminarParcial` (leía `current[idx]` tras `splice`, limpiando los datos parciales del territorio equivocado).
 
-**Pendientes que requieren decisión tuya o deploy:** M1, M3, M4, M6, M8 (recomendaciones en las `references/` de la skill `best-practices`).
+**Resueltos en la segunda pasada:** cobertura de `map-selection.service` (~15% → ~60%) y `map-tile-layer` (~21% → ~70%); M8 (template `@let` en admin, elimina ~30 llamadas `getColor` por tarjeta y ciclo de detección); L9 (handler tipado en vez de `$any` en `map.html`); L1 (helpers `groupByTerritorio`/`countTotalManzanas` en `map-report.service`); M1 (`user-scalable=no` eliminado → habilita zoom de accesibilidad, WCAG 1.4.4/2.5.5); M6 (`skipTests: false` en schematics + nota actualizada en el AGENTS.md del frontend); M4 (cabeceras `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` en `server.ts`).
+
+**Pendientes que requieren decisión tuya o deploy:** M3 (endurecer `admin.guard` — decisión documentada actual: el form de admin vive en la ruta), CSP completo y `allowedHosts`/`trustProxyHeaders` explícitos en `server.ts`/deploy (dependen de la topología de despliegue).
