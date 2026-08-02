@@ -190,8 +190,8 @@ describe('MapInteractionService', () => {
     it('adds a snapped point on the edge of the selected manzana', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      state.manzanaSeleccionadaTerritorio = 5;
-      state.manzanaEdges = [{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }];
+      state.manzanaSeleccionadaTerritorio.set(5);
+      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0));
@@ -203,8 +203,8 @@ describe('MapInteractionService', () => {
     it('ignores a click that does not snap onto the manzana edges', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      state.manzanaSeleccionadaTerritorio = 5;
-      state.manzanaEdges = [{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }];
+      state.manzanaSeleccionadaTerritorio.set(5);
+      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
@@ -215,8 +215,8 @@ describe('MapInteractionService', () => {
     it('does not add points beyond the max partial points', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      state.manzanaSeleccionadaTerritorio = 5;
-      state.manzanaEdges = [{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }];
+      state.manzanaSeleccionadaTerritorio.set(5);
+      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
       state.puntosParciales.set([
         { latlng: { lat: 0, lng: 0 }, edgeIdx: 0, t: 0 },
         { latlng: { lat: 0.2, lng: 0 }, edgeIdx: 0, t: 0.2 },

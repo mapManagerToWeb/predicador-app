@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
+import { MapLayerRegistry } from './map-layer-registry.service';
 import { MAX_PUNTOS_PARCIAL } from '../utils/map-constants';
 import type { SnappedPoint, ManzanaIndex } from '../types/map.types';
 import { snapToContour, pointInPolygon, projectOnSegment } from '../map-geometry';
@@ -17,6 +18,7 @@ export interface MapClickResult {
 export class MapInteractionService {
   private readonly state = inject(MapStateService);
   private readonly rendering = inject(MapRenderingFacade);
+  private readonly registry = inject(MapLayerRegistry);
 
   handleMapClick(e: L.LeafletMouseEvent): MapClickResult {
     const modo = this.state.modoMarcado();
@@ -64,7 +66,7 @@ export class MapInteractionService {
         }
       }
 
-      if (!this.state.manzanaSeleccionada) {
+      if (!this.state.manzanaSeleccionadaTerritorio()) {
         const nearest = hit ?? this.findNearestManzana(e.latlng);
         if (nearest) {
           return { action: 'select_manzana', manzana: nearest };
@@ -76,7 +78,7 @@ export class MapInteractionService {
       const map = this.rendering.getMap();
       if (!map) return { action: 'none' };
 
-      const snapped = snapToContour(e.latlng, this.state.manzanaEdges, map);
+      const snapped = snapToContour(e.latlng, this.state.manzanaEdges(), map);
       
       // Si el punto no está en los bordes de la manzana seleccionada y tampoco está dentro, ignorar
       if (snapped.edgeIdx === -1) {
@@ -98,7 +100,7 @@ export class MapInteractionService {
     if (!map) return this.state.puntosParciales();
 
     const actualizados = [...this.state.puntosParciales()];
-    const snapped = snapToContour(marker.getLatLng(), this.state.manzanaEdges, map);
+    const snapped = snapToContour(marker.getLatLng(), this.state.manzanaEdges(), map);
     actualizados[index] = snapped;
     return actualizados;
   }
@@ -107,8 +109,9 @@ export class MapInteractionService {
     const marcadas = this.state.manzanasMarcadas();
     for (const m of marcadas) {
       if (!m.id.startsWith('parcial-')) continue;
-      if (m.layer instanceof L.Polygon) {
-        const rings = m.layer.getLatLngs();
+      const layer = this.registry.get(m.id);
+      if (layer instanceof L.Polygon) {
+        const rings = layer.getLatLngs();
         const outer = rings[0] as L.LatLng[];
         if (outer && pointInPolygon(latlng, outer)) {
           return { id: m.id };
