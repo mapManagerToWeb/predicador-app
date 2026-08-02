@@ -12,12 +12,13 @@ Verificar contra la doc oficial vigente: https://angular.dev/best-practices/perf
 - **`NgOptimizedImage`** para imágenes estáticas (aquí los avatares son emoji,
   no aplica; si llegan imágenes reales, usar el directive con `priority` en LCP).
 
-## Gotcha PWA: Leaflet CSS desde CDN
-- `index.html` carga `leaflet.css` desde `unpkg.com` (con `integrity`). Es
-  render-blocking y **no entra en el cache del service worker** (ngsw solo
-  cachea `/*.css` de origen). Consecuencia: en modo offline o si unpkg falla,
-  el mapa pierde estilos. Fix recomendado: bundlear el CSS localmente
-  (`src/leaflet.css`) y añadirlo al asset group `app` del `ngsw-config.json`.
+## Gotcha PWA: Leaflet CSS (resuelto 2026-08)
+- `leaflet.css` se bundlea localmente vía `angular.json` → `styles`
+  (`node_modules/leaflet/dist/leaflet.css`); sus imágenes se copian a `media/`
+  con hash y las URLs se reescriben. Ambos entran en ngsw (grupos `app`
+  `/*.css` y `assets` `/**/*.png`) → el mapa funciona offline. Ya **no** hay
+  dependencia de `unpkg.com` en `index.html`. Si se reintroduce una lib CSS de
+  CDN, aplicar el mismo criterio: mismo origen + caché ngsw.
 
 ## SSR / SEO (requisito del proyecto)
 - SSR + `provideClientHydration()` activos. Considerar hydration incremental

@@ -43,8 +43,8 @@ zoneless — ya aplicado —, cambio de builder): el proyecto no los justifica h
 
 | # | Área | Hallazgo | Ubicación |
 |---|---|---|---|
-| C1 | Testing | Flujo crítico #2 (marcado) sin red de seguridad: `map.ts` (componente) 0%, `map-interaction.service.ts` 0%, `map-partial-mark.service.ts` 0%, `map-initialization.service.ts` 0%, `map-capture.service.ts` 4.2%, `map-partial-draw.service.ts` 4.76%. | `features/map/` (reporte de cobertura) |
-| C2 | Rendimiento/PWA | Leaflet CSS cargado desde CDN (`unpkg.com`) con `integrity`; es render-blocking y **no entra en el cache del service worker**, que solo cachea `/*.css` de origen. En modo offline (propósito PWA) o si unpkg falla, el mapa pierde estilos. | `src/index.html:29-31`, `ngsw-config.json` |
+| C1 | Testing | ~~Flujo crítico #2 (marcado) sin red de seguridad: `map.ts` (componente) 0%, `map-interaction.service.ts` 0%, `map-partial-mark.service.ts` 0%, `map-initialization.service.ts` 0%, `map-capture.service.ts` 4.2%, `map-partial-draw.service.ts` 4.76%.~~ **RESUELTO (2026-08):** specs añadidos; `map.ts` 64%, `map-interaction` 94%, `map-partial-mark` 93%, `map-initialization` 88%, `map-capture` 79%, `map-partial-draw` 63%, `map-engine` 100% (líneas). | `features/map/` (reporte de cobertura) |
+| C2 | Rendimiento/PWA | ~~Leaflet CSS cargado desde CDN (`unpkg.com`) con `integrity`; es render-blocking y **no entra en el cache del service worker**, que solo cachea `/*.css` de origen. En modo offline (propósito PWA) o si unpkg falla, el mapa pierde estilos.~~ **RESUELTO (2026-08):** `leaflet.css` se bundlea localmente (`angular.json` styles) con sus imágenes en `media/`; ambos entran en ngsw (grupos `app`/`assets`) y ya no depende de unpkg. | `src/index.html:29-31`, `ngsw-config.json` |
 
 ### Alto
 
@@ -125,3 +125,9 @@ zoneless — ya aplicado —, cambio de builder): el proyecto no los justifica h
 - Mitigación: branch dedicado; tras cada cambio `npm run lint` + `npx ng build --configuration=production` + `npm test -- --run --coverage` en verde; commits atómicos por hallazgo.
 - Los umbrales de cobertura **no se suben** en esta pasada (decisión Fase 0: mantener CI); se documenta A4 como recomendación para una pasada futura.
 - Cualquier cambio con impacto visible para el usuario (p. ej. M1) se señalará explícitamente antes de aplicarse, nunca en silencio.
+
+## 6. Estado de ejecución (actualización 2026-08)
+
+**Resueltos en esta pasada:** C1 (red de seguridad del marcado), C2 (leaflet local/offline), A1, A3, A2, M7, L7 + 8 specs nuevos, `try/catch` en storage, y **bug real** corregido en `map-partial-mark.eliminarParcial` (leía `current[idx]` tras `splice`, limpiando los datos parciales del territorio equivocado).
+
+**Pendientes que requieren decisión tuya o deploy:** M1, M3, M4, M6, M8 (recomendaciones en las `references/` de la skill `best-practices`).
