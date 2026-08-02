@@ -27,11 +27,6 @@ export const STYLE_DEFAULTS = {
     opacity: 1,
     fillOpacity: 0.95,
   },
-  completePolygon: {
-    weight: 4,
-    opacity: 1,
-    fillOpacity: 0.85,
-  },
   partialPolygon: {
     weight: 4,
     fillOpacity: 0.75,
@@ -52,11 +47,6 @@ export const STYLE_DEFAULTS = {
     fillOpacity: 0,
     stroke: false,
     weight: 0,
-  },
-  captureUnmarked: {
-    opacity: 0.3,
-    fillOpacity: 0.02,
-    weight: 1,
   },
   label: {
     className: 'territory-label',
@@ -102,3 +92,13 @@ export const TOAST_MESSAGES = {
   partialMode: 'Tocá en cualquier parte del mapa',
   completeMode: 'Tocá una manzana para marcarla',
 } as const;
+
+let parcialSeq = 0;
+
+/**
+ * Genera un id único y monotónico para una zona parcial. Evita colisiones de
+ * `Date.now()` cuando dos parciales se crean en el mismo milisegundo.
+ */
+export function nextParcialId(): string {
+  return `parcial-${Date.now()}-${parcialSeq++}`;
+}

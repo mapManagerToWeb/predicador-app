@@ -8,7 +8,7 @@ import { MapStateService } from './map-state.service';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { latLngDist } from '../map-geometry';
 import type { SnappedPoint } from '../map-geometry';
-import { DEDUP_THRESHOLD_PX, TOAST_MESSAGES } from '../utils/map-constants';
+import { DEDUP_THRESHOLD_PX, TOAST_MESSAGES, nextParcialId } from '../utils/map-constants';
 import { getPartialPolygonCompleteStyle } from './map-style.service';
 
 @Injectable({ providedIn: 'root' })
@@ -50,7 +50,7 @@ export class MapPartialMarkService {
    *   3. Signal global (fallback).
    */
   private colorTerritorioActivo(): string {
-    const territorioManzana = this.state.manzanaSeleccionadaTerritorio;
+    const territorioManzana = this.state.manzanaSeleccionadaTerritorio();
     const seleccionados = this.state.territoriosSeleccionados();
     const territorio = territorioManzana ?? seleccionados[seleccionados.length - 1];
     if (territorio !== undefined && territorio !== null) {
@@ -61,7 +61,7 @@ export class MapPartialMarkService {
   }
 
   private territorioActivo(): number | null {
-    const territorioManzana = this.state.manzanaSeleccionadaTerritorio;
+    const territorioManzana = this.state.manzanaSeleccionadaTerritorio();
     if (territorioManzana !== null) return territorioManzana;
     const seleccionados = this.state.territoriosSeleccionados();
     return seleccionados.length > 0 ? seleccionados[seleccionados.length - 1] : null;
@@ -71,7 +71,7 @@ export class MapPartialMarkService {
     this.rendering.redibujarParcial(
       this.state.puntosParciales(),
       this.colorTerritorioActivo(),
-      this.state.manzanaEdges,
+      this.state.manzanaEdges(),
       (index, marker) => {
         const actualizados = this.interaction.handleMarkerDrag(marker, index);
         this.state.puntosParciales.set(actualizados);
@@ -92,9 +92,9 @@ export class MapPartialMarkService {
       return;
     }
 
-    const id = `parcial-${Date.now()}`;
-    const nombreBloque = this.state.manzanaSeleccionadaNombre
-      ? `Parcial: ${this.state.manzanaSeleccionadaNombre}`
+    const id = nextParcialId();
+    const nombreBloque = this.state.manzanaSeleccionadaNombre()
+      ? `Parcial: ${this.state.manzanaSeleccionadaNombre()}`
       : 'Zona parcial';
 
     const poligonoParcial = this.rendering.getPoligonoParcial();

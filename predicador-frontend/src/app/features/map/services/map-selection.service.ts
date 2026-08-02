@@ -1,12 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
+import * as GeoJSON from 'geojson';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
+import { MapLayerRegistry } from './map-layer-registry.service';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
-import { getTerritoryFillOpacity } from '../utils/territory-colors';
-import { TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
+import { TOAST_MESSAGES, nextParcialId } from '../utils/map-constants';
 import { elegirUltimoReporte } from '../utils/report-utils';
+import {
+  getBaseTerritoryStyle,
+  getMarkedManzanaStyle,
+  getPartialPolygonCompleteStyle,
+  getSelectedManzanaStyle,
+} from './map-style.service';
 import type { ModoMarcado } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 
@@ -14,16 +21,20 @@ import type { Reporte } from '../../../core/models/models';
 export class MapSelectionService {
   private readonly state = inject(MapStateService);
   private readonly rendering = inject(MapRenderingFacade);
+  private readonly registry = inject(MapLayerRegistry);
   private readonly territorioService = inject(TerritorioService);
   private readonly toastService = inject(Toast);
+
+  /** The currently selected manzana polygon (transient UI state, not in state). */
+  private selectedPolygon: L.Polygon | null = null;
 
   seleccionarManzana(polygon: L.Polygon, color: string, nombreBloque: string, territorioNumero: number): void {
     this.restaurarManzanaAnterior();
 
-    this.state.manzanaSeleccionada = polygon;
-    this.state.manzanaSeleccionadaColor = color;
-    this.state.manzanaSeleccionadaNombre = nombreBloque;
-    this.state.manzanaSeleccionadaTerritorio = territorioNumero;
+    this.selectedPolygon = polygon;
+    this.state.manzanaSeleccionadaColor.set(color);
+    this.state.manzanaSeleccionadaNombre.set(nombreBloque);
+    this.state.manzanaSeleccionadaTerritorio.set(territorioNumero);
 
     const rings = polygon.getLatLngs();
     const outer = rings[0] as L.LatLng[];
@@ -34,9 +45,9 @@ export class MapSelectionService {
       }
       edges.push({ from: outer[outer.length - 1], to: outer[0] });
     }
-    this.state.manzanaEdges = edges;
+    this.state.manzanaEdges.set(edges);
 
-    polygon.setStyle(STYLE_DEFAULTS.selectedManzana);
+    polygon.setStyle(getSelectedManzanaStyle());
 
     if (!this.state.territoriosSeleccionados().includes(territorioNumero)) {
       this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
@@ -49,9 +60,8 @@ export class MapSelectionService {
         const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
         const marcadas = this.state.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).length;
         const isComplete = total > 0 && marcadas >= total;
-        const baseOpacity = getTerritoryFillOpacity(isComplete);
 
-        this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
+        this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
       }
 
       this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
@@ -65,27 +75,23 @@ export class MapSelectionService {
   }
 
   restaurarManzanaAnterior(): void {
-    if (!this.state.manzanaSeleccionada) return;
+    if (!this.selectedPolygon) return;
 
     const territorios = this.state.territoriosSeleccionados();
     if (territorios.length > 0) {
       const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorios[0]).length;
       const marcadas = this.state.manzanasMarcadas().filter(m => m.territorioNumero === territorios[0]).length;
       const isComplete = total > 0 && marcadas >= total;
-      const baseOpacity = getTerritoryFillOpacity(isComplete);
 
-      this.state.manzanaSeleccionada.setStyle({
-        color: this.state.manzanaSeleccionadaColor,
-        fillColor: this.state.manzanaSeleccionadaColor,
-        fillOpacity: baseOpacity,
-        weight: STYLE_DEFAULTS.polygon.weight,
-      });
+      this.selectedPolygon.setStyle(
+        getBaseTerritoryStyle(this.state.manzanaSeleccionadaColor(), isComplete)
+      );
     }
 
-    this.state.manzanaSeleccionada = null;
-    this.state.manzanaSeleccionadaNombre = '';
-    this.state.manzanaSeleccionadaTerritorio = null;
-    this.state.manzanaEdges = [];
+    this.selectedPolygon = null;
+    this.state.manzanaSeleccionadaNombre.set('');
+    this.state.manzanaSeleccionadaTerritorio.set(null);
+    this.state.manzanaEdges.set([]);
   }
 
   toggleManzana(id: string, nombreBloque: string, layer: L.Path, color: string, territorioNumero: number): void {
@@ -107,24 +113,25 @@ export class MapSelectionService {
   private calcularCompletitudTerritorio(
     territorioNumero: number,
     marcadasList: { territorioNumero: number }[]
-  ): { total: number; marcadas: number; isComplete: boolean; baseOpacity: number } {
+  ): { total: number; marcadas: number; isComplete: boolean } {
     const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
     const marcadas = marcadasList.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;
-    const baseOpacity = getTerritoryFillOpacity(isComplete);
-    return { total, marcadas, isComplete, baseOpacity };
+    return { total, marcadas, isComplete };
   }
 
   private desmarcarManzana(
-    current: { id: string; nombreBloque: string; layer: L.Path; territorioNumero: number }[],
+    current: { id: string; nombreBloque: string; color: string; territorioNumero: number }[],
     idx: number,
     territorioNumero: number,
     color: string,
     layer: L.Path
   ): void {
+    const removed = current[idx];
     current.splice(idx, 1);
-    const { baseOpacity, marcadas } = this.calcularCompletitudTerritorio(territorioNumero, current);
-    layer.setStyle({ fillColor: color, fillOpacity: baseOpacity, color, weight: STYLE_DEFAULTS.polygon.weight });
+    const { marcadas, isComplete } = this.calcularCompletitudTerritorio(territorioNumero, current);
+    layer.setStyle(getBaseTerritoryStyle(color, isComplete));
+    if (removed) this.registry.unregister(removed.id);
 
     if (marcadas === 0) {
       this.state.territoriosSeleccionados.update(nums => nums.filter(n => n !== territorioNumero));
@@ -135,20 +142,16 @@ export class MapSelectionService {
   }
 
   private marcarManzana(
-    current: { id: string; nombreBloque: string; layer: L.Path; territorioNumero: number }[],
+    current: { id: string; nombreBloque: string; color: string; territorioNumero: number }[],
     id: string,
     nombreBloque: string,
     layer: L.Path,
     color: string,
     territorioNumero: number
   ): void {
-    current.push({ id, nombreBloque, layer, territorioNumero });
-    layer.setStyle({
-      fillColor: color,
-      fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
-      color,
-      weight: STYLE_DEFAULTS.polygon.weight,
-    });
+    current.push({ id, nombreBloque, color, territorioNumero });
+    this.registry.register(id, layer);
+    layer.setStyle(getMarkedManzanaStyle(color));
 
     if (this.state.territoriosSeleccionados().includes(territorioNumero)) return;
 
@@ -158,8 +161,8 @@ export class MapSelectionService {
 
     const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero);
     if (featureLayer) {
-      const { baseOpacity } = this.calcularCompletitudTerritorio(territorioNumero, current);
-      this.rendering.applyStyleToFeatureLayer(featureLayer, { opacity: 1, fillOpacity: baseOpacity, color: featureLayer.color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
+      const { isComplete } = this.calcularCompletitudTerritorio(territorioNumero, current);
+      this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
     }
 
     this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
@@ -276,7 +279,9 @@ export class MapSelectionService {
         const previosParciales = this.state.manzanasMarcadas()
           .filter(m => m.territorioNumero === territorioNumero && m.id.startsWith('parcial-'));
         for (const p of previosParciales) {
-          this.rendering.removeExtraLayer(p.layer);
+          const layer = this.registry.get(p.id);
+          if (layer) this.rendering.removeExtraLayer(layer);
+          this.registry.unregister(p.id);
         }
         if (previosParciales.length > 0) {
           this.state.manzanasMarcadas.update(current =>
@@ -304,16 +309,12 @@ export class MapSelectionService {
         if (mc.territorioNumero !== territorioNumero) continue;
         const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
         if (isMarked) {
-          mc.polygon.setStyle({
-            fillColor: color,
-            fillOpacity: 0.7,
-            color,
-            weight: STYLE_DEFAULTS.polygon.weight,
-          });
+          mc.polygon.setStyle(getMarkedManzanaStyle(color));
           if (actualizarEstadoMarcado && !existingIds.has(mc.id)) {
+            this.registry.register(mc.id, mc.polygon);
             this.state.manzanasMarcadas.update(current => [
               ...current,
-              { id: mc.id, nombreBloque: mc.nombreBloque, layer: mc.polygon as unknown as L.Path, territorioNumero },
+              { id: mc.id, nombreBloque: mc.nombreBloque, color, territorioNumero },
             ]);
           }
         }
@@ -348,20 +349,16 @@ export class MapSelectionService {
 
       if (latlngs.length === 0) return;
 
-      const parcialId = `parcial-${Date.now()}`;
-      const polygon = L.polygon(latlngs, {
-        fillColor: color,
-        fillOpacity: STYLE_DEFAULTS.partialPolygonComplete.fillOpacity,
-        color,
-        weight: STYLE_DEFAULTS.partialPolygonComplete.weight,
-      }).addTo(map);
+      const parcialId = nextParcialId();
+      const polygon = L.polygon(latlngs, getPartialPolygonCompleteStyle(color)).addTo(map);
 
       this.rendering.addExtraLayer(polygon);
 
       if (actualizarEstadoMarcado) {
+        this.registry.register(parcialId, polygon);
         this.state.manzanasMarcadas.update(current => [
           ...current,
-          { id: parcialId, nombreBloque: 'Zona parcial', layer: polygon as unknown as L.Path, territorioNumero },
+          { id: parcialId, nombreBloque: 'Zona parcial', color, territorioNumero },
         ]);
       }
     } catch {
@@ -385,6 +382,7 @@ export class MapSelectionService {
   }
 
   limpiarMarcas(): void {
+    this.registry.clear();
     this.state.manzanasMarcadas.set([]);
     this.resetUIState();
     this.rendering.limpiarMarcasVisuales();

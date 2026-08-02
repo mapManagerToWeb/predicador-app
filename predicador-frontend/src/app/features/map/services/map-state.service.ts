@@ -1,5 +1,4 @@
 import { Injectable, signal, computed } from '@angular/core';
-import type * as L from 'leaflet';
 import type { SnappedPoint, Edge } from '../map-geometry';
 import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
 
@@ -24,12 +23,12 @@ export class MapStateService {
   screenshotPreview = signal<string | null>(null);
   currentTerritoryColor = signal('');
 
+  manzanaSeleccionadaColor = signal('');
+  manzanaSeleccionadaNombre = signal('');
+  manzanaSeleccionadaTerritorio = signal<number | null>(null);
+  manzanaEdges = signal<Edge[]>([]);
+
   private _datosParcialesGuardados: Map<number, { puntos: SnappedPoint[]; geometria: string }> = new Map();
-  private _manzanaSeleccionada: L.Polygon | null = null;
-  private _manzanaSeleccionadaColor = '';
-  private _manzanaSeleccionadaNombre = '';
-  private _manzanaSeleccionadaTerritorio: number | null = null;
-  private _manzanaEdges: Edge[] = [];
 
   get datosParcialesGuardados(): Map<number, { puntos: SnappedPoint[]; geometria: string }> { return this._datosParcialesGuardados; }
   set datosParcialesGuardados(val: Map<number, { puntos: SnappedPoint[]; geometria: string }>) { this._datosParcialesGuardados = val; }
@@ -48,21 +47,6 @@ export class MapStateService {
     }
   }
 
-  get manzanaSeleccionada(): L.Polygon | null { return this._manzanaSeleccionada; }
-  set manzanaSeleccionada(val: L.Polygon | null) { this._manzanaSeleccionada = val; }
-
-  get manzanaSeleccionadaColor(): string { return this._manzanaSeleccionadaColor; }
-  set manzanaSeleccionadaColor(val: string) { this._manzanaSeleccionadaColor = val; }
-
-  get manzanaSeleccionadaNombre(): string { return this._manzanaSeleccionadaNombre; }
-  set manzanaSeleccionadaNombre(val: string) { this._manzanaSeleccionadaNombre = val; }
-
-  get manzanaSeleccionadaTerritorio(): number | null { return this._manzanaSeleccionadaTerritorio; }
-  set manzanaSeleccionadaTerritorio(val: number | null) { this._manzanaSeleccionadaTerritorio = val; }
-
-  get manzanaEdges(): Edge[] { return this._manzanaEdges; }
-  set manzanaEdges(val: Edge[]) { this._manzanaEdges = val; }
-
   resetUIState(): void {
     this.manzanasMarcadas.set([]);
     this.totalManzanas.set(0);
@@ -76,10 +60,9 @@ export class MapStateService {
     this.screenshotPreview.set(null);
     this.currentTerritoryColor.set('');
     this._datosParcialesGuardados = new Map();
-    this._manzanaSeleccionada = null;
-    this._manzanaSeleccionadaColor = '';
-    this._manzanaSeleccionadaNombre = '';
-    this._manzanaSeleccionadaTerritorio = null;
-    this._manzanaEdges = [];
+    this.manzanaSeleccionadaColor.set('');
+    this.manzanaSeleccionadaNombre.set('');
+    this.manzanaSeleccionadaTerritorio.set(null);
+    this.manzanaEdges.set([]);
   }
 }
