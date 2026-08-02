@@ -84,6 +84,7 @@
       } @else {
         <div class="territory-color-grid">
           @for (numero of numerosTerritorios(); track numero) {
+            @let territorioColor = getColor(numero);
             <div class="territory-color-card">
               <div class="territory-number">{{ numero }}</div>
               <div class="territory-label">Territorio {{ numero }}</div>
@@ -92,15 +93,15 @@
                   <button
                     class="color-swatch"
                     [style.background]="color"
-                    [class.selected]="getColor(numero) === color"
+                    [class.selected]="territorioColor === color"
                     [attr.aria-label]="'Color ' + color"
                     (click)="cambiarColor(numero, color)"
                   ></button>
                 }
               </div>
               <div class="current-color">
-                <span class="color-preview" [style.background]="getColor(numero)"></span>
-                <span class="color-hex">{{ getColor(numero) }}</span>
+                <span class="color-preview" [style.background]="territorioColor"></span>
+                <span class="color-hex">{{ territorioColor }}</span>
               </div>
             </div>
           }
