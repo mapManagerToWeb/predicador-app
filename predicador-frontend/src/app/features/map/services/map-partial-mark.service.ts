@@ -5,9 +5,11 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapInteractionService } from './map-interaction.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+import { MapLayerRegistry } from './map-layer-registry.service';
 import { latLngDist } from '../map-geometry';
 import type { SnappedPoint } from '../map-geometry';
-import { DEDUP_THRESHOLD_PX, TOAST_MESSAGES, STYLE_DEFAULTS } from '../utils/map-constants';
+import { DEDUP_THRESHOLD_PX, TOAST_MESSAGES } from '../utils/map-constants';
+import { getPartialPolygonCompleteStyle } from './map-style.service';
 
 @Injectable({ providedIn: 'root' })
 export class MapPartialMarkService {
@@ -15,6 +17,7 @@ export class MapPartialMarkService {
   private readonly interaction = inject(MapInteractionService);
   private readonly selection = inject(MapSelectionService);
   private readonly state = inject(MapStateService);
+  private readonly registry = inject(MapLayerRegistry);
   private readonly toastService = inject(Toast);
 
   agregarPunto(punto: SnappedPoint): void {
@@ -105,17 +108,12 @@ export class MapPartialMarkService {
       // Aplicar estilo sólido (relleno completo, sin dashArray) al finalizar.
       // Usa el color del territorio activo, no el signal global.
       const color = this.colorTerritorioActivo();
-      poligonoParcial.setStyle({
-        color,
-        fillColor: color,
-        fillOpacity: STYLE_DEFAULTS.partialPolygonComplete.fillOpacity,
-        weight: STYLE_DEFAULTS.partialPolygonComplete.weight,
-        dashArray: undefined,
-      });
+      poligonoParcial.setStyle(getPartialPolygonCompleteStyle(color));
 
+      this.registry.register(id, poligonoParcial);
       this.state.manzanasMarcadas.update(current => [
         ...current,
-        { id, nombreBloque, layer: poligonoParcial as unknown as L.Path, territorioNumero: territorio },
+        { id, nombreBloque, color, territorioNumero: territorio },
       ]);
       this.rendering.addExtraLayer(poligonoParcial);
 
@@ -148,12 +146,14 @@ export class MapPartialMarkService {
     const idx = current.findIndex(m => m.id === id);
     if (idx < 0) return;
 
-    const marcada = current[idx];
-    this.rendering.removeExtraLayer(marcada.layer);
+    const removed = current[idx];
+    const layer = this.registry.get(id);
+    if (layer) this.rendering.removeExtraLayer(layer);
+    this.registry.unregister(id);
     current.splice(idx, 1);
     this.state.manzanasMarcadas.set(current);
     // Limpiar sólo los datos parciales del territorio afectado.
-    this.state.clearDatosParciales(marcada.territorioNumero);
+    this.state.clearDatosParciales(removed.territorioNumero);
     this.toastService.show(TOAST_MESSAGES.partialDeleted);
   }
 }
