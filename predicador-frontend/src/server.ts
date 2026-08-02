@@ -13,6 +13,19 @@ const app = express();
 const angularApp = new AngularNodeAppEngine();
 
 /**
+ * Security hardening headers. Safe defaults that do not depend on the
+ * deployment topology; a full CSP and an explicit `allowedHosts` list are
+ * deploy-specific and must be configured with the serving infrastructure.
+ */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+/**
  * Example Express Rest API endpoints can be defined here.
  * Uncomment and define endpoints as necessary.
  *
