@@ -37,7 +37,8 @@ src/app/
   permitir construcción directa en tests/SSR. El oficial es
   `inject(HttpClient, { optional: true })`; migrarlo es un refactor válido
   pero requiere ajustar los callers que construyen el servicio a mano.
-- El estado del mapa (`MapStateService`) mezcla signals reactivas con
-  getters/setters mutables (`_manzanaEdges`, `_manzanaSeleccionada*`): estado
-  híbrido. Al refactorizar, convertir a signals las piezas que alimentan
-  templates o computeds.
+- El estado del mapa (`MapStateService`) es ahora **100% signals**:
+  `manzanaSeleccionadaColor/Nombre/Territorio` y `manzanaEdges` se leen con `()`
+  y se escriben con `.set()`. La caché de datos parciales
+  (`datosParcialesGuardados` + helpers `get/set/clearDatosParciales`) se
+  mantiene como almacén de datos no reactivo con snapshot/rollback.
