@@ -6,6 +6,9 @@ export interface UserProfile {
   encargadoId?: number;
 }
 
+export type EstadoReporte = 'completed' | 'incomplete';
+export type TipoSesion = 'completa' | 'parcial';
+
 export interface Reporte {
   id: number;
   manzanaId: string | null;
@@ -14,11 +17,11 @@ export interface Reporte {
   encargadoNombre: string;
   encargadoApellido: string;
   sessionTime: string;
-  estado: string;
+  estado: EstadoReporte;
   territorioNumero: number;
   totalManzanas: number;
   manzanasMarcadas: number;
-  tipoSesion: string;
+  tipoSesion: TipoSesion;
   geometriaParcial: string | null;
   puntosParciales: string | null;
   manzanasIds: string | null;
@@ -31,10 +34,10 @@ export interface RegistroReporte {
   encargadoNombre: string;
   encargadoApellido: string;
   sessionTime: string;
-  estado: string;
+  estado: EstadoReporte;
   totalManzanas: number;
   manzanasMarcadas: number;
-  tipoSesion: string;
+  tipoSesion: TipoSesion;
   geometriaParcial?: string | null;
   puntosParciales?: string | null;
   manzanasIds?: string | null;
