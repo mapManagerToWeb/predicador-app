@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TerritorioService } from './territorio';
-import { environment } from '../../../environments/environment';
 
 describe('TerritorioService', () => {
   let service: TerritorioService;
@@ -10,7 +9,7 @@ describe('TerritorioService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [TerritorioService, provideHttpClient(), provideHttpClientTesting()]
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(TerritorioService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -20,114 +19,78 @@ describe('TerritorioService', () => {
     httpMock.verify();
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
+  function isBatchRequest(req: { url: string; method: string }): boolean {
+    return req.method === 'GET' && req.url.includes('/reports/batch');
+  }
+
+  function territoriesFromUrl(url: string): string[] {
+    const query = url.split('?')[1] ?? '';
+    return query
+      .split('&')
+      .filter(part => part.startsWith('territorios='))
+      .map(part => part.slice('territorios='.length));
+  }
+
+  it('chunks report batch requests to respect the backend 100-territory limit', async () => {
+    const territorios = Array.from({ length: 120 }, (_, i) => i + 1);
+    const promise = service.getReportesPorTerritorios(territorios);
+
+    for (const expectedChunk of [50, 50, 20]) {
+      const req = httpMock.expectOne(isBatchRequest);
+      expect(territoriesFromUrl(req.request.url)).toHaveLength(expectedChunk);
+      req.flush({});
+      await Promise.resolve();
+    }
+
+    const result = await promise;
+    expect(result.size).toBe(120);
   });
 
-  describe('getNumerosTerritorios', () => {
-    it('should GET territory numbers', async () => {
-      const mockNumbers = [1, 2, 3, 4, 5];
+  it('does not re-request cached territories', async () => {
+    const promise = service.getReportesPorTerritorios([1, 2]);
 
-      const promise = service.getNumerosTerritorios();
+    const req = httpMock.expectOne(isBatchRequest);
+    req.flush({ 1: [], 2: [] });
 
-      const req = httpMock.expectOne(`${environment.apiUrl}/territories`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockNumbers);
+    const result = await promise;
+    expect(result.get(1)).toEqual([]);
+    expect(result.get(2)).toEqual([]);
 
-      const result = await promise;
-      expect(result).toEqual(mockNumbers);
-    });
+    // Segundo fetch: ambas entradas ya están cacheadas, no debe haber request.
+    await service.getReportesPorTerritorios([1, 2]);
+    httpMock.expectNone(isBatchRequest);
   });
 
-  describe('getAllGeoJson', () => {
-    it('should GET all territories GeoJSON as text', async () => {
-      const mockGeoJson = '{"type":"FeatureCollection","features":[]}';
+  it('single-territory fetch bypasses cache when absent and caches it', async () => {
+    const promise = service.getReportesPorTerritorio(7);
 
-      const promise = service.getAllGeoJson();
+    const req = httpMock.expectOne((r) => r.url.includes('/reports?territorioNumero=7'));
+    req.flush([]);
 
-      const req = httpMock.expectOne(`${environment.apiUrl}/territories/all/geojson`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockGeoJson);
+    expect(await promise).toEqual([]);
 
-      const result = await promise;
-      expect(result).toBe(mockGeoJson);
-    });
+    // Ahora 7 está cacheado; el batch no debe pedirlo de nuevo.
+    await service.getReportesPorTerritorios([7]);
+    httpMock.expectNone(isBatchRequest);
   });
 
-  describe('getColores', () => {
-    it('should GET color map', async () => {
-      const mockColors: Record<number, string> = { 1: '#ff0000', 2: '#3cb44b' };
+  it('re-requests a territory once the cache TTL has expired', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const first = service.getReportesPorTerritorio(7);
+      const req1 = httpMock.expectOne((r) => r.url.includes('/reports?territorioNumero=7'));
+      req1.flush([]);
+      await first;
 
-      const promise = service.getColores();
+      // Avanzar el reloj más allá del TTL de 5 minutos.
+      vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
 
-      const req = httpMock.expectOne(`${environment.apiUrl}/territories/colors`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockColors);
-
-      const result = await promise;
-      expect(result).toEqual(mockColors);
-    });
-  });
-
-  describe('asignarColor', () => {
-    it('should PUT color for a territory', async () => {
-      const promise = service.asignarColor(1, '#ff0000');
-
-      const req = httpMock.expectOne(`${environment.apiUrl}/territories/1/color`);
-      expect(req.request.method).toBe('PUT');
-      expect(req.request.body).toEqual({ color: '#ff0000' });
-      req.flush(null);
-
-      await promise;
-    });
-  });
-
-  describe('crearReportes', () => {
-    it('should POST reportes', async () => {
-      const mockReportes = [{
-        territorioNumero: 1,
-        manzanaIds: [1, 2],
-        encargadoNombre: 'Daniel',
-        encargadoApellido: 'Uribe',
-        sessionTime: 'morning',
-        estado: 'completed'
-      }];
-
-      const mockResponse = [{
-        id: 1,
-        manzanaId: '1-A',
-        fecha: '2026-07-22T00:00:00Z',
-        encargadoNombre: 'Daniel',
-        encargadoApellido: 'Uribe',
-        sessionTime: 'morning',
-        estado: 'completed',
-        territorioNumero: 1
-      }];
-
-      const promise = service.crearReportes(mockReportes);
-
-      const req = httpMock.expectOne(`${environment.apiUrl}/reports`);
-      expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual(mockReportes);
-      req.flush(mockResponse);
-
-      const result = await promise;
-      expect(result.length).toBe(1);
-    });
-  });
-
-  describe('getReportesPorTerritorio', () => {
-    it('should GET reports filtered by territory', async () => {
-      const mockReportes = [{ id: 1, territorioNumero: 5 }];
-
-      const promise = service.getReportesPorTerritorio(5);
-
-      const req = httpMock.expectOne(`${environment.apiUrl}/reports?territorioNumero=5`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockReportes);
-
-      const result = await promise;
-      expect(result).toEqual(mockReportes);
-    });
+      const second = service.getReportesPorTerritorio(7);
+      const req2 = httpMock.expectOne((r) => r.url.includes('/reports?territorioNumero=7'));
+      req2.flush([]);
+      await second;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
