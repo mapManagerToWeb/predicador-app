@@ -8,6 +8,9 @@ Verificar contra la doc oficial vigente: https://angular.dev/best-practices/a11y
   SVGs con `aria-hidden="true" focusable="false"`, `label for` para selects.
 - ESLint con `angular.configs.templateAccessibility` activo en
   `eslint.config.js` — los cambios en templates deben mantenerlo en verde.
+- **Hallazgo pendiente**: `index.html` usa `user-scalable=no` en el viewport,
+  lo que impide el zoom de accesibilidad (falla WCAG 1.4.4 y 2.5.5). Quitarlo
+  es un cambio de comportamiento visible → requiere aprobación explícita.
 
 ## Checklist
 - **Elementos nativos**: `<button>`, `<a>`, `<input>`, `<label for>` antes que

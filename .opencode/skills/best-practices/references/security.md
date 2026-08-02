@@ -24,8 +24,19 @@ Verificar contra la doc oficial vigente: https://angular.dev/best-practices/secu
   interceptor filtra por URL relativa.
 - Protección XSRF: interceptor propio o `withXsrfConfiguration`; los métodos
   mutantes deben llevar la cabecera del token leído de cookie.
+- **Redundancia actual**: `provideHttpClient` ya activa el XSRF built-in
+  (`XSRF-TOKEN` → `X-XSRF-TOKEN`), y además existe `csrfInterceptor` custom que
+  repite el header y añade el seeding a `/api/v1/auth/csrf`. No es un bug
+  (mismo valor, orden controlado), pero es lógica duplicada: documentar o
+  delegar en `withXsrfConfiguration`/`withNoXsrfProtection` si cambia.
 - `errorInterceptor` debe limpiar sesión local y redirigir a `/login` solo en
   `401/403` de endpoints protegidos (no en los de login, para evitar loops).
+
+## Defensa en profundidad (routing)
+- `admin.guard.ts` devuelve siempre `true` (decisión documentada: el form de
+  admin vive en la propia ruta). La protección real es server-side (PUT
+  `/territories/{n}/color` exige token admin). Si se quiere restringir el
+  acceso a la ruta antes de renderizar el form, endurecer el guard.
 
 ## Hosts / SSRF
 - `allowedHosts` explícito en `angular.json` (`security.allowedHosts`), nunca
