@@ -34,14 +34,14 @@
 2. **Perfil**: `profile.ts` (feature) y `Profile` service (cubiertos).
 3. **Reportes**: `map-report.service` (buildRegistros/buildTerritoriosEnvio/
    buildWhatsAppRequest/captureScreenshot — cubiertos), `map-data-persistence`.
-4. **Mapa (decisión de marcado)**: `map-interaction.service` (máquina de 5
-   acciones de `handleMapClick` — cubierto con matriz de modos none/completa/
-   parcial), `map-capture.service` (estilos de captura/restauración — cubierto),
-   `map-engine.service` y `map-layer-registry.service` (cubiertos).
-   Siguen con huecos: `map-selection.service` (415 líneas, ~14%),
-   `map-partial-draw` (~5%), `map-partial-mark` (0%), `map-initialization` (0%),
-   `map-tile-layer` (~21%), y el componente `map.ts` (0% — cáscara delgada que
-   delega en los servicios; el valor está en cubrir esos servicios).
+4. **Mapa (decisión de marcado)**: cubiertos — `map-interaction.service`
+   (máquina de 5 acciones de `handleMapClick`, matriz de modos none/completa/
+   parcial), `map-partial-mark` (agregar/deshacer/finalizar/eliminar parcial),
+   `map-initialization` (handlers del mapa, restore de marcas), `map-partial-draw`
+   (con `vi.mock('leaflet')`), `map-capture` (estilos de captura/restauración),
+   `map-engine` y `map-layer-registry`, y el componente `map.ts` (delegación a
+   los servicios). Siguen con huecos: `map-selection.service` (~15%),
+   `map-tile-layer` (~21%) y `map-territory-layer` (~16%).
 
 ## Patrón para testear la lógica de decisión del mapa
 `MapInteractionService` inyecta `MapStateService` (real, sin deps),
