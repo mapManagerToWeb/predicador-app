@@ -27,20 +27,12 @@ export class MapReportService {
     if (!perfil) return [];
 
     const seleccionados = new Set(territoriosSeleccionados);
-    const porTerritorio = new Map<number, ManzanaMarcada[]>();
-    for (const m of marcadas) {
-      if (!seleccionados.has(m.territorioNumero)) continue;
-      const list = porTerritorio.get(m.territorioNumero) ?? [];
-      list.push(m);
-      porTerritorio.set(m.territorioNumero, list);
-    }
+    const porTerritorio = this.groupByTerritorio(marcadas, seleccionados);
 
     const registros: RegistroReporte[] = [];
     for (const [territorioNum, marcadasTerritorio] of porTerritorio) {
       const featureLayer = allTerritoriesLayer.find(f => f.territorioPadre === territorioNum);
-      const total = featureLayer
-        ? Array.from(featureLayer.layer.getLayers()).filter(l => 'setStyle' in l).length
-        : marcadasTerritorio.length;
+      const total = this.countTotalManzanas(featureLayer, marcadasTerritorio.length);
 
       const nonPartial = marcadasTerritorio.filter(m => !m.id.startsWith('parcial-'));
       const manzanaId = nonPartial.length > 0 ? nonPartial[0].id : null;
@@ -81,19 +73,12 @@ export class MapReportService {
     marcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[]
   ): TerritorioReporteEnvio[] {
-    const porTerritorio = new Map<number, ManzanaMarcada[]>();
-    for (const m of marcadas) {
-      const list = porTerritorio.get(m.territorioNumero) ?? [];
-      list.push(m);
-      porTerritorio.set(m.territorioNumero, list);
-    }
+    const porTerritorio = this.groupByTerritorio(marcadas);
 
     const territorios: TerritorioReporteEnvio[] = [];
     for (const [territorioNum, marcadasTerritorio] of porTerritorio) {
       const featureLayer = allTerritoriesLayer.find(f => f.territorioPadre === territorioNum);
-      const total = featureLayer
-        ? Array.from(featureLayer.layer.getLayers()).filter(l => 'setStyle' in l).length
-        : marcadasTerritorio.length;
+      const total = this.countTotalManzanas(featureLayer, marcadasTerritorio.length);
 
       const nonPartial = marcadasTerritorio.filter(m => !m.id.startsWith('parcial-'));
       const finalizado = nonPartial.length >= total && total > 0;
@@ -159,6 +144,22 @@ export class MapReportService {
 
   async saveToDatabase(registros: RegistroReporte[]): Promise<void> {
     await this.territorioService.crearReportes(registros);
+  }
+
+  private groupByTerritorio(marcadas: ManzanaMarcada[], seleccionados?: Set<number>): Map<number, ManzanaMarcada[]> {
+    const porTerritorio = new Map<number, ManzanaMarcada[]>();
+    for (const m of marcadas) {
+      if (seleccionados && !seleccionados.has(m.territorioNumero)) continue;
+      const list = porTerritorio.get(m.territorioNumero) ?? [];
+      list.push(m);
+      porTerritorio.set(m.territorioNumero, list);
+    }
+    return porTerritorio;
+  }
+
+  private countTotalManzanas(featureLayer: FeatureLayer | undefined, fallback: number): number {
+    if (!featureLayer) return fallback;
+    return Array.from(featureLayer.layer.getLayers()).filter(l => 'setStyle' in l).length;
   }
 
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {
