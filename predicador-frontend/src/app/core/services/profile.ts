@@ -41,7 +41,12 @@ export class Profile {
   }
 
   save(profile: UserProfile): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    } catch {
+      // Storage can be unavailable (private mode); the in-memory signal still
+      // carries the profile for the current session.
+    }
     this.currentUser.set(profile);
   }
 
@@ -50,7 +55,12 @@ export class Profile {
   }
 
   clear(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage can be unavailable (private mode); the in-memory signal still
+      // clears, so the session is dropped for the current session.
+    }
     this.currentUser.set(null);
   }
 }

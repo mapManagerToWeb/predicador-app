@@ -103,7 +103,12 @@ export class TerritorySearch implements OnInit {
 
   toggleTheme(): void {
     this.isDark.set(!this.isDark());
-    localStorage.setItem(THEME_KEY, this.isDark() ? 'dark' : 'light');
+    try {
+      localStorage.setItem(THEME_KEY, this.isDark() ? 'dark' : 'light');
+    } catch {
+      // Storage can be unavailable (private mode); the theme still applies for
+      // the current session.
+    }
     this.applyTheme();
   }
 
