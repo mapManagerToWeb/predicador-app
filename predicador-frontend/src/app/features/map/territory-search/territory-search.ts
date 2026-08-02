@@ -98,6 +98,7 @@ export class TerritorySearch implements OnInit {
   }
 
   private applyTheme(): void {
+    if (typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-theme', this.isDark() ? 'dark' : 'light');
   }
 
