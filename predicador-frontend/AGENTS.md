@@ -39,7 +39,7 @@ This Angular 22 app manages territory tracking and reporting for door-to-door mi
 - Standalone components (no NgModule)
 - Route guards: `canActivate: [profileGuard]` protects map
 - Lazy loading: `loadComponent: () => import('./features/...').then(m => m.PageComponent)`
-- Tests disabled by default in schematics (`skipTests: true`)
+- Specs enabled by default in schematics (`skipTests: false`); review the generated `.spec.ts` so it follows the repo's Vitest/TestBed conventions
 
 **TypeScript Strictness:**
 - `noImplicitAny` — Use `@ts-expect-error` comment if needed (prefer fixing)
@@ -108,10 +108,10 @@ This Angular 22 app manages territory tracking and reporting for door-to-door mi
 
 ## Testing Strategy
 
-- Enable `skipTests: false` in `angular.json` to generate test files
+- `skipTests: false` is set in `angular.json`, so `ng generate` produces `.spec.ts` files by default
 - Test file location: co-located `*.spec.ts`
 - Use `@analogjs/vitest-angular` helpers for Angular testing
-- Mock services with `jasmine.createSpyObj` or vi.mock
+- Mock services with `vi.spyOn` or `vi.mock`
 
 ## Key Gotchas
 
