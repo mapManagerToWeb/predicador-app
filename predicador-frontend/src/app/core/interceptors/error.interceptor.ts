@@ -18,7 +18,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const authToken = inject(AuthTokenService);
   const profile = inject(Profile);
   const router = inject(Router);
-  const isAuthRequest = AUTH_URL_PATTERNS.some(p => req.url.includes(p));
+  const path = req.url.split('?')[0];
+  const isAuthRequest = AUTH_URL_PATTERNS.some(p => path === p || path.endsWith(p));
 
   return next(req).pipe(
     catchError(error => {
