@@ -159,10 +159,10 @@ describe('MapSelectionService', () => {
 
       service.seleccionarManzana(polygon as never, '#ff0000', 'Bloque-m1', 1);
 
-      expect(state.manzanaSeleccionadaColor).toBe('#ff0000');
-      expect(state.manzanaSeleccionadaNombre).toBe('Bloque-m1');
-      expect(state.manzanaSeleccionadaTerritorio).toBe(1);
-      expect(state.manzanaEdges.length).toBe(5);
+      expect(state.manzanaSeleccionadaColor()).toBe('#ff0000');
+      expect(state.manzanaSeleccionadaNombre()).toBe('Bloque-m1');
+      expect(state.manzanaSeleccionadaTerritorio()).toBe(1);
+      expect(state.manzanaEdges().length).toBe(5);
       expect(polygon.setStyle).toHaveBeenCalledWith(getSelectedManzanaStyle());
       expect(state.territoriosSeleccionados()).toContain(1);
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('#ff0000');
