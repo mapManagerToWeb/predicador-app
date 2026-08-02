@@ -90,9 +90,22 @@ Para cada tarea: **escanear → clasificar por severidad → proponer fix → ap
 ### Testing y cobertura
 - [ ] ¿Vitest (no Karma)? ¿Umbrales de cobertura reales y no "de vanidad"?
 - [ ] ¿Specs que testean **código real** (importan el módulo) y no funciones copiadas/reimplementadas? (buscar funciones duplicadas dentro de `.spec.ts`)
-- [ ] ¿Flujos críticos cubiertos: login/auth, perfil, registro de reportes, guardado/envío?
-- [ ] ¿Servicios grandes sin spec (`map-selection.service.ts`)? Priorizar por impacto del flujo.
+- [ ] ¿Flujos críticos cubiertos: login/auth, perfil, marcado de manzanas (decisión por click), captura/guardado/envío del reporte?
+- [ ] ¿La **máquina de decisión del mapa** (`map-interaction.service.ts` → `handleMapClick`, 5 acciones) tiene spec con matriz de modos none/completa/parcial? Es el flujo crítico #2 y hoy está cubierto.
+- [ ] ¿Servicios grandes sin spec (`map-selection.service.ts`, `map-partial-draw`, `map-partial-mark`, `map-initialization`, `map-tile-layer`, `map.ts`)? Priorizar por impacto del flujo.
 - [ ] ¿`fit`/`fdescribe`/`xit` olvidados? ¿`skipTests` del scaffolding activado por error?
+
+## Gotchas específicos del proyecto (verificados 2026-08)
+- **`user-scalable=no`** en `index.html` viewport impide zoom de accesibilidad (WCAG 1.4.4/2.5.5). Quitarlo = cambio visible → requiere aprobación.
+- **`leaflet.css` desde CDN** (`unpkg.com`) con `integrity`: render-blocking y **fuera del cache ngsw** → en modo offline el mapa pierde estilos. Bundlearlo localmente.
+- **`skipTests: true`** en todos los schematics de `angular.json`: al generar con `ng g` no se crean specs; activar tests explícitamente para código nuevo.
+- **`zone.js`** sigue en `dependencies` de producción aunque la app es zoneless (solo se usa para tests). Mover a `devDependencies` o justificar.
+- **`territory-search.ts`** accede a `document.documentElement` en `applyTheme()` desde `ngOnInit` sin guard de SSR (el resto del código sí guarda con `typeof document === 'undefined'`).
+- **`localStorage`**: la mayoría del código usa `try/catch` + guard SSR; verificar que cualquier `setItem`/`getItem` nuevo también lo haga (modo privado lanza).
+- **XSRF duplicado**: `provideHttpClient` ya tiene XSRF built-in y además hay `csrfInterceptor` custom. No romper el orden actual sin validar el seeding.
+- **`models.ts`**: `estado`/`tipoSesion` deben ser uniones de literales (`'completed'|'incomplete'`, `'completa'|'parcial'`), no `string`.
+- **`$any($event.target).value`** en templates (`map.html`): prefieres un handler tipado en el componente.
+- **Estilos duplicados**: la secuencia post-guardado (invalidate → restaurar → reaplicar → reset) y el conteo de `total` se duplican entre `map-report.service` y `map-data-persistence.service`.
 
 ### Calidad de código
 - [ ] ¿`strict: true` en tsconfig? ¿ESLint flat config (`eslint.config.js`), no `.eslintrc.*`?

@@ -32,5 +32,12 @@ src/app/
 - Preferir `inject()` sobre constructor-DI (guía oficial).
 - `providedIn: 'root'` para singletons; considerar `providedIn` por feature
   solo si el servicio va asociado a una ruta lazy.
-- Eliminar código muerto que exponga APIs engañosas (ej. una signal que
-  siempre es `null`). Verificado en `auth-token.ts`.
+- `auth-token.ts` usa constructor-DI con `@Optional() http?: HttpClient` y
+  `eslint-disable @angular-eslint/prefer-inject`: decisión documentada para
+  permitir construcción directa en tests/SSR. El oficial es
+  `inject(HttpClient, { optional: true })`; migrarlo es un refactor válido
+  pero requiere ajustar los callers que construyen el servicio a mano.
+- El estado del mapa (`MapStateService`) mezcla signals reactivas con
+  getters/setters mutables (`_manzanaEdges`, `_manzanaSeleccionada*`): estado
+  híbrido. Al refactorizar, convertir a signals las piezas que alimentan
+  templates o computeds.

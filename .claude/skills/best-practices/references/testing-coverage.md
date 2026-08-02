@@ -30,13 +30,26 @@
 - **`vi.mock`** para librerías de captura (`html2canvas`) que no deben ejecutarse.
 
 ## Prioridad de cobertura (flujos críticos del negocio)
-1. **Login/auth**: `phone.ts`, `encargado.ts`, `login.ts` (YA cubiertos, antes a 0%).
+1. **Login/auth**: `phone.ts`, `encargado.ts`, `login.ts` (cubiertos).
 2. **Perfil**: `profile.ts` (feature) y `Profile` service (cubiertos).
 3. **Reportes**: `map-report.service` (buildRegistros/buildTerritoriosEnvio/
    buildWhatsAppRequest/captureScreenshot — cubiertos), `map-data-persistence`.
-4. **Mapa**: `map-geometry`, `map-state` (cubiertos); pendientes de más
-   cobertura: `map-selection.service` (417 líneas), `map-partial-draw`,
-   `map-initialization`, `map-tile-layer`, `map-interaction`.
+4. **Mapa (decisión de marcado)**: `map-interaction.service` (máquina de 5
+   acciones de `handleMapClick` — cubierto con matriz de modos none/completa/
+   parcial), `map-capture.service` (estilos de captura/restauración — cubierto),
+   `map-engine.service` y `map-layer-registry.service` (cubiertos).
+   Siguen con huecos: `map-selection.service` (415 líneas, ~14%),
+   `map-partial-draw` (~5%), `map-partial-mark` (0%), `map-initialization` (0%),
+   `map-tile-layer` (~21%), y el componente `map.ts` (0% — cáscara delgada que
+   delega en los servicios; el valor está en cubrir esos servicios).
+
+## Patrón para testear la lógica de decisión del mapa
+`MapInteractionService` inyecta `MapStateService` (real, sin deps),
+`MapRenderingFacade` (mock `useValue` con `getManzanaIndex`/`getMap`) y
+`MapLayerRegistry` (real). Los paths Leaflet se crean con `new L.Polygon([...])`
+(no requiere DOM) y se espían con `vi.spyOn(p, 'setStyle')`. Los container
+points del mapa se mockean con objetos `{ x, y, distanceTo }` — cuidado: los
+`distanceTo` como arrow functions no enlazan `this`, capturar `x`/`y` en closure.
 
 ## Criterios de calidad
 - Nunca subir un umbral de cobertura "por subir": primero medir con
