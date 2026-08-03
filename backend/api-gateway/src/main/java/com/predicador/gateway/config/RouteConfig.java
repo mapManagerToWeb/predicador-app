@@ -108,7 +108,7 @@ public class RouteConfig {
                 .filter(s -> !s.isEmpty())
                 .toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
+        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN", "Idempotency-Key"));
         config.setExposedHeaders(List.of("ETag", "Location"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
@@ -126,7 +126,7 @@ public class RouteConfig {
                 .filter(s -> !s.isEmpty())
                 .toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
+        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN", "Idempotency-Key"));
         config.setExposedHeaders(List.of("ETag", "Location"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

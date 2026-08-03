@@ -1,6 +1,7 @@
-import { Component, signal, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Profile } from '../../core/services/profile';
+import { AuthTokenService } from '../../core/services/auth-token';
 import { EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
 import { normalizePhone } from '../../core/utils/phone';
@@ -12,14 +13,24 @@ import { normalizePhone } from '../../core/utils/phone';
   templateUrl: './login.html',
   styleUrls: ['./login.css', './auth.css']
 })
-export class LoginPage {
+export class LoginPage implements OnInit {
   private profileService = inject(Profile);
+  private authToken = inject(AuthTokenService);
   private encargadoService = inject(EncargadoService);
   private router = inject(Router);
   private toast = inject(Toast);
 
   telefono = signal('');
   loading = signal(false);
+
+  ngOnInit(): void {
+    // Tras un refresh (SSR no conoce el rol persistido) la sesión encargado
+    // se rehidrata desde localStorage; llevar al usuario directo al mapa en
+    // vez de dejarlo en el formulario de login.
+    if (this.authToken.hasToken() && this.profileService.hasProfile()) {
+      void this.router.navigate(['/map']);
+    }
+  }
 
   onTelefonoInput(event: Event): void {
     this.telefono.set((event.target as HTMLInputElement).value);

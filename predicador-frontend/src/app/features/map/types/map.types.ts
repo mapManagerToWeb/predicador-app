@@ -5,10 +5,14 @@ export type { SnappedPoint, Edge };
 
 export type ModoMarcado = 'none' | 'completa' | 'parcial';
 
+/**
+ * Pure data for a marked manzana — no Leaflet handles.
+ * The live layer is resolved through the MapLayerRegistry seam.
+ */
 export interface ManzanaMarcada {
   id: string;
   nombreBloque: string;
-  layer: L.Path;
+  color: string;
   territorioNumero: number;
 }
 

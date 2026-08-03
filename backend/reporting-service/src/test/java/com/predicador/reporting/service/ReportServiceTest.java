@@ -162,6 +162,20 @@ class ReportServiceTest {
     }
 
     @Test
+    void createReports_shouldDefaultNullEncargadoIdToTokenSubjectForEncargado() {
+        ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
+                null, null, null, null, null, null, null);
+        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+        saved.setEncargadoId(7L);
+        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
+
+        List<ReportDto> result = reportService.createReports(List.of(dto), encargado("7"));
+
+        assertEquals(1, result.size());
+        verify(repository).saveAll(anyList());
+    }
+
+    @Test
     void createReports_shouldRejectReportOwnedByAnotherEncargado() {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
                 8L, null, null, null, null, null, null);
@@ -205,22 +219,24 @@ class ReportServiceTest {
     }
 
     @Test
-    void getReportsByTerritorio_shouldRejectOwnerAndAllowAdmin() {
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.getReportsByTerritorio(12L, pageable, encargado("7")));
-
+    void getReportsByTerritorio_shouldAllowAnyAuthenticatedAndAdmin() {
         when(repository.findByTerritorioNumeroOrderByFechaDesc(12L, pageable)).thenReturn(Page.empty());
+        assertTrue(reportService.getReportsByTerritorio(12L, pageable, encargado("7")).getContent().isEmpty());
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, admin).getContent().isEmpty());
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportsByTerritorio(12L, pageable, null));
     }
 
     @Test
-    void getReportsByMultipleTerritorios_shouldRejectOwnerAndAllowAdmin() {
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> reportService.getReportsByMultipleTerritorios(List.of(12L), encargado("7")));
-
+    void getReportsByMultipleTerritorios_shouldAllowAnyAuthenticatedAndAdmin() {
         when(repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(List.of(12L)))
                 .thenReturn(List.of());
+        assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), encargado("7")).isEmpty());
         assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), admin).isEmpty());
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportsByMultipleTerritorios(List.of(12L), null));
     }
 
     private SessionToken encargado(String subject) {

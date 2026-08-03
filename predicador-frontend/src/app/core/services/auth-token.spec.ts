@@ -10,22 +10,29 @@ describe('AuthTokenService', () => {
     localStorage.clear();
   });
 
-  it('starts with no role', () => {
+  it('starts with no role when nothing is persisted', () => {
     const svc = new AuthTokenService();
     expect(svc.role()).toBeNull();
     expect(svc.hasToken()).toBe(false);
     expect(svc.isAdmin()).toBe(false);
   });
 
-  it('set() updates reactive role state without persisting the session', () => {
+  it('persists the role so a page refresh keeps the UI logged in', () => {
     const svc = new AuthTokenService();
     svc.set('encargado');
 
     expect(svc.role()).toBe('encargado');
     expect(svc.hasToken()).toBe(true);
+    expect(localStorage.getItem('predicador_role')).toBe('encargado');
+  });
+
+  it('rehydrates the role from localStorage on a fresh page load', () => {
+    localStorage.setItem('predicador_role', 'encargado');
+
+    const svc = new AuthTokenService();
+    expect(svc.role()).toBe('encargado');
+    expect(svc.hasToken()).toBe(true);
     expect(svc.isAdmin()).toBe(false);
-    expect(localStorage.getItem('predicador_session_token')).toBeNull();
-    expect(localStorage.getItem('predicador_session_role')).toBeNull();
   });
 
   it('isAdmin true when role is admin', () => {
@@ -34,17 +41,17 @@ describe('AuthTokenService', () => {
     expect(svc.isAdmin()).toBe(true);
   });
 
-  it('clear() wipes signals without touching session storage', () => {
+  it('clear() wipes role and removes the persisted marker', () => {
     const svc = new AuthTokenService();
     svc.set('admin');
     svc.clear();
 
     expect(svc.role()).toBeNull();
     expect(svc.hasToken()).toBe(false);
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.getItem('predicador_role')).toBeNull();
   });
 
-  it('does not rehydrate a session from localStorage', () => {
+  it('ignores legacy/stale storage keys', () => {
     localStorage.setItem('predicador_session_token', 'stored.token');
     localStorage.setItem('predicador_session_role', 'admin');
 
@@ -86,6 +93,7 @@ describe('AuthTokenService', () => {
 
     expect(svc.role()).toBeNull();
     expect(svc.hasToken()).toBe(false);
+    expect(localStorage.getItem('predicador_role')).toBeNull();
     expect(postSpy).toHaveBeenCalledWith('/api/v1/auth/logout', {});
   });
 
@@ -96,5 +104,6 @@ describe('AuthTokenService', () => {
 
     expect(svc.hasToken()).toBe(false);
     expect(svc.role()).toBeNull();
+    expect(localStorage.getItem('predicador_role')).toBeNull();
   });
 });

@@ -30,6 +30,15 @@ class AuthorizationServiceTest {
         assertEquals(403, exception.getStatusCode().value());
     }
 
+    @Test
+    void authorizeOwner_allowsNullTokenInUnenforcedDevMode() {
+        var unconfiguredTokens = new com.predicador.shared.security.SessionTokenService("", 12, false, "local");
+        var devAuthService = new AuthorizationService(unconfiguredTokens);
+        assertDoesNotThrow(() -> devAuthService.authorizeOwner(null, 7L));
+        assertDoesNotThrow(() -> devAuthService.requireAuthenticated(null));
+        assertDoesNotThrow(() -> devAuthService.requireAdmin(null));
+    }
+
     private SessionToken encargado(String subject) {
         return new SessionToken(subject, SessionToken.ROLE_ENCARGADO, 1L, 2L);
     }

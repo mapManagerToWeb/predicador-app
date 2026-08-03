@@ -1,9 +1,10 @@
 package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.ReportDto;
+import com.predicador.reporting.dto.WhatsAppDeliveryDto;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
-import com.predicador.reporting.dto.WhatsAppSendResponse;
-import com.predicador.reporting.service.ReportSendService;
+import com.predicador.reporting.model.WhatsAppDeliveryStatus;
+import com.predicador.reporting.service.WhatsAppSendService;
 import com.predicador.reporting.service.ReportService;
 import com.predicador.reporting.service.AuthorizationService;
 import com.predicador.reporting.client.WhatsAppIntegrationException;
@@ -28,13 +29,13 @@ import java.util.Map;
 public class ReportController {
 
     private final ReportService reportService;
-    private final ReportSendService reportSendService;
+    private final WhatsAppSendService whatsAppSendService;
     private final AuthorizationService authorization;
 
-    public ReportController(ReportService reportService, ReportSendService reportSendService,
+    public ReportController(ReportService reportService, WhatsAppSendService whatsAppSendService,
                             AuthorizationService authorization) {
         this.reportService = reportService;
-        this.reportSendService = reportSendService;
+        this.whatsAppSendService = whatsAppSendService;
         this.authorization = authorization;
     }
 
@@ -83,12 +84,23 @@ public class ReportController {
     }
 
     @PostMapping("/send")
-    public ResponseEntity<WhatsAppSendResponse> sendWhatsAppReport(
+    public ResponseEntity<WhatsAppDeliveryDto> sendWhatsAppReport(
             @Valid @RequestBody WhatsAppSendRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest httpRequest) {
         authorization.requireAuthenticated(token(httpRequest));
-        return ResponseEntity.ok(reportSendService.sendReport(request, idempotencyKey));
+        WhatsAppDeliveryDto delivery = whatsAppSendService.submit(request, idempotencyKey);
+        if (WhatsAppDeliveryStatus.IN_PROGRESS.name().equals(delivery.status())) {
+            return ResponseEntity.accepted().body(delivery);
+        }
+        return ResponseEntity.ok(delivery);
+    }
+
+    @GetMapping("/send/{idempotencyKey}")
+    public ResponseEntity<WhatsAppDeliveryDto> getSendStatus(
+            @PathVariable String idempotencyKey, HttpServletRequest httpRequest) {
+        authorization.requireAuthenticated(token(httpRequest));
+        return ResponseEntity.ok(whatsAppSendService.getStatus(idempotencyKey));
     }
 
     private SessionToken token(HttpServletRequest request) {

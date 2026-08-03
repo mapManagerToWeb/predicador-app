@@ -2,8 +2,9 @@ import { Injectable, inject, signal } from '@angular/core';
 import * as L from 'leaflet';
 import * as GeoJSON from 'geojson';
 import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
-import { getColorForTerritorio, getTerritoryFillOpacity } from '../utils/territory-colors';
+import { getColorForTerritorio } from '../utils/territory-colors';
 import { MapEngineService } from './map-engine.service';
+import { getBaseTerritoryStyle } from './map-style.service';
 import type { ManzanaIndex, FeatureLayer, TerritorioCacheData } from '../types/map.types';
 
 export type ManzanaClickHandler = (
@@ -217,13 +218,7 @@ export class MapTerritoryLayerService {
   }
 
   private getTerritoryStyle(color: string): L.PathOptions {
-    return {
-      fillColor: color,
-      fillOpacity: getTerritoryFillOpacity(false),
-      opacity: 1,
-      color,
-      weight: STYLE_DEFAULTS.polygon.weight,
-    };
+    return getBaseTerritoryStyle(color, false);
   }
 
   private onEachFeature(

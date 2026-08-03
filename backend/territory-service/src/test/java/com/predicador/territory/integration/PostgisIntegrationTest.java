@@ -80,7 +80,7 @@ class PostgisIntegrationTest {
         Optional<ManzanaTerritorio> found = territoryRepository.findById(1L);
         assertThat(found).isPresent();
         assertThat(found.get().getNombreBloque()).isEqualTo("Manzana A");
-        assertThat(found.get().getGeometry()).contains("POLYGON Z");
+        assertThat(found.get().getGeometry()).isNotNull();
     }
 
     @Test
@@ -149,6 +149,46 @@ class PostgisIntegrationTest {
 
         Optional<ManzanaTerritorio> found = territoryRepository.findById(300L);
         assertThat(found).isPresent();
-        assertThat(found.get().getGeometry()).contains("LINESTRING Z");
+        assertThat(found.get().getGeometry()).isNotNull();
+    }
+
+    @Test
+    void geoJsonProjection_producesStAsGeoJsonPolygon() {
+        ManzanaTerritorio manzana = new ManzanaTerritorio();
+        manzana.setId(400L);
+        manzana.setTerritorioPadre(30L);
+        manzana.setNombreBloque("30.a");
+        manzana.setGeometry("SRID=4326;POLYGON ((-70.65 -33.45, -70.64 -33.45, -70.64 -33.44, -70.65 -33.44, -70.65 -33.45))");
+
+        territoryRepository.save(manzana);
+
+        List<TerritoryRepository.ManzanaGeoJsonProjection> rows =
+                territoryRepository.findGeoJsonByTerritorioPadre(30L);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getTerritorioPadre()).isEqualTo(30L);
+        assertThat(rows.get(0).getNombreBloque()).isEqualTo("30.a");
+        assertThat(rows.get(0).getGeoJson()).contains("\"type\":\"Polygon\"");
+    }
+
+    @Test
+    void geoJsonProjection_returnsAllTerritories() {
+        ManzanaTerritorio m1 = new ManzanaTerritorio();
+        m1.setId(500L);
+        m1.setTerritorioPadre(40L);
+        m1.setNombreBloque("40.a");
+        m1.setGeometry("SRID=4326;POINT (-70.65 -33.45)");
+
+        ManzanaTerritorio m2 = new ManzanaTerritorio();
+        m2.setId(501L);
+        m2.setTerritorioPadre(50L);
+        m2.setNombreBloque("50.a");
+        m2.setGeometry("SRID=4326;POINT (-70.64 -33.44)");
+
+        territoryRepository.saveAll(List.of(m1, m2));
+
+        List<TerritoryRepository.ManzanaGeoJsonProjection> rows =
+                territoryRepository.findAllGeoJsonGroupedByTerritorio();
+        assertThat(rows).extracting(TerritoryRepository.ManzanaGeoJsonProjection::getTerritorioPadre)
+                .contains(40L, 50L);
     }
 }

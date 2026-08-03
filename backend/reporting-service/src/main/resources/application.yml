@@ -21,18 +21,17 @@ spring:
   jpa:
     defer-datasource-initialization: true
     hibernate:
-      ddl-auto: validate
+      # Flyway gestiona el esquema; `none` evita que Hibernate valide antes de
+      # que Flyway migre (en Spring Boot 4 el EntityManagerFactory se crea
+      # antes que el initializer de Flyway).
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
-    locations: classpath:db/migration
-    validate-on-migrate: true
+    enabled: false
 
 server:
   port: 8082

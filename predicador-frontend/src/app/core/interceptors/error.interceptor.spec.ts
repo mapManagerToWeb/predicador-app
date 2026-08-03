@@ -78,7 +78,9 @@ describe('errorInterceptor', () => {
     expect(capturedStatus).toBe(500);
   });
 
-  it('en 403 fuera de rutas de auth: limpia token/profile y navega a /login', () => {
+  it('en 403 NO limpia la sesión ni redirige: el usuario sigue autenticado', () => {
+    // 403 = autenticado pero sin permiso (o token CSRF rechazado). Tratarlo
+    // como sesión expirada expulsaba al login al guardar un reporte.
     authToken.set('encargado');
     profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -87,9 +89,9 @@ describe('errorInterceptor', () => {
     const req = httpMock.expectOne('/api/v1/reports');
     req.flush({}, { status: 403, statusText: 'Forbidden' });
 
-    expect(authToken.hasToken()).toBe(false);
-    expect(profile.currentUser()).toBeNull();
-    expect(navSpy).toHaveBeenCalledWith(['/login']);
+    expect(authToken.hasToken()).toBe(true);
+    expect(profile.currentUser()).not.toBeNull();
+    expect(navSpy).not.toHaveBeenCalled();
   });
 
   it('en 404 no redirige ni limpia sesión', () => {

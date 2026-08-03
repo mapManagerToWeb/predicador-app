@@ -20,7 +20,7 @@ public class ReportMessageService {
         // Meta rechaza los parámetros con saltos de línea/tab o más de 4 espacios seguidos.
         // Usamos " | " como separador visible y compatible.
         String territorios = request.territorios().stream()
-            .map(t -> "Territorio " + t.numero() + " " + (t.finalizado() ? "*terminado*" : "*faltante*"))
+            .map(t -> "Territorio " + t.numero() + " " + (t.finalizado() ? "*terminado*" : "*incompleto*"))
             .reduce((a, b) -> a + " | " + b)
             .orElse("");
         params.put("territorio", clean(territorios));

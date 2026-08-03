@@ -44,7 +44,7 @@ class ReportingSecurityIntegrationTest {
         authorizationService = mock(AuthorizationService.class);
 
         var controller = new com.predicador.reporting.controller.ReportController(
-                reportService, mock(com.predicador.reporting.service.ReportSendService.class),
+                reportService, mock(com.predicador.reporting.service.WhatsAppSendService.class),
                 authorizationService);
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
