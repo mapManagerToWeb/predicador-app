@@ -6,18 +6,18 @@ import com.predicador.shared.security.SessionAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.util.HexFormat;
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -50,7 +50,7 @@ public class AuthController {
             @Value("${app.admin.username:}") String adminUsername,
             @Value("${app.admin.password:}") String adminPassword,
             @Value("${app.admin.password-bcrypt:}") String adminPasswordBcrypt,
-            @Value("${app.session.cookie-secure:true}") boolean sessionCookieSecure) {
+            @Value("${app.session.cookie-secure:false}") boolean sessionCookieSecure) {
         this.tokens = tokens;
         this.adminUsername = adminUsername;
         this.adminPassword = adminPassword;
@@ -61,8 +61,11 @@ public class AuthController {
         }
     }
 
+    /** Vida de la sesión; coincide con el TTL del token firmado. */
+    private static final Duration SESSION_TTL = Duration.ofHours(12);
+
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials, ServerWebExchange exchange) {
         String username = credentials.getOrDefault("username", "");
         String password = credentials.getOrDefault("password", "");
 
@@ -75,35 +78,34 @@ public class AuthController {
         }
 
         String token = tokens.issue("admin", SessionToken.ROLE_ADMIN);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, csrfCookie(), sessionCookie(token, 12 * 60 * 60))
-                .body(Map.of(
+        // La cookie CSRF la emite y rota CsrfProtectionFilter; aquí solo la sesión.
+        exchange.getResponse().addCookie(sessionCookie(token, SESSION_TTL));
+        return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Autenticación exitosa",
                 "role", SessionToken.ROLE_ADMIN));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
-        return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, sessionCookie("", 0))
+    public ResponseEntity<Void> logout(ServerWebExchange exchange) {
+        exchange.getResponse().addCookie(sessionCookie("", Duration.ZERO));
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Cookie de sesión construida con {@link ResponseCookie} en lugar de un
+     * header a mano: los atributos se serializan según RFC 6265 y no es posible
+     * escribir combinaciones que el navegador interprete al revés (p. ej.
+     * {@code HttpOnly=false}, que <em>sí</em> activa HttpOnly).
+     */
+    private ResponseCookie sessionCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(SessionAuthFilter.SESSION_COOKIE_NAME, value)
+                .httpOnly(true)
+                .secure(sessionCookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(maxAge)
                 .build();
-    }
-
-private String sessionCookie(String value, long maxAge) {
-        return SessionAuthFilter.SESSION_COOKIE_NAME + "=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
-                .formatted(value, maxAge,
-                        sessionCookieSecure ? " Secure;" : "");
-    }
-
-    private static final SecureRandom CSRF_RANDOM = new SecureRandom();
-
-    private String csrfCookie() {
-        byte[] bytes = new byte[32];
-        CSRF_RANDOM.nextBytes(bytes);
-        return "XSRF-TOKEN=%s; Path=/; HttpOnly=false;%s SameSite=Lax"
-                .formatted(HexFormat.of().formatHex(bytes),
-                        sessionCookieSecure ? " Secure;" : "");
     }
 
     private boolean passwordMatches(String provided) {

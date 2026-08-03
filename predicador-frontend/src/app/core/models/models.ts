@@ -65,3 +65,12 @@ export interface WhatsAppSendResponse {
   messageId: string | null;
   error: string | null;
 }
+
+export type WhatsAppDeliveryStatus = 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED';
+
+export interface WhatsAppDeliveryDto {
+  idempotencyKey: string;
+  status: WhatsAppDeliveryStatus;
+  messageId: string | null;
+  error: string | null;
+}

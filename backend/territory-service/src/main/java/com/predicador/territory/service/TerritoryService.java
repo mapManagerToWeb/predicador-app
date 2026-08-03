@@ -2,14 +2,15 @@ package com.predicador.territory.service;
 
 import com.predicador.territory.config.CacheConfig;
 import com.predicador.territory.dto.TerritoryDto;
+import com.predicador.territory.geojson.TerritoryGeoJsonSerializer;
 import com.predicador.shared.exception.ResourceNotFoundException;
-import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
@@ -25,6 +26,7 @@ public class TerritoryService {
 
     private final TerritoryRepository territoryRepository;
     private final TerritoryColorRepository colorRepository;
+    private final TerritoryGeoJsonSerializer geoJsonSerializer;
     private final ObjectProvider<TerritoryService> self;
     private final Timer geojsonLoadTimer;
 
@@ -35,14 +37,16 @@ public class TerritoryService {
         "#FF00FF", "#4169E1", "#FF69B4", "#7B68EE"
     };
 
-    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, MeterRegistry registry) {
-        this(territoryRepository, colorRepository, registry, null);
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry) {
+        this(territoryRepository, colorRepository, geoJsonSerializer, registry, null);
     }
 
-    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, MeterRegistry registry,
+    @Autowired
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry,
                             ObjectProvider<TerritoryService> self) {
         this.territoryRepository = territoryRepository;
         this.colorRepository = colorRepository;
+        this.geoJsonSerializer = geoJsonSerializer;
         this.self = self;
         this.geojsonLoadTimer = Timer.builder("territory.geojson.load.duration")
                 .description("Tiempo para generar el GeoJSON completo de todos los territorios")
@@ -67,13 +71,14 @@ public class TerritoryService {
     public TerritoryDto getTerritory(Long number) {
         // No cacheado individualmente: la mayoría del tráfico usa el endpoint
         // /all/geojson agregado. Cachear cada TerritoryDto duplicaría memoria.
-        List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
+        List<TerritoryRepository.ManzanaGeoJsonProjection> manzanas =
+                territoryRepository.findGeoJsonByTerritorioPadre(number);
         if (manzanas.isEmpty()) {
             throw new ResourceNotFoundException("Territorio", number);
         }
 
-        String geoJson = convertToGeoJson(manzanas, number);
         String color = getColorForTerritory(number);
+        String geoJson = geoJsonSerializer.serializeTerritory(manzanas, color);
         String name = "Territorio " + number;
 
         return new TerritoryDto(number, name, geoJson, color);
@@ -81,46 +86,23 @@ public class TerritoryService {
 
     @Cacheable(value = CacheConfig.CACHE_GEOJSON_ONE, key = "#number")
     public String getTerritoryGeoJson(Long number) {
-        List<ManzanaTerritorio> manzanas = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(number);
+        List<TerritoryRepository.ManzanaGeoJsonProjection> manzanas =
+                territoryRepository.findGeoJsonByTerritorioPadre(number);
         if (manzanas.isEmpty()) {
             throw new ResourceNotFoundException("Territorio", number);
         }
-        return convertToGeoJson(manzanas, number);
+        return geoJsonSerializer.serializeTerritory(manzanas, getColorForTerritory(number));
     }
 
     @Cacheable(CacheConfig.CACHE_GEOJSON_ALL)
     public String getAllTerritoriesGeoJson() {
         long start = System.nanoTime();
         try {
-            List<ManzanaTerritorio> allManzanas = territoryRepository.findAllGroupedByTerritorio();
+            List<TerritoryRepository.ManzanaGeoJsonProjection> allManzanas =
+                    territoryRepository.findAllGeoJsonGroupedByTerritorio();
             Map<Long, String> colorMap = self().getAllColors();
 
-            Map<Long, List<ManzanaTerritorio>> byTerritorio = allManzanas.stream()
-                    .collect(Collectors.groupingBy(ManzanaTerritorio::getTerritorioPadre, LinkedHashMap::new, Collectors.toList()));
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
-
-            boolean first = true;
-            for (Map.Entry<Long, List<ManzanaTerritorio>> entry : byTerritorio.entrySet()) {
-                Long number = entry.getKey();
-                String color = colorMap.getOrDefault(number, "#3b82f6");
-
-                for (ManzanaTerritorio m : entry.getValue()) {
-                    double[][] coords = parseWkbHexToCoords(m.getGeometry());
-                    if (coords == null || coords.length == 0) continue;
-
-                    if (!first) sb.append(",");
-                    first = false;
-
-                    appendFeature(sb, number, m.getNombreBloque(), coords);
-                    injectProperty(sb, "color", escapeJson(color));
-                    closeFeature(sb);
-                }
-            }
-
-            sb.append("]}");
-            return sb.toString();
+            return geoJsonSerializer.serializeAll(allManzanas, colorMap);
         } finally {
             long elapsed = System.nanoTime() - start;
             geojsonLoadTimer.record(elapsed, TimeUnit.NANOSECONDS);
@@ -166,130 +148,5 @@ public class TerritoryService {
         List<Long> numbers = self().getTerritoryNumbers();
         int idx = numbers.indexOf(number);
         return PALETTE[Math.max(0, idx) % PALETTE.length];
-    }
-
-    private String convertToGeoJson(List<ManzanaTerritorio> manzanas, Long territorioPadre) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
-
-        boolean first = true;
-        for (ManzanaTerritorio m : manzanas) {
-            double[][] coords = parseWkbHexToCoords(m.getGeometry());
-            if (coords == null || coords.length == 0) continue;
-
-            if (!first) sb.append(",");
-            first = false;
-
-            appendFeature(sb, territorioPadre, m.getNombreBloque(), coords);
-            closeFeature(sb);
-        }
-
-        sb.append("]}");
-        return sb.toString();
-    }
-
-    private void appendFeature(StringBuilder sb, Long territorioPadre, String nombreBloque, double[][] coords) {
-        sb.append("{\"type\":\"Feature\",");
-        sb.append("\"properties\":{");
-        sb.append("\"id\":\"").append(territorioPadre).append("-").append(nombreBloque).append("\",");
-        sb.append("\"nombre_bloque\":\"").append(escapeJson(nombreBloque)).append("\",");
-        sb.append("\"territorio_padre\":").append(territorioPadre);
-        sb.append("},");
-        sb.append("\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[");
-
-        for (int j = 0; j < coords.length; j++) {
-            if (j > 0) sb.append(",");
-            sb.append("[").append(coords[j][0]).append(",").append(coords[j][1]).append("]");
-        }
-
-        sb.append("]]");
-    }
-
-    private void injectProperty(StringBuilder sb, String key, String value) {
-        sb.append(",\"").append(key).append("\":\"").append(value).append("\"");
-    }
-
-    private void closeFeature(StringBuilder sb) {
-        sb.append("}}");
-    }
-
-    private double[][] parseWkbHexToCoords(String wkbHex) {
-        try {
-            byte[] bytes = hexToBytes(wkbHex);
-            if (bytes.length < 9) return null;
-
-            int byteOrder = bytes[0];
-            int geomType = readInt32(bytes, 1, byteOrder == 0);
-
-            int typeNum = geomType & 0xFF;
-            if (typeNum != 3) return null;
-
-            int offset = 5;
-            if ((geomType & 0x20000000) != 0) {
-                offset = 9;
-            }
-
-            boolean hasZ = (geomType & 0x80000000) != 0;
-            int coordSize = hasZ ? 3 : 2;
-
-            int numRings = readInt32(bytes, offset, byteOrder == 0);
-            offset += 4;
-
-            int numPoints = readInt32(bytes, offset, byteOrder == 0);
-            offset += 4;
-
-            double[][] coords = new double[numPoints][2];
-            for (int i = 0; i < numPoints; i++) {
-                coords[i][0] = readDouble(bytes, offset, byteOrder == 0);
-                coords[i][1] = readDouble(bytes, offset + 8, byteOrder == 0);
-                offset += coordSize * 8;
-            }
-
-            return coords;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private byte[] hexToBytes(String hex) {
-        if (hex.startsWith("0x") || hex.startsWith("0X")) hex = hex.substring(2);
-        hex = hex.replaceAll("\\s", "");
-        int len = hex.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character.digit(hex.charAt(i + 1), 16));
-        }
-        return data;
-    }
-
-    private int readInt32(byte[] bytes, int offset, boolean bigEndian) {
-        if (bigEndian) {
-            return ((bytes[offset] & 0xFF) << 24) | ((bytes[offset + 1] & 0xFF) << 16)
-                    | ((bytes[offset + 2] & 0xFF) << 8) | (bytes[offset + 3] & 0xFF);
-        } else {
-            return (bytes[offset] & 0xFF) | ((bytes[offset + 1] & 0xFF) << 8)
-                    | ((bytes[offset + 2] & 0xFF) << 16) | ((bytes[offset + 3] & 0xFF) << 24);
-        }
-    }
-
-    private double readDouble(byte[] bytes, int offset, boolean bigEndian) {
-        long bits;
-        if (bigEndian) {
-            bits = ((long) bytes[offset] & 0xFF) << 56 | ((long) bytes[offset + 1] & 0xFF) << 48
-                    | ((long) bytes[offset + 2] & 0xFF) << 40 | ((long) bytes[offset + 3] & 0xFF) << 32
-                    | ((long) bytes[offset + 4] & 0xFF) << 24 | ((long) bytes[offset + 5] & 0xFF) << 16
-                    | ((long) bytes[offset + 6] & 0xFF) << 8 | ((long) bytes[offset + 7] & 0xFF);
-        } else {
-            bits = (bytes[offset] & 0xFF) | ((long) bytes[offset + 1] & 0xFF) << 8
-                    | ((long) bytes[offset + 2] & 0xFF) << 16 | ((long) bytes[offset + 3] & 0xFF) << 24
-                    | ((long) bytes[offset + 4] & 0xFF) << 32 | ((long) bytes[offset + 5] & 0xFF) << 40
-                    | ((long) bytes[offset + 6] & 0xFF) << 48 | ((long) bytes[offset + 7] & 0xFF) << 56;
-        }
-        return Double.longBitsToDouble(bits);
-    }
-
-    private String escapeJson(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }

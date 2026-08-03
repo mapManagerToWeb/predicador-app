@@ -26,7 +26,10 @@ spring:
       enabled: true
   jpa:
     hibernate:
-      ddl-auto: validate
+      # Flyway gestiona el esquema; `none` evita que Hibernate valide antes de
+      # que Flyway migre (en Spring Boot 4 el EntityManagerFactory se crea
+      # antes que el initializer de Flyway).
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -38,6 +41,11 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: true
+    # Tabla de historial propia: territory-service y reporting-service comparten
+    # base de datos (Neon) pero versionan sus migraciones por separado. Sin esta
+    # tabla dedicada, la migración V1 (índices de manzanas) colisionaría con la
+    # V1 de reporting (índices de reportes) en el mismo historial.
+    table: flyway_schema_history_territory
 
 server:
   port: 8081

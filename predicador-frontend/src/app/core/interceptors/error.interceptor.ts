@@ -5,6 +5,7 @@ import { catchError, throwError } from 'rxjs';
 import { AuthTokenService } from '../services/auth-token';
 import { Profile } from '../services/profile';
 import { Toast } from '../services/toast';
+import { AuthService } from '../services/auth.service';
 
 /**
  * Endpoints that issue tokens or bootstrap a session. Errors here are handled
@@ -18,6 +19,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const authToken = inject(AuthTokenService);
   const profile = inject(Profile);
   const router = inject(Router);
+  const authService = inject(AuthService, { optional: true });
   const path = req.url.split('?')[0];
   const isAuthRequest = AUTH_URL_PATTERNS.some(p => path === p || path.endsWith(p));
 
@@ -27,9 +29,15 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       // Limpiar credenciales locales y forzar re-login. No aplicamos esta
       // lógica a los propios endpoints de login (evita loop y sobrescribir
       // el mensaje del formulario).
-      if ((error.status === 401 || error.status === 403) && !isAuthRequest) {
+      //
+      // Un 403 NO entra aquí: significa "autenticado pero sin permiso para
+      // este recurso" (o un token CSRF rechazado). Cerrar la sesión en ese
+      // caso expulsaba al usuario al login por acciones que solo debían
+      // mostrar un aviso.
+      if (error.status === 401 && !isAuthRequest) {
         authToken.clear();
         profile.clear();
+        authService?.invalidateCache();
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('isAdmin');
         }
@@ -43,6 +51,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
         if (error.status === 0) {
           message = 'Servidor no disponible';
+        } else if (error.status === 403) {
+          message = 'No tenés permisos para realizar esta acción';
         } else if (error.status === 404) {
           message = 'Recurso no encontrado';
         } else if (error.status === 429) {

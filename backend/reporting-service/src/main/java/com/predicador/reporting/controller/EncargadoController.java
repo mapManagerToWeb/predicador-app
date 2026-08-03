@@ -8,9 +8,12 @@ import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.data.domain.PageRequest;
@@ -18,8 +21,7 @@ import org.springframework.data.domain.Sort;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
-import java.security.SecureRandom;
-import java.util.HexFormat;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +34,7 @@ public class EncargadoController {
     private final boolean sessionCookieSecure;
 
     public EncargadoController(EncargadoService encargadoService, SessionTokenService tokens,
-            @Value("${app.session.cookie-secure:true}") boolean sessionCookieSecure) {
+            @Value("${app.session.cookie-secure:false}") boolean sessionCookieSecure) {
         this.encargadoService = encargadoService;
         this.tokens = tokens;
         this.sessionCookieSecure = sessionCookieSecure;
@@ -105,29 +107,49 @@ public class EncargadoController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
     }
 
+    @GetMapping("/session")
+    public ResponseEntity<?> validateSession(HttpServletRequest request) {
+        SessionToken sessionToken = token(request);
+        if (sessionToken == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "role", sessionToken.role(),
+                "subject", sessionToken.subject()
+        ));
+    }
+
     private ResponseEntity<LoginResponse> withSessionCookie(LoginResponse response) {
         if (response.token() == null) {
             return ResponseEntity.ok(response);
         }
+        // La cookie CSRF pertenece al edge (CsrfProtectionFilter en el gateway),
+        // que la rota al autenticar. Emitirla también aquí produce dos
+        // Set-Cookie con valores distintos en la misma respuesta.
         return ResponseEntity.ok()
-                .header("Set-Cookie", csrfCookie(), sessionCookie(response.token(), 12 * 60 * 60))
+                .header(HttpHeaders.SET_COOKIE, sessionCookie(response.token(), SESSION_TTL))
                 .body(new LoginResponse(response.encargado(), null));
     }
 
-    private String sessionCookie(String value, long maxAge) {
-        return "%s=%s; Path=/; Max-Age=%d; HttpOnly;%s SameSite=Lax"
-                .formatted(SessionAuthFilter.SESSION_COOKIE_NAME, value, maxAge,
-                        sessionCookieSecure ? " Secure;" : "");
-    }
+    /** Vida de la sesión; coincide con el TTL del token firmado. */
+    private static final Duration SESSION_TTL = Duration.ofHours(12);
 
-    private static final SecureRandom CSRF_RANDOM = new SecureRandom();
-
-    private String csrfCookie() {
-        byte[] bytes = new byte[32];
-        CSRF_RANDOM.nextBytes(bytes);
-        return "XSRF-TOKEN=%s; Path=/; HttpOnly=false;%s SameSite=Lax"
-                .formatted(HexFormat.of().formatHex(bytes),
-                        sessionCookieSecure ? " Secure;" : "");
+    /**
+     * Cookie de sesión serializada por {@link ResponseCookie} en vez de
+     * concatenar atributos a mano: evita combinaciones que el navegador
+     * interpreta al revés (p. ej. {@code HttpOnly=false} <em>sí</em> activa
+     * HttpOnly, según RFC 6265 §5.2.6).
+     */
+    private String sessionCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(SessionAuthFilter.SESSION_COOKIE_NAME, value)
+                .httpOnly(true)
+                .secure(sessionCookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(maxAge)
+                .build()
+                .toString();
     }
 
     /**

@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -136,11 +137,11 @@ public class SessionAuthFilter extends OncePerRequestFilter {
             methods = List.copyOf(methods);
         }
 
-        public static Rule of(String method, String regex, String requiredRole) {
+        public static Rule of(String method, String regex, @Nullable String requiredRole) {
             return new Rule(List.of(method), Pattern.compile(regex), requiredRole);
         }
 
-        public static Rule any(List<String> methods, String regex, String requiredRole) {
+        public static Rule any(List<String> methods, String regex, @Nullable String requiredRole) {
             return new Rule(methods, Pattern.compile(regex), requiredRole);
         }
     }

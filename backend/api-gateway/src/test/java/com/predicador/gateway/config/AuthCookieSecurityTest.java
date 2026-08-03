@@ -1,8 +1,7 @@
 package com.predicador.gateway.config;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpCookie;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -10,59 +9,31 @@ import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Edge protections that are not CSRF: actuator exposure and CORS.
+ *
+ * @see CsrfProtectionFilterTest for the double-submit token contract
+ */
 class AuthCookieSecurityTest {
 
     @Test
-    void csrfFilter_rejectsMutationWithoutMatchingToken() {
-        ActuatorAccessFilter filter = new ActuatorAccessFilter();
-        MockServerHttpRequest request = MockServerHttpRequest.method(HttpMethod.POST, "/api/v1/reports")
-                .cookie(new HttpCookie("XSRF-TOKEN", "cookie-token"))
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    void actuatorFilter_blocksSensitiveEndpoints() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/actuator/env").build());
 
-        filter.filter(exchange, ignored -> Mono.empty()).block();
+        new ActuatorAccessFilter().filter(exchange, ignored -> Mono.empty()).block();
 
-        assertThat(exchange.getResponse().getStatusCode().value()).isEqualTo(403);
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
-    void csrfFilter_allowsMutationWithMatchingToken() {
-        ActuatorAccessFilter filter = new ActuatorAccessFilter();
-        MockServerHttpRequest request = MockServerHttpRequest.method(HttpMethod.POST, "/api/v1/reports")
-                .cookie(new HttpCookie("XSRF-TOKEN", "csrf-token"))
-                .header("X-XSRF-TOKEN", "csrf-token")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    void actuatorFilter_allowsHealthProbes() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/actuator/health/readiness").build());
 
-        filter.filter(exchange, ignored -> Mono.empty()).block();
+        new ActuatorAccessFilter().filter(exchange, ignored -> Mono.empty()).block();
 
         assertThat(exchange.getResponse().getStatusCode()).isNull();
-    }
-
-    @Test
-    void csrfFilter_allowsPublicLoginBootstrapWithoutCsrfToken() {
-        ActuatorAccessFilter filter = new ActuatorAccessFilter();
-        MockServerHttpRequest request = MockServerHttpRequest.method(HttpMethod.POST, "/api/v1/encargados/login")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
-
-        filter.filter(exchange, ignored -> Mono.empty()).block();
-
-        assertThat(exchange.getResponse().getStatusCode()).isNull();
-    }
-
-    @Test
-    void csrfEndpoint_deliversReadableSecureSameSiteToken() {
-        ActuatorAccessFilter filter = new ActuatorAccessFilter();
-        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/auth/csrf").build());
-
-        filter.filter(exchange, ignored -> Mono.empty()).block();
-
-        assertThat(exchange.getResponse().getHeaders().getFirst("Set-Cookie"))
-                .contains("XSRF-TOKEN=")
-                .contains("Secure")
-                .contains("SameSite=Lax")
-                .doesNotContain("HttpOnly");
     }
 
     @Test

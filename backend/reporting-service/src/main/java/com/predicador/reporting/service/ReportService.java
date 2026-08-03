@@ -39,6 +39,35 @@ public class ReportService {
 
     @Transactional
     public List<ReportDto> createReports(List<ReportDto> dtos, SessionToken token) {
+        if (token != null && token.hasRole(SessionToken.ROLE_ENCARGADO)) {
+            try {
+                Long tokenEncargadoId = Long.valueOf(token.subject());
+                dtos = dtos.stream().map(dto -> {
+                    if (dto.encargadoId() == null) {
+                        return new ReportDto(
+                                dto.id(),
+                                dto.manzanaId(),
+                                dto.fecha(),
+                                dto.encargadoNombre(),
+                                dto.encargadoApellido(),
+                                dto.sessionTime(),
+                                dto.estado(),
+                                dto.territorioNumero(),
+                                tokenEncargadoId,
+                                dto.totalManzanas(),
+                                dto.manzanasMarcadas(),
+                                dto.tipoSesion(),
+                                dto.geometriaParcial(),
+                                dto.puntosParciales(),
+                                dto.manzanasIds()
+                        );
+                    }
+                    return dto;
+                }).collect(Collectors.toList());
+            } catch (NumberFormatException ignored) {
+                // If token subject is non-numeric, fall through to authorization check
+            }
+        }
         dtos.forEach(dto -> authorization.authorizeOwner(token, dto.encargadoId()));
         long start = System.nanoTime();
         try {
@@ -65,7 +94,9 @@ public class ReportService {
     }
 
     public Page<ReportDto> getReportsByTerritorio(Long territorioNumero, Pageable pageable, SessionToken token) {
-        authorization.requireAdmin(token);
+        // Cualquier encargado autenticado debe poder leer el progreso de un
+        // territorio para restaurar las marcas en el mapa al iniciar sesión.
+        authorization.requireAuthenticated(token);
         return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero, pageable).map(this::toDto);
     }
 
@@ -76,7 +107,7 @@ public class ReportService {
 
     public Map<Long, List<ReportDto>> getReportsByMultipleTerritorios(Collection<Long> territorioNumeros,
                                                                        SessionToken token) {
-        authorization.requireAdmin(token);
+        authorization.requireAuthenticated(token);
         if (territorioNumeros == null || territorioNumeros.size() > MAX_BATCH_SIZE) {
             throw new IllegalArgumentException("El lote de territorios no puede superar " + MAX_BATCH_SIZE);
         }

@@ -129,7 +129,7 @@ class EncargadoControllerTest {
             .andReturn();
 
         java.util.List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
-        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(1);
         org.assertj.core.api.Assertions.assertThat(setCookieHeaders)
                 .anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("Secure") && c.contains("SameSite=Lax"));
     }
@@ -152,13 +152,13 @@ class EncargadoControllerTest {
             .andReturn();
 
         java.util.List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
-        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(1);
         org.assertj.core.api.Assertions.assertThat(setCookieHeaders)
                 .anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("Secure") && c.contains("SameSite=Lax"));
     }
 
     @Test
-    void login_setsCsrfCookieAlongsideSessionCookie() throws Exception {
+    void login_doesNotEmitCsrfCookie() throws Exception {
         EncargadoDto dto = createDto(7L, "Ana", "Perez");
 
         when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
@@ -171,12 +171,14 @@ class EncargadoControllerTest {
             .andExpect(status().isOk())
             .andReturn();
 
+        // El token CSRF es responsabilidad del gateway (CsrfProtectionFilter):
+        // un servicio detrás del edge que también lo emita deja al navegador
+        // con dos valores distintos y rompe el double-submit.
         java.util.List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
-        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(setCookieHeaders).hasSize(1);
         org.assertj.core.api.Assertions.assertThat(setCookieHeaders.get(0))
-                .contains("XSRF-TOKEN=").contains("SameSite=Lax");
-        org.assertj.core.api.Assertions.assertThat(setCookieHeaders.get(1))
-                .contains("predicador_session=").contains("HttpOnly").contains("SameSite=Lax");
+                .contains("predicador_session=").contains("HttpOnly").contains("SameSite=Lax")
+                .doesNotContain("XSRF-TOKEN");
     }
 
     @Test

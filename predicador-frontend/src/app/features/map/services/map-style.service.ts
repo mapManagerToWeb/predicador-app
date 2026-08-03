@@ -1,20 +1,23 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { getTerritoryFillOpacity } from '../utils/territory-colors';
+import { MapLayerRegistry } from './map-layer-registry.service';
 import type { FeatureLayer, ManzanaMarcada } from '../types/map.types';
 
-// ─── Pure style functions (testable without Leaflet) ────────────────
+// ─── Pure style functions (the single source of truth) ──────────────
+// Every style decision in the map feature funnels through these. They are
+// deliberately pure (no Leaflet objects) so the interface is the test surface:
+// what the tests assert is exactly what production renders.
 
-export function getBaseTerritoryStyle(
-  color: string,
-  isComplete: boolean
-): L.PathOptions {
+export function getBaseTerritoryStyle(color: string, isComplete: boolean): L.PathOptions {
   return {
-    opacity: 1,
+    fillColor: color,
     fillOpacity: getTerritoryFillOpacity(isComplete),
+    opacity: 1,
     color,
     weight: STYLE_DEFAULTS.polygon.weight,
+    stroke: true,
   };
 }
 
@@ -22,8 +25,10 @@ export function getMarkedManzanaStyle(color: string): L.PathOptions {
   return {
     fillColor: color,
     fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
+    opacity: 1,
     color,
     weight: STYLE_DEFAULTS.polygon.weight,
+    stroke: true,
   };
 }
 
@@ -31,13 +36,32 @@ export function getHiddenStyle(): L.PathOptions {
   return { ...STYLE_DEFAULTS.hiddenPolygon };
 }
 
-export function getSelectedManzanaStyle(color: string): L.PathOptions {
+export function getSelectedManzanaStyle(): L.PathOptions {
+  return { ...STYLE_DEFAULTS.selectedManzana };
+}
+
+export function getPartialPolygonStyle(color: string, dashed: boolean): L.PathOptions {
   return {
-    weight: STYLE_DEFAULTS.selectedManzana.weight,
-    color: STYLE_DEFAULTS.selectedManzana.color,
+    color,
     fillColor: color,
-    fillOpacity: STYLE_DEFAULTS.selectedManzana.fillOpacity,
+    fillOpacity: STYLE_DEFAULTS.partialPolygon.fillOpacity,
+    weight: STYLE_DEFAULTS.partialPolygon.weight,
+    dashArray: dashed ? STYLE_DEFAULTS.partialPolygon.dashArray : undefined,
   };
+}
+
+export function getPartialPolygonCompleteStyle(color: string): L.PathOptions {
+  return {
+    color,
+    fillColor: color,
+    fillOpacity: STYLE_DEFAULTS.partialPolygonComplete.fillOpacity,
+    weight: STYLE_DEFAULTS.partialPolygonComplete.weight,
+    dashArray: undefined,
+  };
+}
+
+export function getCaptureUnmarkedStyle(color: string): L.PathOptions {
+  return { opacity: 0.6, fillOpacity: 0.05, color, weight: 1.5 };
 }
 
 /**
@@ -50,6 +74,7 @@ export function getSelectedManzanaStyle(color: string): L.PathOptions {
 export class MapStyleService implements OnDestroy {
   private pendingStyleFrame: number | null = null;
   private pendingStyleQueue: Array<() => void> = [];
+  private readonly registry = inject(MapLayerRegistry);
 
   queueStyleUpdate(fn: () => void): void {
     this.pendingStyleQueue.push(fn);
@@ -86,15 +111,11 @@ export class MapStyleService implements OnDestroy {
   ): void {
     const total = options.total ?? manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = options.isComplete ?? (total > 0 && marcadasCount >= total);
-    const fillOpacity = getTerritoryFillOpacity(isComplete);
+    const style = getBaseTerritoryStyle(color, isComplete);
 
     for (const fl of allTerritoriesLayer) {
       if (fl.territorioPadre !== territorioNumero) continue;
-      fl.layer.eachLayer(l => {
-        if (l instanceof L.Path) {
-          l.setStyle({ fillColor: color, fillOpacity, opacity: 1, color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true });
-        }
-      });
+      this.applyStyleToFeatureLayer(fl, style);
     }
   }
 
@@ -111,40 +132,20 @@ export class MapStyleService implements OnDestroy {
       const total = manzanaIndex.filter(m => m.territorioNumero === num).length;
       const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num).length;
       const isComplete = total > 0 && marcadas >= total;
-      const fillOpacity = getTerritoryFillOpacity(isComplete);
 
-      this.applyStyleToFeatureLayer(featureLayer, {
-        fillOpacity,
-        opacity: 1,
-        weight: STYLE_DEFAULTS.polygon.weight,
-        fillColor: featureLayer.color,
-        color: featureLayer.color,
-        stroke: true,
-      });
+      this.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
 
       const marcadasLayers = manzanasMarcadas.filter(m => m.territorioNumero === num);
       for (const m of marcadasLayers) {
-        m.layer.setStyle({
-          fillColor: featureLayer.color,
-          fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
-          color: featureLayer.color,
-          weight: STYLE_DEFAULTS.polygon.weight,
-          stroke: true,
-        });
+        const layer = this.registry.get(m.id);
+        if (layer) layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
       }
     }
   }
 
   limpiarMarcasVisuales(allTerritoriesLayer: FeatureLayer[]): void {
     for (const fl of allTerritoriesLayer) {
-      this.applyStyleToFeatureLayer(fl, {
-        fillColor: fl.color,
-        fillOpacity: STYLE_DEFAULTS.polygon.fillOpacity,
-        color: fl.color,
-        weight: STYLE_DEFAULTS.polygon.weight,
-        opacity: 1,
-        stroke: true,
-      });
+      this.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(fl.color, false));
     }
   }
 
