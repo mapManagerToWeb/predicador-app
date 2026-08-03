@@ -7,9 +7,9 @@ services:
     expose:
       - "8888"
     environment:
-      - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
       # El config-server materializa placeholders como ${SESSION_SECRET} en
       # los YAML servidos. Pasar el valor aquí es lo que hace que los servicios
       # downstream (gateway, reporting, territory) reciban el secret propagado.
@@ -18,7 +18,10 @@ services:
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
+      # El config-server sirve config desde classpath (perfil `native`).
+      # Un SPRING_PROFILES_ACTIVE vacío (default de ${VAR:-}) sobreescribiría
+      # ese perfil y haría que intente usar un repo git sin uri. Default nativo.
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-native}
       # Igual con las credenciales admin, que hoy se resuelven al arrancar el
       # gateway pero el config-server también las sirve como overlay opcional.
       - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
@@ -77,7 +80,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
       # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
       # Para activar tracing con el colector, levantar con el perfil observability
       # y exportar en el shell del host:
@@ -104,9 +107,9 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
       # Debe coincidir con el api-gateway y reporting-service: mismo HMAC
       # secret para poder verificar los tokens que emiten los otros servicios.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
@@ -136,9 +139,9 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - DB_URL=${DB_URL:-jdbc:postgresql://localhost:5432/predicador}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-asignacion_territorio}

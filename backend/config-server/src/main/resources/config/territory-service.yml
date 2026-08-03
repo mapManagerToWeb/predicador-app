@@ -8,7 +8,9 @@ spring:
     password: ${DB_PASSWORD:}
   jpa:
     hibernate:
-      ddl-auto: validate
+      # Flyway gestiona el esquema; `none` evita que Hibernate valide antes de
+      # que Flyway migre (Spring Boot 4 crea el EntityManagerFactory primero).
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -19,6 +21,9 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: true
+    # Historial propio: territory y reporting comparten la BD pero versionan
+    # sus migraciones por separado para no colisionar en la misma tabla.
+    table: flyway_schema_history_territory
 
 server:
   port: 8081

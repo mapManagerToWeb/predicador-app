@@ -9,6 +9,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import javax.annotation.Nullable;
 import java.util.List;
 
 /**
@@ -40,7 +41,7 @@ public class SecurityConfig {
 
         List<Rule> rules = List.of(
                 // Reports: todo excepto rutas internas quedan protegidas.
-                Rule.any(List.of("GET", "POST"), "^/api/v1/reports(/.*)?$", ROLE_ANY),
+                Rule.any(List.of("GET", "POST"), "^/api/v1/reports(/.*)?$", null),
 
                 // Encargados: mutaciones y consultas requieren sesión.
                 // Excluye:
@@ -48,9 +49,10 @@ public class SecurityConfig {
                 //   POST /encargados/buscar-crear   (emite token; también registra)
                 //   POST /encargados                (registro directo)
                 //   POST /encargados/{id}? via PUT abajo
-                Rule.of("PUT", "^/api/v1/encargados/[0-9]+$", ROLE_ANY),
-                Rule.of("GET", "^/api/v1/encargados/?$", ROLE_ANY),
-                Rule.of("GET", "^/api/v1/encargados/buscar$", ROLE_ANY)
+                Rule.of("PUT", "^/api/v1/encargados/[0-9]+$", null),
+                Rule.of("GET", "^/api/v1/encargados/?$", null),
+                Rule.of("GET", "^/api/v1/encargados/buscar$", null),
+                Rule.of("GET", "^/api/v1/encargados/session$", null)
         );
 
         FilterRegistrationBean<SessionAuthFilter> reg = new FilterRegistrationBean<>(

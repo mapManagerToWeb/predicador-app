@@ -4,6 +4,7 @@ import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { latLngDist, traceContourBetween } from '../map-geometry';
 import polygonClipping from 'polygon-clipping';
 import { MapEngineService } from './map-engine.service';
+import { getPartialPolygonStyle } from './map-style.service';
 import type { SnappedPoint, Edge } from '../map-geometry';
 
 /**
@@ -90,13 +91,7 @@ export class MapPartialDrawService {
   private createPolygonFromLatLngs(latlngs: L.LatLngExpression[], color: string, map: L.Map): void {
     if (latlngs.length < 2) return;
     const fillColor = color || '#22c55e';
-    const polygon = L.polygon(latlngs, {
-      color: fillColor,
-      fillColor,
-      fillOpacity: STYLE_DEFAULTS.partialPolygon.fillOpacity,
-      weight: STYLE_DEFAULTS.partialPolygon.weight,
-      dashArray: latlngs.length < 3 ? STYLE_DEFAULTS.partialPolygon.dashArray : undefined,
-    }).addTo(map);
+    const polygon = L.polygon(latlngs, getPartialPolygonStyle(fillColor, latlngs.length < 3)).addTo(map);
     this.poligonoParcial = polygon;
   }
 

@@ -104,7 +104,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **Selección de territorios**: Búsqueda con autocompletado, selección múltiple
 - **Gestión de colores**: Colores asignados por territorio para diferenciación visual
 - **Captura de pantalla**: Screenshot automático del mapa para envío por WhatsApp
-- **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada
+- **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada; el reporte se envía **siempre con la captura** (aunque todos los territorios estén completos) y cada territorio se lista como `*terminado*` o `*incompleto*`, dirigido al teléfono del encargado logueado
 - **Guardado local**: Marcado persistido en base de datos, restauración al recargar
 - **Modo oscuro**: Soporte completo de temas claro/oscuro
 - **PWA**: Instalable, funciona offline con Service Worker
@@ -241,6 +241,32 @@ mvn clean verify
 npx sonar-scanner
 ```
 
+## Base de datos (Neon + PostGIS) e importación de territorios
+
+La base de datos es PostgreSQL + PostGIS (Neon en producción). Los territorios
+se importan **externamente** en la tabla `manzanas_territorio`: cada manzana
+guarda su geometría como tipo PostGIS `geometry(GeometryZ, 4326)` (la columna
+`geometry`). No hay un seed automático en el repo; los shapes se cargaron una vez
+con el SRID 4326 (Polygon y MultiPolygon, con coordenadas 2D + Z).
+
+`territory-service` expone esa geometría como GeoJSON generándolo con PostGIS
+(`ST_AsGeoJSON(ST_Force2D(geometry))`), de modo que no se parsea WKB/WKT en Java
+y se soportan Polygon, MultiPolygon y huecos de forma nativa.
+
+### Migraciones (Flyway)
+
+Cada servicio que posee base de datos versiona sus migraciones en una tabla de
+historial **propia**, aunque compartan la misma base:
+
+| Servicio | Tabla de historial | Migraciones |
+|---|---|---|
+| `territory-service` | `flyway_schema_history_territory` | `V1__add_indexes.sql` (índices de `manzanas_territorio` y `territory_settings`) |
+| `reporting-service` | Flyway deshabilitado | `V1_1`, `V2`, `V3` (dedupe de encargados, índices, `whatsapp_delivery_idempotency`) |
+
+Nota: si se vuelve a habilitar Flyway en `reporting-service`, debe apuntar a una
+tabla de historial propia (`flyway_schema_history_reporting`) para no colisionar
+con las versiones de `territory-service`.
+
 ## Variables de Entorno
 
 Ver `.env.example` para la lista completa.
@@ -325,11 +351,12 @@ npm run test:coverage        # Con cobertura V8
 # Lines: 80% | Statements: 80% | Functions: 80% | Branches: 75%
 ```
 
-**Archivos de test (15 spec files):**
-- Core: `profile.ts`, `auth-token.ts`, `territorio.ts`, `toast.ts`, `whatsapp.ts`, `rum.ts`
-- Interceptors: `auth.interceptor.ts`, `error.interceptor.ts`
-- Map: `map.ts`, `map-envio.ts`, `map-territory-layer.ts`, `map-rendering.facade.ts`, `map-style.ts`, `territory-search.ts`
-- Admin: `admin.ts`
+**Archivos de test (26 spec files):**
+- Core: `profile.ts`, `auth-token.ts`, `territorio.ts`, `toast.ts`, `whatsapp.ts`, `rum.ts`, `phone.ts`, `encargado.ts`
+- Interceptors: `auth.interceptor.ts`, `error.interceptor.ts`, `csrf.interceptor.ts`
+- Guards: `admin.guard.ts`, `profile.guard.ts`
+- Map: `map.ts`, `map-report.service.ts`, `map-geometry.ts`, `map-rendering.facade.ts`, `map-state.service.ts`, `map-style.ts`, `map-selection.service.ts`, `map-data-persistence.service.ts`, `map-territory-layer.ts`, `territory-search.ts`
+- Auth/Admin/Profile: `login.ts`, `admin.ts`, `profile.ts`
 
 ### Backend
 

@@ -91,14 +91,13 @@ export class MapDataPersistenceService {
     let whatsappSent = false;
     try {
       const territorios = this.reportService.buildTerritoriosEnvio(marcadas, this.rendering.getAllTerritoriesLayer());
-      const requiereScreenshot = territorios.some(t => !t.finalizado);
-      let screenshotBase64: string | null = null;
-      if (requiereScreenshot) {
-        screenshotBase64 = await this.reportService.captureScreenshot(
-          () => this.prepararCaptura(),
-          () => this.restaurarMapaPostCaptura()
-        );
-      }
+      // El reporte se envía SIEMPRE con la captura del mapa (aunque todos los
+      // territorios estén completos). Si la captura falla, se propaga el error
+      // y se bloquea el envío para no mandar una imagen placeholder.
+      const screenshotBase64 = await this.reportService.captureScreenshot(
+        () => this.prepararCaptura(),
+        () => this.restaurarMapaPostCaptura()
+      );
 
       const request = this.reportService.buildWhatsAppRequest(
         perfil,
@@ -127,7 +126,7 @@ export class MapDataPersistenceService {
 
       if (success) {
         const mensajes = territorios.map(t => {
-          const estado = t.finalizado ? '*terminado*' : '*faltante*';
+          const estado = t.finalizado ? '*terminado*' : '*incompleto*';
           return `Territorio ${t.numero} ${estado}`;
         });
         this.toastService.show(mensajes.join('\n'));

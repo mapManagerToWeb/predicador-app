@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LoginPage } from './login';
 import { Profile } from '../../core/services/profile';
+import { AuthTokenService } from '../../core/services/auth-token';
 import { EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -9,7 +10,7 @@ describe('LoginPage', () => {
   let fixture: ComponentFixture<LoginPage>;
   let component: LoginPage;
   let encargadoService: { loginByPhone: ReturnType<typeof vi.fn> };
-  let profile: { save: ReturnType<typeof vi.fn> };
+  let profile: { save: ReturnType<typeof vi.fn>; hasProfile: ReturnType<typeof vi.fn> };
   let toast: { show: ReturnType<typeof vi.fn> };
   let router: {
     navigate: ReturnType<typeof vi.fn>;
@@ -19,8 +20,9 @@ describe('LoginPage', () => {
   };
 
   beforeEach(async () => {
+    localStorage.clear();
     encargadoService = { loginByPhone: vi.fn() };
-    profile = { save: vi.fn() };
+    profile = { save: vi.fn(), hasProfile: vi.fn().mockReturnValue(false) };
     toast = { show: vi.fn() };
     router = {
       navigate: vi.fn().mockResolvedValue(true),
@@ -32,6 +34,7 @@ describe('LoginPage', () => {
     await TestBed.configureTestingModule({
       imports: [LoginPage],
       providers: [
+        AuthTokenService,
         { provide: EncargadoService, useValue: encargadoService },
         { provide: Profile, useValue: profile },
         { provide: Toast, useValue: toast },
@@ -42,6 +45,17 @@ describe('LoginPage', () => {
 
     fixture = TestBed.createComponent(LoginPage);
     component = fixture.componentInstance;
+  });
+
+  it('redirects to /map when an encargado session is already present (refresh case)', () => {
+    TestBed.inject(AuthTokenService).set('encargado');
+    (profile.hasProfile as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+    fixture = TestBed.createComponent(LoginPage);
+    component = fixture.componentInstance;
+    component.ngOnInit();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/map']);
   });
 
   it('does nothing when the phone is empty', async () => {

@@ -1,10 +1,12 @@
 package com.predicador.territory.service;
 
 import com.predicador.territory.dto.TerritoryDto;
-import com.predicador.territory.model.ManzanaTerritorio;
+import com.predicador.territory.geojson.HibernateSpatialTerritoryGeoJsonSerializer;
+import com.predicador.territory.geojson.TerritoryGeoJsonSerializer;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
+import com.predicador.territory.repository.TerritoryRepository.ManzanaGeoJsonProjection;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +19,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,20 +32,36 @@ class TerritoryServiceTest {
     @Mock
     private TerritoryColorRepository colorRepository;
 
+    private TerritoryGeoJsonSerializer geoJsonSerializer;
     private TerritoryService territoryService;
 
     @BeforeEach
     void setUp() {
-        territoryService = new TerritoryService(territoryRepository, colorRepository, new SimpleMeterRegistry());
+        geoJsonSerializer = new HibernateSpatialTerritoryGeoJsonSerializer();
+        territoryService = new TerritoryService(territoryRepository, colorRepository, geoJsonSerializer, new SimpleMeterRegistry());
     }
 
-    private ManzanaTerritorio createManzana(Long id, Long territorioPadre, String nombreBloque, String geometry) {
-        ManzanaTerritorio m = new ManzanaTerritorio();
-        m.setId(id);
-        m.setTerritorioPadre(territorioPadre);
-        m.setNombreBloque(nombreBloque);
-        m.setGeometry(geometry);
-        return m;
+    private ManzanaGeoJsonProjection projection(Long territorioPadre, String nombreBloque, String geoJson) {
+        return new ManzanaGeoJsonProjection() {
+            @Override
+            public Long getTerritorioPadre() {
+                return territorioPadre;
+            }
+
+            @Override
+            public String getNombreBloque() {
+                return nombreBloque;
+            }
+
+            @Override
+            public String getGeoJson() {
+                return geoJson;
+            }
+        };
+    }
+
+    private String simplePolygonGeojson() {
+        return "{\"type\":\"Polygon\",\"coordinates\":[[[-73.4,-37.4],[-73.4,-37.5],[-73.5,-37.5],[-73.5,-37.4],[-73.4,-37.4]]]}";
     }
 
     @Test
@@ -57,8 +76,8 @@ class TerritoryServiceTest {
 
     @Test
     void getTerritory_shouldReturnDto() {
-        ManzanaTerritorio m = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m));
+        ManzanaGeoJsonProjection m = projection(1L, "1.a", simplePolygonGeojson());
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m));
         when(colorRepository.findById(1L)).thenReturn(Optional.of(new TerritoryColor()));
 
         TerritoryDto result = territoryService.getTerritory(1L);
@@ -72,15 +91,15 @@ class TerritoryServiceTest {
 
     @Test
     void getTerritory_shouldThrowWhenNotFound() {
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(99L)).thenReturn(List.of());
+        when(territoryRepository.findGeoJsonByTerritorioPadre(99L)).thenReturn(List.of());
 
         assertThrows(RuntimeException.class, () -> territoryService.getTerritory(99L));
     }
 
     @Test
     void getTerritoryGeoJson_shouldReturnGeoJson() {
-        ManzanaTerritorio m = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m));
+        ManzanaGeoJsonProjection m = projection(1L, "1.a", simplePolygonGeojson());
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m));
 
         String result = territoryService.getTerritoryGeoJson(1L);
 
@@ -93,10 +112,10 @@ class TerritoryServiceTest {
 
     @Test
     void getAllTerritoriesGeoJson_shouldReturnAllFeatures() {
-        ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
-        ManzanaTerritorio m2 = createManzana(2L, 2L, "2.a", createSimplePolygonHex());
+        ManzanaGeoJsonProjection m1 = projection(1L, "1.a", simplePolygonGeojson());
+        ManzanaGeoJsonProjection m2 = projection(2L, "2.a", simplePolygonGeojson());
 
-        when(territoryRepository.findAllGroupedByTerritorio()).thenReturn(List.of(m1, m2));
+        when(territoryRepository.findAllGeoJsonGroupedByTerritorio()).thenReturn(List.of(m1, m2));
         when(territoryRepository.findDistinctTerritorioPadres()).thenReturn(List.of(1L, 2L));
         when(colorRepository.findAll()).thenReturn(List.of());
 
@@ -162,10 +181,10 @@ class TerritoryServiceTest {
 
     @Test
     void getTerritoryGeoJson_shouldHandleMultipleManzanas() {
-        ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
-        ManzanaTerritorio m2 = createManzana(2L, 1L, "1.b", createSimplePolygonHex());
+        ManzanaGeoJsonProjection m1 = projection(1L, "1.a", simplePolygonGeojson());
+        ManzanaGeoJsonProjection m2 = projection(1L, "1.b", simplePolygonGeojson());
 
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m1, m2));
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m1, m2));
 
         String result = territoryService.getTerritoryGeoJson(1L);
 
@@ -175,23 +194,23 @@ class TerritoryServiceTest {
 
     @Test
     void getTerritoryGeoJson_shouldSkipEmptyGeometry() {
-        ManzanaTerritorio m = createManzana(1L, 1L, "1.a", null);
+        ManzanaGeoJsonProjection m = projection(1L, "1.a", null);
 
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m));
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m));
 
         String result = territoryService.getTerritoryGeoJson(1L);
 
         assertTrue(result.contains("FeatureCollection"));
-        assertFalse(result.contains("Feature,"));
+        assertFalse(result.contains("1.a"));
     }
 
     @Test
     void getTerritoryGeoJson_shouldNotProduceDoubleCommaWhenMiddleGeometryInvalid() {
-        ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
-        ManzanaTerritorio m2 = createManzana(2L, 1L, "1.b", null);
-        ManzanaTerritorio m3 = createManzana(3L, 1L, "1.c", createSimplePolygonHex());
+        ManzanaGeoJsonProjection m1 = projection(1L, "1.a", simplePolygonGeojson());
+        ManzanaGeoJsonProjection m2 = projection(1L, "1.b", null);
+        ManzanaGeoJsonProjection m3 = projection(1L, "1.c", simplePolygonGeojson());
 
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m1, m2, m3));
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m1, m2, m3));
 
         String result = territoryService.getTerritoryGeoJson(1L);
 
@@ -203,46 +222,15 @@ class TerritoryServiceTest {
 
     @Test
     void getTerritoryGeoJson_shouldNotProduceTrailingCommaWhenLastGeometryInvalid() throws Exception {
-        ManzanaTerritorio m1 = createManzana(1L, 1L, "1.a", createSimplePolygonHex());
-        ManzanaTerritorio m2 = createManzana(2L, 1L, "1.b", null);
+        ManzanaGeoJsonProjection m1 = projection(1L, "1.a", simplePolygonGeojson());
+        ManzanaGeoJsonProjection m2 = projection(1L, "1.b", null);
 
-        when(territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(1L)).thenReturn(List.of(m1, m2));
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m1, m2));
 
         String result = territoryService.getTerritoryGeoJson(1L);
 
         assertFalse(result.contains(",]}"), "No debe quedar una coma final antes de cerrar el arreglo");
         com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result);
         assertEquals(1, json.get("features").size());
-    }
-
-    private String createSimplePolygonHex() {
-        byte[] bytes = new byte[]{
-            0x01,                                           // byteOrder: little-endian
-            0x03, 0x00, 0x00, 0x20,                         // geometryType: Polygon with SRID
-            0x0E, 0x00, 0x00, 0x00,                         // SRID: 4326
-            0x01, 0x00, 0x00, 0x00,                         // numRings: 1
-            0x05, 0x00, 0x00, 0x00,                         // numPoints: 5
-            // Point 1: (-73.4, -37.4)
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x14, 0x00, 0x00, 0x00,
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x14, 0x00, 0x00, 0x00,
-            // Point 2: (-73.4, -37.5)
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x14, 0x00, 0x00, 0x00,
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x24, 0x00, 0x00, 0x00,
-            // Point 3: (-73.5, -37.5)
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x24, 0x00, 0x00, 0x00,
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x24, 0x00, 0x00, 0x00,
-            // Point 4: (-73.5, -37.4)
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x24, 0x00, 0x00, 0x00,
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x14, 0x00, 0x00, 0x00,
-            // Point 5: (-73.4, -37.4) - close
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x14, 0x00, 0x00, 0x00,
-            0x77, (byte)0xBE, (byte)0x9F, (byte)0xC0, 0x14, 0x00, 0x00, 0x00,
-        };
-
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
     }
 }

@@ -1,0 +1,11 @@
+# Hallazgos altos
+
+## Seguridad y autorización
+
+1. **Autorización no ligada al propietario del recurso** — `backend/reporting-service/src/main/java/com/predicador/reporting/config/SecurityConfig.java:28-30,41-53`, `EncargadoController.java:40-42`, `ReportController.java:30-64`. Los endpoints aceptan cualquier token válido sin comprobar que el `encargadoId` o el recurso correspondan al sujeto. Aplicar autorización por rol y propietario; reservar operaciones globales a administradores. **Esfuerzo: M.**
+2. **Servicios internos publicados fuera del gateway** — `docker-compose.yml:7-8,35-36,87-88,116-117`. Config Server, discovery, territory y reporting tienen `ports` publicados. Un cliente puede eludir rate limiting, CORS y cabeceras del gateway. Publicar solo el gateway y usar redes internas. **Esfuerzo: M.**
+3. **Config Server y Actuator expuestos** — `backend/config-server/src/main/resources/application.yml:10-17`, `backend/config-server/src/main/resources/config/api-gateway.yml:22-33`, configuraciones de servicios. Restringir Config Server y endpoints de gestión a la red administrativa/scraper; exponer como mínimo solo health. **Esfuerzo: M.**
+4. **Autorización administrativa frontend manipulable** — `predicador-frontend/src/app/core/guards/admin.guard.ts:18-24`, `src/app/features/admin/admin.ts:45-52,67-76`. El guard devuelve siempre `true` y el flag `isAdmin` de `localStorage` se puede modificar. El backend debe ser la autoridad; eliminar el flag y exigir sesión/rol validado. **Esfuerzo: M.**
+5. **Perfil e identidad confiados desde `localStorage`** — `src/app/core/guards/profile.guard.ts:5-14`, `src/app/core/services/profile.ts:8-23`. El perfil puede falsificarse o crearse al fallar el backend. No usarlo como autenticación ni autorización. **Esfuerzo: M.**
+6. **Token de sesión en `localStorage`** — `src/app/core/services/auth-token.ts:14-18,37-55`. Un XSS futuro podría extraerlo. Evaluar cookie `HttpOnly`, `Secure`, `SameSite` con protección CSRF. **Esfuerzo: L.**
+7. **Workflow Docker con contexto incompatible** — `.github/workflows/docker.yml:49-53` usa `backend/<service>`, pero `backend/api-gateway/Dockerfile:3-9` espera `pom.xml` y `shared/pom.xml` desde la raíz de backend. Verificar/corregir el contexto a `backend/` y ejecutar el build en CI. **Esfuerzo: S.**

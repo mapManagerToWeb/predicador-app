@@ -1,8 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
-import { STYLE_DEFAULTS } from '../utils/map-constants';
-import { getTerritoryFillOpacity } from '../utils/territory-colors';
 import { MapEngineService } from './map-engine.service';
+import {
+  getBaseTerritoryStyle,
+  getHiddenStyle,
+  getMarkedManzanaStyle,
+} from './map-style.service';
+import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapTileLayerService } from './map-tile-layer.service';
 import { MapTerritoryLayerService, type ManzanaClickHandler } from './map-territory-layer.service';
 import { MapStyleService } from './map-style.service';
@@ -38,6 +42,7 @@ export class MapRenderingFacade {
   private readonly capture = inject(MapCaptureService);
   private readonly partialDraw = inject(MapPartialDrawService);
   private readonly state = inject(MapStateService);
+  private readonly registry = inject(MapLayerRegistry);
 
   // ─── Engine delegation ───────────────────────────────────────────
 
@@ -163,7 +168,7 @@ export class MapRenderingFacade {
 
     for (const fl of this.territories.getAllTerritoriesLayer()) {
       if (seleccionadosSet.has(fl.territorioPadre)) continue;
-      this.styles.applyStyleToFeatureLayer(fl, { opacity: 0, fillOpacity: 0, stroke: false, weight: 0 });
+      this.styles.applyStyleToFeatureLayer(fl, getHiddenStyle());
     }
 
     this.territories.updateLabelsForSelection(seleccionadosSet);
@@ -178,7 +183,7 @@ export class MapRenderingFacade {
     this.styles.queueStyleUpdate(() => {
       for (const fl of this.territories.getAllTerritoriesLayer()) {
         if (hayFiltroActivo && !seleccionadosSet.has(fl.territorioPadre)) {
-          this.styles.applyStyleToFeatureLayer(fl, { opacity: 0, fillOpacity: 0, stroke: false, weight: 0 });
+          this.styles.applyStyleToFeatureLayer(fl, getHiddenStyle());
           continue;
         }
 
@@ -191,13 +196,8 @@ export class MapRenderingFacade {
 
         const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num);
         for (const m of marcadas) {
-          m.layer.setStyle({
-            fillColor: featureLayer.color,
-            fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
-            color: featureLayer.color,
-            weight: STYLE_DEFAULTS.polygon.weight,
-            stroke: true,
-          });
+          const layer = this.registry.get(m.id);
+          if (layer) layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
         }
       }
 
@@ -282,9 +282,8 @@ export class MapRenderingFacade {
     const total = this.territories.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
     const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;
-    const fillOpacity = getTerritoryFillOpacity(isComplete);
     const color = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
-    return { opacity: 1, fillOpacity, color, weight: STYLE_DEFAULTS.polygon.weight, stroke: true };
+    return getBaseTerritoryStyle(color, isComplete);
   }
 
   // ─── Private helpers ─────────────────────────────────────────────

@@ -11,6 +11,7 @@ describe('EncargadoService', () => {
   let authToken: AuthTokenService;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         EncargadoService,

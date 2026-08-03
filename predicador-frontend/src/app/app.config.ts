@@ -21,10 +21,11 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     // Keep map and screenshot libraries lazy until the map route is opened.
     provideRouter(routes),
-    // Orden importa: authInterceptor mete el header antes de que errorInterceptor
-    // observe la respuesta. Si el token expira y el backend devuelve 401,
-    // errorInterceptor lo puede convertir en toast.
-     provideHttpClient(withInterceptors([authInterceptor, csrfInterceptor, errorInterceptor])),
+    // El orden define el anidamiento: el primero es el más externo y ve la
+    // respuesta al final. csrfInterceptor va por dentro de errorInterceptor
+    // para poder refrescar el token y reintentar un 403 de CSRF antes de que
+    // errorInterceptor lo interprete como un fallo real de la petición.
+    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor, csrfInterceptor])),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

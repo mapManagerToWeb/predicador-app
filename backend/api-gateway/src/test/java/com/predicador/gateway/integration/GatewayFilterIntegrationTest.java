@@ -1,6 +1,7 @@
 package com.predicador.gateway.integration;
 
 import com.predicador.gateway.config.ActuatorAccessFilter;
+import com.predicador.gateway.config.CsrfProtectionFilter;
 import com.predicador.gateway.config.SecurityHeadersFilter;
 import com.predicador.gateway.controller.FallbackController;
 import com.predicador.shared.security.SessionTokenService;
@@ -28,11 +29,13 @@ class GatewayFilterIntegrationTest {
     private WebTestClient webTestClient;
     private SecurityHeadersFilter securityHeadersFilter;
     private ActuatorAccessFilter actuatorFilter;
+    private CsrfProtectionFilter csrfFilter;
 
     @BeforeEach
     void setUp() {
         securityHeadersFilter = new SecurityHeadersFilter();
         actuatorFilter = new ActuatorAccessFilter();
+        csrfFilter = new CsrfProtectionFilter();
 
         var tokenService = new SessionTokenService(SECRET, 12);
 
@@ -47,6 +50,7 @@ class GatewayFilterIntegrationTest {
         webTestClient = WebTestClient
                 .bindToController(authController, fallbackController)
                 .webFilter(securityHeadersFilter)
+                .webFilter(csrfFilter)
                 .webFilter(actuatorFilter)
                 .build();
     }
@@ -120,6 +124,10 @@ class GatewayFilterIntegrationTest {
         assertThat(cookies).isNotNull();
         assertThat(cookies).hasSize(2);
         assertThat(cookies).anyMatch(c -> c.contains("predicador_session=") && c.contains("HttpOnly") && c.contains("SameSite=Lax"));
+        // El token CSRF se rota al autenticar y debe quedar legible por el SPA:
+        // con HttpOnly el navegador lo enviaría pero JS no podría copiarlo al
+        // header X-XSRF-TOKEN y toda mutación posterior daría 403.
+        assertThat(cookies).anyMatch(c -> c.contains("XSRF-TOKEN=") && !c.contains("HttpOnly"));
     }
 
     @Test
