@@ -64,18 +64,6 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
-    public ProblemDetail handleResponseStatus(org.springframework.web.server.ResponseStatusException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                ex.getStatusCode(), ex.getReason() != null ? ex.getReason() : "Error");
-        problem.setType(URI.create("https://api.predicador.com/errors/http-status"));
-        if (ex.getStatusCode().value() == 403) {
-            problem.setTitle("Acceso denegado");
-            problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
-        }
-        return problem;
-    }
-
     @ExceptionHandler(NumberFormatException.class)
     public ProblemDetail handleNumberFormat(NumberFormatException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Valores numéricos inválidos");
