@@ -12,14 +12,14 @@ import java.util.Optional;
 public class TokenValidator {
 
     private final SessionTokenService tokens;
-    private final List<SessionAuthFilter.Rule> rules;
+    private final List<SecurityRule> rules;
     private final boolean allowHeaderAuth;
 
-    public TokenValidator(SessionTokenService tokens, List<SessionAuthFilter.Rule> rules) {
+    public TokenValidator(SessionTokenService tokens, List<SecurityRule> rules) {
         this(tokens, rules, false);
     }
 
-    public TokenValidator(SessionTokenService tokens, List<SessionAuthFilter.Rule> rules,
+    public TokenValidator(SessionTokenService tokens, List<SecurityRule> rules,
                           boolean allowHeaderAuth) {
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.rules = List.copyOf(rules);
@@ -34,8 +34,8 @@ public class TokenValidator {
      * Find a matching rule for the given method and path.
      * Returns {@code Optional.empty()} if no rule matches (public endpoint).
      */
-    public Optional<SessionAuthFilter.Rule> findMatchingRule(String method, String path) {
-        for (SessionAuthFilter.Rule rule : rules) {
+    public Optional<SecurityRule> findMatchingRule(String method, String path) {
+        for (SecurityRule rule : rules) {
             if (!rule.methods().contains(method)) continue;
             if (rule.pattern().matcher(path).matches()) return Optional.of(rule);
         }
@@ -51,7 +51,7 @@ public class TokenValidator {
             return Optional.empty();
         }
 
-        SessionAuthFilter.Rule matched = findMatchingRule(method, path).orElse(null);
+        SecurityRule matched = findMatchingRule(method, path).orElse(null);
         if (matched == null) {
             return Optional.empty();
         }
@@ -71,10 +71,10 @@ public class TokenValidator {
     }
 
     private String extractToken(CookieSource cookieSource) {
-        String cookie = cookieSource.getCookieValue(SessionAuthFilter.SESSION_COOKIE_NAME);
+        String cookie = cookieSource.getCookieValue(SecurityConstants.SESSION_COOKIE_NAME);
         return cookie != null
                 ? cookie
-                : (allowHeaderAuth ? cookieSource.getHeaderValue(SessionAuthFilter.HEADER_NAME) : null);
+                : (allowHeaderAuth ? cookieSource.getHeaderValue(SecurityConstants.HEADER_NAME) : null);
     }
 
     /**
