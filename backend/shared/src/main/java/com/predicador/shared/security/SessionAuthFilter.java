@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -21,17 +21,8 @@ import java.util.regex.Pattern;
  * Servlet filter that enforces {@link SessionToken} presence on protected
  * routes.
  *
- * <p>Rules are declared per-service via {@link Rule}. A rule matches when the
- * request method is in the rule's allowed set AND the URI path matches the
- * rule's regex. Non-matching requests pass through unchanged (public
- * endpoints); matching requests without a valid token get {@code 401}.</p>
- *
- * <p>Only an explicitly non-strict local configuration may disable enforcement.
- * Strict mode rejects missing or undersized secrets during service construction.</p>
- *
- * <p>The extracted subject is attached to the request via {@link #ATTR_SUBJECT}
- * so downstream controllers can inspect the authenticated principal without
- * re-parsing the token.</p>
+ * <p>Delegates rule matching to {@link TokenValidator} for reuse by reactive
+ * adapters. Rules are declared per-service via {@link Rule}.</p>
  */
 public class SessionAuthFilter extends OncePerRequestFilter {
 
@@ -46,45 +37,39 @@ public class SessionAuthFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(SessionAuthFilter.class);
 
+    private final TokenValidator validator;
     private final SessionTokenService tokens;
-    private final List<Rule> rules;
-    private final boolean allowHeaderAuth;
 
     public SessionAuthFilter(SessionTokenService tokens, List<Rule> rules) {
         this(tokens, rules, false);
     }
 
     public SessionAuthFilter(SessionTokenService tokens, List<Rule> rules, boolean allowHeaderAuth) {
-        this.tokens = Objects.requireNonNull(tokens, "tokens");
-        this.rules = List.copyOf(rules);
-        this.allowHeaderAuth = allowHeaderAuth;
+        this.tokens = tokens;
+        this.validator = new TokenValidator(tokens, rules, allowHeaderAuth);
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
+        // If no rule matches, this is a public endpoint — pass through
+        var matchedRule = validator.findMatchingRule(req.getMethod(), req.getRequestURI());
+        if (matchedRule.isEmpty()) {
+            chain.doFilter(req, res);
+            return;
+        }
 
+        // Rule matches — check if unconfigured
         if (!tokens.isConfigured() && !tokens.isStrict()) {
             chain.doFilter(req, res);
             return;
         }
 
-        Rule matched = findMatchingRule(req);
-        if (matched == null) {
-            chain.doFilter(req, res);
-            return;
-        }
-
-        String cookie = Optional.ofNullable(req.getCookies())
-                .stream()
-                .flatMap(java.util.Arrays::stream)
-                .filter(c -> SESSION_COOKIE_NAME.equals(c.getName()))
-                .map(jakarta.servlet.http.Cookie::getValue)
-                .findFirst()
-                .orElse(null);
+        // Extract and verify token
+        String cookie = extractCookie(req);
         String presented = cookie != null
                 ? cookie
-                : (allowHeaderAuth ? req.getHeader(HEADER_NAME) : null);
+                : (validator.isAllowHeaderAuth() ? req.getHeader(HEADER_NAME) : null);
         Optional<SessionToken> parsed = tokens.verify(presented);
         if (parsed.isEmpty()) {
             writeUnauthorized(res, "Token de sesión ausente o inválido.");
@@ -92,7 +77,8 @@ public class SessionAuthFilter extends OncePerRequestFilter {
         }
 
         SessionToken token = parsed.get();
-        if (matched.requiredRole != null && !token.hasRole(matched.requiredRole)) {
+        Rule rule = matchedRule.get();
+        if (rule.requiredRole != null && !token.hasRole(rule.requiredRole)) {
             writeUnauthorized(res, "Permisos insuficientes para este recurso.");
             return;
         }
@@ -102,14 +88,14 @@ public class SessionAuthFilter extends OncePerRequestFilter {
         chain.doFilter(req, res);
     }
 
-    private Rule findMatchingRule(HttpServletRequest req) {
-        String method = req.getMethod();
-        String path = req.getRequestURI();
-        for (Rule rule : rules) {
-            if (!rule.methods.contains(method)) continue;
-            if (rule.pattern.matcher(path).matches()) return rule;
-        }
-        return null;
+    private static String extractCookie(HttpServletRequest req) {
+        return Optional.ofNullable(req.getCookies())
+                .stream()
+                .flatMap(java.util.Arrays::stream)
+                .filter(c -> SESSION_COOKIE_NAME.equals(c.getName()))
+                .map(jakarta.servlet.http.Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
     private static void writeUnauthorized(HttpServletResponse res, String detail) throws IOException {
