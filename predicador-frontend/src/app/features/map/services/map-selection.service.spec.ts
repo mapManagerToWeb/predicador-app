@@ -4,7 +4,7 @@ import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
-import { TerritorioService } from '../../../core/services/territorio';
+import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { Toast } from '../../../core/services/toast';
 import { getMarkedManzanaStyle, getSelectedManzanaStyle } from './map-style.service';
 
@@ -57,8 +57,11 @@ describe('MapSelectionService', () => {
     restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
     cancelPendingStyleUpdates: ReturnType<typeof vi.fn>;
   };
-  let territorioService: { getReportesPorTerritorio: ReturnType<typeof vi.fn> };
   let toast: { show: ReturnType<typeof vi.fn> };
+  let restoration: {
+    restaurarDesdeDB: ReturnType<typeof vi.fn>;
+    restaurarConReportes: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     rendering = {
@@ -80,15 +83,18 @@ describe('MapSelectionService', () => {
       restaurarVisibilidadPoligonos: vi.fn(),
       cancelPendingStyleUpdates: vi.fn(),
     };
-    territorioService = { getReportesPorTerritorio: vi.fn() };
     toast = { show: vi.fn() };
+    restoration = {
+      restaurarDesdeDB: vi.fn().mockResolvedValue(undefined),
+      restaurarConReportes: vi.fn(),
+    };
     TestBed.configureTestingModule({
       providers: [
         MapSelectionService,
         MapStateService,
         { provide: MapRenderingFacade, useValue: rendering },
         MapLayerRegistry,
-        { provide: TerritorioService, useValue: territorioService },
+        { provide: MapMarkRestorationService, useValue: restoration },
         { provide: Toast, useValue: toast },
       ],
     });
@@ -190,32 +196,6 @@ describe('MapSelectionService', () => {
 
       expect(result).toEqual([1, 5]);
       expect(state.territoriosSeleccionados()).toEqual([1, 5]);
-    });
-  });
-
-  describe('restaurarMarcadoDesdeDB', () => {
-    it('restores the marks from the last report', async () => {
-      rendering.getAllTerritoriesLayer.mockReturnValue([
-        { territorioPadre: 1, color: '#ff0000', layer: {} },
-      ]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1), fakeManzana('m2', 1)]);
-      territorioService.getReportesPorTerritorio.mockResolvedValue([
-        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: 'm1', manzanaId: null } as never,
-      ]);
-
-      await service.restaurarMarcadoDesdeDB(1);
-
-      expect(rendering.applyBaseTerritoryStyle).toHaveBeenCalled();
-      expect(state.manzanasMarcadas().map(m => m.id)).toEqual(['m1']);
-      expect(registry.get('m1')).not.toBeNull();
-    });
-
-    it('shows a toast when the reports cannot be loaded', async () => {
-      territorioService.getReportesPorTerritorio.mockRejectedValue(new Error('boom'));
-
-      await service.restaurarMarcadoDesdeDB(1);
-
-      expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('restaurar'));
     });
   });
 

@@ -1,6 +1,6 @@
 package com.predicador.gateway.config;
 
-import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.TokenValidator;
 import org.slf4j.Logger;
@@ -27,7 +27,7 @@ import java.util.Optional;
  * their own auth, but this filter catches unauthenticated requests early.</p>
  *
  * <p>Uses {@link TokenValidator} to share validation logic with the
- * servlet-based {@link SessionAuthFilter}.</p>
+ * servlet-based {@link com.predicador.shared.security.SessionAuthFilter}.</p>
  */
 @Component
 public class ReactiveSessionAuthFilter implements WebFilter, Ordered {
@@ -59,8 +59,8 @@ public class ReactiveSessionAuthFilter implements WebFilter, Ordered {
         }
 
         SessionToken token = validated.get();
-        exchange.getAttributes().put(SessionAuthFilter.ATTR_TOKEN, token);
-        exchange.getAttributes().put(SessionAuthFilter.ATTR_SUBJECT, token.subject());
+        exchange.getAttributes().put(SecurityConstants.ATTR_TOKEN, token);
+        exchange.getAttributes().put(SecurityConstants.ATTR_SUBJECT, token.subject());
         return chain.filter(exchange);
     }
 

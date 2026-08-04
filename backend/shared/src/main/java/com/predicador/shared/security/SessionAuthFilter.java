@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * routes.
  *
  * <p>Delegates rule matching to {@link TokenValidator} for reuse by reactive
- * adapters. Rules are declared per-service via {@link Rule}.</p>
+ * adapters. Rules are declared per-service via {@link SecurityRule}.</p>
  */
 public class SessionAuthFilter extends OncePerRequestFilter {
 
@@ -40,11 +40,11 @@ public class SessionAuthFilter extends OncePerRequestFilter {
     private final TokenValidator validator;
     private final SessionTokenService tokens;
 
-    public SessionAuthFilter(SessionTokenService tokens, List<Rule> rules) {
+    public SessionAuthFilter(SessionTokenService tokens, List<SecurityRule> rules) {
         this(tokens, rules, false);
     }
 
-    public SessionAuthFilter(SessionTokenService tokens, List<Rule> rules, boolean allowHeaderAuth) {
+    public SessionAuthFilter(SessionTokenService tokens, List<SecurityRule> rules, boolean allowHeaderAuth) {
         this.tokens = tokens;
         this.validator = new TokenValidator(tokens, rules, allowHeaderAuth);
     }
@@ -77,8 +77,8 @@ public class SessionAuthFilter extends OncePerRequestFilter {
         }
 
         SessionToken token = parsed.get();
-        Rule rule = matchedRule.get();
-        if (rule.requiredRole != null && !token.hasRole(rule.requiredRole)) {
+        SecurityRule rule = matchedRule.get();
+        if (rule.requiredRole() != null && !token.hasRole(rule.requiredRole())) {
             writeUnauthorized(res, "Permisos insuficientes para este recurso.");
             return;
         }
@@ -108,26 +108,17 @@ public class SessionAuthFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Rule = (HTTP methods, path regex, required role).
-     *
-     * @param methods       HTTP verbs the rule applies to. Empty set = no match.
-     * @param pattern       regex matched against {@code request.getRequestURI()}.
-     * @param requiredRole  role the token must carry, or {@code null} to accept
-     *                      any authenticated principal.
+     * @deprecated Use {@link SecurityRule} directly.
      */
-    public record Rule(List<String> methods, Pattern pattern, String requiredRole) {
-
-        public Rule {
-            Objects.requireNonNull(methods, "methods");
-            Objects.requireNonNull(pattern, "pattern");
-            methods = List.copyOf(methods);
+    @Deprecated
+    public static class Rule extends SecurityRule {
+        public Rule(List<String> methods, Pattern pattern, String requiredRole) {
+            super(methods, pattern, requiredRole);
         }
-
-        public static Rule of(String method, String regex, @Nullable String requiredRole) {
+        public static Rule of(String method, String regex, String requiredRole) {
             return new Rule(List.of(method), Pattern.compile(regex), requiredRole);
         }
-
-        public static Rule any(List<String> methods, String regex, @Nullable String requiredRole) {
+        public static Rule any(List<String> methods, String regex, String requiredRole) {
             return new Rule(methods, Pattern.compile(regex), requiredRole);
         }
     }
