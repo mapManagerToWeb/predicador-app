@@ -3,7 +3,7 @@ package com.predicador.reporting.controller;
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.dto.LoginResponse;
 import com.predicador.reporting.service.EncargadoService;
-import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import jakarta.validation.Valid;
@@ -142,7 +142,7 @@ public class EncargadoController {
      * HttpOnly, según RFC 6265 §5.2.6).
      */
     private String sessionCookie(String value, Duration maxAge) {
-        return ResponseCookie.from(SessionAuthFilter.SESSION_COOKIE_NAME, value)
+        return ResponseCookie.from(SecurityConstants.SESSION_COOKIE_NAME, value)
                 .httpOnly(true)
                 .secure(sessionCookieSecure)
                 .sameSite("Lax")
@@ -167,6 +167,6 @@ public class EncargadoController {
     }
 
     private SessionToken token(HttpServletRequest request) {
-        return (SessionToken) request.getAttribute(SessionAuthFilter.ATTR_TOKEN);
+        return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
     }
 }

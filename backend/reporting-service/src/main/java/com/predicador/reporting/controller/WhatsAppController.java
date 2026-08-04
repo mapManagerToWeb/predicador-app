@@ -8,7 +8,7 @@ import com.predicador.reporting.service.WhatsAppSendService;
 import com.predicador.reporting.service.AuthorizationService;
 import com.predicador.reporting.client.WhatsAppIntegrationException;
 import com.predicador.reporting.publisher.WhatsAppSendPublisher;
-import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -71,7 +71,7 @@ public class WhatsAppController {
     }
 
     private SessionToken token(HttpServletRequest request) {
-        return (SessionToken) request.getAttribute(SessionAuthFilter.ATTR_TOKEN);
+        return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
     }
 
     @ExceptionHandler(WhatsAppIntegrationException.class)

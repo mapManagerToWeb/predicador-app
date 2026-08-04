@@ -1,7 +1,8 @@
 package com.predicador.gateway.config;
 
-import com.predicador.shared.security.SessionAuthFilter;
-import com.predicador.shared.security.SessionAuthFilter.Rule;
+import com.predicador.shared.security.SecurityConstants;
+import com.predicador.shared.security.SecurityRule;
+import com.predicador.shared.security.SecurityRules;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import com.predicador.shared.security.TokenValidator;
@@ -18,7 +19,6 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.List;
 import java.util.List;
 
 /**
@@ -45,14 +45,7 @@ public class RouteConfig {
 
     @Bean
     public TokenValidator tokenValidator(SessionTokenService tokens) {
-        List<Rule> rules = List.of(
-                Rule.of("POST", "^/api/v1/reports(/.*)?$", null),
-                Rule.of("PUT", "^/api/v1/reports(/.*)?$", null),
-                Rule.of("DELETE", "^/api/v1/reports(/.*)?$", null),
-                Rule.of("PUT", "^/api/v1/territories/[0-9]+/color$", SessionToken.ROLE_ADMIN),
-                Rule.of("PUT", "^/api/v1/encargados/[0-9]+$", null)
-        );
-        return new TokenValidator(tokens, rules);
+        return new TokenValidator(tokens, SecurityRules.GATEWAY);
     }
 
     @Bean
