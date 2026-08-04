@@ -8,6 +8,7 @@ import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
 import com.predicador.reporting.model.WhatsAppDelivery;
 import com.predicador.reporting.repository.WhatsAppDeliveryRepository;
+import com.predicador.shared.util.PhoneUtil;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -125,7 +126,7 @@ public class ReportSendService {
             components.add(Map.of("type", "body", "parameters", bodyParams));
 
             String destination = request.destinationNumber() != null
-                ? normalizePhone(request.destinationNumber())
+                ? PhoneUtil.normalize(request.destinationNumber())
                 : props.destinationNumber();
 
             WhatsAppMessageResponse response = messageClient.sendTemplateMessage(
@@ -231,12 +232,4 @@ public class ReportSendService {
     }
 
     private record Reservation(WhatsAppDelivery delivery, WhatsAppSendResponse replay) {}
-
-    private String normalizePhone(String phone) {
-        String digits = phone.replaceAll("[^0-9]", "");
-        if (digits.length() == 9 && digits.startsWith("9")) {
-            return "56" + digits;
-        }
-        return digits;
-    }
 }

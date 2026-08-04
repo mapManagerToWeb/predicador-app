@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.shared.exception.ResourceNotFoundException;
 import com.predicador.shared.security.SessionToken;
+import com.predicador.shared.util.PhoneUtil;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class EncargadoService {
     public Optional<EncargadoDto> buscarOCrear(String nombre, String apellido, String telefono) {
         String nombreLimpio = nombre != null ? nombre.trim() : "";
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
-        String telefonoLimpio = normalizePhone(telefono);
+        String telefonoLimpio = PhoneUtil.normalize(telefono);
 
         Optional<Encargado> encontrado = repository.findByNaturalIdentity(
                 nombreLimpio, apellidoLimpio);
@@ -65,7 +66,7 @@ public class EncargadoService {
         encargado.setAvatar(dto.avatar() != null ? dto.avatar() : 1);
         // Normalizamos aquí para que el registro directo respete el mismo
         // formato E.164 chileno que buscarOCrear/buscarPorTelefono.
-        encargado.setTelefono(normalizePhone(dto.telefono()));
+        encargado.setTelefono(PhoneUtil.normalize(dto.telefono()));
         encargado.setActivo(true);
         Encargado saved = repository.saveAndFlush(encargado);
         return toDto(saved);
@@ -79,7 +80,7 @@ public class EncargadoService {
         encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : encargado.getNombre());
         encargado.setApellido(dto.apellido() != null ? dto.apellido().trim() : encargado.getApellido());
         if (dto.avatar() != null) encargado.setAvatar(dto.avatar());
-        if (dto.telefono() != null) encargado.setTelefono(normalizePhone(dto.telefono()));
+        if (dto.telefono() != null) encargado.setTelefono(PhoneUtil.normalize(dto.telefono()));
         if (dto.activo() != null) encargado.setActivo(dto.activo());
         Encargado saved = repository.save(encargado);
         return toDto(saved);
@@ -95,7 +96,7 @@ public class EncargadoService {
         if (telefono == null || telefono.isBlank()) {
             return Optional.empty();
         }
-        String normalizado = normalizePhone(telefono);
+        String normalizado = PhoneUtil.normalize(telefono);
         if (normalizado == null || normalizado.isBlank()) {
             return Optional.empty();
         }
@@ -137,12 +138,4 @@ public class EncargadoService {
         );
     }
 
-    private String normalizePhone(String phone) {
-        if (phone == null) return null;
-        String digits = phone.replaceAll("[^0-9]", "");
-        if (digits.length() == 9 && digits.startsWith("9")) {
-            return "56" + digits;
-        }
-        return digits;
-    }
 }
