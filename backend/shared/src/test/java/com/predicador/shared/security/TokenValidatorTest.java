@@ -20,8 +20,8 @@ class TokenValidatorTest {
     void setUp() {
         tokens = new SessionTokenService(SECRET, 1);
         validator = new TokenValidator(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null),
-                SessionAuthFilter.Rule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
+                SecurityRule.of("POST", "^/api/v1/reports$", null),
+                SecurityRule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
                         SessionToken.ROLE_ADMIN)
         ));
         encargadoToken = tokens.issue("42", SessionToken.ROLE_ENCARGADO);
@@ -30,7 +30,7 @@ class TokenValidatorTest {
 
     @Test
     void validToken_returnsSessionToken() {
-        var cookie = new SimpleCookieSource(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken, null);
+        var cookie = new SimpleCookieSource(SecurityConstants.SESSION_COOKIE_NAME, encargadoToken, null);
         var result = validator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isPresent());
@@ -47,7 +47,7 @@ class TokenValidatorTest {
 
     @Test
     void invalidToken_returnsEmpty() {
-        var cookie = new SimpleCookieSource(SessionAuthFilter.SESSION_COOKIE_NAME, "garbage", null);
+        var cookie = new SimpleCookieSource(SecurityConstants.SESSION_COOKIE_NAME, "garbage", null);
         var result = validator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isEmpty());
@@ -55,7 +55,7 @@ class TokenValidatorTest {
 
     @Test
     void roleMismatch_returnsEmpty() {
-        var cookie = new SimpleCookieSource(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken, null);
+        var cookie = new SimpleCookieSource(SecurityConstants.SESSION_COOKIE_NAME, encargadoToken, null);
         var result = validator.validate("PUT", "/api/v1/territories/5/color", cookie);
 
         assertTrue(result.isEmpty());
@@ -72,7 +72,7 @@ class TokenValidatorTest {
     @Test
     void headerAuth_whenAllowed_usesHeader() {
         TokenValidator headerValidator = new TokenValidator(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)
+                SecurityRule.of("POST", "^/api/v1/reports$", null)
         ), true);
         var cookie = new SimpleCookieSource(null, null, encargadoToken);
 
