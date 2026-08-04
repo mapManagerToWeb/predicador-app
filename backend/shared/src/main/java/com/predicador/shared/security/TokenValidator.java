@@ -1,8 +1,5 @@
 package com.predicador.shared.security;
 
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -46,38 +43,6 @@ public class TokenValidator {
     }
 
     /**
-     * Validate a servlet request. Extracts token from cookie (or header
-     * if allowed), verifies HMAC, checks route rules and role requirements.
-     *
-     * <p>Returns {@code Optional.empty()} when no rule matches (public endpoint)
-     * or when the token is invalid/missing. Use {@link #findMatchingRule} to
-     * distinguish these cases.</p>
-     */
-    public Optional<SessionToken> validate(HttpServletRequest req) {
-        if (!tokens.isConfigured() && !tokens.isStrict()) {
-            return Optional.empty();
-        }
-
-        SessionAuthFilter.Rule matched = findMatchingRule(req.getMethod(), req.getRequestURI()).orElse(null);
-        if (matched == null) {
-            return Optional.empty();
-        }
-
-        String presented = extractTokenFromServlet(req);
-        Optional<SessionToken> parsed = tokens.verify(presented);
-        if (parsed.isEmpty()) {
-            return Optional.empty();
-        }
-
-        SessionToken token = parsed.get();
-        if (matched.requiredRole() != null && !token.hasRole(matched.requiredRole())) {
-            return Optional.empty();
-        }
-
-        return Optional.of(token);
-    }
-
-    /**
      * Validate with explicit method, path, and cookie source. Useful for
      * reactive adapters that don't have a servlet request.
      */
@@ -103,19 +68,6 @@ public class TokenValidator {
         }
 
         return Optional.of(token);
-    }
-
-    private String extractTokenFromServlet(HttpServletRequest req) {
-        String cookie = Optional.ofNullable(req.getCookies())
-                .stream()
-                .flatMap(java.util.Arrays::stream)
-                .filter(c -> SessionAuthFilter.SESSION_COOKIE_NAME.equals(c.getName()))
-                .map(Cookie::getValue)
-                .findFirst()
-                .orElse(null);
-        return cookie != null
-                ? cookie
-                : (allowHeaderAuth ? req.getHeader(SessionAuthFilter.HEADER_NAME) : null);
     }
 
     private String extractToken(CookieSource cookieSource) {
