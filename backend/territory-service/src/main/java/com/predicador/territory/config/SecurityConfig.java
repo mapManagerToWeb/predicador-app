@@ -1,7 +1,8 @@
 package com.predicador.territory.config;
 
+import com.predicador.shared.security.SecurityRule;
+import com.predicador.shared.security.SecurityRules;
 import com.predicador.shared.security.SessionAuthFilter;
-import com.predicador.shared.security.SessionAuthFilter.Rule;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
 import org.slf4j.Logger;
@@ -32,13 +33,8 @@ public class SecurityConfig {
                     + "(no aplica enforcement). Configurar app.session.secret en producción.");
         }
 
-        List<Rule> rules = List.of(
-                // Solo el admin puede reasignar colores.
-                Rule.of("PUT", "^/api/v1/territories/[0-9]+/color$", SessionToken.ROLE_ADMIN)
-        );
-
         FilterRegistrationBean<SessionAuthFilter> reg = new FilterRegistrationBean<>(
-                new SessionAuthFilter(tokens, rules));
+                new SessionAuthFilter(tokens, SecurityRules.TERRITORY));
         reg.setName("sessionAuthFilter");
         reg.setOrder(-100);
         reg.addUrlPatterns("/api/v1/*");

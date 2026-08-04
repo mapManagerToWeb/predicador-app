@@ -1,17 +1,12 @@
 package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.ReportDto;
-import com.predicador.reporting.dto.WhatsAppDeliveryDto;
-import com.predicador.reporting.dto.WhatsAppSendRequest;
-import com.predicador.reporting.model.WhatsAppDeliveryStatus;
-import com.predicador.reporting.service.WhatsAppSendService;
 import com.predicador.reporting.service.ReportService;
 import com.predicador.reporting.service.AuthorizationService;
-import com.predicador.reporting.client.WhatsAppIntegrationException;
-import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
-import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -29,13 +24,10 @@ import java.util.Map;
 public class ReportController {
 
     private final ReportService reportService;
-    private final WhatsAppSendService whatsAppSendService;
     private final AuthorizationService authorization;
 
-    public ReportController(ReportService reportService, WhatsAppSendService whatsAppSendService,
-                            AuthorizationService authorization) {
+    public ReportController(ReportService reportService, AuthorizationService authorization) {
         this.reportService = reportService;
-        this.whatsAppSendService = whatsAppSendService;
         this.authorization = authorization;
     }
 
@@ -83,28 +75,8 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getReportsByMultipleTerritorios(territorios, token(request)));
     }
 
-    @PostMapping("/send")
-    public ResponseEntity<WhatsAppDeliveryDto> sendWhatsAppReport(
-            @Valid @RequestBody WhatsAppSendRequest request,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            HttpServletRequest httpRequest) {
-        authorization.requireAuthenticated(token(httpRequest));
-        WhatsAppDeliveryDto delivery = whatsAppSendService.submit(request, idempotencyKey);
-        if (WhatsAppDeliveryStatus.IN_PROGRESS.name().equals(delivery.status())) {
-            return ResponseEntity.accepted().body(delivery);
-        }
-        return ResponseEntity.ok(delivery);
-    }
-
-    @GetMapping("/send/{idempotencyKey}")
-    public ResponseEntity<WhatsAppDeliveryDto> getSendStatus(
-            @PathVariable String idempotencyKey, HttpServletRequest httpRequest) {
-        authorization.requireAuthenticated(token(httpRequest));
-        return ResponseEntity.ok(whatsAppSendService.getStatus(idempotencyKey));
-    }
-
     private SessionToken token(HttpServletRequest request) {
-        return (SessionToken) request.getAttribute(SessionAuthFilter.ATTR_TOKEN);
+        return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
     }
 
     private int boundedPage(String value) {
@@ -121,15 +93,5 @@ public class ReportController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size debe estar entre 1 y 100");
         }
         return size;
-    }
-
-    @ExceptionHandler(WhatsAppIntegrationException.class)
-    ResponseEntity<ProblemDetail> handleWhatsAppFailure(WhatsAppIntegrationException exception) {
-        HttpStatus status = HttpStatus.resolve(exception.status());
-        if (status == null || status.is2xxSuccessful()) status = HttpStatus.BAD_GATEWAY;
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, exception.getMessage());
-        problem.setTitle("Fallo en la integración WhatsApp");
-        problem.setType(URI.create("https://api.predicador.com/errors/whatsapp-integration"));
-        return ResponseEntity.status(status).body(problem);
     }
 }

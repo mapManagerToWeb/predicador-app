@@ -1,5 +1,7 @@
 package com.predicador.shared.security;
 
+import jakarta.annotation.Nullable;
+
 public final class SecurityConstants {
     private SecurityConstants() {}
     public static final String ATTR_TOKEN = "predicador.session.token";
