@@ -31,6 +31,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Jakarta Annotations for @Nullable (replaces javax.annotation in Java 11+) -->
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <version>2.1.1</version>
+        </dependency>
     </dependencies>
 
 </project>
