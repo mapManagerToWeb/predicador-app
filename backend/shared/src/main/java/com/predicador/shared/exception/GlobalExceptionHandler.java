@@ -7,6 +7,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.Map;
@@ -67,6 +68,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NumberFormatException.class)
     public ProblemDetail handleNumberFormat(NumberFormatException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Valores numéricos inválidos");
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ProblemDetail handleResponseStatus(ResponseStatusException ex) {
+        log.debug("ResponseStatusException: {} {}", ex.getStatusCode(), ex.getReason());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                ex.getStatusCode(), ex.getReason() != null ? ex.getReason() : "Error");
+        problem.setType(URI.create("https://api.predicador.com/errors/http-status"));
+        if (ex.getStatusCode().value() == 403) {
+            problem.setTitle("Acceso denegado");
+            problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
+        }
+        return problem;
     }
 
     @ExceptionHandler(Exception.class)
