@@ -104,6 +104,8 @@ services:
     depends_on:
       discovery-server:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
@@ -115,6 +117,11 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
+      # RabbitMQ configuration
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
       # Si el config-server exige auth, enviar las mismas credenciales.
       - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
@@ -136,6 +143,8 @@ services:
     depends_on:
       discovery-server:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
@@ -151,6 +160,11 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      # RabbitMQ configuration
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
       # Si el config-server exige auth, enviar las mismas credenciales.
       - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
@@ -160,6 +174,24 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
   # --------------------------------------------------------------------------
   # Observability stack. Activado con:
@@ -230,3 +262,4 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  rabbitmq_data:

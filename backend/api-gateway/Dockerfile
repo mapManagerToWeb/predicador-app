@@ -9,7 +9,7 @@ COPY territory-service/pom.xml territory-service/
 COPY reporting-service/pom.xml reporting-service/
 RUN mvn dependency:go-offline -pl api-gateway -am -B
 COPY . .
-RUN mvn clean package -pl api-gateway -am -DskipTests -B
+RUN mvn clean package -pl api-gateway -am -Dmaven.test.skip=true -B
 
 FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
