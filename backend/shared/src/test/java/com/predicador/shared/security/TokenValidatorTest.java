@@ -2,7 +2,6 @@ package com.predicador.shared.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.List;
 
@@ -31,11 +30,8 @@ class TokenValidatorTest {
 
     @Test
     void validToken_returnsSessionToken() {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
-        req.setCookies(new jakarta.servlet.http.Cookie(
-                SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken));
-
-        var result = validator.validate(req);
+        var cookie = new SimpleCookieSource(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken, null);
+        var result = validator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isPresent());
         assertEquals("42", result.get().subject());
@@ -43,41 +39,32 @@ class TokenValidatorTest {
 
     @Test
     void missingToken_returnsEmpty() {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
-
-        var result = validator.validate(req);
+        var cookie = new SimpleCookieSource(null, null, null);
+        var result = validator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isEmpty());
     }
 
     @Test
     void invalidToken_returnsEmpty() {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
-        req.setCookies(new jakarta.servlet.http.Cookie(
-                SessionAuthFilter.SESSION_COOKIE_NAME, "garbage"));
-
-        var result = validator.validate(req);
+        var cookie = new SimpleCookieSource(SessionAuthFilter.SESSION_COOKIE_NAME, "garbage", null);
+        var result = validator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isEmpty());
     }
 
     @Test
     void roleMismatch_returnsEmpty() {
-        MockHttpServletRequest req = new MockHttpServletRequest("PUT",
-                "/api/v1/territories/5/color");
-        req.setCookies(new jakarta.servlet.http.Cookie(
-                SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken));
-
-        var result = validator.validate(req);
+        var cookie = new SimpleCookieSource(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken, null);
+        var result = validator.validate("PUT", "/api/v1/territories/5/color", cookie);
 
         assertTrue(result.isEmpty());
     }
 
     @Test
     void nonMatchingRoute_returnsEmpty() {
-        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/v1/territories");
-
-        var result = validator.validate(req);
+        var result = validator.validate("GET", "/api/v1/territories",
+                new SimpleCookieSource(null, null, null));
 
         assertTrue(result.isEmpty());
     }
@@ -87,21 +74,32 @@ class TokenValidatorTest {
         TokenValidator headerValidator = new TokenValidator(tokens, List.of(
                 SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)
         ), true);
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
-        req.addHeader(SessionAuthFilter.HEADER_NAME, encargadoToken);
+        var cookie = new SimpleCookieSource(null, null, encargadoToken);
 
-        var result = headerValidator.validate(req);
+        var result = headerValidator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isPresent());
     }
 
     @Test
     void headerAuth_whenNotAllowed_ignoresHeader() {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
-        req.addHeader(SessionAuthFilter.HEADER_NAME, encargadoToken);
-
-        var result = validator.validate(req);
+        var cookie = new SimpleCookieSource(null, null, encargadoToken);
+        var result = validator.validate("POST", "/api/v1/reports", cookie);
 
         assertTrue(result.isEmpty());
+    }
+
+    private record SimpleCookieSource(String cookieName, String cookieValue, String headerValue)
+            implements TokenValidator.CookieSource {
+
+        @Override
+        public String getCookieValue(String name) {
+            return cookieName != null && cookieName.equals(name) ? cookieValue : null;
+        }
+
+        @Override
+        public String getHeaderValue(String name) {
+            return headerValue;
+        }
     }
 }
