@@ -1,13 +1,4 @@
-**/target/
-**/node_modules/
-**/.git/
-**/.idea/
-**/.settings/
-**/.classpath
-**/.project
-**/.DS_Store
-**/dist/
-**/.angular/
-*.iml
-*.swp
-*.swo
+**/RabbitMQConfig.java
+**/WhatsAppSendPublisher.java
+**/WhatsAppSendListener.java
+**/WhatsAppMessageRequest.java
