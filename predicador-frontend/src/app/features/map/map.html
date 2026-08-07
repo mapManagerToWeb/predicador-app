@@ -1,3 +1,15 @@
+<!-- Paper grain SVG filter (referenced by CSS) -->
+<svg class="paper-grain-filter" aria-hidden="true" focusable="false">
+  <filter id="paperGrain">
+    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch" result="noise"/>
+    <feColorMatrix type="saturate" values="0" in="noise" result="gray"/>
+    <feBlend in="SourceGraphic" in2="gray" mode="multiply" result="blended"/>
+    <feComponentTransfer in="blended">
+      <feFuncA type="linear" slope="0.04"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
+
 <div class="map-page">
   <div class="map-container" id="map"></div>
 
@@ -32,43 +44,54 @@
   </button>
 
   @if (tieneTerritorio()) {
-    <div class="bottom-bar">
-      <!-- Row 1: mode + info + actions -->
-      <div class="bar-row">
+    <div class="clipboard-sheet">
+      <!-- Metal clip -->
+      <div class="clip" aria-hidden="true">
+        <svg viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="56" height="20" rx="4" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="10" y="6" width="40" height="12" rx="3" fill="currentColor" opacity="0.15"/>
+          <line x1="20" y1="10" x2="40" y2="10" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+          <line x1="20" y1="14" x2="40" y2="14" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+        </svg>
+      </div>
+
+      <!-- Territory header -->
+      <div class="sheet-header" aria-live="polite">
+        @if (territoriosSeleccionados().length > 1) {
+          <span class="sheet-territory-number">{{ territoriosSeleccionados().length }} terr.</span>
+          <span class="sheet-manzanas-count">{{ manzanasCount() }} marcadas</span>
+        } @else {
+          <span class="sheet-territory-number">{{ territorioSeleccionado() }}</span>
+          <span class="sheet-manzanas-count">{{ manzanasCount() }}/{{ totalManzanas() }}</span>
+        }
+      </div>
+
+      <!-- Row 1: mode + actions -->
+      <div class="sheet-row">
         <div class="mode-group" role="group" aria-label="Modo de marcado">
           <button
             type="button"
-            class="mode-btn complete"
+            class="mode-tab complete"
             [class.active]="modoMarcado() === 'completa'"
             [attr.aria-pressed]="modoMarcado() === 'completa'"
             (click)="toggleModoCompleto()"
           >
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            <span class="mode-label">Marcar</span>
+            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            <span class="tab-label">Marcar</span>
           </button>
           <button
             type="button"
-            class="mode-btn partial"
+            class="mode-tab partial"
             [class.active]="modoMarcado() === 'parcial'"
             [attr.aria-pressed]="modoMarcado() === 'parcial'"
             (click)="setModoMarcado('parcial')"
           >
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            <span class="mode-label">Trazar</span>
+            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            <span class="tab-label">Trazar</span>
           </button>
         </div>
 
-        <div class="territory-info" aria-live="polite">
-          @if (territoriosSeleccionados().length > 1) {
-            <span class="territory-number">{{ territoriosSeleccionados().length }} terr.</span>
-            <span class="manzanas-count">{{ manzanasCount() }} marcadas</span>
-          } @else {
-            <span class="territory-number">{{ territorioSeleccionado() }}</span>
-            <span class="manzanas-count">{{ manzanasCount() }}/{{ totalManzanas() }}</span>
-          }
-        </div>
-
-        <div class="action-group">
+        <div class="sheet-actions">
           <label class="visually-hidden" for="predicacion-select">Momento del día</label>
           <select
             id="predicacion-select"
@@ -89,8 +112,8 @@
             @if (enviando()) {
               <div class="btn-spinner" aria-hidden="true"></div>
             } @else {
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-              <span class="mode-label">Enviar</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              <span class="btn-label">Enviar</span>
             }
           </button>
           <button
@@ -99,15 +122,15 @@
             (click)="limpiarTodo()"
             [attr.aria-label]="modoMarcado() !== 'none' ? 'Cancelar marcado' : 'Limpiar todas las marcas'"
           >
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            <span class="mode-label">{{ modoMarcado() !== 'none' ? 'Cancelar' : 'Limpiar' }}</span>
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            <span class="btn-label">{{ modoMarcado() !== 'none' ? 'Cancelar' : 'Limpiar' }}</span>
           </button>
         </div>
       </div>
 
       <!-- Row 2: partial mode controls -->
       @if (modoMarcado() === 'parcial') {
-        <div class="partial-row" role="group" aria-label="Controles de marcado parcial">
+        <div class="sheet-row partial-controls" role="group" aria-label="Controles de marcado parcial">
           <span class="partial-hint" aria-live="polite">{{ puntosCount() }}/6</span>
 
           <button
@@ -117,8 +140,8 @@
             (click)="deshacerPunto()"
             aria-label="Deshacer último punto"
           >
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
-            <span class="mode-label">Deshacer</span>
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+            <span class="btn-label">Deshacer</span>
           </button>
 
           <button
@@ -127,8 +150,8 @@
             (click)="cancelarParcial()"
             aria-label="Cancelar marcado parcial"
           >
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            <span class="mode-label">Cancelar</span>
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            <span class="btn-label">Cancelar</span>
           </button>
 
           <button
@@ -138,8 +161,8 @@
             (click)="finalizarParcial()"
             aria-label="Confirmar zona parcial"
           >
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            <span class="mode-label">Listo</span>
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            <span class="btn-label">Listo</span>
           </button>
         </div>
       }
