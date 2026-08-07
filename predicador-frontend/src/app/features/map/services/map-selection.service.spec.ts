@@ -56,6 +56,8 @@ describe('MapSelectionService', () => {
     reaplicarMarcasTerritorio: ReturnType<typeof vi.fn>;
     restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
     cancelPendingStyleUpdates: ReturnType<typeof vi.fn>;
+    getFeatureLayerByTerritorio: ReturnType<typeof vi.fn>;
+    getManzanaCountByTerritorio: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
   let restoration: {
@@ -82,6 +84,8 @@ describe('MapSelectionService', () => {
       reaplicarMarcasTerritorio: vi.fn(),
       restaurarVisibilidadPoligonos: vi.fn(),
       cancelPendingStyleUpdates: vi.fn(),
+      getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
+      getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
     };
     toast = { show: vi.fn() };
     restoration = {

@@ -53,7 +53,7 @@ export class MapInitializationService {
     const newlyLoaded = this.rendering.updateVisibleTerritories();
 
     for (const num of newlyLoaded) {
-      const fl = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === num);
+      const fl = this.rendering.getFeatureLayerByTerritorio(num); // O(1)
       if (fl) {
         await this.selection.restaurarMarcadoDesdeDB(num, fl.color, { actualizarEstadoMarcado: false });
       }

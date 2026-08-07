@@ -108,6 +108,7 @@ describe('MapPage', () => {
       toggleSatellite: vi.fn(),
       isSatellite: vi.fn().mockReturnValue(false),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
+      getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
       restaurarVisibilidadPoligonos: vi.fn(),
       cancelPendingStyleUpdates: vi.fn(),
       destroy: vi.fn(),
@@ -156,13 +157,12 @@ describe('MapPage', () => {
 
     it('prepares the territories and restores marks from the database', async () => {
       selection.prepareTerritorioSeleccionado.mockReturnValue([5]);
-      rendering.getAllTerritoriesLayer.mockReturnValue([
-        { territorioPadre: 5, color: '#ff0000', layer: {} },
-      ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 5, color: '#ff0000', layer: {} });
 
       await component.onTerritorioSeleccionado([5]);
 
       expect(selection.prepareTerritorioSeleccionado).toHaveBeenCalledWith([5]);
+      expect(rendering.getFeatureLayerByTerritorio).toHaveBeenCalledWith(5);
       expect(selection.restaurarMarcadoDesdeDB).toHaveBeenCalledWith(5, '#ff0000', { actualizarEstadoMarcado: true });
     });
   });

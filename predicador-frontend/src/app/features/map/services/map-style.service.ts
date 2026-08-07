@@ -32,8 +32,11 @@ export function getMarkedManzanaStyle(color: string): L.PathOptions {
   };
 }
 
+// Singleton — Leaflet reads but never mutates the passed style object, so
+// returning a frozen constant avoids one allocation per hidden territory per frame.
+const HIDDEN_STYLE: L.PathOptions = Object.freeze({ ...STYLE_DEFAULTS.hiddenPolygon });
 export function getHiddenStyle(): L.PathOptions {
-  return { ...STYLE_DEFAULTS.hiddenPolygon };
+  return HIDDEN_STYLE;
 }
 
 export function getSelectedManzanaStyle(): L.PathOptions {

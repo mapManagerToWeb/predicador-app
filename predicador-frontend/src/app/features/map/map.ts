@@ -73,12 +73,14 @@ export class MapPage implements OnDestroy {
 
     const numsAConsiderar = this.selection.prepareTerritorioSeleccionado(numeros);
 
-    for (const numero of numsAConsiderar) {
-      const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === numero);
-      if (featureLayer) {
-        await this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
-      }
-    }
+    // Parallel DB restoration — avoids sequential awaits for multi-territory selection
+    await Promise.all(
+      numsAConsiderar.map(numero => {
+        const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero); // O(1)
+        if (!featureLayer) return Promise.resolve();
+        return this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
+      })
+    );
   }
 
   private onMapClick(e: L.LeafletMouseEvent): void {

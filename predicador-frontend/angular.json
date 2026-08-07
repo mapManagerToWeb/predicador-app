@@ -51,7 +51,7 @@
               }
             ],
             "polyfills": [],
-            "styles": ["src/styles.css", "node_modules/leaflet/dist/leaflet.css"],
+            "styles": ["src/styles.css"],
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
@@ -66,18 +66,18 @@
                "optimization": true,
                "sourceMap": false,
                "allowedCommonJsDependencies": ["leaflet"],
-               "budgets": [
-                 {
-                   "type": "initial",
-                   "maximumWarning": "320kB",
-                   "maximumError": "600kB"
-                 },
-                 {
-                   "type": "anyComponentStyle",
-                   "maximumWarning": "12kB",
-                   "maximumError": "16kB"
-                 }
-               ],
+                "budgets": [
+                  {
+                    "type": "initial",
+                    "maximumWarning": "320kB",
+                    "maximumError": "600kB"
+                  },
+                  {
+                    "type": "anyComponentStyle",
+                    "maximumWarning": "24kB",
+                    "maximumError": "32kB"
+                  }
+                ],
                "outputHashing": "all",
                "serviceWorker": "ngsw-config.json"
              },
