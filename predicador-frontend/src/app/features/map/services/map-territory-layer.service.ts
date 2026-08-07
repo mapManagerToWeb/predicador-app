@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import * as GeoJSON from 'geojson';
 import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
@@ -19,15 +19,25 @@ export type ManzanaClickHandler = (
 /**
  * Manages territory GeoJSON layers, indices, and viewport-based loading.
  *
- * <p>Loads GeoJSON, groups features by territory, creates/removes Leaflet
- * layers, manages manzana indices, and handles territory labels.</p>
+ * <p>Uses plain Maps instead of signals for internal state so that hot-path
+ * operations (territory add/remove, label lookup) are O(1) and never create
+ * intermediate array copies.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapTerritoryLayerService {
-  private allTerritoriesLayer = signal<FeatureLayer[]>([]);
-  private manzanaIndex = signal<ManzanaIndex[]>([]);
-  private territoryLabels = signal<L.Marker[]>([]);
-  private territoryDataCache = signal<Map<number, TerritorioCacheData>>(new Map());
+  // O(1) territory → layer lookup; replaces signal<FeatureLayer[]>
+  private layerByTerritory = new Map<number, FeatureLayer>();
+
+  // Flat manzana list for iteration (MapInteractionService); O(1) by-territory index alongside
+  private manzanaList: ManzanaIndex[] = [];
+  private manzanasByTerritory = new Map<number, ManzanaIndex[]>();
+
+  // O(1) territory → label lookup; replaces signal<L.Marker[]> + querySelector
+  private labelByTerritory = new Map<number, L.Marker>();
+
+  // Plain map; was signal<Map<...>> — no reactivity needed (set once at load)
+  private dataCache = new Map<number, TerritorioCacheData>();
+
   private manzanaClickHandler: ManzanaClickHandler | null = null;
   private extraLayers: L.Layer[] = [];
 
@@ -42,15 +52,20 @@ export class MapTerritoryLayerService {
   }
 
   getManzanaIndex(): ManzanaIndex[] {
-    return this.manzanaIndex();
+    return this.manzanaList;
+  }
+
+  /** O(1) lookup — avoids .find() in hot paths. */
+  getFeatureLayerByTerritorio(territorioNum: number): FeatureLayer | undefined {
+    return this.layerByTerritory.get(territorioNum);
   }
 
   getAllTerritoriesLayer(): FeatureLayer[] {
-    return this.allTerritoriesLayer();
+    return Array.from(this.layerByTerritory.values());
   }
 
   getTerritoryDataCache(): Map<number, TerritorioCacheData> {
-    return this.territoryDataCache();
+    return this.dataCache;
   }
 
   async loadAllTerritories(territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
@@ -60,9 +75,7 @@ export class MapTerritoryLayerService {
     const geoJson = JSON.parse(geoJsonText) as GeoJSON.FeatureCollection;
 
     const byTerritorio = this.groupFeaturesByTerritorio(geoJson.features);
-    const cache = this.buildTerritorioCache(byTerritorio);
-
-    this.territoryDataCache.set(cache);
+    this.dataCache = this.buildTerritorioCache(byTerritorio);
   }
 
   private groupFeaturesByTerritorio(features: GeoJSON.Feature[]): Map<number, GeoJSON.Feature[]> {
@@ -93,12 +106,11 @@ export class MapTerritoryLayerService {
     if (!map) return [];
 
     const mapBounds = map.getBounds().pad(MAP_DEFAULTS.mapBoundsPadFactor);
-    const loadedNums = new Set(this.allTerritoriesLayer().map(fl => fl.territorioPadre));
     const newlyLoaded: number[] = [];
 
-    for (const [num, data] of this.territoryDataCache()) {
+    for (const [num, data] of this.dataCache) {
       const isVisible = data.bounds.isValid() && data.bounds.intersects(mapBounds);
-      const isLoaded = loadedNums.has(num);
+      const isLoaded = this.layerByTerritory.has(num); // O(1) — no Set creation
 
       if (isVisible && !isLoaded) {
         this.addTerritoryLayer(num, data);
@@ -113,18 +125,19 @@ export class MapTerritoryLayerService {
   }
 
   ensureTerritoryLoaded(territorioNum: number): void {
-    if (this.allTerritoriesLayer().some(fl => fl.territorioPadre === territorioNum)) return;
-    const data = this.territoryDataCache().get(territorioNum);
+    if (this.layerByTerritory.has(territorioNum)) return; // O(1)
+    const data = this.dataCache.get(territorioNum);
     if (data) this.addTerritoryLayer(territorioNum, data);
   }
 
   clearAllLayers(): void {
-    for (const fl of this.allTerritoriesLayer()) fl.layer.remove();
-    for (const lbl of this.territoryLabels()) lbl.remove();
-    this.allTerritoriesLayer.set([]);
-    this.territoryLabels.set([]);
-    this.manzanaIndex.set([]);
-    this.territoryDataCache.set(new Map());
+    for (const fl of this.layerByTerritory.values()) fl.layer.remove();
+    for (const lbl of this.labelByTerritory.values()) lbl.remove();
+    this.layerByTerritory.clear();
+    this.labelByTerritory.clear();
+    this.manzanaList = [];
+    this.manzanasByTerritory.clear();
+    this.dataCache.clear();
   }
 
   updateLabelsVisibility(): void {
@@ -132,7 +145,7 @@ export class MapTerritoryLayerService {
     if (!map) return;
 
     const show = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
-    for (const lbl of this.territoryLabels()) {
+    for (const lbl of this.labelByTerritory.values()) {
       lbl.setOpacity(show ? 1 : 0);
     }
   }
@@ -148,11 +161,9 @@ export class MapTerritoryLayerService {
       return;
     }
 
-    for (const lbl of this.territoryLabels()) {
-      const el = lbl.getElement();
-      if (!el) continue;
-      const text = el.querySelector('.territory-label__text')?.textContent;
-      lbl.setOpacity(text && seleccionados.has(Number(text)) ? 1 : 0);
+    // O(1) per label — direct Map lookup instead of querySelector
+    for (const [num, lbl] of this.labelByTerritory) {
+      lbl.setOpacity(seleccionados.has(num) ? 1 : 0);
     }
   }
 
@@ -160,15 +171,16 @@ export class MapTerritoryLayerService {
     const map = this.engine.getMap();
     if (!map) return;
     const show = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
-    for (const lbl of this.territoryLabels()) lbl.setOpacity(show ? 1 : 0);
+    for (const lbl of this.labelByTerritory.values()) lbl.setOpacity(show ? 1 : 0);
   }
 
-  getFeatureLayerByTerritorio(territorioNum: number): FeatureLayer | undefined {
-    return this.allTerritoriesLayer().find(f => f.territorioPadre === territorioNum);
+  /** O(1) count — avoids .filter() in hot paths. */
+  getManzanaCountByTerritorio(territorioNum: number): number {
+    return this.manzanasByTerritory.get(territorioNum)?.length ?? 0;
   }
 
   getTerritoryLabels(): L.Marker[] {
-    return this.territoryLabels();
+    return Array.from(this.labelByTerritory.values());
   }
 
   addExtraLayer(layer: L.Layer): void {
@@ -188,10 +200,6 @@ export class MapTerritoryLayerService {
     this.extraLayers = [];
   }
 
-  getManzanaCountByTerritorio(territorioNum: number): number {
-    return this.manzanaIndex().filter(m => m.territorioNumero === territorioNum).length;
-  }
-
   private addTerritoryLayer(territorioNum: number, data: TerritorioCacheData): void {
     const { fc, color, bounds } = data;
     const map = this.engine.getMap();
@@ -205,7 +213,16 @@ export class MapTerritoryLayerService {
     });
 
     if (newEntries.length > 0) {
-      this.manzanaIndex.update(idx => [...idx, ...newEntries]);
+      // Push directly — no array spread/copy
+      for (const entry of newEntries) {
+        this.manzanaList.push(entry);
+        let list = this.manzanasByTerritory.get(territorioNum);
+        if (!list) {
+          list = [];
+          this.manzanasByTerritory.set(territorioNum, list);
+        }
+        list.push(entry);
+      }
     }
 
     layer.addTo(map);
@@ -214,7 +231,7 @@ export class MapTerritoryLayerService {
       this.addTerritoryLabel(map, territorioNum, bounds);
     }
 
-    this.allTerritoriesLayer.update(layers => [...layers, { territorioPadre: territorioNum, color, layer }]);
+    this.layerByTerritory.set(territorioNum, { territorioPadre: territorioNum, color, layer });
   }
 
   private getTerritoryStyle(color: string): L.PathOptions {
@@ -280,31 +297,34 @@ export class MapTerritoryLayerService {
       interactive: false,
       keyboard: false,
     }).addTo(map);
-    this.territoryLabels.update(labels => [...labels, label]);
+
+    // O(1) insert — no array push + spread
+    this.labelByTerritory.set(territorioNum, label);
   }
 
   private removeTerritoryLayer(territorioNum: number): void {
-    const idx = this.allTerritoriesLayer().findIndex(fl => fl.territorioPadre === territorioNum);
-    if (idx < 0) return;
+    const fl = this.layerByTerritory.get(territorioNum);
+    if (!fl) return;
 
-    const fl = this.allTerritoriesLayer()[idx];
     fl.layer.remove();
-    this.allTerritoriesLayer.update(layers => layers.filter((_, i) => i !== idx));
+    this.layerByTerritory.delete(territorioNum);
 
     this.removeTerritoryLabel(territorioNum);
-    this.manzanaIndex.update(index => index.filter(m => m.territorioNumero !== territorioNum));
+
+    // Remove manzanas for this territory
+    const manzanas = this.manzanasByTerritory.get(territorioNum);
+    this.manzanasByTerritory.delete(territorioNum);
+    if (manzanas && manzanas.length > 0) {
+      const toRemove = new Set(manzanas);
+      this.manzanaList = this.manzanaList.filter(m => !toRemove.has(m));
+    }
   }
 
   private removeTerritoryLabel(territorioNum: number): void {
-    const labelIdx = this.territoryLabels().findIndex(lbl => {
-      const el = lbl.getElement();
-      if (!el) return false;
-      const text = el.querySelector('.territory-label__text')?.textContent;
-      return text === String(territorioNum);
-    });
-    if (labelIdx >= 0) {
-      this.territoryLabels()[labelIdx].remove();
-      this.territoryLabels.update(labels => labels.filter((_, i) => i !== labelIdx));
+    const label = this.labelByTerritory.get(territorioNum);
+    if (label) {
+      label.remove();
+      this.labelByTerritory.delete(territorioNum);
     }
   }
 

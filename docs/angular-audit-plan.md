@@ -135,3 +135,57 @@ zoneless — ya aplicado —, cambio de builder): el proyecto no los justifica h
 **Resueltos en la tercera pasada:** M2 (guard SSR en `territory-search.applyTheme()`); M5 (`zone.js` movido a `devDependencies`); L3 (`MapStateService` sin getters/setters mutables: `manzanaSeleccionada*` y `manzanaEdges` ahora son signals, con callers y specs actualizados); L5 (`error.interceptor` matchea rutas auth por sufijo exacto, no por substring); L10 (`nextParcialId()` monotónico en vez de `parcial-${Date.now()}`); L14 (caché de `territorio.ts` con TTL de 5 min + test de re-fetch tras expirar).
 
 **Pendientes que requieren decisión tuya o deploy:** M3 (endurecer `admin.guard` — decisión documentada actual: el form de admin vive en la ruta), CSP completo y `allowedHosts`/`trustProxyHeaders` explícitos en `server.ts`/deploy (dependen de la topología de despliegue). Resto de hallazgos bajos (L2, L4, L6, L8, L11–L13, L15) son refactors o decisiones documentadas sin impacto en flujos críticos.
+
+## 8. Estado de ejecución — Pasada 4 (2026-08-07)
+
+**Resueltos en esta pasada:**
+
+- **P1** (Leaflet CSS en bundle inicial): `leaflet.css` movido a `map.css` via `@import` → desaparece del initial bundle, solo se carga en `/map`. Initial CSS de 16.92 kB → 5.85 kB.
+- **P2** (signal<array> con spread copies): `MapTerritoryLayerService` refactorizado a estructuras plain (`Map<number, FeatureLayer>`, `Map<number, L.Marker>`, array plano + `Map<number, ManzanaIndex[]>`). 0 copias de array en cada carga de territorio.
+- **P3** (O(n) lookups): `getFeatureLayerByTerritorio()` y `getManzanaCountByTerritorio()` añadidos a facade → O(1) en todos los hot paths.
+- **P4** (new Set() en moveend): `updateVisibleTerritories()` usa `layerByTerrory.has(num)` directamente → sin Set/map creation.
+- **P5** (querySelector en labels): Labels gestionados por `Map<number, L.Marker>` → sin DOM reads en hot paths de selección.
+- **P6** (getHiddenStyle allocations): `HIDDEN_STYLE` singleton congelado → cero allocations por llamada.
+- **P7** (restauración secuencial): `Promise.all(numsAConsiderar.map(...))` en `onTerritorioSeleccionado` → restauración paralela de múltiples territorios.
+- **P8** (setTimeout leak): Timer almacenado y limpiado con `DestroyRef.onDestroy`.
+
+**Tests:** 307 pasando (37 spec files). Lint limpio. Build production exitoso con presupuestos de bundle actualizados (24 kB / 32 kB para anyComponentStyle).
+
+## 7. Pasada 4 — Rendimiento de carga y runtime (2026-08-07)
+
+**Contexto:** el usuario confirmó que el objetivo principal de esta pasada es **máximo rendimiento en móvil** (app mobile-first para usuarios con habilidad tecnológica baja/media). Se acepta cualquier refactor que no rompa los flujos críticos ni cambie el comportamiento visible.
+
+### Nuevos hallazgos de rendimiento
+
+| # | Severidad | Área | Hallazgo | Ubicación |
+|---|---|---|---|---|
+| P1 | **Alto** | Loading | Leaflet CSS (~12 kB) está en el bundle inicial (`styles-*.css`) y se descarga en **todas las rutas** (login, profile, admin) aunque solo se usa en `/map`. Coste innecesario en el path crítico de primera carga. | `angular.json:54`, `styles-*.css` initial chunk |
+| P2 | **Alto** | Runtime | `signal<FeatureLayer[]>` y `signal<L.Marker[]>` en `MapTerritoryLayerService` se actualizan con `update(arr => [...arr, item])` en cada territorio cargado, creando copias innecesarias del array. Con 20 territorios en viewport = 60+ arrays descartados en la carga inicial. | `map-territory-layer.service.ts:208,217,283` |
+| P3 | **Alto** | Runtime | `getAllTerritoriesLayer().find(f => f.territorioPadre === num)` y `getManzanaIndex().filter(m => m.territorioNumero === num).length` se repiten en 8+ sitios en hot paths (click, pan, selección). Complejidad O(n) donde n = territorios/manzanas cargadas. | `map-rendering.facade.ts:282,285,194`, `map-selection.service.ts:55,57`, `map-initialization.service.ts:56`, `map-style.service.ts:112,129,132` |
+| P4 | **Alto** | Runtime | `updateVisibleTerritories()` (llamado en cada `moveend`) crea `new Set(allTerritoriesLayer().map(...))` — un Set + array nuevo en cada pan/zoom del mapa. | `map-territory-layer.service.ts:96` |
+| P5 | **Alto** | Runtime | `updateLabelsForSelection()` y `removeTerritoryLabel()` hacen `el.querySelector('.territory-label__text')?.textContent` para cada label — lectura de DOM que fuerza layout reflow en hot paths de selección. | `map-territory-layer.service.ts:154,299-303` |
+| P6 | **Medio** | Runtime | `getHiddenStyle()` retorna `{ ...STYLE_DEFAULTS.hiddenPolygon }` (spread = objeto nuevo) en cada llamada. Se invoca una vez por territorio no-seleccionado en cada `ocultarPoligonosNoSeleccionados()`. | `map-style.service.ts:36` |
+| P7 | **Medio** | Robustez | `onTerritorioSeleccionado()` restaura marcas de DB de forma **secuencial** (`for await`); seleccionar N territorios bloquea N peticiones en serie. | `map.ts:76-81` |
+| P8 | **Bajo** | Robustez | `TerritorySearch.onBlur()` usa `setTimeout` sin limpiar el timer al destruir el componente; puede disparar `signal.set()` en un componente ya destruido. | `territory-search.ts:151` |
+
+### Soluciones aplicadas en esta pasada
+
+- **P1**: `leaflet.css` movido de `angular.json` styles globales a `map.css` via `@import` → se bundlea con el lazy chunk de `/map`, desaparece del initial bundle.
+- **P2**: `signal<FeatureLayer[]>`, `signal<L.Marker[]>`, `signal<ManzanaIndex[]>` y `signal<Map<...>>` reemplazados por estructuras plain (`Map<number, FeatureLayer>`, `Map<number, L.Marker>`, array plano + `Map<number, ManzanaIndex[]>`). 0 copias de array en cada carga de territorio.
+- **P3 + P4 + P5**: `getFeatureLayerByTerritorio(num)` → O(1) via Map. `getManzanaCountByTerritorio(num)` → O(1) via Map. Labels gestionados por `Map<number, L.Marker>` → sin querySelector. Facade actualizada para usarlos en todos los hot paths.
+- **P6**: `getHiddenStyle()` retorna objeto singleton `HIDDEN_STYLE` congelado (`Object.freeze`). Cero allocations por llamada.
+- **P7**: `Promise.all(numsAConsiderar.map(...))` en vez de `for await` — restauración paralela de múltiples territorios.
+- **P8**: Timer almacenado, limpiado con `DestroyRef.onDestroy`.
+
+### Métricas antes/después (build production real)
+
+| Métrica | Antes | Después |
+|---|---|---|
+| Initial CSS bundle | 16.92 kB (incl. Leaflet ~11 kB) | 5.85 kB (solo app styles) |
+| Initial total bundle | 314.43 kB | 303.36 kB |
+| Initial CSS comprimido | 3.72 kB | 1.59 kB |
+| Map lazy chunk (CSS) | 0 | Leaflet CSS ahora en chunk lazy |
+| Array copies por carga de territorio | O(n_territorios) spreads | 0 (Map direct insert) |
+| Lookup territorio en hot path | O(n_territorios) | O(1) |
+| Lookup manzana-count en hot path | O(n_manzanas) | O(1) |
+| querySelector por selección de territorio | O(n_labels) DOM reads | 0 (Map direct access) |

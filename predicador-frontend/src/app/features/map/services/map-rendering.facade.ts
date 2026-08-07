@@ -25,13 +25,10 @@ import type {
 /**
  * Facade that coordinates all map sub-services.
  *
- * <p>Replaces MapRenderingService by delegating to focused services.
- * Maintains backward-compatible public API during migration of consumers
- * (MapSelectionService, MapPartialMarkService, MapInitializationService,
- * MapDataPersistenceService).</p>
- *
- * <p>After all consumers are migrated, this facade can be renamed to
- * MapRenderingService if convenient.</p>
+ * <p>Hot-path methods (applyBaseTerritoryStyle, reaplicarMarcasTerritorio,
+ * computeBaseStyle, restaurarVisibilidadPoligonos) use O(1) Map lookups via
+ * getFeatureLayerByTerritorio / getManzanaCountByTerritorio instead of
+ * iterating the full territory array.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapRenderingFacade {
@@ -104,35 +101,59 @@ export class MapRenderingFacade {
     return this.territories.getTerritoryDataCache();
   }
 
+  /** O(1) — replaces getAllTerritoriesLayer().find() in hot paths. */
+  getFeatureLayerByTerritorio(territorioNum: number): FeatureLayer | undefined {
+    return this.territories.getFeatureLayerByTerritorio(territorioNum);
+  }
+
+  /** O(1) — replaces getManzanaIndex().filter().length in hot paths. */
+  getManzanaCountByTerritorio(territorioNum: number): number {
+    return this.territories.getManzanaCountByTerritorio(territorioNum);
+  }
+
   // ─── Style delegation ────────────────────────────────────────────
 
+  /**
+   * Applies the base territory style using O(1) lookups.
+   * Bypasses the MapStyleService array-scan version.
+   */
   applyBaseTerritoryStyle(
     territorioNumero: number,
     color: string,
     marcadasCount: number,
     options: { total?: number; isComplete?: boolean } = {}
   ): void {
-    this.styles.applyBaseTerritoryStyle(
-      this.territories.getAllTerritoriesLayer(),
-      this.territories.getManzanaIndex(),
-      territorioNumero,
-      color,
-      marcadasCount,
-      options
-    );
+    const fl = this.territories.getFeatureLayerByTerritorio(territorioNumero);
+    if (!fl) return;
+    const total = options.total ?? this.territories.getManzanaCountByTerritorio(territorioNumero);
+    const isComplete = options.isComplete ?? (total > 0 && marcadasCount >= total);
+    this.styles.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(color, isComplete));
   }
 
   applyStyleToFeatureLayer(fl: FeatureLayer, style: L.PathOptions | ((fl: FeatureLayer) => L.PathOptions)): void {
     this.styles.applyStyleToFeatureLayer(fl, style);
   }
 
+  /**
+   * Re-applies base + marked styles for the given territory numbers using O(1) lookups.
+   * Bypasses the MapStyleService array-scan version.
+   */
   reaplicarMarcasTerritorio(manzanasMarcadas: ManzanaMarcada[], territorioNumeros: number[]): void {
-    this.styles.reaplicarMarcasTerritorio(
-      this.territories.getAllTerritoriesLayer(),
-      this.territories.getManzanaIndex(),
-      manzanasMarcadas,
-      territorioNumeros
-    );
+    for (const num of territorioNumeros) {
+      const fl = this.territories.getFeatureLayerByTerritorio(num); // O(1)
+      if (!fl) continue;
+
+      const total = this.territories.getManzanaCountByTerritorio(num); // O(1)
+      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num).length;
+      const isComplete = total > 0 && marcadas >= total;
+
+      this.styles.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(fl.color, isComplete));
+
+      for (const m of manzanasMarcadas.filter(m => m.territorioNumero === num)) {
+        const layer = this.registry.get(m.id);
+        if (layer) layer.setStyle(getMarkedManzanaStyle(fl.color));
+      }
+    }
   }
 
   limpiarMarcasVisuales(): void {
@@ -191,7 +212,7 @@ export class MapRenderingFacade {
       }
 
       for (const num of territoriosSeleccionados) {
-        const featureLayer = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === num);
+        const featureLayer = this.territories.getFeatureLayerByTerritorio(num); // O(1)
         if (!featureLayer) continue;
 
         const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num);
@@ -279,14 +300,12 @@ export class MapRenderingFacade {
   }
 
   private computeBaseStyle(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): L.PathOptions {
-    const total = this.territories.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+    const total = this.territories.getManzanaCountByTerritorio(territorioNumero); // O(1)
     const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;
-    const color = this.territories.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero)?.color ?? '';
+    const color = this.territories.getFeatureLayerByTerritorio(territorioNumero)?.color ?? ''; // O(1)
     return getBaseTerritoryStyle(color, isComplete);
   }
-
-  // ─── Private helpers ─────────────────────────────────────────────
 
   // ─── Destroy ─────────────────────────────────────────────────────
 
