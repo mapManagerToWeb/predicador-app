@@ -52,9 +52,9 @@ export class MapSelectionService {
         this.state.territoriosSeleccionados().length === 1 ? territorioNumero : null
       );
 
-      const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero);
+      const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero); // O(1)
       if (featureLayer) {
-        const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+        const total = this.rendering.getManzanaCountByTerritorio(territorioNumero); // O(1)
         const marcadas = this.state.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).length;
         const isComplete = total > 0 && marcadas >= total;
 
@@ -62,8 +62,9 @@ export class MapSelectionService {
       }
 
       this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
+      const seleccionados = this.state.territoriosSeleccionados();
       this.state.totalManzanas.set(
-        this.rendering.getManzanaIndex().filter(m => this.state.territoriosSeleccionados().includes(m.territorioNumero)).length
+        seleccionados.reduce((sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n), 0) // O(k)
       );
     }
 
@@ -76,7 +77,7 @@ export class MapSelectionService {
 
     const territorios = this.state.territoriosSeleccionados();
     if (territorios.length > 0) {
-      const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorios[0]).length;
+      const total = this.rendering.getManzanaCountByTerritorio(territorios[0]); // O(1)
       const marcadas = this.state.manzanasMarcadas().filter(m => m.territorioNumero === territorios[0]).length;
       const isComplete = total > 0 && marcadas >= total;
 
@@ -102,8 +103,9 @@ export class MapSelectionService {
     }
 
     this.state.manzanasMarcadas.set(current);
+    const seleccionados = this.state.territoriosSeleccionados();
     this.state.totalManzanas.set(
-      this.rendering.getManzanaIndex().filter(m => this.state.territoriosSeleccionados().includes(m.territorioNumero)).length
+      seleccionados.reduce((sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n), 0) // O(k)
     );
   }
 
@@ -111,7 +113,7 @@ export class MapSelectionService {
     territorioNumero: number,
     marcadasList: { territorioNumero: number }[]
   ): { total: number; marcadas: number; isComplete: boolean } {
-    const total = this.rendering.getManzanaIndex().filter(m => m.territorioNumero === territorioNumero).length;
+    const total = this.rendering.getManzanaCountByTerritorio(territorioNumero); // O(1)
     const marcadas = marcadasList.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;
     return { total, marcadas, isComplete };
@@ -156,7 +158,7 @@ export class MapSelectionService {
     const seleccionados = this.state.territoriosSeleccionados();
     this.state.territorioSeleccionado.set(seleccionados.length === 1 ? territorioNumero : null);
 
-    const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === territorioNumero);
+    const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero); // O(1)
     if (featureLayer) {
       const { isComplete } = this.calcularCompletitudTerritorio(territorioNumero, current);
       this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
@@ -199,7 +201,7 @@ export class MapSelectionService {
 
     let combinedBounds: L.LatLngBounds | null = null;
     for (const numero of numsAConsiderar) {
-      const featureLayer = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === numero);
+      const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero); // O(1)
       if (!featureLayer) continue;
 
       this.rendering.setCurrentTerritoryColor(featureLayer.color);
@@ -225,21 +227,12 @@ export class MapSelectionService {
   }
 
   private updateTotalManzanas(numsAConsiderar: number[]): void {
-    if (numsAConsiderar.length === 1) {
-      const fl = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === numsAConsiderar[0]);
-      if (fl) {
-        this.state.totalManzanas.set(Array.from(fl.layer.getLayers()).filter(l => l instanceof L.Path).length);
-      }
-    } else {
-      let total = 0;
-      for (const numero of numsAConsiderar) {
-        const fl = this.rendering.getAllTerritoriesLayer().find(f => f.territorioPadre === numero);
-        if (fl) {
-          total += Array.from(fl.layer.getLayers()).filter(l => l instanceof L.Path).length;
-        }
-      }
-      this.state.totalManzanas.set(total);
-    }
+    // O(k) where k = selected territories — uses O(1) per-territory lookup
+    const total = numsAConsiderar.reduce(
+      (sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n),
+      0
+    );
+    this.state.totalManzanas.set(total);
   }
 
   async restaurarMarcadoDesdeDB(

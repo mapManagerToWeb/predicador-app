@@ -1,4 +1,4 @@
-import { Component, signal, computed, output, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, signal, computed, output, inject, OnInit, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Profile } from '../../../core/services/profile';
@@ -17,6 +17,9 @@ export class TerritorySearch implements OnInit {
   private profileService = inject(Profile);
   private authToken = inject(AuthTokenService);
   private router = inject(Router);
+
+  private readonly destroyRef = inject(DestroyRef);
+  private blurTimer: ReturnType<typeof setTimeout> | null = null;
 
   consultaBusqueda = signal('');
   todosLosNumeros = signal<number[]>([]);
@@ -79,6 +82,9 @@ export class TerritorySearch implements OnInit {
   ngOnInit(): void {
     this.applyTheme();
     void this.loadTerritorios();
+    this.destroyRef.onDestroy(() => {
+      if (this.blurTimer !== null) clearTimeout(this.blurTimer);
+    });
   }
 
   async loadTerritorios(): Promise<void> {
@@ -148,6 +154,10 @@ export class TerritorySearch implements OnInit {
   }
 
   onBlur(): void {
-    setTimeout(() => this.mostrarDropdown.set(false), 200);
+    if (this.blurTimer !== null) clearTimeout(this.blurTimer);
+    this.blurTimer = setTimeout(() => {
+      this.mostrarDropdown.set(false);
+      this.blurTimer = null;
+    }, 200);
   }
 }

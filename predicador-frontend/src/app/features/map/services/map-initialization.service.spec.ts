@@ -42,6 +42,7 @@ describe('MapInitializationService', () => {
       loadAllTerritories: vi.fn().mockResolvedValue(undefined),
       updateVisibleTerritories: vi.fn().mockReturnValue([]),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
+      getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
       ocultarPoligonosNoSeleccionados: vi.fn(),
       updateLabelsVisibility: vi.fn(),
     };
@@ -110,13 +111,12 @@ describe('MapInitializationService', () => {
 
   it('restores marks for newly visible territories and hides the rest while marking', async () => {
     rendering.updateVisibleTerritories.mockReturnValue([3]);
-    rendering.getAllTerritoriesLayer.mockReturnValue([
-      { territorioPadre: 3, color: '#ff0000', layer: {} },
-    ]);
+    rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#ff0000', layer: {} });
     state.modoMarcado.set('completa');
 
     await service.initialize(document.createElement('div'), vi.fn());
 
+    expect(rendering.getFeatureLayerByTerritorio).toHaveBeenCalledWith(3);
     expect(selection.restaurarMarcadoDesdeDB).toHaveBeenCalledWith(3, '#ff0000', { actualizarEstadoMarcado: false });
     expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
   });
