@@ -1,6 +1,7 @@
 import * as L from 'leaflet';
 import * as GeoJSON from 'geojson';
 import { SnappedPoint, Edge } from '../map-geometry';
+import type { Reporte } from '../../../core/models/models';
 export type { SnappedPoint, Edge };
 
 export type ModoMarcado = 'none' | 'completa' | 'parcial';
@@ -40,15 +41,5 @@ export interface TerritorioCacheData {
   fc: GeoJSON.FeatureCollection;
   color: string;
   bounds: L.LatLngBounds;
-}
-
-export interface Reporte {
-  id?: number;
-  sessionTime: string;
-  manzanasIds?: string;
-  manzanaId?: number;
-  geometriaParcial?: string;
-  territorioNumero: number;
-  predicacion: string;
 }
 

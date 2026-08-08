@@ -101,33 +101,30 @@ export class MapRenderingFacade {
     return this.territories.getTerritoryDataCache();
   }
 
-  /** O(1) — replaces getAllTerritoriesLayer().find() in hot paths. */
   getFeatureLayerByTerritorio(territorioNum: number): FeatureLayer | undefined {
     return this.territories.getFeatureLayerByTerritorio(territorioNum);
   }
 
-  /** O(1) — replaces getManzanaIndex().filter().length in hot paths. */
   getManzanaCountByTerritorio(territorioNum: number): number {
     return this.territories.getManzanaCountByTerritorio(territorioNum);
   }
 
   // ─── Style delegation ────────────────────────────────────────────
 
-  /**
-   * Applies the base territory style using O(1) lookups.
-   * Bypasses the MapStyleService array-scan version.
-   */
   applyBaseTerritoryStyle(
     territorioNumero: number,
     color: string,
     marcadasCount: number,
     options: { total?: number; isComplete?: boolean } = {}
   ): void {
-    const fl = this.territories.getFeatureLayerByTerritorio(territorioNumero);
-    if (!fl) return;
-    const total = options.total ?? this.territories.getManzanaCountByTerritorio(territorioNumero);
-    const isComplete = options.isComplete ?? (total > 0 && marcadasCount >= total);
-    this.styles.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(color, isComplete));
+    this.styles.applyBaseTerritoryStyle(
+      this.territories.getAllTerritoriesLayer(),
+      this.territories.getManzanaIndex(),
+      territorioNumero,
+      color,
+      marcadasCount,
+      options
+    );
   }
 
   applyStyleToFeatureLayer(fl: FeatureLayer, style: L.PathOptions | ((fl: FeatureLayer) => L.PathOptions)): void {
@@ -139,21 +136,12 @@ export class MapRenderingFacade {
    * Bypasses the MapStyleService array-scan version.
    */
   reaplicarMarcasTerritorio(manzanasMarcadas: ManzanaMarcada[], territorioNumeros: number[]): void {
-    for (const num of territorioNumeros) {
-      const fl = this.territories.getFeatureLayerByTerritorio(num); // O(1)
-      if (!fl) continue;
-
-      const total = this.territories.getManzanaCountByTerritorio(num); // O(1)
-      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num).length;
-      const isComplete = total > 0 && marcadas >= total;
-
-      this.styles.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(fl.color, isComplete));
-
-      for (const m of manzanasMarcadas.filter(m => m.territorioNumero === num)) {
-        const layer = this.registry.get(m.id);
-        if (layer) layer.setStyle(getMarkedManzanaStyle(fl.color));
-      }
-    }
+    this.styles.reaplicarMarcasTerritorio(
+      this.territories.getAllTerritoriesLayer(),
+      this.territories.getManzanaIndex(),
+      manzanasMarcadas,
+      territorioNumeros
+    );
   }
 
   limpiarMarcasVisuales(): void {
@@ -212,7 +200,7 @@ export class MapRenderingFacade {
       }
 
       for (const num of territoriosSeleccionados) {
-        const featureLayer = this.territories.getFeatureLayerByTerritorio(num); // O(1)
+        const featureLayer = this.territories.getFeatureLayerByTerritorio(num);
         if (!featureLayer) continue;
 
         const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num);
@@ -225,7 +213,7 @@ export class MapRenderingFacade {
       if (hayFiltroActivo) {
         this.territories.updateLabelsForSelection(seleccionadosSet);
       } else {
-        this.territories.mostrarTodosLosLabels();
+        this.territories.updateLabelsVisibility();
       }
     });
   }
@@ -300,10 +288,10 @@ export class MapRenderingFacade {
   }
 
   private computeBaseStyle(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): L.PathOptions {
-    const total = this.territories.getManzanaCountByTerritorio(territorioNumero); // O(1)
+    const total = this.territories.getManzanaCountByTerritorio(territorioNumero);
     const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;
-    const color = this.territories.getFeatureLayerByTerritorio(territorioNumero)?.color ?? ''; // O(1)
+    const color = this.territories.getFeatureLayerByTerritorio(territorioNumero)?.color ?? '';
     return getBaseTerritoryStyle(color, isComplete);
   }
 

@@ -6,16 +6,8 @@ import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
+import { TERRITORY_COLORS } from '../map/utils/territory-colors';
 import { environment } from '../../../environments/environment';
-
-const COLORES_PREDEFINIDOS = [
-  '#DC143C', '#00A86B', '#FF6600', '#8A2BE2', '#E0115F',
-  '#00CED1', '#FF1493', '#32CD32', '#FF4500', '#1E90FF',
-  '#DA70D6', '#FFD700', '#00FF7F', '#FF00FF', '#4169E1',
-  '#FF69B4', '#7B68EE', '#FF8C00', '#00BFFF', '#FF6347',
-  '#9370DB', '#3CB371', '#FF1493', '#4682B4', '#FFA500',
-  '#2E8B57', '#CD5C5C', '#6A5ACD', '#20B2AA', '#DAA520'
-];
 
 @Component({
   selector: 'app-admin',
@@ -39,7 +31,7 @@ export class AdminPage implements OnInit {
 
   numerosTerritorios = signal<number[]>([]);
   colores = signal<Record<number, string>>({});
-  coloresPredefinidos = COLORES_PREDEFINIDOS;
+  coloresPredefinidos = TERRITORY_COLORS;
   guardando = signal(false);
 
   ngOnInit(): void {
@@ -103,7 +95,7 @@ export class AdminPage implements OnInit {
   }
 
   getColor(numero: number): string {
-    return this.colores()[numero] || COLORES_PREDEFINIDOS[(numero - 1) % COLORES_PREDEFINIDOS.length];
+    return this.colores()[numero] || TERRITORY_COLORS[(numero - 1) % TERRITORY_COLORS.length];
   }
 
   async cambiarColor(numero: number, color: string): Promise<void> {

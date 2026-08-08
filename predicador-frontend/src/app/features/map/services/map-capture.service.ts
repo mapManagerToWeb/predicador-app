@@ -49,10 +49,12 @@ export class MapCaptureService {
     this.updateLabelVisibility(territoryLabels, seleccionados);
     this.fitBoundsToSelection(map, seleccionados, manzanasMarcadas, allTerritoriesLayer);
 
-    this.captureTimer = setTimeout(() => {
-      this.captureTimer = null;
-      resolve();
-    }, MAP_DEFAULTS.captureDelayMs);
+    return new Promise<void>((resolve) => {
+      this.captureTimer = setTimeout(() => {
+        this.captureTimer = null;
+        resolve();
+      }, MAP_DEFAULTS.captureDelayMs);
+    });
   }
 
   restaurarMapaPostCaptura(
@@ -100,12 +102,12 @@ export class MapCaptureService {
     });
   }
 
-  private stylePartialMarks(manzanasMarcadas: ManzanaMarcada[], allTerritoriesLayer: FeatureLayer[]): void {
+  private stylePartialMarks(manzanasMarcadas: ManzanaMarcada[], _allTerritoriesLayer: FeatureLayer[]): void {
     for (const m of manzanasMarcadas) {
       if (!m.id.startsWith('parcial-')) continue;
       const layer = this.registry.get(m.id);
       if (!layer) continue;
-      const fl = allTerritoriesLayer.find(f => f.territorioPadre === m.territorioNumero);
+      const fl = this.territories.getFeatureLayerByTerritorio(m.territorioNumero);
       if (!fl) continue;
       layer.setStyle(getPartialPolygonCompleteStyle(fl.color));
     }
@@ -145,10 +147,10 @@ export class MapCaptureService {
     return combined;
   }
 
-  private getBoundsFromSelectedTerritories(seleccionados: Set<number>, allTerritoriesLayer: FeatureLayer[]): L.LatLngBounds | null {
+  private getBoundsFromSelectedTerritories(seleccionados: Set<number>, _allTerritoriesLayer: FeatureLayer[]): L.LatLngBounds | null {
     let combined: L.LatLngBounds | null = null;
     for (const num of seleccionados) {
-      const fl = allTerritoriesLayer.find(f => f.territorioPadre === num);
+      const fl = this.territories.getFeatureLayerByTerritorio(num);
       if (!fl) continue;
       const b = fl.layer.getBounds();
       if (b.isValid()) {

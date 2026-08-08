@@ -39,9 +39,7 @@ export class MapMarkRestorationService {
     options: { actualizarEstadoMarcado?: boolean } = {}
   ): void {
     try {
-      const featureLayerColor = this.rendering
-        .getAllTerritoriesLayer()
-        .find(f => f.territorioPadre === territorioNumero)?.color;
+      const featureLayerColor = this.rendering.getFeatureLayerByTerritorio(territorioNumero)?.color;
       const color = colorOverride ?? featureLayerColor ?? this.rendering.getCurrentTerritoryColor();
       const { actualizarEstadoMarcado = true } = options;
 
@@ -62,7 +60,7 @@ export class MapMarkRestorationService {
 
       const ultimo = elegirUltimoReporte(reportes);
       const ids = ultimo?.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
-      const total = this.rendering.getManzanaIndex().filter(mc => mc.territorioNumero === territorioNumero).length;
+      const total = this.rendering.getManzanaCountByTerritorio(territorioNumero);
       const marcadas = ids.length;
       const isComplete = total > 0 && marcadas >= total;
 
