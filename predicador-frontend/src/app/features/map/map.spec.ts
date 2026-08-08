@@ -109,6 +109,7 @@ describe('MapPage', () => {
       isSatellite: vi.fn().mockReturnValue(false),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
+      getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
       restaurarVisibilidadPoligonos: vi.fn(),
       cancelPendingStyleUpdates: vi.fn(),
       destroy: vi.fn(),

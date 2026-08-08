@@ -141,37 +141,26 @@ export class MapTerritoryLayerService {
   }
 
   updateLabelsVisibility(): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-
-    const show = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
-    for (const lbl of this.labelByTerritory.values()) {
-      lbl.setOpacity(show ? 1 : 0);
-    }
+    this.updateLabels(null);
   }
 
   updateLabelsForSelection(seleccionados: Set<number>): void {
+    this.updateLabels(seleccionados);
+  }
+
+  private updateLabels(seleccionados: Set<number> | null): void {
     const map = this.engine.getMap();
     if (!map) return;
 
-    const zoomVisible = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
-
-    if (seleccionados.size === 0 || !zoomVisible) {
-      this.mostrarTodosLosLabels();
+    const show = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
+    if (!show || seleccionados === null || seleccionados.size === 0) {
+      for (const lbl of this.labelByTerritory.values()) lbl.setOpacity(show ? 1 : 0);
       return;
     }
 
-    // O(1) per label — direct Map lookup instead of querySelector
     for (const [num, lbl] of this.labelByTerritory) {
       lbl.setOpacity(seleccionados.has(num) ? 1 : 0);
     }
-  }
-
-  mostrarTodosLosLabels(): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-    const show = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
-    for (const lbl of this.labelByTerritory.values()) lbl.setOpacity(show ? 1 : 0);
   }
 
   /** O(1) count — avoids .filter() in hot paths. */

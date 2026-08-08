@@ -7,6 +7,7 @@ import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { environment } from '../../../environments/environment';
+import { TERRITORY_COLORS } from '../map/utils/territory-colors';
 
 describe('AdminPage', () => {
   let component: AdminPage;
@@ -49,12 +50,12 @@ describe('AdminPage', () => {
       const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({ username: 'admin', password: 'correct_password' });
-      req.flush({ success: true });
+      req.flush({ success: true, token: 'mock-token' });
 
       await loginPromise;
 
       expect(component.isLoggedIn()).toBeTruthy();
-       expect(localStorage.getItem('isAdmin')).toBeNull();
+      expect(localStorage.getItem('isAdmin')).toBeNull();
     });
 
     it('should show error with wrong credentials', async () => {

@@ -36,6 +36,8 @@ describe('MapMarkRestorationService', () => {
       addExtraLayer: vi.fn(),
       removeExtraLayer: vi.fn(),
       getCurrentTerritoryColor: vi.fn().mockReturnValue('#fff'),
+      getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
+      getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
     };
     territorioService = { getReportesPorTerritorio: vi.fn() };
     toast = { show: vi.fn() };
@@ -85,12 +87,8 @@ describe('MapMarkRestorationService', () => {
 
   describe('restaurarConReportes', () => {
     it('applies base territory style with correct completion', () => {
-      rendering.getAllTerritoriesLayer.mockReturnValue([
-        { territorioPadre: 1, color: '#ff0000', layer: {} },
-      ]);
-      rendering.getManzanaIndex.mockReturnValue([
-        { territorioNumero: 1, id: 'm1', nombreBloque: 'A', polygon: fakePath() },
-      ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 1, color: '#ff0000', layer: {} });
+      rendering.getManzanaCountByTerritorio.mockReturnValue(1);
 
       service.restaurarConReportes(1, [
         { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: 'm1', manzanaId: null } as never,
@@ -100,7 +98,7 @@ describe('MapMarkRestorationService', () => {
     });
 
     it('resets the territory style with zero marcadas when reports is empty', () => {
-      rendering.getManzanaIndex.mockReturnValue([]);
+      rendering.getManzanaCountByTerritorio.mockReturnValue(0);
 
       service.restaurarConReportes(1, []);
 
