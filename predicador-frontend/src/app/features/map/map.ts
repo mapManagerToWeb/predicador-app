@@ -76,7 +76,7 @@ export class MapPage implements OnDestroy {
     // Parallel DB restoration — avoids sequential awaits for multi-territory selection
     await Promise.all(
       numsAConsiderar.map(numero => {
-        const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero); // O(1)
+        const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero);
         if (!featureLayer) return Promise.resolve();
         return this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
       })

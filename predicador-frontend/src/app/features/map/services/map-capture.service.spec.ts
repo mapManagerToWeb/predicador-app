@@ -57,7 +57,7 @@ describe('MapCaptureService', () => {
   beforeEach(() => {
     fakeMap = { fitBounds: vi.fn(), getZoom: vi.fn().mockReturnValue(15) };
     engine = { getMap: vi.fn() };
-    territories = { getAllTerritoriesLayer: vi.fn(), getTerritoryLabels: vi.fn() };
+    territories = { getAllTerritoriesLayer: vi.fn(), getTerritoryLabels: vi.fn(), getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined), getManzanaCountByTerritorio: vi.fn().mockReturnValue(0) };
     TestBed.configureTestingModule({
       providers: [
         MapCaptureService,
@@ -97,6 +97,11 @@ describe('MapCaptureService', () => {
         fakeFeatureLayer(2, '#00ff00', [hiddenPath]),
       ]);
       territories.getTerritoryLabels.mockReturnValue([fakeLabel('1'), fakeLabel('2')]);
+      territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
+        if (num === 1) return { territorioPadre: 1, color: '#ff0000', layer: { getBounds: () => ({ isValid: () => true }) } };
+        if (num === 2) return { territorioPadre: 2, color: '#00ff00', layer: { getBounds: () => ({ isValid: () => true }) } };
+        return undefined;
+      });
 
       const marcadas = [
         { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 },
@@ -148,6 +153,11 @@ describe('MapCaptureService', () => {
         fakeFeatureLayer(2, '#00ff00', [unselectedPath]),
       ]);
       territories.getTerritoryLabels.mockReturnValue([]);
+      territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
+        if (num === 1) return { territorioPadre: 1, color: '#ff0000', layer: { getBounds: () => ({ isValid: () => true }) } };
+        if (num === 2) return { territorioPadre: 2, color: '#00ff00', layer: { getBounds: () => ({ isValid: () => true }) } };
+        return undefined;
+      });
 
       service.restaurarMapaPostCaptura([], [1], 'none');
 
