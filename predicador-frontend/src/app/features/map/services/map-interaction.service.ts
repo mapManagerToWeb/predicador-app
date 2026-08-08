@@ -31,8 +31,7 @@ export class MapInteractionService {
     if (modo === 'none') {
       const hit = this.findManzanaInside(e.latlng);
       if (hit) {
-        const current = this.state.manzanasMarcadas();
-        const isMarked = current.some(m => m.id === hit.id);
+        const isMarked = this.state.manzanasById().has(hit.id);
         if (isMarked) {
           return { action: 'toggle_manzana', manzana: hit };
         }
@@ -55,8 +54,7 @@ export class MapInteractionService {
     if (modo === 'parcial') {
       const hit = this.findManzanaInside(e.latlng);
       if (hit) {
-        const current = this.state.manzanasMarcadas();
-        const isMarked = current.some(m => m.id === hit.id);
+        const isMarked = this.state.manzanasById().has(hit.id);
         if (isMarked) {
           return { action: 'toggle_manzana', manzana: hit };
         }
@@ -106,16 +104,14 @@ export class MapInteractionService {
   }
 
   private findParcialAtPoint(latlng: L.LatLng): { id: string } | null {
-    const marcadas = this.state.manzanasMarcadas();
-    for (const m of marcadas) {
+    for (const m of this.state.manzanasById().values()) {
       if (!m.id.startsWith('parcial-')) continue;
       const layer = this.registry.get(m.id);
-      if (layer instanceof L.Polygon) {
-        const rings = layer.getLatLngs();
-        const outer = rings[0] as L.LatLng[];
-        if (outer && pointInPolygon(latlng, outer)) {
-          return { id: m.id };
-        }
+      if (!(layer instanceof L.Polygon)) continue;
+      const rings = layer.getLatLngs();
+      const outer = rings[0] as L.LatLng[];
+      if (outer && pointInPolygon(latlng, outer)) {
+        return { id: m.id };
       }
     }
     return null;

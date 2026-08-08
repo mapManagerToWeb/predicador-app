@@ -4,8 +4,13 @@ import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
 
 @Injectable({ providedIn: 'root' })
 export class MapStateService {
-  manzanasMarcadas = signal<ManzanaMarcada[]>([]);
-  manzanasCount = computed(() => this.manzanasMarcadas().length);
+  manzanasById = signal<Map<string, ManzanaMarcada>>(new Map());
+  manzanasCount = computed(() => this.manzanasById().size);
+  manzanasMarcadaList = computed(() => {
+    const arr: ManzanaMarcada[] = [];
+    this.manzanasById().forEach(m => arr.push(m));
+    return arr;
+  });
   totalManzanas = signal(0);
   territorioSeleccionado = signal<number | null>(null);
   territoriosSeleccionados = signal<number[]>([]);
@@ -28,6 +33,16 @@ export class MapStateService {
   manzanaSeleccionadaTerritorio = signal<number | null>(null);
   manzanaEdges = signal<Edge[]>([]);
 
+  manzanasByTerritorio = computed(() => {
+    const map = new Map<number, ManzanaMarcada[]>();
+    for (const m of this.manzanasById().values()) {
+      const list = map.get(m.territorioNumero) ?? [];
+      list.push(m);
+      if (list.length === 1) map.set(m.territorioNumero, list);
+    }
+    return map;
+  });
+
   private _datosParcialesGuardados: Map<number, { puntos: SnappedPoint[]; geometria: string }> = new Map();
 
   get datosParcialesGuardados(): Map<number, { puntos: SnappedPoint[]; geometria: string }> { return this._datosParcialesGuardados; }
@@ -48,7 +63,7 @@ export class MapStateService {
   }
 
   resetUIState(): void {
-    this.manzanasMarcadas.set([]);
+    this.manzanasById.set(new Map());
     this.totalManzanas.set(0);
     this.territorioSeleccionado.set(null);
     this.territoriosSeleccionados.set([]);

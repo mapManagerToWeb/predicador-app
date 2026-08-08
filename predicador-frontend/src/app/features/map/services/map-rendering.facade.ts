@@ -135,11 +135,11 @@ export class MapRenderingFacade {
    * Re-applies base + marked styles for the given territory numbers using O(1) lookups.
    * Bypasses the MapStyleService array-scan version.
    */
-  reaplicarMarcasTerritorio(manzanasMarcadas: ManzanaMarcada[], territorioNumeros: number[]): void {
+  reaplicarMarcasTerritorio(manzanasMarcadaList: ManzanaMarcada[], territorioNumeros: number[]): void {
     this.styles.reaplicarMarcasTerritorio(
       this.territories.getAllTerritoriesLayer(),
       this.territories.getManzanaIndex(),
-      manzanasMarcadas,
+      manzanasMarcadaList,
       territorioNumeros
     );
   }
@@ -183,7 +183,7 @@ export class MapRenderingFacade {
     this.territories.updateLabelsForSelection(seleccionadosSet);
   }
 
-  restaurarVisibilidadPoligonos(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): void {
+  restaurarVisibilidadPoligonos(manzanasMarcadaList: ManzanaMarcada[], territoriosSeleccionados: number[]): void {
     this.styles.cancelPendingStyleUpdates();
 
     const seleccionadosSet = new Set(territoriosSeleccionados);
@@ -196,14 +196,14 @@ export class MapRenderingFacade {
           continue;
         }
 
-        this.styles.applyStyleToFeatureLayer(fl, this.computeBaseStyle(fl.territorioPadre, manzanasMarcadas));
+        this.styles.applyStyleToFeatureLayer(fl, this.computeBaseStyle(fl.territorioPadre, manzanasMarcadaList));
       }
 
       for (const num of territoriosSeleccionados) {
         const featureLayer = this.territories.getFeatureLayerByTerritorio(num);
         if (!featureLayer) continue;
 
-        const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num);
+        const marcadas = manzanasMarcadaList.filter(m => m.territorioNumero === num);
         for (const m of marcadas) {
           const layer = this.registry.get(m.id);
           if (layer) layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
@@ -220,17 +220,17 @@ export class MapRenderingFacade {
 
   // ─── Capture ─────────────────────────────────────────────────────
 
-  prepararCaptura(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
-    return this.capture.prepararCaptura(manzanasMarcadas, territoriosSeleccionados);
+  prepararCaptura(manzanasMarcadaList: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
+    return this.capture.prepararCaptura(manzanasMarcadaList, territoriosSeleccionados);
   }
 
   restaurarMapaPostCaptura(
-    manzanasMarcadas: ManzanaMarcada[],
+    manzanasMarcadaList: ManzanaMarcada[],
     territoriosSeleccionados: number[],
     modoMarcado: string
   ): void {
     this.capture.restaurarMapaPostCaptura(
-      manzanasMarcadas,
+      manzanasMarcadaList,
       territoriosSeleccionados,
       modoMarcado
     );
@@ -287,9 +287,9 @@ export class MapRenderingFacade {
     return this.state.currentTerritoryColor();
   }
 
-  private computeBaseStyle(territorioNumero: number, manzanasMarcadas: ManzanaMarcada[]): L.PathOptions {
+  private computeBaseStyle(territorioNumero: number, manzanasMarcadaList: ManzanaMarcada[]): L.PathOptions {
     const total = this.territories.getManzanaCountByTerritorio(territorioNumero);
-    const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === territorioNumero).length;
+    const marcadas = manzanasMarcadaList.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;
     const color = this.territories.getFeatureLayerByTerritorio(territorioNumero)?.color ?? '';
     return getBaseTerritoryStyle(color, isComplete);

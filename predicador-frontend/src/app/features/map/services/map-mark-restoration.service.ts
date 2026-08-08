@@ -44,17 +44,16 @@ export class MapMarkRestorationService {
       const { actualizarEstadoMarcado = true } = options;
 
       if (actualizarEstadoMarcado) {
-        const previosParciales = this.state.manzanasMarcadas()
-          .filter(m => m.territorioNumero === territorioNumero && m.id.startsWith('parcial-'));
+        const previosParciales = this.state.manzanasByTerritorio().get(territorioNumero)?.filter(m => m.id.startsWith('parcial-')) ?? [];
         for (const p of previosParciales) {
           const layer = this.registry.get(p.id);
           if (layer) this.rendering.removeExtraLayer(layer);
           this.registry.unregister(p.id);
         }
         if (previosParciales.length > 0) {
-          this.state.manzanasMarcadas.update(current =>
-            current.filter(m => !(m.territorioNumero === territorioNumero && m.id.startsWith('parcial-')))
-          );
+          const newMap = new Map(this.state.manzanasById());
+          for (const p of previosParciales) newMap.delete(p.id);
+          this.state.manzanasById.set(newMap);
         }
       }
 
@@ -70,7 +69,7 @@ export class MapMarkRestorationService {
 
       const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
       const existingIds = new Set(
-        this.state.manzanasMarcadas().filter(m => m.territorioNumero === territorioNumero).map(m => m.id)
+        this.state.manzanasByTerritorio().get(territorioNumero)?.map(m => m.id) ?? []
       );
 
       for (const mc of this.rendering.getManzanaIndex()) {
@@ -80,10 +79,9 @@ export class MapMarkRestorationService {
           mc.polygon.setStyle(getMarkedManzanaStyle(color));
           if (actualizarEstadoMarcado && !existingIds.has(mc.id)) {
             this.registry.register(mc.id, mc.polygon);
-            this.state.manzanasMarcadas.update(current => [
-              ...current,
-              { id: mc.id, nombreBloque: mc.nombreBloque, color, territorioNumero },
-            ]);
+            const newMap = new Map(this.state.manzanasById());
+            newMap.set(mc.id, { id: mc.id, nombreBloque: mc.nombreBloque, color, territorioNumero });
+            this.state.manzanasById.set(newMap);
           }
         }
       }
@@ -124,10 +122,9 @@ export class MapMarkRestorationService {
 
       if (actualizarEstadoMarcado) {
         this.registry.register(parcialId, polygon);
-        this.state.manzanasMarcadas.update(current => [
-          ...current,
-          { id: parcialId, nombreBloque: 'Zona parcial', color, territorioNumero },
-        ]);
+        const newMap = new Map(this.state.manzanasById());
+        newMap.set(parcialId, { id: parcialId, nombreBloque: 'Zona parcial', color, territorioNumero });
+        this.state.manzanasById.set(newMap);
       }
     } catch {
       /* ignore parse errors */

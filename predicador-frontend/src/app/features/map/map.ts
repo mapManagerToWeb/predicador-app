@@ -35,7 +35,6 @@ export class MapPage implements OnDestroy {
   private readonly dataPersistence = inject(MapDataPersistenceService);
   private readonly toastService = inject(Toast);
 
-  manzanasMarcadas = this.state.manzanasMarcadas;
   manzanasCount = this.state.manzanasCount;
   totalManzanas = this.state.totalManzanas;
   territorioSeleccionado = this.state.territorioSeleccionado;
@@ -67,7 +66,7 @@ export class MapPage implements OnDestroy {
     // Si se recibe un array vacío, limpiar selección y restaurar visibilidad
     if (numeros.length === 0) {
       this.selection.limpiarMarcas();
-      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadas(), []);
+      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
       return;
     }
 
@@ -196,7 +195,7 @@ export class MapPage implements OnDestroy {
       return;
     }
 
-    const hasData = this.state.manzanasMarcadas().length > 0 || this.state.territoriosSeleccionados().length > 0;
+    const hasData = this.state.manzanasById().size > 0 || this.state.territoriosSeleccionados().length > 0;
     this.limpiarMarcas();
 
     if (hasData) {
