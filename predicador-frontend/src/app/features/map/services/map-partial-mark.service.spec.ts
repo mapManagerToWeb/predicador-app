@@ -161,15 +161,15 @@ describe('MapPartialMarkService', () => {
       service.finalizarParcial();
 
       expect(state.getDatosParciales(1)).not.toBeNull();
-      expect(state.manzanasMarcadas()).toHaveLength(1);
-      expect(state.manzanasMarcadas()[0].territorioNumero).toBe(1);
+      expect(state.manzanasMarcadaList()).toHaveLength(1);
+      expect(state.manzanasMarcadaList()[0].territorioNumero).toBe(1);
       expect(polygon.setStyle).toHaveBeenCalledWith(getPartialPolygonCompleteStyle('#ff0000'));
       expect(rendering.addExtraLayer).toHaveBeenCalledWith(polygon);
       expect(rendering.clearPoligonoParcialRef).toHaveBeenCalled();
       expect(state.puntosParciales()).toEqual([]);
       expect(state.modoMarcado()).toBe('none');
       expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Zona parcial marcada'));
-      expect(registry.get(state.manzanasMarcadas()[0].id)).toBe(polygon);
+      expect(registry.get(state.manzanasMarcadaList()[0].id)).toBe(polygon);
     });
   });
 
@@ -196,16 +196,14 @@ describe('MapPartialMarkService', () => {
     it('removes the layer, the mark and the partial data', () => {
       const layer = {} as never;
       registry.register('parcial-9', layer);
-      state.manzanasMarcadas.set([
-        { id: 'parcial-9', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
-      ]);
+      state.manzanasById.set(new Map([['parcial-9', { id: 'parcial-9', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 }]]));
       state.setDatosParciales(1, { puntos: [], geometria: '{}' });
 
       service.eliminarParcial('parcial-9');
 
       expect(rendering.removeExtraLayer).toHaveBeenCalledWith(layer);
       expect(registry.get('parcial-9')).toBeNull();
-      expect(state.manzanasMarcadas()).toEqual([]);
+      expect(state.manzanasMarcadaList()).toEqual([]);
       expect(state.getDatosParciales(1)).toBeNull();
       expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('eliminada'));
     });

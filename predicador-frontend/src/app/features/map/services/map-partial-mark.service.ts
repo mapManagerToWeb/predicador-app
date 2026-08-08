@@ -111,10 +111,9 @@ export class MapPartialMarkService {
       poligonoParcial.setStyle(getPartialPolygonCompleteStyle(color));
 
       this.registry.register(id, poligonoParcial);
-      this.state.manzanasMarcadas.update(current => [
-        ...current,
-        { id, nombreBloque, color, territorioNumero: territorio },
-      ]);
+      const newMap = new Map(this.state.manzanasById());
+      newMap.set(id, { id, nombreBloque, color, territorioNumero: territorio });
+      this.state.manzanasById.set(newMap);
       this.rendering.addExtraLayer(poligonoParcial);
 
       poligonoParcial.on('click', (e: L.LeafletMouseEvent) => {
@@ -129,7 +128,7 @@ export class MapPartialMarkService {
     this.state.puntosParciales.set([]);
     this.selection.restaurarManzanaAnterior();
     this.state.modoMarcado.set('none');
-    this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadas(), this.state.territoriosSeleccionados());
+    this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
     this.toastService.show(TOAST_MESSAGES.partialMarked);
   }
 
@@ -142,17 +141,16 @@ export class MapPartialMarkService {
   }
 
   eliminarParcial(id: string): void {
-    const current = [...this.state.manzanasMarcadas()];
-    const idx = current.findIndex(m => m.id === id);
-    if (idx < 0) return;
+    const current = this.state.manzanasById();
+    const removed = current.get(id);
+    if (!removed) return;
 
-    const removed = current[idx];
     const layer = this.registry.get(id);
     if (layer) this.rendering.removeExtraLayer(layer);
     this.registry.unregister(id);
-    current.splice(idx, 1);
-    this.state.manzanasMarcadas.set(current);
-    // Limpiar sólo los datos parciales del territorio afectado.
+    const newMap = new Map(current);
+    newMap.delete(id);
+    this.state.manzanasById.set(newMap);
     this.state.clearDatosParciales(removed.territorioNumero);
     this.toastService.show(TOAST_MESSAGES.partialDeleted);
   }

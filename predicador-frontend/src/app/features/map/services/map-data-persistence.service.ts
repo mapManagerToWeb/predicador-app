@@ -6,6 +6,7 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
+import type { ManzanaMarcada } from '../types/map.types';
 
 @Injectable({ providedIn: 'root' })
 export class MapDataPersistenceService {
@@ -23,7 +24,7 @@ export class MapDataPersistenceService {
       return;
     }
 
-    const marcadas = this.state.manzanasMarcadas();
+    const marcadas = this.state.manzanasMarcadaList();
     if (!marcadas.length) {
       this.toastService.show(TOAST_MESSAGES.noMarked);
       return;
@@ -32,7 +33,7 @@ export class MapDataPersistenceService {
     if (this.state.enviando()) return;
     this.state.enviando.set(true);
 
-    let previousMarcadas: typeof marcadas | null = null;
+    let previousMarcadas: Map<string, ManzanaMarcada> | null = null;
     let previousDatosParciales: typeof this.state.datosParcialesGuardados | null = null;
     try {
       const registros = this.reportService.buildRegistros(
@@ -42,7 +43,7 @@ export class MapDataPersistenceService {
         this.state.datosParcialesGuardados
       );
 
-      previousMarcadas = [...marcadas];
+      previousMarcadas = new Map(this.state.manzanasById());
       previousDatosParciales = new Map(this.state.datosParcialesGuardados);
       this.toastService.show(TOAST_MESSAGES.saving);
       this.state.clearDatosParciales();
@@ -55,15 +56,15 @@ export class MapDataPersistenceService {
 
       this.selection.reaplicarMarcasSeleccionadas();
       this.toastService.show(TOAST_MESSAGES.saveSuccess);
-      
+
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
-      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadas(), []);
-      this.state.manzanasMarcadas.set([]);
+      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
+      this.state.manzanasById.set(new Map());
       this.state.totalManzanas.set(0);
     } catch {
       if (previousMarcadas && previousDatosParciales) {
-        this.state.manzanasMarcadas.set(previousMarcadas);
+        this.state.manzanasById.set(previousMarcadas);
         this.state.datosParcialesGuardados = previousDatosParciales;
       }
       this.toastService.show(TOAST_MESSAGES.saveError);
@@ -79,7 +80,7 @@ export class MapDataPersistenceService {
       return;
     }
 
-    const marcadas = this.state.manzanasMarcadas();
+    const marcadas = this.state.manzanasMarcadaList();
     if (!marcadas.length) {
       this.toastService.show(TOAST_MESSAGES.noTerritories);
       return;
@@ -107,7 +108,7 @@ export class MapDataPersistenceService {
       );
 
       const registros = this.reportService.buildRegistros(
-        this.state.manzanasMarcadas(),
+        this.state.manzanasMarcadaList(),
         this.rendering.getAllTerritoriesLayer(),
         this.state.territoriosSeleccionados(),
         this.state.datosParcialesGuardados
@@ -134,8 +135,8 @@ export class MapDataPersistenceService {
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
-        this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadas(), []);
-        this.state.manzanasMarcadas.set([]);
+        this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
+        this.state.manzanasById.set(new Map());
         this.state.totalManzanas.set(0);
       } else {
         this.toastService.show(TOAST_MESSAGES.sendError);
@@ -148,7 +149,7 @@ export class MapDataPersistenceService {
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
-        this.state.manzanasMarcadas.set([]);
+        this.state.manzanasById.set(new Map());
         this.state.totalManzanas.set(0);
       }
     } finally {
@@ -158,7 +159,7 @@ export class MapDataPersistenceService {
   }
 
   prepararCaptura(): Promise<void> {
-    const marcadas = this.state.manzanasMarcadas();
+    const marcadas = this.state.manzanasMarcadaList();
     if (marcadas.length === 0) return Promise.resolve();
 
     return this.rendering.prepararCaptura(marcadas, this.state.territoriosSeleccionados());
@@ -166,7 +167,7 @@ export class MapDataPersistenceService {
 
   restaurarMapaPostCaptura(): void {
     this.rendering.restaurarMapaPostCaptura(
-      this.state.manzanasMarcadas(),
+      this.state.manzanasMarcadaList(),
       this.state.territoriosSeleccionados(),
       this.state.modoMarcado()
     );

@@ -10,7 +10,7 @@ describe('MapStateService', () => {
   });
 
   it('starts with empty, unselected state', () => {
-    expect(service.manzanasMarcadas()).toEqual([]);
+    expect(service.manzanasMarcadaList()).toEqual([]);
     expect(service.manzanasCount()).toBe(0);
     expect(service.totalManzanas()).toBe(0);
     expect(service.territorioSeleccionado()).toBeNull();
@@ -22,8 +22,8 @@ describe('MapStateService', () => {
     expect(service.enviando()).toBe(false);
   });
 
-  it('derives manzanasCount from manzanasMarcadas', () => {
-    service.manzanasMarcadas.set([{ id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]);
+  it('derives manzanasCount from manzanasById', () => {
+    service.manzanasById.set(new Map([['a', { id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
     expect(service.manzanasCount()).toBe(1);
   });
 
@@ -72,7 +72,7 @@ describe('MapStateService', () => {
   });
 
   it('resets all UI state via resetUIState', () => {
-    service.manzanasMarcadas.set([{ id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]);
+    service.manzanasById.set(new Map([['a', { id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
     service.totalManzanas.set(10);
     service.territorioSeleccionado.set(1);
     service.territoriosSeleccionados.set([1]);
@@ -88,7 +88,7 @@ describe('MapStateService', () => {
 
     service.resetUIState();
 
-    expect(service.manzanasMarcadas()).toEqual([]);
+    expect(service.manzanasMarcadaList()).toEqual([]);
     expect(service.totalManzanas()).toBe(0);
     expect(service.territorioSeleccionado()).toBeNull();
     expect(service.territoriosSeleccionados()).toEqual([]);

@@ -72,7 +72,7 @@ describe('MapMarkRestorationService', () => {
       await service.restaurarDesdeDB(1);
 
       expect(rendering.applyBaseTerritoryStyle).toHaveBeenCalled();
-      expect(state.manzanasMarcadas().map(m => m.id)).toEqual(['m1']);
+      expect(state.manzanasMarcadaList().map(m => m.id)).toEqual(['m1']);
       expect(registry.get('m1')).not.toBeNull();
     });
 

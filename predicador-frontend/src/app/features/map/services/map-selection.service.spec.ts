@@ -114,16 +114,16 @@ describe('MapSelectionService', () => {
       const layer2 = fakePath();
       registry.register('m1', layer1 as never);
       registry.register('m2', layer2 as never);
-      state.manzanasMarcadas.set([
-        { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 },
-        { id: 'm2', nombreBloque: 'B', color: '#fff', territorioNumero: 1 },
-      ]);
+      state.manzanasById.set(new Map([
+        ['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }],
+        ['m2', { id: 'm2', nombreBloque: 'B', color: '#fff', territorioNumero: 1 }],
+      ]));
 
       service.toggleManzana('m1', 'A', layer1 as never, '#fff', 1);
 
       expect(registry.get('m1')).toBeNull();
       expect(registry.get('m2')).not.toBeNull();
-      expect(state.manzanasMarcadas()).toEqual([
+      expect(state.manzanasMarcadaList()).toEqual([
         { id: 'm2', nombreBloque: 'B', color: '#fff', territorioNumero: 1 },
       ]);
     });
@@ -132,7 +132,7 @@ describe('MapSelectionService', () => {
       state.territoriosSeleccionados.set([1]);
       const layer1 = fakePath();
       registry.register('m1', layer1 as never);
-      state.manzanasMarcadas.set([{ id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]);
+      state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
 
       service.toggleManzana('m1', 'A', layer1 as never, '#fff', 1);
 
@@ -149,7 +149,7 @@ describe('MapSelectionService', () => {
 
       service.toggleManzana('m1', 'Bloque-m1', layer as never, '#ff0000', 1);
 
-      expect(state.manzanasMarcadas()).toEqual([
+      expect(state.manzanasMarcadaList()).toEqual([
         { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 1 },
       ]);
       expect(registry.get('m1')).toBe(layer);
@@ -226,14 +226,14 @@ describe('MapSelectionService', () => {
     it('clears the registry, the state and the visual marks', () => {
       const layer = fakePath();
       registry.register('m1', layer as never);
-      state.manzanasMarcadas.set([{ id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]);
+      state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
       state.territoriosSeleccionados.set([1]);
       state.totalManzanas.set(10);
 
       service.limpiarMarcas();
 
       expect(registry.get('m1')).toBeNull();
-      expect(state.manzanasMarcadas()).toEqual([]);
+      expect(state.manzanasMarcadaList()).toEqual([]);
       expect(state.territoriosSeleccionados()).toEqual([]);
       expect(state.totalManzanas()).toBe(0);
       expect(rendering.limpiarMarcasVisuales).toHaveBeenCalled();
