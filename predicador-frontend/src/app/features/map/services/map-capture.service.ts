@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, DestroyRef } from '@angular/core';
 import * as L from 'leaflet';
 import { MAP_DEFAULTS } from '../utils/map-constants';
 import { MapEngineService } from './map-engine.service';
@@ -24,6 +24,14 @@ export class MapCaptureService {
   private engine = inject(MapEngineService);
   private territories = inject(MapTerritoryLayerService);
   private registry = inject(MapLayerRegistry);
+  private readonly destroyRef = inject(DestroyRef);
+  private captureTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.captureTimer !== null) clearTimeout(this.captureTimer);
+    });
+  }
 
   prepararCaptura(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
     const map = this.engine.getMap();
@@ -41,15 +49,11 @@ export class MapCaptureService {
     this.updateLabelVisibility(territoryLabels, seleccionados);
     this.fitBoundsToSelection(map, seleccionados, manzanasMarcadas, allTerritoriesLayer);
 
-     return new Promise(resolve => {
-       const complete = () => setTimeout(resolve, MAP_DEFAULTS.captureDelayMs);
-       if (typeof requestAnimationFrame === 'function') {
-         requestAnimationFrame(complete);
-       } else {
-         complete();
-       }
-     });
-   }
+    this.captureTimer = setTimeout(() => {
+      this.captureTimer = null;
+      resolve();
+    }, MAP_DEFAULTS.captureDelayMs);
+  }
 
   restaurarMapaPostCaptura(
     manzanasMarcadas: ManzanaMarcada[],
