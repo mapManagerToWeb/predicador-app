@@ -1,0 +1,51 @@
+<div class="simulation-container">
+  <h2>Simulación de Envío WhatsApp</h2>
+  
+  <div class="form-group">
+    <label for="destination-number">Número Destino:</label>
+    <input
+      id="destination-number"
+      type="text"
+      [(ngModel)]="destinationNumber"
+      placeholder="56936577203"
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="template-name">Plantilla:</label>
+    <input
+      id="template-name"
+      type="text"
+      [(ngModel)]="templateName"
+      placeholder="asignacion_territorio"
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="language-code">Idioma:</label>
+    <input id="language-code" type="text" [(ngModel)]="languageCode" placeholder="es" />
+  </div>
+  
+  <button 
+    class="btn-primary" 
+    (click)="sendTestReport()" 
+    [disabled]="loading()"
+  >
+    {{ loading() ? 'Enviando...' : 'Enviar Reporte de Prueba' }}
+  </button>
+  
+  @if (statusPolling()) {
+    <div class="polling">{{ statusPolling() }}</div>
+  }
+  
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+  
+  @if (result()) {
+    <div class="result">
+      <h3>Resultado:</h3>
+      <pre>{{ result() | json }}</pre>
+    </div>
+  }
+</div>

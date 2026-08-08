@@ -244,7 +244,7 @@ describe('MapPage', () => {
     });
 
     it('clears marks and reloads territories when there is data', () => {
-      state.manzanasMarcadas.set([{ id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]);
+      state.manzanasById.set(new Map([["{ id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }"]]));
 
       component.limpiarTodo();
 

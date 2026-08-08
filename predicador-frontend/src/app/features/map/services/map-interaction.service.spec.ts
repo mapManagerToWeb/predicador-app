@@ -72,7 +72,7 @@ describe('MapInteractionService', () => {
     it('toggles a manzana that is already marked', () => {
       state.modoMarcado.set('none');
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
-      state.manzanasMarcadas.set([{ id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]);
+      state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -139,9 +139,7 @@ describe('MapInteractionService', () => {
         ],
       ]);
       registry.register('parcial-123', parcial);
-      state.manzanasMarcadas.set([
-        { id: 'parcial-123', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 5 },
-      ]);
+      state.manzanasById.set(new Map([['parcial-123', { id: 'parcial-123', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 5 }]]));
       rendering.getManzanaIndex.mockReturnValue([]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
@@ -153,7 +151,7 @@ describe('MapInteractionService', () => {
     it('toggles a manzana that is already marked', () => {
       state.modoMarcado.set('parcial');
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
-      state.manzanasMarcadas.set([{ id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]);
+      state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 

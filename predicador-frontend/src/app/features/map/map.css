@@ -1,6 +1,3 @@
-/* Leaflet CSS — importado aquí para que solo se cargue en el lazy bundle de /map */
-@import 'leaflet/dist/leaflet.css';
-
 /* ═══════════════════════════════════════════════════
    Map Page — Clipboard Sheet
    ═══════════════════════════════════════════════════ */

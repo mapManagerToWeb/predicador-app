@@ -43,7 +43,7 @@ describe('MapDataPersistenceService', () => {
     });
     service = TestBed.inject(MapDataPersistenceService);
     state = TestBed.inject(MapStateService);
-    state.manzanasMarcadas.set([{ id: 'A', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]);
+    state.manzanasById.set(new Map([["{ id: 'A', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }"]]));
     state.territoriosSeleccionados.set([1]);
   });
 
