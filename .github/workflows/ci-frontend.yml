@@ -24,23 +24,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm/action-setup instala la versión declarada en `packageManager`
+      # (pnpm@9.15.0) sin depender de npm.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: predicador-frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: predicador-frontend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        # pnpm 9 no tiene `pnpm ci` (llegó en pnpm 11); el equivalente CI
+        # es `install --frozen-lockfile`, que falla si el lockfile no está
+        # sincronizado con package.json.
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Type check
-        run: npx ng build --configuration=production 2>&1 | tee /tmp/build.log
+        run: pnpm exec ng build --configuration=production 2>&1 | tee /tmp/build.log
 
       - name: Test
-        run: npm test -- --run --coverage
+        run: pnpm test -- --run --coverage
 
       - name: Upload coverage
         if: always()
@@ -51,4 +60,4 @@ jobs:
           retention-days: 7
 
       - name: Build production
-        run: npm run build
+        run: pnpm run build

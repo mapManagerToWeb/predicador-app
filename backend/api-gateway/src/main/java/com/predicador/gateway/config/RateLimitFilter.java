@@ -4,6 +4,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -50,6 +52,8 @@ import java.util.function.Function;
 public class RateLimitFilter implements WebFilter, Ordered {
 
     private static final MediaType PROBLEM_JSON = MediaType.valueOf("application/problem+json");
+
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     /** Upper bound on unique IPs tracked per policy. ~1 MiB total in memory. */
     private static final int MAX_BUCKETS = 20_000;
@@ -161,6 +165,7 @@ public class RateLimitFilter implements WebFilter, Ordered {
             InetAddress addr = InetAddress.getByName(ip);
             return addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress();
         } catch (Exception e) {
+            log.warn("No se pudo resolver IP para proxy confiable, se ignora X-Forwarded-For: {}", ip, e);
             return false;
         }
     }

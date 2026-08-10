@@ -124,19 +124,19 @@ describe('MapReportService', () => {
     });
   });
 
-  describe('buildTerritoriosEnvio', () => {
-    it('marks territories as finished only when all manzanas are marked', () => {
+  describe('buildTerritoriosEnvioSoloIncompletos', () => {
+    it('excludes territories that are fully marked', () => {
       const marcadas = [makeMarcada('m1', 1)];
-      const territorios = service.buildTerritoriosEnvio(marcadas, [makeTerritoryLayer(1, 1)]);
+      const territorios = service.buildTerritoriosEnvioSoloIncompletos(marcadas, [makeTerritoryLayer(1, 1)]);
 
-      expect(territorios).toEqual([{ numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 }]);
+      expect(territorios).toEqual([]);
     });
 
-    it('marks territories as unfinished when coverage is partial', () => {
+    it('includes territories as unfinished when coverage is partial', () => {
       const marcadas = [makeMarcada('parcial-1', 1)];
-      const territorios = service.buildTerritoriosEnvio(marcadas, [makeTerritoryLayer(1, 4)]);
+      const territorios = service.buildTerritoriosEnvioSoloIncompletos(marcadas, [makeTerritoryLayer(1, 4)]);
 
-      expect(territorios[0].finalizado).toBe(false);
+      expect(territorios).toEqual([{ numero: 1, finalizado: false, totalManzanas: 4, manzanasMarcadas: 1 }]);
     });
   });
 
@@ -145,7 +145,7 @@ describe('MapReportService', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-07-21T12:00:00'));
 
-      const territorios = service.buildTerritoriosEnvio([makeMarcada('m1', 1)], [makeTerritoryLayer(1, 1)]);
+      const territorios = [{ numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 }];
       const request = service.buildWhatsAppRequest(profile, territorios, null, 'tarde');
 
       expect(request).toEqual({

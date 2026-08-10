@@ -106,20 +106,4 @@ public class SessionAuthFilter extends OncePerRequestFilter {
                 """.formatted(detail.replace("\"", "'")));
         log.debug("SessionAuthFilter rechazó petición: {}", detail);
     }
-
-    /**
-     * @deprecated Use {@link SecurityRule} directly.
-     */
-    @Deprecated
-    public static class Rule extends SecurityRule {
-        public Rule(List<String> methods, Pattern pattern, String requiredRole) {
-            super(methods, pattern, requiredRole);
-        }
-        public static Rule of(String method, String regex, String requiredRole) {
-            return new Rule(List.of(method), Pattern.compile(regex), requiredRole);
-        }
-        public static Rule any(List<String> methods, String regex, String requiredRole) {
-            return new Rule(methods, Pattern.compile(regex), requiredRole);
-        }
-    }
 }

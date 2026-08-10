@@ -111,6 +111,7 @@ describe('MapPage', () => {
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
       getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
       restaurarVisibilidadPoligonos: vi.fn(),
+      ocultarPoligonosNoSeleccionados: vi.fn(),
       cancelPendingStyleUpdates: vi.fn(),
       destroy: vi.fn(),
     };

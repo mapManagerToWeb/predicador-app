@@ -109,14 +109,14 @@ describe('MapInteractionService', () => {
       expect(result.action).toBe('toggle_manzana');
     });
 
-    it('selects the territory first when it is not selected yet', () => {
+    it('ignores click on unselected territory (no select_territory)', () => {
       state.modoMarcado.set('completa');
       state.territoriosSeleccionados.set([]);
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
-      expect(result.action).toBe('select_territory');
+      expect(result.action).toBe('none');
     });
 
     it('returns none when clicking empty space', () => {
@@ -158,24 +158,13 @@ describe('MapInteractionService', () => {
       expect(result.action).toBe('toggle_manzana');
     });
 
-    it('selects the nearest manzana when clicking empty space with no manzana selected yet', () => {
-      state.modoMarcado.set('parcial');
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
-
-      const result = service.handleMapClick(clickAt(50, 50));
-
-      expect(result.action).toBe('select_manzana');
-      expect(result.manzana?.id).toBe('m1');
-    });
-
-    it('selects the territory first when clicking a manzana of an unselected territory', () => {
+    it('ignores click on unselected territory (no select_manzana)', () => {
       state.modoMarcado.set('parcial');
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
-      expect(result.action).toBe('select_territory');
-      expect(result.manzana?.id).toBe('m1');
+      expect(result.action).toBe('none');
     });
 
     it('returns none when no manzana is selected and none is near', () => {

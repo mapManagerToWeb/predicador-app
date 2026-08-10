@@ -1,7 +1,6 @@
 import * as L from 'leaflet';
 import * as GeoJSON from 'geojson';
 import { SnappedPoint, Edge } from '../map-geometry';
-import type { Reporte } from '../../../core/models/models';
 export type { SnappedPoint, Edge };
 
 export type ModoMarcado = 'none' | 'completa' | 'parcial';

@@ -43,10 +43,12 @@ export class MapInteractionService {
     if (modo === 'completa') {
       const hit = this.findManzanaInside(e.latlng);
       if (hit) {
-        if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-          return { action: 'select_territory', manzana: hit };
+        // Solo permitir toggle en territorios YA seleccionados
+        if (this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
+          return { action: 'toggle_manzana', manzana: hit };
         }
-        return { action: 'toggle_manzana', manzana: hit };
+        // Territorio no seleccionado: ignorar click
+        return { action: 'none' };
       }
       return { action: 'none' };
     }
@@ -59,8 +61,9 @@ export class MapInteractionService {
           return { action: 'toggle_manzana', manzana: hit };
         }
 
+        // Territorio no seleccionado: ignorar click
         if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-          return { action: 'select_territory', manzana: hit };
+          return { action: 'none' };
         }
       }
 

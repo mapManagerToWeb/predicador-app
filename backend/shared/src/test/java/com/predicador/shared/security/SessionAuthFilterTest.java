@@ -34,7 +34,7 @@ class SessionAuthFilterTest {
     @Test
     void routeNotMatchingRule_passesThrough_withoutToken() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                new SessionAuthFilter.Rule(List.of("POST"),
+                new SecurityRule(List.of("POST"),
                         Pattern.compile("^/api/v1/reports$"), null)));
 
         MockHttpServletResponse res = doFilter(filter, "GET", "/api/v1/territories", null);
@@ -47,7 +47,7 @@ class SessionAuthFilterTest {
     @Test
     void protectedRoute_withValidToken_passes() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
 
         MockHttpServletResponse res = doFilter(filter, "POST", "/api/v1/reports", encargadoToken);
 
@@ -57,7 +57,7 @@ class SessionAuthFilterTest {
     @Test
     void protectedRoute_withValidSessionCookie_passesWithoutHeader() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
         req.setCookies(new jakarta.servlet.http.Cookie(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken));
         MockHttpServletResponse res = new MockHttpServletResponse();
@@ -71,7 +71,7 @@ class SessionAuthFilterTest {
     @Test
     void invalidSessionCookie_doesNotFallBackToHeader() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
         req.setCookies(new jakarta.servlet.http.Cookie(SessionAuthFilter.SESSION_COOKIE_NAME, "invalid"));
         req.addHeader(SessionAuthFilter.HEADER_NAME, encargadoToken);
@@ -85,7 +85,7 @@ class SessionAuthFilterTest {
     @Test
     void absentSessionCookie_withValidHeader_isRejectedForBrowserMode() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
         req.addHeader(SessionAuthFilter.HEADER_NAME, encargadoToken);
         MockHttpServletResponse res = new MockHttpServletResponse();
@@ -98,7 +98,7 @@ class SessionAuthFilterTest {
     @Test
     void protectedRoute_withoutToken_returns401() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
 
         MockHttpServletResponse res = doFilter(filter, "POST", "/api/v1/reports", null);
 
@@ -109,7 +109,7 @@ class SessionAuthFilterTest {
     @Test
     void protectedRoute_withInvalidToken_returns401() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
 
         MockHttpServletResponse res = doFilter(filter, "POST", "/api/v1/reports",
                 "not-a-real.token");
@@ -122,7 +122,7 @@ class SessionAuthFilterTest {
     @Test
     void adminRoute_withEncargadoToken_returns401() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
+                SecurityRule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
                         SessionToken.ROLE_ADMIN)));
 
         MockHttpServletResponse res = doFilter(filter, "PUT", "/api/v1/territories/5/color",
@@ -135,7 +135,7 @@ class SessionAuthFilterTest {
     @Test
     void adminRoute_withAdminToken_passes() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
+                SecurityRule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
                         SessionToken.ROLE_ADMIN)));
 
         MockHttpServletResponse res = doFilter(filter, "PUT", "/api/v1/territories/5/color",
@@ -150,7 +150,7 @@ class SessionAuthFilterTest {
     void unconfiguredSecret_passesThroughEverything() throws Exception {
         SessionTokenService disabled = new SessionTokenService("", 1, false, "local");
         SessionAuthFilter filter = new SessionAuthFilter(disabled, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
 
         MockHttpServletResponse res = doFilter(filter, "POST", "/api/v1/reports", null);
 
@@ -163,7 +163,7 @@ class SessionAuthFilterTest {
     @Test
     void validToken_attachesSubjectAsRequestAttribute() throws Exception {
         SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null)));
+                SecurityRule.of("POST", "^/api/v1/reports$", null)));
 
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/reports");
         req.setCookies(new jakarta.servlet.http.Cookie(SessionAuthFilter.SESSION_COOKIE_NAME, encargadoToken));

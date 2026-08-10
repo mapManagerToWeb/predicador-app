@@ -50,7 +50,7 @@ class ReportingSecurityIntegrationTest {
                 .addFilter(new com.predicador.shared.security.SessionAuthFilter(
                         tokenService,
                         List.of(
-                                com.predicador.shared.security.SessionAuthFilter.Rule.any(
+                                com.predicador.shared.security.SecurityRule.any(
                                         List.of("GET", "POST"), "^/api/v1/reports(/.*)?$", null)
                         )
                 ), "/api/v1/*")

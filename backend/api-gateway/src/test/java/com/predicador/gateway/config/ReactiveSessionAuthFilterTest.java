@@ -2,6 +2,7 @@ package com.predicador.gateway.config;
 
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
+import com.predicador.shared.security.SecurityRule;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.TokenValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,8 +30,8 @@ class ReactiveSessionAuthFilterTest {
     void setUp() {
         tokens = new SessionTokenService(SECRET, 1);
         filter = new ReactiveSessionAuthFilter(new TokenValidator(tokens, List.of(
-                SessionAuthFilter.Rule.of("POST", "^/api/v1/reports$", null),
-                SessionAuthFilter.Rule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
+                SecurityRule.of("POST", "^/api/v1/reports$", null),
+                SecurityRule.of("PUT", "^/api/v1/territories/[0-9]+/color$",
                         SessionToken.ROLE_ADMIN)
         )));
         encargadoToken = tokens.issue("42", SessionToken.ROLE_ENCARGADO);

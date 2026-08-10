@@ -13,7 +13,7 @@ describe('MapDataPersistenceService', () => {
   let report: {
     getProfile: ReturnType<typeof vi.fn>;
     buildRegistros: ReturnType<typeof vi.fn>;
-    buildTerritoriosEnvio: ReturnType<typeof vi.fn>;
+    buildTerritoriosEnvioSoloIncompletos: ReturnType<typeof vi.fn>;
     captureScreenshot: ReturnType<typeof vi.fn>;
     buildWhatsAppRequest: ReturnType<typeof vi.fn>;
     saveToDatabase: ReturnType<typeof vi.fn>;
@@ -24,7 +24,7 @@ describe('MapDataPersistenceService', () => {
     report = {
       getProfile: vi.fn().mockReturnValue({ name: 'A', lastName: 'B', avatar: 0, telefono: '56912345678' }),
       buildRegistros: vi.fn().mockReturnValue([]),
-      buildTerritoriosEnvio: vi.fn().mockReturnValue([]),
+      buildTerritoriosEnvioSoloIncompletos: vi.fn().mockReturnValue([]),
       captureScreenshot: vi.fn().mockResolvedValue('screenshot-base64'),
       buildWhatsAppRequest: vi.fn().mockReturnValue({}),
       saveToDatabase: vi.fn().mockResolvedValue([]),
@@ -58,7 +58,7 @@ describe('MapDataPersistenceService', () => {
   });
 
   it('clears loading when WhatsApp territory construction fails', async () => {
-    report.buildTerritoriosEnvio.mockImplementation(() => {
+    report.buildTerritoriosEnvioSoloIncompletos.mockImplementation(() => {
       throw new Error('build failed');
     });
 
@@ -68,43 +68,42 @@ describe('MapDataPersistenceService', () => {
     expect(report.captureScreenshot).not.toHaveBeenCalled();
   });
 
-  it('always captures a screenshot before sending, even when every territory is finished', async () => {
-    report.buildTerritoriosEnvio.mockReturnValue([
-      { numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 },
-    ]);
-    report.buildWhatsAppRequest.mockReturnValue({
-      encargadoNombre: 'A',
-      encargadoApellido: 'B',
-      fechaRegistro: '01-08-2026',
-      predicacion: 'tarde',
-      territorios: [{ numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 }],
-      screenshotBase64: 'screenshot-base64',
-      destinationNumber: '56912345678',
-    });
-
-    await service.guardarYEnviar();
-
-    expect(report.captureScreenshot).toHaveBeenCalledTimes(1);
-    expect(report.sendWhatsApp).toHaveBeenCalledTimes(1);
-    expect(report.buildWhatsAppRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'A' }),
-      expect.arrayContaining([expect.objectContaining({ finalizado: true })]),
-      'screenshot-base64',
-      'tarde'
-    );
-    expect(state.enviando()).toBe(false);
-  });
-
-  it('reports incomplete territories with the *incompleto* wording on success', async () => {
-    report.buildTerritoriosEnvio.mockReturnValue([
-      { numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 },
-      { numero: 2, finalizado: false, totalManzanas: 1, manzanasMarcadas: 0 },
-    ]);
+  it('does NOT capture or send when every territory is finished', async () => {
+    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([]);
     const toast = TestBed.inject(Toast);
     const show = toast.show as ReturnType<typeof vi.fn>;
 
     await service.guardarYEnviar();
 
+    expect(report.captureScreenshot).not.toHaveBeenCalled();
+    expect(report.sendWhatsApp).not.toHaveBeenCalled();
+    expect(show).toHaveBeenCalledWith(expect.stringContaining('No hay territorios incompletos para enviar'));
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('reports incomplete territories with the *incompleto* wording on success', async () => {
+    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([
+      { numero: 2, finalizado: false, totalManzanas: 1, manzanasMarcadas: 0 },
+    ]);
+    report.captureScreenshot.mockResolvedValue('screenshot-base64');
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A',
+      encargadoApellido: 'B',
+      fechaRegistro: '01-08-2026',
+      predicacion: 'tarde',
+      territorios: [{ numero: 2, finalizado: false, totalManzanas: 1, manzanasMarcadas: 0 }],
+      screenshotBase64: 'screenshot-base64',
+      destinationNumber: '56912345678',
+    });
+    report.sendWhatsApp.mockResolvedValue(true);
+
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+
+    await service.guardarYEnviar();
+
+    expect(report.captureScreenshot).toHaveBeenCalledTimes(1);
+    expect(report.sendWhatsApp).toHaveBeenCalledTimes(1);
     expect(show).toHaveBeenCalledWith(expect.stringContaining('*incompleto*'));
     expect(show).not.toHaveBeenCalledWith(expect.stringContaining('*faltante*'));
   });

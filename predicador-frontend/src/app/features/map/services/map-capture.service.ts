@@ -33,18 +33,22 @@ export class MapCaptureService {
     });
   }
 
+  getAllTerritoriesLayer(): FeatureLayer[] {
+    return this.territories.getAllTerritoriesLayer();
+  }
+
   prepararCaptura(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
     const map = this.engine.getMap();
     if (!map) return Promise.resolve();
 
     const seleccionados = new Set(territoriosSeleccionados);
-    const markedLayers = new Set<L.Path>(
+    const _markedLayers = new Set<L.Path>(
       manzanasMarcadas.map(m => this.registry.get(m.id)!).filter(Boolean)
     );
     const allTerritoriesLayer = this.territories.getAllTerritoriesLayer();
     const territoryLabels = this.territories.getTerritoryLabels();
 
-    this.styleTerritoryLayers(allTerritoriesLayer, seleccionados, markedLayers);
+    this.styleTerritoryLayers(allTerritoriesLayer, seleccionados, _markedLayers);
     this.stylePartialMarks(manzanasMarcadas, allTerritoriesLayer);
     this.updateLabelVisibility(territoryLabels, seleccionados);
     this.fitBoundsToSelection(map, seleccionados, manzanasMarcadas, allTerritoriesLayer);
@@ -55,6 +59,70 @@ export class MapCaptureService {
         resolve();
       }, MAP_DEFAULTS.captureDelayMs);
     });
+  }
+
+  /**
+   * Prepara captura SOLO para territorios INCOMPLETOS.
+   * Los territorios completados se ocultan para la captura.
+   */
+  prepararCapturaSoloIncompletos(
+    manzanasMarcadas: ManzanaMarcada[],
+    territoriosSeleccionados: number[],
+    allTerritoriesLayer: FeatureLayer[],
+    getManzanaCountByTerritorio: (num: number) => number
+  ): Promise<void> {
+    const map = this.engine.getMap();
+    if (!map) return Promise.resolve();
+
+    // Filtrar solo territorios INCOMPLETOS
+    const incompletos = new Set<number>();
+    for (const num of territoriosSeleccionados) {
+      const total = getManzanaCountByTerritorio(num);
+      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num && !m.id.startsWith('parcial-')).length;
+      if (total > 0 && marcadas < total) {
+        incompletos.add(num);
+      }
+    }
+
+if (incompletos.size === 0) return Promise.resolve();
+
+    const territoryLabels = this.territories.getTerritoryLabels();
+
+    // Ocultar territorios completados
+    this.styleTerritoryLayersSoloIncompletos(allTerritoriesLayer, incompletos);
+    this.stylePartialMarks(manzanasMarcadas, allTerritoriesLayer);
+    this.updateLabelVisibility(territoryLabels, incompletos);
+    this.fitBoundsToSelection(map, incompletos, manzanasMarcadas, allTerritoriesLayer);
+
+    return new Promise<void>((resolve) => {
+      this.captureTimer = setTimeout(() => {
+        this.captureTimer = null;
+        resolve();
+      }, MAP_DEFAULTS.captureDelayMs);
+    });
+  }
+
+  /**
+   * Aplica estilos de captura SOLO a territorios incompletos.
+   * Los completados se ocultan.
+   */
+  private styleTerritoryLayersSoloIncompletos(
+    allTerritoriesLayer: FeatureLayer[],
+    incompletos: Set<number>
+  ): void {
+    for (const fl of allTerritoriesLayer) {
+      if (incompletos.has(fl.territorioPadre)) {
+        // Incompleto: estilo de captura (no marcado)
+        fl.layer.eachLayer(l => {
+          if (l instanceof L.Path) {
+            l.setStyle({ opacity: 0.6, fillOpacity: 0.05, color: fl.color, weight: 1.5 });
+          }
+        });
+      } else {
+        // Completado: ocultar
+        this.applyHiddenStyle(fl);
+      }
+    }
   }
 
   restaurarMapaPostCaptura(

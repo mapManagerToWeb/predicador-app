@@ -9,6 +9,9 @@
 **/dist/
 **/.angular/
 **/coverage/
+# pnpm es el único package manager (package.json pinnea pnpm@9.15.0); el
+# lockfile de npm no debe volver a commitearse.
+**/package-lock.json
 
 # IDE
 .idea/
