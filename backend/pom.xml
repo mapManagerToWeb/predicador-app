@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.0</version>
+        <version>4.0.7</version>
         <relativePath/>
     </parent>
 
@@ -76,6 +76,21 @@
                 <version>${opentelemetry-instrumentation.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!--
+                Transitive dependency overrides for known CVEs (CVE-2026-54291
+                in pgjdbc, CVE-2025-14813 in Bouncy Castle) that the managed
+                versions shipped by Spring Boot / Spring Cloud do not yet fix.
+            -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>42.7.12</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>1.81.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
