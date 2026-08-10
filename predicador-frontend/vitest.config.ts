@@ -19,6 +19,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // `@analogjs/vite-plugin-angular` defaults to the `vmThreads` pool, where
+    // `isolate` has no effect (https://vitest.dev/config/isolate). On small
+    // runners (e.g. CI) spec files then share a worker and Angular's global
+    // TestBed state bleeds across files, throwing "Cannot configure the test
+    // module when the test module has already been instantiated". The
+    // `threads` pool honours `isolate: true` and resets per-file state.
+    pool: 'threads',
     include: ['src/**/*.spec.ts'],
     exclude: ['node_modules/**', 'dist/**'],
     setupFiles: ['src/test-setup.ts'],
