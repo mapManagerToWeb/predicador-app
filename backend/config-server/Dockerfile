@@ -12,7 +12,8 @@ COPY . .
 RUN mvn clean package -pl config-server -am -Dmaven.test.skip=true -B
 
 FROM eclipse-temurin:25-jre-alpine
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk upgrade --no-cache \
+    && addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=build /workspace/config-server/target/*.jar app.jar
 RUN chown appuser:appgroup app.jar
