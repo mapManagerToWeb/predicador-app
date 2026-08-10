@@ -42,17 +42,37 @@ describe('AuthService', () => {
       expect(result).toBe(false);
     });
 
-    it('should return false on network error', async () => {
+    it('should return false on 401 (genuinely invalid session)', async () => {
+      const validatePromise = service.validateSession();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/encargados/session`);
+      req.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+      const result = await validatePromise;
+      expect(result).toBe(false);
+    });
+
+    it('should keep the session on 502/503 (service unavailable, not invalid)', async () => {
+      const validatePromise = service.validateSession();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/encargados/session`);
+      req.flush({}, { status: 503, statusText: 'Service Unavailable' });
+
+      const result = await validatePromise;
+      expect(result).toBe(true);
+    });
+
+    it('should keep the session on network error', async () => {
       const validatePromise = service.validateSession();
 
       const req = httpMock.expectOne(`${environment.apiUrl}/encargados/session`);
       req.error(new ProgressEvent('network error'));
 
       const result = await validatePromise;
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
-    it('should return false on timeout', async () => {
+    it('should keep the session on timeout', async () => {
       const validatePromise = service.validateSession();
 
       httpMock.expectOne(`${environment.apiUrl}/encargados/session`);
@@ -60,7 +80,20 @@ describe('AuthService', () => {
       await new Promise(resolve => setTimeout(resolve, 4000));
 
       const result = await validatePromise;
-      expect(result).toBe(false);
+      expect(result).toBe(true);
+    });
+
+    it('should not cache a transient failure so the next validation retries', async () => {
+      const first = service.validateSession();
+      const req1 = httpMock.expectOne(`${environment.apiUrl}/encargados/session`);
+      req1.flush({}, { status: 502, statusText: 'Bad Gateway' });
+      expect(await first).toBe(true);
+
+      // Sin caché del fallo: la siguiente validación vuelve a consultar el backend
+      const second = service.validateSession();
+      const req2 = httpMock.expectOne(`${environment.apiUrl}/encargados/session`);
+      req2.flush({ valid: true });
+      expect(await second).toBe(true);
     });
 
     it('should cache successful validation', async () => {

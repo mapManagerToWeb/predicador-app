@@ -37,6 +37,8 @@ import java.util.List;
 public class RouteConfig {
 
     private static final String REPORTING_CB = "reportingCB";
+    private static final String ENCARGADOS_CB = "encargadosCB";
+    private static final String RUM_CB = "rumCB";
     private static final String REPORTING_FALLBACK = "forward:/fallback/reporting";
     private static final String REPORTING_SERVICE_URI = "lb://reporting-service";
 
@@ -54,7 +56,7 @@ public class RouteConfig {
                 .route("territory-colors", r -> r
                         .path("/api/v1/territories/colors")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName("territoryCB")
+                                .circuitBreaker(c -> c.setName("territoryCB-colors")
                                         .setFallbackUri("forward:/fallback/territory"))
                                 .retry(config -> config
                                         .setRetries(2)
@@ -64,7 +66,7 @@ public class RouteConfig {
                 .route("territory-geojson-all", r -> r
                         .path("/api/v1/territories/all/geojson")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName("territoryCB")
+                                .circuitBreaker(c -> c.setName("territoryCB-geojson")
                                         .setFallbackUri("forward:/fallback/territory"))
                                 .retry(config -> config
                                         .setRetries(2)
@@ -74,7 +76,7 @@ public class RouteConfig {
                 .route("territory-service", r -> r
                         .path("/api/v1/territories/**")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName("territoryCB")
+                                .circuitBreaker(c -> c.setName("territoryCB-default")
                                         .setFallbackUri("forward:/fallback/territory"))
                                 .retry(config -> config
                                         .setRetries(2)
@@ -94,7 +96,7 @@ public class RouteConfig {
                 .route("encargados-service", r -> r
                         .path("/api/v1/encargados/**")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName(REPORTING_CB)
+                                .circuitBreaker(c -> c.setName(ENCARGADOS_CB)
                                         .setFallbackUri(REPORTING_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(1)
@@ -105,7 +107,7 @@ public class RouteConfig {
                 // (métrica idempotente pero perder una es aceptable).
                 .route("rum-sink", r -> r
                         .path("/api/v1/rum")
-                        .filters(f -> f.circuitBreaker(c -> c.setName(REPORTING_CB)
+                        .filters(f -> f.circuitBreaker(c -> c.setName(RUM_CB)
                                 .setFallbackUri(REPORTING_FALLBACK)))
                         .uri(REPORTING_SERVICE_URI))
                 .build();

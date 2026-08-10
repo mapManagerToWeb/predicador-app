@@ -5,11 +5,11 @@ This Angular 22 app manages territory tracking and reporting for door-to-door mi
 ## Quick Start
 
 **Build/Run Commands:**
-- `npm start` — Dev server (http://localhost:4200)
-- `npm test` / `npm run test:watch` — Vitest with jsdom environment
-- `npm run build` — Production build
-- `npm run lint` / `npm run lint:fix` — ESLint check/fix
-- `npm run serve:ssr:predicador-frontend` — Run SSR production server
+- `pnpm start` — Dev server (http://localhost:4200)
+- `pnpm test` / `pnpm run test:watch` — Vitest with jsdom environment
+- `pnpm run build` — Production build
+- `pnpm run lint` / `pnpm run lint:fix` — ESLint check/fix
+- `pnpm run serve:ssr:predicador-frontend` — Run SSR production server
 
 **Key Files:**
 - [src/app/app.routes.ts](src/app/app.routes.ts) — Routing config (standalone components, lazy-loaded)
@@ -51,7 +51,7 @@ This Angular 22 app manages territory tracking and reporting for door-to-door mi
 - `@typescript-eslint/no-explicit-any`: warn — Any types are flagged; fix them
 - `@typescript-eslint/no-floating-promises`: error — Must `await` Promises
 - `no-console`: warn (allow warn/error) — Debug logs should use console.warn/error
-- Prettier enforced — Use `npm run lint:fix` to auto-format
+- Prettier enforced — Use `pnpm run lint:fix` to auto-format
 
 **Testing:**
 - Vitest + jsdom (browser-like DOM)

@@ -92,7 +92,7 @@ describe('MapInitializationService', () => {
     expect(fakeMap.on).not.toHaveBeenCalled();
   });
 
-  it('toggles a manzana from the click handler only in completa mode', async () => {
+  it('toggles a manzana from the click handler only in completa mode and only for selected territories', async () => {
     await service.initialize(document.createElement('div'), vi.fn());
     const handler = rendering.setManzanaClickHandler.mock.calls[0][0];
     const event = {
@@ -100,6 +100,13 @@ describe('MapInitializationService', () => {
     } as never;
 
     state.modoMarcado.set('completa');
+    // Territorio NO seleccionado: el click debe ignorarse (bloquea seleccionar
+    // territorios ajenos desde el modo marcar-completo).
+    handler('m0', 'Otro', {} as L.Polygon, '#0000ff', 99, event as L.LeafletMouseEvent);
+    expect(selection.toggleManzana).not.toHaveBeenCalled();
+
+    // Territorio seleccionado: sí permite marcar/desmarcar manzanas.
+    state.territoriosSeleccionados.set([5]);
     handler('m1', 'A', {} as L.Polygon, '#ff0000', 5, event as L.LeafletMouseEvent);
     expect(selection.toggleManzana).toHaveBeenCalledWith('m1', 'A', {}, '#ff0000', 5);
 
@@ -137,13 +144,39 @@ describe('MapInitializationService', () => {
     expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(2, [], '#0000ff', { actualizarEstadoMarcado: false });
   });
 
-  it('shows a toast and clears the loading flag when territory loading fails', async () => {
-    rendering.loadAllTerritories.mockRejectedValue(new Error('boom'));
+  it('shows a toast and clears the loading flag when territory loading fails after all retries', async () => {
+    vi.useFakeTimers();
+    try {
+      rendering.loadAllTerritories.mockRejectedValue(new Error('boom'));
 
-    await service.initialize(document.createElement('div'), vi.fn());
+      const initPromise = service.initialize(document.createElement('div'), vi.fn());
+      await vi.advanceTimersByTimeAsync(10_000);
+      await initPromise;
 
-    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('cargar'));
-    expect(state.isLoading()).toBe(false);
+      expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('cargar'));
+      expect(state.isLoading()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries the territory load after a transient failure and succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      rendering.loadAllTerritories
+        .mockRejectedValueOnce(new Error('cold start'))
+        .mockResolvedValueOnce(undefined);
+
+      const initPromise = service.initialize(document.createElement('div'), vi.fn());
+      await vi.advanceTimersByTimeAsync(3_000);
+      await initPromise;
+
+      expect(rendering.loadAllTerritories).toHaveBeenCalledTimes(2);
+      expect(toast.show).not.toHaveBeenCalled();
+      expect(state.isLoading()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reloadAllTerritories invalidates caches and reloads', async () => {

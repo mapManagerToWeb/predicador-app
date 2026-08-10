@@ -5,6 +5,7 @@ import { MapReportService } from '../map-report.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+import { MapCaptureService } from './map-capture.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 import type { ManzanaMarcada } from '../types/map.types';
 
@@ -16,6 +17,7 @@ export class MapDataPersistenceService {
   private readonly territorioService = inject(TerritorioService);
   private readonly toastService = inject(Toast);
   private readonly reportService = inject(MapReportService);
+  private readonly captureService = inject(MapCaptureService);
 
   async guardarEnBaseDeDatos(): Promise<void> {
     const perfil = this.reportService.getProfile();
@@ -57,9 +59,12 @@ export class MapDataPersistenceService {
       this.selection.reaplicarMarcasSeleccionadas();
       this.toastService.show(TOAST_MESSAGES.saveSuccess);
 
+      // Guardar referencia ANTES de limpiar manzanasById
+      const marcadasParaRestaurar = this.state.manzanasMarcadaList();
+
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
-      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
+      this.rendering.restaurarVisibilidadPoligonos(marcadasParaRestaurar, []);
       this.state.manzanasById.set(new Map());
       this.state.totalManzanas.set(0);
     } catch {
@@ -91,12 +96,23 @@ export class MapDataPersistenceService {
 
     let whatsappSent = false;
     try {
-      const territorios = this.reportService.buildTerritoriosEnvio(marcadas, this.rendering.getAllTerritoriesLayer());
-      // El reporte se envía SIEMPRE con la captura del mapa (aunque todos los
-      // territorios estén completos). Si la captura falla, se propaga el error
-      // y se bloquea el envío para no mandar una imagen placeholder.
+      // Filtrar solo territorios INCOMPLETOS para envío
+      const territorios = this.reportService.buildTerritoriosEnvioSoloIncompletos(marcadas, this.rendering.getAllTerritoriesLayer());
+
+      if (territorios.length === 0) {
+        this.toastService.show('No hay territorios incompletos para enviar');
+        this.state.enviando.set(false);
+        return;
+      }
+
+      // Captura SOLO de territorios incompletos
       const screenshotBase64 = await this.reportService.captureScreenshot(
-        () => this.prepararCaptura(),
+        () => this.captureService.prepararCapturaSoloIncompletos(
+          marcadas,
+          this.state.territoriosSeleccionados(),
+          this.rendering.getAllTerritoriesLayer(),
+          (num: number) => this.rendering.getManzanaCountByTerritorio(num)
+        ),
         () => this.restaurarMapaPostCaptura()
       );
 
@@ -132,10 +148,13 @@ export class MapDataPersistenceService {
         });
         this.toastService.show(mensajes.join('\n'));
 
+        // Guardar referencia ANTES de limpiar manzanasById
+        const marcadasParaRestaurar = this.state.manzanasMarcadaList();
+
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
-        this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
+        this.rendering.restaurarVisibilidadPoligonos(marcadasParaRestaurar, []);
         this.state.manzanasById.set(new Map());
         this.state.totalManzanas.set(0);
       } else {

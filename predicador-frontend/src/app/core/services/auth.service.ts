@@ -35,22 +35,35 @@ export class AuthService {
           timeout(AuthService.VALIDATION_TIMEOUT_MS)
         )
       );
-      
+
       // Cachear resultado exitoso
       this.cache = {
         valid: response.valid,
         expiresAt: Date.now() + AuthService.CACHE_TTL_MS
       };
-      
+
       return response.valid;
-    } catch {
-      // En caso de error (timeout, network, etc.), asumimos sesión inválida
-      // para forzar re-login
-      this.cache = {
-        valid: false,
-        expiresAt: Date.now() + AuthService.CACHE_TTL_MS
-      };
-      return false;
+    } catch (error) {
+      const status = (error as { status?: number } | undefined)?.status;
+
+      // Un 401 significa token ausente/inválido/expirado: la sesión realmente
+      // ya no existe en el backend. Invalidarla localmente para forzar re-login.
+      if (status === 401) {
+        this.cache = {
+          valid: false,
+          expiresAt: Date.now() + AuthService.CACHE_TTL_MS
+        };
+        return false;
+      }
+
+      // 5xx (502/503 del gateway), timeout o error de red NO significan sesión
+      // inválida: el servicio está temporalmente no disponible (p. ej. durante
+      // el arranque en frío del stack, cuando los servicios aún no se registran
+      // en Eureka y el gateway no puede resolver lb://reporting-service).
+      // Cerrar la sesión aquí expulsaba al usuario injustamente. Mantener la
+      // sesión y NO cachear el fallo para que la próxima validación reintente.
+      this.cache = null;
+      return true;
     }
   }
 

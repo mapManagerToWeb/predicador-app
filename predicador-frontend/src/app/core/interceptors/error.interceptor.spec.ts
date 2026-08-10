@@ -141,4 +141,38 @@ describe('errorInterceptor', () => {
     expect(authToken.hasToken()).toBe(true);
     expect(navSpy).not.toHaveBeenCalled();
   });
+
+  it('en 401 sobre el probe de sesión: limpia token/profile y navega a /login', () => {
+    // El probe solo suprime el toast genérico para 5xx/red (cold start). Un 401
+    // ahí es una sesión genuinamente expirada y debe recibir la limpieza completa.
+    authToken.set('encargado');
+    profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
+    localStorage.setItem('isAdmin', 'true');
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/encargados/session').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/encargados/session');
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(authToken.role()).toBeNull();
+    expect(profile.currentUser()).toBeNull();
+    expect(localStorage.getItem('isAdmin')).toBeNull();
+    expect(navSpy).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('en 502 sobre el probe de sesión: NO limpia token ni redirige (cold start)', () => {
+    // Durante el arranque en frío el gateway responde 502/503; el guard decide
+    // mantener la sesión, así que el interceptor no debe tocar el estado local.
+    authToken.set('encargado');
+    profile.save({ name: 'X', lastName: 'Y', avatar: 0 });
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    http.get('/api/v1/encargados/session').subscribe({ error: () => void 0 });
+    const req = httpMock.expectOne('/api/v1/encargados/session');
+    req.flush({}, { status: 502, statusText: 'Bad Gateway' });
+
+    expect(authToken.hasToken()).toBe(true);
+    expect(profile.currentUser()).not.toBeNull();
+    expect(navSpy).not.toHaveBeenCalled();
+  });
 });
