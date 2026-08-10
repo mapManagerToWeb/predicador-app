@@ -83,7 +83,7 @@ Angular 22, **zoneless**, standalone components, all routes lazy. State is plain
 
 ## Gotchas
 
-- **Package manager is split-brain.** The repo now has `pnpm-lock.yaml` (`package-lock.json` was deleted), but `.github/workflows/ci-frontend.yml` still runs `npm ci` and `angular.json` still declares `cli.packageManager: "npm"`. Frontend CI will fail until those are reconciled.
+- **Frontend uses pnpm exclusively.** `package.json` pins `packageManager: pnpm@9.15.0` (Corepack), `angular.json` declares `cli.packageManager: "pnpm"`, `.github/workflows/ci-frontend.yml` runs `pnpm install --frozen-lockfile` (pnpm 9 has no `pnpm ci`), and `pnpm-lock.yaml` is the only committed lockfile (`package-lock.json` was removed). Never use npm for frontend commands.
 - **`docs/ARCHITECTURE.md` in the frontend is aspirational, not descriptive.** It prescribes Clean Architecture layers, repositories, use cases, and a `shared/` folder — none of which exist. Read it as a proposal; read the code for reality.
 - `whatsapp-simulation/` sits at `src/app/` top level rather than under `features/`, has no spec, and is missing from `app.routes.server.ts` (it falls through to `**`).
 - `Reporte` is declared twice: `core/models/models.ts` and `features/map/types/map.types.ts`.

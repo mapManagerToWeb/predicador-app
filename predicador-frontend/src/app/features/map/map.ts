@@ -80,6 +80,9 @@ export class MapPage implements OnDestroy {
         return this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
       })
     );
+
+    // Ocultar territorios no seleccionados tras la selección
+    this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
   }
 
   private onMapClick(e: L.LeafletMouseEvent): void {

@@ -179,15 +179,17 @@ mvn -pl reporting-service spring-boot:run      # :8082
 ```bash
 cd predicador-frontend
 
-# Instalar dependencias
-npm install
+# Instalar dependencias (pnpm; se instala automáticamente vía Corepack
+# desde el campo `packageManager` de package.json)
+corepack enable
+pnpm install
 
 # Desarrollo (proxy a :8080)
-npm start                   # http://localhost:4200
+pnpm start                   # http://localhost:4200
 
 # SSR producción
-npm run build
-npm run serve:ssr:predicador-frontend  # http://localhost:4000
+pnpm run build
+pnpm run serve:ssr:predicador-frontend  # http://localhost:4000
 ```
 
 ## Comandos
@@ -196,15 +198,15 @@ npm run serve:ssr:predicador-frontend  # http://localhost:4000
 
 | Comando | Descripción |
 |---|---|
-| `npm start` | Servidor de desarrollo (http://localhost:4200) |
-| `npm run build` | Build de producción con SSR |
-| `npm run watch` | Build en modo watch |
-| `npm test` | Ejecutar tests (Vitest) |
-| `npm run test:watch` | Tests en modo watch |
-| `npm run test:coverage` | Tests con cobertura V8 |
-| `npm run lint` | Verificar lint (ESLint) |
-| `npm run lint:fix` | Auto-fix lint + Prettier |
-| `npm run serve:ssr:predicador-frontend` | Servidor SSR producción |
+| `pnpm start` | Servidor de desarrollo (http://localhost:4200) |
+| `pnpm run build` | Build de producción con SSR |
+| `pnpm run watch` | Build en modo watch |
+| `pnpm test` | Ejecutar tests (Vitest) |
+| `pnpm run test:watch` | Tests en modo watch |
+| `pnpm run test:coverage` | Tests con cobertura V8 |
+| `pnpm run lint` | Verificar lint (ESLint) |
+| `pnpm run lint:fix` | Auto-fix lint + Prettier |
+| `pnpm run serve:ssr:predicador-frontend` | Servidor SSR producción |
 
 ### Backend (`backend/`)
 
@@ -232,7 +234,7 @@ npm run serve:ssr:predicador-frontend  # http://localhost:4000
 ```bash
 # Escanear frontend
 cd predicador-frontend
-npm run build
+pnpm run build
 npx sonar-scanner
 
 # Escanear backend
@@ -343,12 +345,12 @@ Ver `.env.example` para la lista completa.
 cd predicador-frontend
 
 # Ejecutar tests
-npm test                     # Ejecución única
-npm run test:watch           # Watch mode
-npm run test:coverage        # Con cobertura V8
+pnpm test                     # Ejecución única
+pnpm run test:watch           # Watch mode
+pnpm run test:coverage        # Con cobertura V8
 
-# Cobertura mínima
-# Lines: 80% | Statements: 80% | Functions: 80% | Branches: 75%
+# Cobertura mínima (vitest.config.ts)
+# Lines: 30% | Statements: 30% | Functions: 30% | Branches: 20%
 ```
 
 **Archivos de test (26 spec files):**

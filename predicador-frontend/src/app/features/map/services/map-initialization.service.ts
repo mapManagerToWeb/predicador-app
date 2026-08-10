@@ -23,7 +23,12 @@ export class MapInitializationService {
     this.rendering.setManzanaClickHandler((id, nombreBloque, polygon, color, territorioNumero, e) => {
       if (this.state.modoMarcado() === 'completa') {
         L.DomEvent.stop(e);
-        this.selection.toggleManzana(id, nombreBloque, polygon, color, territorioNumero);
+        // En modo marcar-completo solo se marcan manzanas de territorios YA
+        // seleccionados. Togglear un territorio ajeno desde aquí lo agregaría
+        // a la selección, igual que el parcial bloquea clicks fuera del suyo.
+        if (this.state.territoriosSeleccionados().includes(territorioNumero)) {
+          this.selection.toggleManzana(id, nombreBloque, polygon, color, territorioNumero);
+        }
       }
     });
 
@@ -39,13 +44,34 @@ export class MapInitializationService {
     this.state.isLoading.set(true);
 
     try {
-      await this.rendering.loadAllTerritories(this.territorioService);
+      await this.loadTerritoriesWithRetry();
       await this.onMoveEnd();
       await this.restoreAllMarks();
     } catch {
       this.toastService.show(TOAST_MESSAGES.loadError);
     } finally {
       this.state.isLoading.set(false);
+    }
+  }
+
+  /**
+   * Reintenta la carga inicial de territorios con backoff. Durante el arranque
+   * en frío del stack los servicios todavía no se registran en Eureka y el
+   * gateway no puede resolver `lb://territory-service` (502/503). El retry del
+   * gateway no ayuda ahí — el load balancer falla antes de llegar a él — así
+   * que reintentamos desde el frontend para no obligar al usuario a recargar.
+   */
+  private static readonly MAX_LOAD_RETRIES = 3;
+  private static readonly LOAD_RETRY_BASE_MS = 1000;
+
+  private async loadTerritoriesWithRetry(attempt = 1): Promise<void> {
+    try {
+      await this.rendering.loadAllTerritories(this.territorioService);
+    } catch (error) {
+      if (attempt >= MapInitializationService.MAX_LOAD_RETRIES) throw error;
+      const delay = MapInitializationService.LOAD_RETRY_BASE_MS * 2 ** (attempt - 1);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      await this.loadTerritoriesWithRetry(attempt + 1);
     }
   }
 

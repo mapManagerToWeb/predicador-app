@@ -82,9 +82,17 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 3
         automatic-transition-from-open-to-half-open-enabled: true
     instances:
-      territoryCB:
+      territoryCB-colors:
+        base-config: default
+      territoryCB-geojson:
+        base-config: default
+      territoryCB-default:
         base-config: default
       reportingCB:
+        base-config: default
+      encargadosCB:
+        base-config: default
+      rumCB:
         base-config: default
   timelimiter:
     configs:
@@ -92,11 +100,20 @@ resilience4j:
         timeout-duration: 5s
         cancel-running-future: true
     instances:
-      territoryCB:
+      territoryCB-colors:
+        base-config: default
+      territoryCB-geojson:
+        base-config: default
+      territoryCB-default:
         base-config: default
       reportingCB:
         timeout-duration: 20s
         cancel-running-future: true
+      encargadosCB:
+        timeout-duration: 10s
+        cancel-running-future: true
+      rumCB:
+        base-config: default
 
 ---
 # Profile: observability — enables OTLP trace export to collector.

@@ -12,7 +12,18 @@ import { AuthService } from '../services/auth.service';
  * by the caller (LoginPage/ProfilePage) so we do not surface a generic toast
  * that would step on their own messaging.
  */
-const AUTH_URL_PATTERNS = ['/encargados/login', '/encargados/buscar-crear', '/auth/login'];
+const LOGIN_URL_PATTERNS = ['/encargados/login', '/encargados/buscar-crear', '/auth/login'];
+
+/**
+ * The session-validation probe (`/encargados/session`) is added on top of the
+ * login endpoints: during a cold-starting stack its failure is a transient 5xx
+ * from the gateway (services not yet registered in Eureka), not a session
+ * error, and the guard decides how to react without a misleading
+ * "Error del servidor" toast. A genuine 401 on the probe, however, IS a real
+ * expired session and must keep the full logout hygiene below — so the 401
+ * branch only excludes the login endpoints, not the probe.
+ */
+const AUTH_URL_PATTERNS = [...LOGIN_URL_PATTERNS, '/encargados/session'];
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(Toast);
@@ -21,6 +32,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const authService = inject(AuthService, { optional: true });
   const path = req.url.split('?')[0];
+  const isLoginRequest = LOGIN_URL_PATTERNS.some(p => path === p || path.endsWith(p));
   const isAuthRequest = AUTH_URL_PATTERNS.some(p => path === p || path.endsWith(p));
 
   return next(req).pipe(
@@ -34,7 +46,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       // este recurso" (o un token CSRF rechazado). Cerrar la sesión en ese
       // caso expulsaba al usuario al login por acciones que solo debían
       // mostrar un aviso.
-      if (error.status === 401 && !isAuthRequest) {
+      if (error.status === 401 && !isLoginRequest) {
         authToken.clear();
         profile.clear();
         authService?.invalidateCache();

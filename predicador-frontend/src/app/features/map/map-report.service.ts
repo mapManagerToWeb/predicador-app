@@ -69,7 +69,11 @@ export class MapReportService {
     return registros;
   }
 
-  buildTerritoriosEnvio(
+  /**
+   * Construye lista de territorios SOLO incompletos para envío por WhatsApp.
+   * Los territorios completados NO se envían.
+   */
+  buildTerritoriosEnvioSoloIncompletos(
     marcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[]
   ): TerritorioReporteEnvio[] {
@@ -83,12 +87,15 @@ export class MapReportService {
       const nonPartial = marcadasTerritorio.filter(m => !m.id.startsWith('parcial-'));
       const finalizado = nonPartial.length >= total && total > 0;
 
-      territorios.push({
-        numero: territorioNum,
-        finalizado,
-        totalManzanas: total,
-        manzanasMarcadas: marcadasTerritorio.length
-      });
+      // Solo incluir territorios INCOMPLETOS
+      if (!finalizado) {
+        territorios.push({
+          numero: territorioNum,
+          finalizado: false,
+          totalManzanas: total,
+          manzanasMarcadas: marcadasTerritorio.length
+        });
+      }
     }
 
     return territorios;
