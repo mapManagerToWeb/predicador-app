@@ -51,5 +51,11 @@ yarn-error.log*
 # Build artifacts
 **/build/
 
+# AI tooling (local only, not part of the shared repo)
+.agents/
+.claude/
+.opencode/
+.superpowers/
+
 # Local linked worktrees
 .worktrees/
