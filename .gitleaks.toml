@@ -1,0 +1,21 @@
+# Gitleaks configuration (TOML format)
+title = "Predicador Gitleaks Config"
+
+[allowlist]
+# Test fixtures with hardcoded test secrets
+paths = [
+    "backend/api-gateway/src/test/**",
+    "backend/reporting-service/src/test/**",
+]
+
+# Config server config files with test passwords (local dev only)
+paths = [
+    "backend/config-server/src/main/resources/config/*.yml",
+    "backend/reporting-service/src/main/resources/application.yml",
+    "backend/territory-service/src/main/resources/application.yml",
+]
+
+# Documentation examples with curl auth placeholders
+paths = [
+    "docs/superpowers/plans/2026-08-03-rabbitmq-whatsapp-integration.md",
+]
