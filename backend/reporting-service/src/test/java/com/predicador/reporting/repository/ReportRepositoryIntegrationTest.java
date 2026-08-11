@@ -87,7 +87,8 @@ class ReportRepositoryIntegrationTest {
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting(Report::getTerritorioNumero).containsExactly(1L, 2L);
-        assertThat(result).extracting(Report::getId).containsExactly(2, 4);
+        assertThat(result.get(0).getFecha()).isEqualTo(Instant.parse("2026-08-10T10:00:00Z"));
+        assertThat(result.get(1).getFecha()).isEqualTo(Instant.parse("2026-08-11T10:00:00Z"));
         assertThat(result.get(0).getManzanasIds()).isEqualTo("A,B,C");
     }
 
