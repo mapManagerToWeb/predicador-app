@@ -60,17 +60,21 @@ export class MapInitializationService {
    * gateway no puede resolver `lb://territory-service` (502/503). El retry del
    * gateway no ayuda ahí — el load balancer falla antes de llegar a él — así
    * que reintentamos desde el frontend para no obligar al usuario a recargar.
+   *
+   * El territory-service puede tardar hasta ~150s en arrancar cuando conecta a
+   * una BD cloud (Neon): HikariPool inicializa, Flyway valida y el registro en
+   * Eureka se propaga. Por eso el backoff es lineal y prolongado (20 intentos
+   * x 10s = 200s máx) en vez de exponencial corto.
    */
-  private static readonly MAX_LOAD_RETRIES = 3;
-  private static readonly LOAD_RETRY_BASE_MS = 1000;
+  private static readonly MAX_LOAD_RETRIES = 20;
+  private static readonly LOAD_RETRY_DELAY_MS = 10000;
 
   private async loadTerritoriesWithRetry(attempt = 1): Promise<void> {
     try {
       await this.rendering.loadAllTerritories(this.territorioService);
     } catch (error) {
       if (attempt >= MapInitializationService.MAX_LOAD_RETRIES) throw error;
-      const delay = MapInitializationService.LOAD_RETRY_BASE_MS * 2 ** (attempt - 1);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, MapInitializationService.LOAD_RETRY_DELAY_MS));
       await this.loadTerritoriesWithRetry(attempt + 1);
     }
   }
