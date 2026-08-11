@@ -40,4 +40,21 @@ public interface TerritoryRepository extends JpaRepository<ManzanaTerritorio, Lo
             + "WHERE m.territorio_padre = :territorioPadre "
             + "ORDER BY m.nombre_bloque", nativeQuery = true)
     List<ManzanaGeoJsonProjection> findGeoJsonByTerritorioPadre(@Param("territorioPadre") Long territorioPadre);
+
+    @Query(value = "SELECT json_build_object("
+            + "'type', 'FeatureCollection', "
+            + "'features', COALESCE(json_agg("
+            + "json_build_object("
+            + "'type', 'Feature', "
+            + "'geometry', ST_AsGeoJSON(ST_Force2D(m.geometry))::json, "
+            + "'properties', json_build_object("
+            + "'id', m.territorio_padre || '-' || COALESCE(m.nombre_bloque, ''), "
+            + "'nombre_bloque', COALESCE(m.nombre_bloque, ''), "
+            + "'territorio_padre', m.territorio_padre, "
+            + "'color', ts.color"
+            + "))), '[]'::json))::text "
+            + "FROM manzanas_territorio m "
+            + "LEFT JOIN territory_settings ts ON ts.territory_number = m.territorio_padre "
+            + "WHERE m.territorio_padre IS NOT NULL", nativeQuery = true)
+    String findAllGeoJsonAsFeatureCollection();
 }
