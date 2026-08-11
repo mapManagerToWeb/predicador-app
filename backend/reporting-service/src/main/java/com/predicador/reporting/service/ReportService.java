@@ -111,7 +111,7 @@ public class ReportService {
         if (territorioNumeros == null || territorioNumeros.size() > MAX_BATCH_SIZE) {
             throw new IllegalArgumentException("El lote de territorios no puede superar " + MAX_BATCH_SIZE);
         }
-        return repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(territorioNumeros)
+        return repository.findLatestByTerritorioNumeroIn(territorioNumeros)
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.groupingBy(ReportDto::territorioNumero));

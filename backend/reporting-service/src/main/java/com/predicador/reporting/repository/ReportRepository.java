@@ -21,7 +21,13 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
 
     Page<Report> findByEncargadoIdOrderByFechaDesc(Long encargadoId, Pageable pageable);
 
-    List<Report> findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(Collection<Long> territorioNumeros);
+    @Query(value = """
+            SELECT DISTINCT ON (territorio_numero) *
+            FROM registro_predicacion
+            WHERE territorio_numero IN (:territorioNumeros)
+            ORDER BY territorio_numero, fecha DESC NULLS LAST, id DESC
+            """, nativeQuery = true)
+    List<Report> findLatestByTerritorioNumeroIn(@Param("territorioNumeros") Collection<Long> territorioNumeros);
 
     @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin ORDER BY r.fecha DESC")
     Page<Report> findByFechaRange(@Param("inicio") Instant inicio, @Param("fin") Instant fin, Pageable pageable);
