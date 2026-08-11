@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -230,13 +231,36 @@ class ReportServiceTest {
 
     @Test
     void getReportsByMultipleTerritorios_shouldAllowAnyAuthenticatedAndAdmin() {
-        when(repository.findByTerritorioNumeroInOrderByTerritorioNumeroAscFechaDesc(List.of(12L)))
+        when(repository.findLatestByTerritorioNumeroIn(List.of(12L)))
                 .thenReturn(List.of());
         assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), encargado("7")).isEmpty());
         assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), admin).isEmpty());
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> reportService.getReportsByMultipleTerritorios(List.of(12L), null));
+    }
+
+    @Test
+    void getReportsByMultipleTerritorios_shouldGroupOneLatestReportPerTerritory() {
+        Report old1 = createReport(1, "1-A", "Daniel", "Uribe", "05:00", "incomplete", 1L);
+        old1.setFecha(Instant.parse("2026-08-01T10:00:00Z"));
+        Report latest1 = createReport(2, "1-A", "Daniel", "Uribe", "06:00", "completed", 1L);
+        latest1.setFecha(Instant.parse("2026-08-10T10:00:00Z"));
+        Report latest2 = createReport(3, "2-B", "Maria", "Lopez", "07:00", "completed", 2L);
+        latest2.setFecha(Instant.parse("2026-08-11T10:00:00Z"));
+
+        when(repository.findLatestByTerritorioNumeroIn(List.of(1L, 2L)))
+                .thenReturn(List.of(latest1, latest2));
+
+        Map<Long, List<ReportDto>> result =
+                reportService.getReportsByMultipleTerritorios(List.of(1L, 2L), admin);
+
+        assertEquals(2, result.size());
+        assertEquals(1, result.get(1L).size());
+        assertEquals("completed", result.get(1L).get(0).estado());
+        assertEquals(1, result.get(2L).size());
+        assertEquals("completed", result.get(2L).get(0).estado());
+        assertEquals(2L, result.get(2L).get(0).territorioNumero());
     }
 
     private SessionToken encargado(String subject) {
