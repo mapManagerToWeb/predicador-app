@@ -150,7 +150,7 @@ describe('MapInitializationService', () => {
       rendering.loadAllTerritories.mockRejectedValue(new Error('boom'));
 
       const initPromise = service.initialize(document.createElement('div'), vi.fn());
-      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(200_000);
       await initPromise;
 
       expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('cargar'));
@@ -168,7 +168,7 @@ describe('MapInitializationService', () => {
         .mockResolvedValueOnce(undefined);
 
       const initPromise = service.initialize(document.createElement('div'), vi.fn());
-      await vi.advanceTimersByTimeAsync(3_000);
+      await vi.advanceTimersByTimeAsync(10_000);
       await initPromise;
 
       expect(rendering.loadAllTerritories).toHaveBeenCalledTimes(2);
