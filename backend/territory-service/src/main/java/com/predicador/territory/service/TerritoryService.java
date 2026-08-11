@@ -98,11 +98,7 @@ public class TerritoryService {
     public String getAllTerritoriesGeoJson() {
         long start = System.nanoTime();
         try {
-            List<TerritoryRepository.ManzanaGeoJsonProjection> allManzanas =
-                    territoryRepository.findAllGeoJsonGroupedByTerritorio();
-            Map<Long, String> colorMap = self().getAllColors();
-
-            return geoJsonSerializer.serializeAll(allManzanas, colorMap);
+            return territoryRepository.findAllGeoJsonAsFeatureCollection();
         } finally {
             long elapsed = System.nanoTime() - start;
             geojsonLoadTimer.record(elapsed, TimeUnit.NANOSECONDS);
