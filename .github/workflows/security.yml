@@ -52,10 +52,11 @@ jobs:
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          AUTO_UPDATE=$([[ -n "$NVD_API_KEY" ]] && echo true || echo false)
+          # autoUpdate siempre true: sin esto, si no hay cache NVD y la API key
+          # está vacía, falla con "NoDataException: database does not exist".
           mvn org.owasp:dependency-check-maven:12.2.2:check -B \
             -DfailBuildOnCVSS=7 \
-            -DautoUpdate=$AUTO_UPDATE \
+            -DautoUpdate=true \
             ${NVD_API_KEY:+-DnvdApiKey=$NVD_API_KEY} \
             -Ddata.directory=owasp-data
       - name: Upload report
