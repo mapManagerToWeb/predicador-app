@@ -112,12 +112,12 @@ class TerritoryServiceTest {
 
     @Test
     void getAllTerritoriesGeoJson_shouldReturnAllFeatures() {
-        ManzanaGeoJsonProjection m1 = projection(1L, "1.a", simplePolygonGeojson());
-        ManzanaGeoJsonProjection m2 = projection(2L, "2.a", simplePolygonGeojson());
+        String expected = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
+                + "\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[1,0],[1,1],[0,0]]]},"
+                + "\"properties\":{\"id\":\"1-1.a\",\"nombre_bloque\":\"1.a\","
+                + "\"territorio_padre\":1,\"color\":null}}]}";
 
-        when(territoryRepository.findAllGeoJsonGroupedByTerritorio()).thenReturn(List.of(m1, m2));
-        when(territoryRepository.findDistinctTerritorioPadres()).thenReturn(List.of(1L, 2L));
-        when(colorRepository.findAll()).thenReturn(List.of());
+        when(territoryRepository.findAllGeoJsonAsFeatureCollection()).thenReturn(expected);
 
         String result = territoryService.getAllTerritoriesGeoJson();
 
