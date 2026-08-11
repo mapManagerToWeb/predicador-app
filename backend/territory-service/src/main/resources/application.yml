@@ -49,6 +49,10 @@ spring:
 
 server:
   port: 8081
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 1024
 
 management:
   server:
