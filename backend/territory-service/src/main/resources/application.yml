@@ -51,7 +51,7 @@ server:
   port: 8081
   compression:
     enabled: true
-    mime-types: application/json
+    mime-types: text/plain,application/json
     min-response-size: 1024
 
 management:
