@@ -27,6 +27,10 @@ server:
 management:
   server:
     port: 8090
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 otel:
   traces:
