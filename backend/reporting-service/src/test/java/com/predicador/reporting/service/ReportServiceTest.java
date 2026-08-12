@@ -263,6 +263,32 @@ class ReportServiceTest {
         assertEquals(2L, result.get(2L).get(0).territorioNumero());
     }
 
+    @Test
+    void getReportVersions_requiresAuthenticatedUser() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.getReportVersions(List.of(1L), null));
+    }
+
+    @Test
+    void getReportVersions_rejectsBatchLargerThanMax() {
+        assertThrows(IllegalArgumentException.class,
+                () -> reportService.getReportVersions(
+                        java.util.stream.LongStream.rangeClosed(1, 101).boxed().toList(), admin));
+    }
+
+    @Test
+    void getReportVersions_groupsLastNonEmptyReportIdPerTerritory() {
+        when(repository.findVersions(List.of(1L, 2L)))
+                .thenReturn(List.of(new Object[]{1L, 101L}, new Object[]{2L, 103L}));
+
+        Map<Long, Long> result = reportService.getReportVersions(List.of(1L, 2L), admin);
+
+        assertEquals(2, result.size());
+        assertEquals(Long.valueOf(101L), result.get(1L));
+        assertEquals(Long.valueOf(103L), result.get(2L));
+        verify(repository).findVersions(List.of(1L, 2L));
+    }
+
     private SessionToken encargado(String subject) {
         return new SessionToken(subject, SessionToken.ROLE_ENCARGADO, 1L, 2L);
     }
