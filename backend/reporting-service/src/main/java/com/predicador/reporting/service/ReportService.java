@@ -117,6 +117,18 @@ public class ReportService {
                 .collect(Collectors.groupingBy(ReportDto::territorioNumero));
     }
 
+    public Map<Long, Long> getReportVersions(Collection<Long> territorioNumeros, SessionToken token) {
+        authorization.requireAuthenticated(token);
+        if (territorioNumeros == null || territorioNumeros.size() > MAX_BATCH_SIZE) {
+            throw new IllegalArgumentException("El lote de territorios no puede superar " + MAX_BATCH_SIZE);
+        }
+        return repository.findVersions(territorioNumeros).stream()
+                .collect(Collectors.toMap(
+                        row -> ((Number) row[0]).longValue(),
+                        row -> ((Number) row[1]).longValue(),
+                        (first, ignored) -> first));
+    }
+
     private Report toEntity(ReportDto dto) {
         Report report = new Report();
         report.setManzanaId(dto.manzanaId());
