@@ -118,4 +118,26 @@ class ReportControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
     }
+
+    @Test
+    void getReportVersions_shouldReturn200() throws Exception {
+        when(reportService.getReportVersions(java.util.List.of(1L, 2L), admin))
+                .thenReturn(java.util.Map.of(1L, 101L, 2L, 103L));
+
+        mockMvc.perform(get("/api/v1/reports/versions")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin)
+                        .param("territorios", "1", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.1").value(101))
+                .andExpect(jsonPath("$.2").value(103));
+    }
+
+    @Test
+    void getReportVersions_shouldReturn400WhenOverBatchLimit() throws Exception {
+        java.util.List<Long> tooMany = java.util.stream.LongStream.rangeClosed(1, 101).boxed().toList();
+        mockMvc.perform(get("/api/v1/reports/versions")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin)
+                        .param("territorios", tooMany.stream().map(String::valueOf).toArray(String[]::new)))
+                .andExpect(status().isBadRequest());
+    }
 }

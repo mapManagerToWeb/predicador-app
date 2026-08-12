@@ -75,6 +75,13 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getReportsByMultipleTerritorios(territorios, token(request)));
     }
 
+    @GetMapping("/versions")
+    public ResponseEntity<Map<Long, Long>> getReportVersions(
+            @RequestParam List<Long> territorios, HttpServletRequest request) {
+        if (territorios.size() > ReportService.MAX_BATCH_SIZE) return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok(reportService.getReportVersions(territorios, token(request)));
+    }
+
     private SessionToken token(HttpServletRequest request) {
         return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
     }
