@@ -547,7 +547,7 @@ Rewrite `TerritorioService` to the spec shape. Keep the existing `ReportDto`/`to
 
 **Ordering note:** `TerritorioService.logout()`/`limpiarCache()` should call `ReportCacheService.clear()` only in this task. Wire the `DraftMarksService.clear()` call inside `logout()` in Task 10 (after Task 7 creates the service). Until then `logout()` clears only the report cache — no behavior regression since nothing calls it yet.
 
-- [ ] **Step 1: Write the failing/extended tests**
+- [x] **Step 1: Write the failing/extended tests**
 
 Rewrite `territorio.spec.ts`. It must not depend on timers (TTL is gone). Mock localStorage is real (jsdom). DraftMarksService is not injected here.
 
@@ -676,13 +676,13 @@ describe('TerritorioService', () => {
 
 > `service['reportCache']` and `service['versionsSeen']` reach private members for test seeding. `TerritorioService` constructor must inject `ReportCacheService` (root-provided) — TestBed auto-resolves it.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test -- src/app/core/services/territorio.spec.ts`
 
 Expected: FAIL — `getReportesDesdeCache`/`revalidarReportes` don't exist; `crearReportes` returns `void`; `versionsSeen` not present.
 
-- [ ] **Step 3: Rewrite `territorio.ts`**
+- [x] **Step 3: Rewrite `territorio.ts`**
 
 Replace the whole file:
 
@@ -897,7 +897,7 @@ export class TerritorioService {
 
 > **Deliberate change vs. previous behavior:** `getReportesPorTerritorio` (singular) no longer caches to a TTL map — it writes `ReportCacheService` and `versionsSeen`. `invalidateReportCache`/`invalidateAll` are deleted (spec §4.3) — Task 6 removes their last callers. `getReportesDesdeCache` is the fast render path for Task 10.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test -- src/app/core/services/territorio.spec.ts`
 
