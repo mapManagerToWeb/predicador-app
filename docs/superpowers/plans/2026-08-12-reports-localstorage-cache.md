@@ -35,7 +35,7 @@ Existing `findVersions` (already in `ReportRepository.java`) uses JPQL with a re
 **Interfaces:**
 - Produces: `List<Object[]> findVersions(@Param("territorioNumeros") Collection<Long> territorioNumeros)` — each row `[territorioNumero, id]`, one row per territory. Consumed by Task 2 (`ReportService.getReportVersions`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `ReportRepositoryIntegrationTest.java` (before the closing brace):
 
@@ -77,7 +77,9 @@ Run (Docker required): `mvn -pl reporting-service test -Dtest=ReportRepositoryIn
 
 Expected: FAIL — the current JPQL `findVersions` has the redundant predicate so `manzanasIds = null` territories qualify, or returns non-DISTINCT rows and the `hasSize(2)` assertion trips.
 
-- [ ] **Step 3: Replace `findVersions` with the native DISTINCT ON query**
+> **Environment note (2026-08-12):** this step could not be executed via the Testcontainers harness on this machine (see Step 4 note) — the query was replaced with the native version and its semantics verified directly against Postgres 16 instead.
+
+- [x] **Step 3: Replace `findVersions` with the native DISTINCT ON query**
 
 In `ReportRepository.java`, replace the JPQL `findVersions` (lines 32-33) with:
 
@@ -100,7 +102,9 @@ Run: `mvn -pl reporting-service test -Dtest=ReportRepositoryIntegrationTest -Ddo
 
 Expected: PASS (2 tests: existing `findLatestByTerritorioNumeroIn` suite + the 2 new `findVersions` tests).
 
-- [ ] **Step 5: Commit**
+> **Environment note (2026-08-12):** the Testcontainers harness cannot start on this machine — Docker Desktop 4.83 returns `400 BadRequest` to docker-java (Testcontainers 1.20.1) on every client-provider strategy at context load, breaking the pre-existing tests too (not this change). The query semantics were instead verified directly against a real `postgres:16-alpine` container run via the Docker CLI: with `(NULL,'2026-08-01','completed',1)`, `('A,B,C','2026-08-10','completed',1)`, `('D','2026-08-05','incomplete',2)`, `('D,E','2026-08-11','completed',2)` it returns `(1,2),(2,4)` for `IN (1,2,99)` and `(0 rows)` for territory 9 (only empty reports). CI runs the integration test with a postgis service, so it will gate there.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/reporting-service/src/main/java/com/predicador/reporting/repository/ReportRepository.java backend/reporting-service/src/test/java/com/predicador/reporting/repository/ReportRepositoryIntegrationTest.java
@@ -119,7 +123,7 @@ git commit -m "perf(reporting): return only last non-empty report id per territo
 - Consumes: `findVersions(Collection<Long>)` from Task 1.
 - Produces: `Map<Long, Long> getReportVersions(Collection<Long> territorioNumeros, SessionToken token)`. Consumed by Task 3 (`ReportController`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `ReportServiceTest.java`:
 
@@ -151,13 +155,13 @@ Append to `ReportServiceTest.java`:
     }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `mvn -pl reporting-service test -Dtest=ReportServiceTest`
 
 Expected: FAIL — `getReportVersions` does not exist.
 
-- [ ] **Step 3: Implement `getReportVersions`**
+- [x] **Step 3: Implement `getReportVersions`**
 
 Add to `ReportService.java`, after `getReportsByMultipleTerritorios`:
 
@@ -175,7 +179,7 @@ Add to `ReportService.java`, after `getReportsByMultipleTerritorios`:
     }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `mvn -pl reporting-service test -Dtest=ReportServiceTest`
 
@@ -201,7 +205,7 @@ git commit -m "feat(reporting): expose last report id per territory as version m
 - Consumes: `getReportVersions(Collection<Long>, SessionToken)` from Task 2.
 - Produces: `GET /api/v1/reports/versions?territorios=1&territorios=2` → `ResponseEntity<Map<Long, Long>>`; 400 when `territorios.size() > MAX_BATCH_SIZE`. Consumed by Task 5 (`TerritorioService.revalidarReportes`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `ReportControllerTest.java`:
 
@@ -229,13 +233,13 @@ Append to `ReportControllerTest.java`:
     }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `mvn -pl reporting-service test -Dtest=ReportControllerTest`
 
 Expected: FAIL — `getReportVersions` not found on controller / no `/versions` mapping.
 
-- [ ] **Step 3: Add the endpoint**
+- [x] **Step 3: Add the endpoint**
 
 In `ReportController.java`, after the `/batch` mapping (line ~76):
 
@@ -248,13 +252,13 @@ In `ReportController.java`, after the `/batch` mapping (line ~76):
     }
 ```
 
-- [ ] **Step 4: Delete the `.bak` file**
+- [x] **Step 4: Delete the `.bak` file**
 
 ```bash
 rm backend/reporting-service/src/main/java/com/predicador/reporting/controller/ReportController.java.bak
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `mvn -pl reporting-service test -Dtest=ReportControllerTest`
 
