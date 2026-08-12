@@ -108,4 +108,30 @@ class ReportRepositoryIntegrationTest {
     void returnsEmptyWhenNoTerritoriesMatch() {
         assertThat(repository.findLatestByTerritorioNumeroIn(List.of(99L))).isEmpty();
     }
+
+    @Test
+    void findVersionsReturnsLastNonEmptyReportPerTerritory() {
+        // Territorio 1: empty report (older) then non-empty (newer) -> version = id of the non-empty.
+        repository.save(report(100, 1L, Instant.parse("2026-08-01T10:00:00Z"), "completed", null));
+        repository.save(report(101, 1L, Instant.parse("2026-08-10T10:00:00Z"), "completed", "A,B,C"));
+        // Territorio 2: two non-empty -> version = id of the one ordered last by fecha DESC, id DESC.
+        repository.save(report(102, 2L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", "D"));
+        repository.save(report(103, 2L, Instant.parse("2026-08-11T10:00:00Z"), "completed", "D,E"));
+
+        List<Object[]> result = repository.findVersions(List.of(1L, 2L, 99L));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(row -> ((Number) row[0]).longValue())
+                .containsExactly(1L, 2L);
+        assertThat(((Number) result.get(0)[1]).longValue()).isEqualTo(101L);
+        assertThat(((Number) result.get(1)[1]).longValue()).isEqualTo(103L);
+    }
+
+    @Test
+    void findVersionsExcludesTerritoriesWithOnlyEmptyReports() {
+        repository.save(report(110, 9L, Instant.parse("2026-08-01T10:00:00Z"), "completed", null));
+        repository.save(report(111, 9L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", ""));
+
+        assertThat(repository.findVersions(List.of(9L))).isEmpty();
+    }
 }
