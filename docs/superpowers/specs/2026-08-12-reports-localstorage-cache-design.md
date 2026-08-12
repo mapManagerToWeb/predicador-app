@@ -3,7 +3,7 @@
 **Date**: 2026-08-12
 **Project**: Predicador (frontend Angular + backend Spring Boot reporting-service)
 **Branch**: `perf/reports-latest-per-territory`
-**Status**: Approved for implementation
+**Status**: Approved for implementation — iteración 1 (render instantáneo + borrador; cola offline diferida)
 
 ---
 
@@ -13,34 +13,35 @@ Hoy el mapa carga reportes del backend en cada sesión aunque no haya cambios: e
 frontend consulta `/reports/batch` por todos los territorios visibles y solo lo
 cachea en memoria con TTL de 5 min. Este diseño persiste el **último reporte por
 territorio marcado** en `localStorage`, revalida qué territorios **cambiaron** con
-una consulta ligera de versiones y solo descarga los reportes de esos territorios.
-Además añade una **cola offline** que guarda localmente las marcas y la petición
-WhatsApp (con screenshot) cuando no hay conexión, y las reenvía automáticamente al
-reconectar. Se refuerza la garantía de que el envío WhatsApp llegue siempre al
-número del encargado que editó.
+una consulta ligera de versiones (`GET /reports/versions`) y solo descarga los
+reportes de esos territorios. Añade además un **borrador local de marcas sin
+guardar** en `localStorage`: si el encargado marca polígonos y cierra sin enviar,
+al volver recupera esas marcas sin necesidad de red. La **cola offline de
+WhatsApp** (guardar marcas + screenshot + petición cuando no hay conexión y
+reenviar al reconectar) es la **iteración 2** y queda fuera de este alcance.
 
 ---
 
 ## 2. Goals & Non-Goals
 
-### Goals
+### Goals (iteración 1)
 - No repetir la consulta de reportes al backend cuando no hay cambios.
 - Al iniciar, pintar el mapa **instantáneamente** desde `localStorage` y revalidar
   en segundo plano solo los territorios cuyo reporte cambió.
 - Cargar **solo reportes con marcas** (territorios sin reporte o con reporte vacío
   no se pintan ni se consultan).
 - Cuando un encargado marca y guarda, refrescar **solo ese territorio**.
-- Soporte offline: marcar, tomar el screenshot y guardar todo en cola local; al
-  reconectar, persistir y reenviar WhatsApp automáticamente, en orden.
-- El reporte WhatsApp siempre se envía al **número del encargado logueado**.
-- Limpiar el cache y la cola al hacer logout.
+- **Borrador local**: si el encargado marca y cierra sin guardar, al volver se
+  restauran sus marcas (polígonos completos + parciales) desde `localStorage`.
+- Limpiar el cache y el borrador al hacer logout.
 
-### Non-Goals
+### Non-Goals (iteración 1)
+- **No** se implementa la cola offline (packs de pendientes, reenvío WhatsApp al
+  reconectar, badge, IndexedDB para screenshots) — iteración 2.
 - No cambia el motor de mapa ni la lógica de marcado parcial/completo.
 - No agrega listados históricos de reportes en el frontend.
-- No introduce un mecanismo general de sincronización multi-dispositivo (la cola es
-  por navegador).
-- No cambia el formato de imagen soportado por WhatsApp (solo JPEG/PNG).
+- No introduce sincronización multi-dispositivo (cache y borrador son por navegador).
+- No cambia el formato de imagen soportado por WhatsApp.
 
 ---
 
@@ -54,14 +55,27 @@ número del encargado que editó.
 - `MapMarkRestorationService.restaurarConReportes` pinta con **el último** reporte
   por territorio (`elegirUltimoReporte` en `utils/report-utils.ts`).
 - Al guardar, `MapDataPersistenceService.guardarEnBaseDeDatos()` / `guardarYEnviar()`
-  invalida la caché solo de los territorios editados y re-restaura desde DB.
+  invalidan la caché solo de los territorios editados y re-restauran desde DB
+  (`invalidateReportCache` + `restaurarMarcadoDesdeDB` → re-fetch completo).
+- El estado de marcado en sesión vive en `MapStateService` (`manzanasById`,
+  `datosParcialesGuardados`, `territoriosSeleccionados`, `modoMarcado`,
+  `predicacion`) y se pierde al salir sin guardar.
+- **`ManzanaMarcada` es datos puros** (id, nombreBloque, color, territorioNumero);
+  la geometría se resuelve por id vía `MapLayerRegistry`. Serializable a JSON.
+- `ReportCacheService` / `PendingReportsQueueService` (`core/services/report-cache.ts`,
+  `pending-reports-queue.ts`) existen como archivos **nuevos sin commitear y sin
+  cablear** (cero callers, sin specs). `PendingReportsQueueService.flush()` tiene un
+  bug (dos `.map()` consecutivos que se pisan) — fuera de este alcance, se documenta
+  para iteración 2.
 - **WhatsApp**: `WhatsAppService.sendReport` genera `crypto.randomUUID()` por
   llamada, POST `Idempotency-Key` → estado `IN_PROGRESS` → polling cada 2 s (60 s
   máx). Backend persiste entrega en `whatsapp_delivery` con lease de 5 min y envía
-  por executor o cola RabbitMQ.
-- `buildWhatsAppRequest` usa `destinationNumber = perfil.telefono || null`; el
-  backend cae a `props.destinationNumber()` (admin) si es null.
-- Logout (`profile.ts` / `admin.ts`) limpia solo el perfil, no los reportes.
+  por executor o cola RabbitMQ. **Sin cambios en esta iteración.**
+- Backend `ReportRepository` ya tiene `findVersions` **sin commitear** (query JPA
+  con predicate redundante `r.manzanasIds IS NOT NULL AND (r.manzanasIds ...)`),
+  pero **no hay** `ReportService.getReportVersions` ni endpoint `/versions`
+  (solo existe un `.bak` con el endpoint a medio escribir).
+- Logout (`profile.ts` / `admin.ts`) limpia solo el perfil, no los reportes ni marcas.
 
 ---
 
@@ -116,7 +130,9 @@ interface ReportCacheEntry {
 
 API:
 - `getCache(): Map<number, Reporte>` — snapshot para pintar el mapa.
-- `setTerritorio(num, reporte)` / `setTerritorios(Map<number, Reporte>)`.
+- `setTerritorio(num, reporte)` — la `version` se deriva de `reporte.id` (id = versión
+  monotónica del backend); la API interna puede aceptarla explícita.
+- `setTerritorios(Map<number, Reporte>)`.
 - `removeTerritorios(nums)` / `clear()`.
 - `hasData(): boolean`.
 - SSR guard (`typeof localStorage === 'undefined'` → operaciones no-op), parseo con
@@ -133,100 +149,89 @@ Reemplaza la caché en memoria por **dos capas**:
 **`getReportesPorTerritorios(nums)`**:
 1. **Fase rápida:** construye el resultado con `ReportCacheService.getCache()` para
    los territorios con marcas → el mapa se pinta instantáneo.
-2. **Fase revalidación (fondo):** `GET /versions` para `nums`. Para cada territorio
-   cuya `version` (id del último reporte en backend) difiere de la cacheada (o que
-   no está en cache):
+2. **Fase revalidación (fondo):** `GET /versions` para `nums` (paginado en chunks de
+   50). Para cada territorio cuya `version` (id del último reporte marcado en backend)
+   difiere de la cacheada (o que no está en cache):
    - descarga su reporte vía `/reports/batch` (solo esos números),
    - actualiza `ReportCacheService` y `versionsSeen`.
-   Los territorios sin cambios se **saltan** el batch.
+   Los territorios **sin** versión en backend (no existe reporte marcado) y **sin**
+   entrada en cache se **saltan** (no se pintan ni se consultan).
 3. El resultado final se expone como `Map<number, Reporte[]>` (1 elemento por
    territorio con marcas) para no romper la firma actual.
 4. Si `/versions` falla (offline/backend caído) → no bloquea; el mapa ya pintó del
    cache. Sin reintento en bucle.
 
-**`crearReportes(reportes)`**: tras POST exitoso, actualiza `ReportCacheService` con
-los reportes guardados (respuesta del backend) → refleja el territorio editado sin
-re-consultarlo.
+**`crearReportes(registros)`**: cambia retorno de `void` a `Reporte[]` (respuesta del
+backend, ids asignados). `guardarEnBaseDeDatos` / `guardarYEnviar` la usan para
+`ReportCacheService.setTerritorio` y limpiar el draft de los territorios guardados.
 
 **`getReportesPorTerritorio(num)` (singular)**: se usa en la restauración bajo
-demanda (al seleccionar un territorio nuevo o en `moveend` para territorios sin
-marcas). Mantiene su comportamiento: si el territorio tiene entrada en cache y su
-`version` coincide con la última conocida, devuelve la cache; si no, consulta
-`GET /reports?territorioNumero=...` y actualiza cache/`versionsSeen`. Nunca cae al
-fallback del admin de WhatsApp (ver 4.7).
+demanda (al seleccionar un territorio nuevo o en `moveend`). Si el territorio tiene
+entrada en cache y su `version` coincide con `versionsSeen`, devuelve la cache; si
+no, consulta `GET /reports?territorioNumero=...` y actualiza cache/`versionsSeen`.
 
-**`logout()` expuesto** (o método en `ReportCacheService`) que hace `clear()` del
-cache + cola. Se engancha en `Profile.clear()` / `logout` de `ProfilePage` y
-`admin.ts`.
+**Eliminados**: `invalidateReportCache(num)` / `invalidateAll()` (ya no hay TTL en
+memoria). `reloadAllTerritories` pasa a `ReportCacheService.clear()`.
 
-### 4.4 Cola offline — `PendingReportsQueueService` (nuevo, `core/services/pending-reports-queue.ts`)
+**`logout()`**: expuesto en `TerritorioService` → `ReportCacheService.clear()` +
+`DraftMarksService.clear()`. Se engancha en el logout de `ProfilePage` y `admin.ts`.
 
-Persistencia en `localStorage` (key `predicador_pending_reports`):
+### 4.4 Borrador local de marcas — `DraftMarksService` (nuevo, `core/services/map-draft.ts`)
+
+Persistencia en `localStorage` (key `predicador_map_draft`):
 
 ```ts
-interface PendingPack {
-  registros: RegistroReporte[];
-  whatsappRequest?: WhatsAppSendRequest; // opcional: solo en guardarYEnviar
-  screenshotRef?: { store: 'localStorage' | 'indexeddb'; key: string }; // si cabe/además del base64 en whatsappRequest
-  idempotencyKey?: string;  // generado 1 vez al encolar, reutilizado en retries
-  retries: number;
-  status: 'pending' | 'done' | 'error';
+interface MapDraft {
+  manzanasById: Record<string, ManzanaMarcada>;       // datos puros, serializable
+  territoriosSeleccionados: number[];
+  territorioSeleccionado: number | null;
+  datosParcialesGuardados: Record<number, { puntos: SnappedPoint[]; geometria: string }>;
+  modoMarcado: ModoMarcado;
+  predicacion: string;
+  savedAt: number;
 }
 ```
 
 Reglas:
-- Se encola cuando el requerimiento detecta **fallo de red** (HTTP error con
-  status 0 / `navigator.onLine === false` / timeout). Los errores de negocio
-  (400/403/409/413) **no** se encolan.
-- El screenshot se captura offline (preview del mapa) y se guarda **comprimido**
-  en el pack; si excede el umbral de `localStorage`, el blob va a **IndexedDB** y el
-  pack guarda `screenshotRef`.
-- `flush()` procesa en orden **FIFO**: POST `/reports` (persistir) → si aplica,
-  `sendReport` con la **misma `idempotencyKey`** almacenada → marcar `done`.
-  Cada fallo de red mantiene el pack con `retries++`; `error` de negocio lo marca
-  `error` (visible, descartable).
-- Flush disparado por: listener `window 'online'` (en `MapPage`), carga de página
-  con packs `pending`, y click en el badge.
-- Expone `pendingCount = signal<number>` para el badge.
-
-**Idempotencia**: la key se genera una sola vez al encolar y se reutiliza en cada
-intento → no genera envíos duplicados (hoy `sendReport` genera `randomUUID()` por
-llamada).
+- **Guardado**: `effect` en `MapStateService` con **debounce ~400 ms** ante cambios en
+  `manzanasById`, `territoriosSeleccionados`, `modoMarcado`, `predicacion`,
+  `datosParcialesGuardados`. Guard de plataforma SSR (`typeof localStorage`).
+- **Restaura**: al inicializar el mapa, si existe draft → pintar esas marcas (resolve
+  de geometría por id) y setear `territoriosSeleccionados`. Si no hay draft → pintar
+  desde el report-cache.
+- **Prioridad**: territorio con draft → manda el draft (es lo más reciente); sin draft
+  → report-cache. La revalidación por `/versions` aplica **solo** a territorios sin
+  draft (el draft se marca como "visto" para no pisarlo).
+- **Limpieza**: tras `guardarEnBaseDeDatos` / `guardarYEnviar` exitosos (borrar solo
+  los territorios guardados), tras `limpiarMarcas`, y en `logout()`.
+- SSR: operaciones no-op fuera de navegador; parseo con `try/catch` y descarte de
+  cache corrupto.
 
 ### 4.5 Flujo `guardarEnBaseDeDatos` / `guardarYEnviar` (map-data-persistence.service.ts)
 
-- Se detecta red antes/después del primer intento.
-- `guardarYEnviar` **precaptura** el screenshot (existe `captureScreenshot`) y arma
-  el `WhatsAppRequest` **antes** del POST, para tenerlo disponible si el POST falla
-  por red → se encola el pack completo (registros + request + screenshot).
-- Si la llamada falla por red → encolar + toast "Sin conexión: guardado localmente,
-  se enviará al reconectar". Si falla por negocio → toast de error actual, sin
-  encolar.
-- Tras carga/guardado exitoso se aplica la Sección 4.3.
+- Reemplaza `invalidateReportCache(num)` + `restaurarMarcadoDesdeDB` (re-fetch) por:
+  usar la respuesta de `crearReportes` → `ReportCacheService.setTerritorio` y
+  `DraftMarksService.remove(territoriosGuardados)`.
+- `restaurarMarcadoDesdeDB` se conserva únicamente donde se necesita re-pintar estado
+  de marcado en sesión (se evalúa caso por caso en el plan).
+- Si falla el POST → no toca cache ni draft.
 
-### 4.6 UI — Badge de pendientes
+> La iteración 2 (cola offline) reutilizará este mismo flujo con precaptura de
+> screenshot, retries y reenvío al reconectar — documentado, fuera de este alcance.
 
-- `map.html`: badge contador "N pendientes" junto al botón de guardar/enviar,
-  ligado a `pendingCount` del queue service. Click → `flush()` manual.
-- Toast en reconexión: "Conexión restablecida, sincronizando...".
-- Validación predictiva: si el perfil no tiene `telefono` y se intenta
-  `guardarYEnviar`, se bloquea con aviso "Agrega tu número de WhatsApp" en vez de
-  caer al fallback del admin.
+### 4.6 UI — Sin badge en iteración 1
 
-### 4.7 WhatsApp — verificaciones y correcciones
+- El badge de pendientes, toast de reconexión y validación predictiva de `telefono`
+  pertenecen a la cola offline (iteración 2).
+- En esta iteración el flujo de guardado mantiene los toasts actuales de
+  éxito/error; la única diferencia es que al guardar se escribe el cache y se limpia
+  el draft en lugar de re-consultar.
 
-- **Destino**: SIEMPRE el `telefono` del encargado logueado (`perfil.telefono`).
-  El fallback a `props.destinationNumber()` del backend solo debe ocurrir si el DTO
-  no trae número; el frontend impide ese caso para encargados.
-- **Formato screenshot**: se mantiene **JPEG** (WhatsApp solo acepta JPEG/PNG para
-  templates, 5 MB máx; WebP es solo stickers). Se reduce peso con calidad ~0.4 y/o
-  `scale: 0.5` en html2canvas.
-- **Timeout polling (60 s) vs lease backend (5 min)**: evaluar subir el timeout o
-  alinear el mensaje de estado para no reportar error cuando el envío sigue en
-  curso. (Se valida en implementación; decisión documentada en el plan.)
-- **Camino doble**: verificar que executor y cola RabbitMQ no dupliquen envíos
-  (ambos ya aplican idempotencia por clave — se revisa con tests de regresión).
-- Se verifican `phone.ts` (normalización) y la construcción de `components`.
+### 4.7 WhatsApp — sin cambios en iteración 1
+
+- El flujo WhatsApp existente (`WhatsAppService.sendReport`, polling 60 s, destino
+  `perfil.telefono`) no se toca. Las verificaciones de calidad/scale del screenshot,
+  timeout vs lease y el camino doble executor/cola se difieren a iteración 2.
 
 > La carpeta `predicador-frontend/AGENTS.md` tiene la guía y gotchas de este
 > frontend; seguir sus convenciones (Vitest, Señales, SSR guards).
@@ -236,11 +241,10 @@ llamada).
 ## 5. Data & Storage
 
 - `localStorage['predicador_reports_cache']` — cache persistente de últimos reportes.
-- `localStorage['predicador_pending_reports']` — cola offline.
-- `IndexedDB` (db `predicador-offline`, store `screenshots`) — blobs grandes de
-  screenshot cuando no caben en localStorage.
-- Backend: sin cambios de schema. Nuevo endpoint de versiones sobre la tabla
-  existente `registro_predicacion`.
+- `localStorage['predicador_map_draft']` — borrador local de marcas sin guardar.
+- Backend: sin cambios de schema. Nuevo endpoint `GET /reports/versions` sobre la
+  tabla existente `registro_predicacion`. (*Fuera de esta iteración:* cola offline
+  `predicador_pending_reports` e IndexedDB `predicador-offline` para screenshots.)
 
 ---
 
@@ -249,22 +253,27 @@ llamada).
 ### Backend (`backend/reporting-service/`)
 - `src/main/java/com/predicador/reporting/controller/ReportController.java` — `GET /versions`.
 - `src/main/java/com/predicador/reporting/service/ReportService.java` — `getReportVersions(...)`.
-- `src/main/java/com/predicador/reporting/repository/ReportRepository.java` — query versions.
+- `src/main/java/com/predicador/reporting/repository/ReportRepository.java` — limpiar
+  query `findVersions` (predicate redundante) y respetar último por territorio.
+- Eliminar `controller/ReportController.java.bak` (basura, endpoint a medio escribir).
 - Tests: `ReportRepositoryIntegrationTest`, `ReportServiceTest`, controller spec existente.
 
 ### Frontend (`predicador-frontend/src/app/`)
-- `core/services/report-cache.ts` — **nuevo**.
-- `core/services/pending-reports-queue.ts` — **nuevo**.
-- `core/services/territorio.ts` — cache 2 capas + `logout()`.
+- `core/services/report-cache.ts` — **nuevo** (ya existe sin commitear): limpiar
+  detalles (quitar `effect()` del constructor), `getCache()`/`setTerritorio` como
+  fuente de verdad.
+- `core/services/map-draft.ts` — **nuevo** (`DraftMarksService`, borrador de marcas).
+- `core/services/territorio.ts` — cache 2 capas + `/versions` + `logout()`.
 - `core/services/territorio.spec.ts` — extender.
-- `core/services/profile.ts` / `features/profile/profile.ts` / `features/admin/admin.ts` — hook de logout.
-- `features/map/services/map-data-persistence.service.ts` — flujo offline + precaptura screenshot.
-- `features/map/map-report.service.ts` — quality/scale del screenshot.
-- `features/map/map.html` — badge de pendientes.
-- `features/map/map.ts` — listener `online`, subscribe a `pendingCount`.
-- Tests: `report-cache.service.spec.ts`, `pending-reports-queue.service.spec.ts`,
-  extensiones de `territorio.spec.ts`, `map-data-persistence.service.spec.ts`,
-  `map-report.service.spec.ts`.
+- `core/services/profile.ts` / `features/profile/profile.ts` / `features/admin/admin.ts` —
+  hook de logout (limpiar cache + draft).
+- `features/map/services/map-data-persistence.service.ts` — escribir cache + limpiar
+  draft al guardar (reemplaza `invalidateReportCache` + re-fetch).
+- `features/map/map-initialization.service.ts` — restaurar draft al arrancar.
+- Tests: `report-cache.service.spec.ts`, `map-draft.service.spec.ts`,
+  extensiones de `territorio.spec.ts` y `map-data-persistence.service.spec.ts`.
+- (*No tocado en esta iteración:* `pending-reports-queue.ts` queda sin cablear;
+  documenta su bug de `flush()` para iteración 2.)
 
 ---
 
@@ -273,39 +282,43 @@ llamada).
 ### Frontend (Vitest, ver `predicador-frontend/AGENTS.md`)
 - `report-cache.service.spec.ts`: set/get/remove/clear, SSR guard, parseo corrupto,
   límite de storage.
-- `territorio.service.spec.ts`: fase rápida desde cache; revalidación **solo** de
-  territorios cuyo version cambió; fallo de `/versions` → usa cache.
-- `pending-reports-queue.service.spec.ts`: FIFO, reutilización de `idempotencyKey`,
-  no encola errores de negocio, retries→`done`, `error` descartable.
-- `map-data-persistence.service.spec.ts`: red caída → encola (no `saveError`);
-  `guardarYEnviar` precaptura screenshot para el pack.
-- `map-report.service.spec.ts`: capture quality 0.4 / scale 0.5.
+- `territorio.service.spec.ts`: fase rápida desde cache sin red; revalidación **solo**
+  de territorios cuyo version cambió; territorio sin marca → no se consulta; fallo de
+  `/versions` → usa cache; chunking 50.
+- `map-draft.service.spec.ts`: guarda con debounce, restaura, prioridad sobre cache,
+  limpia tras guardar/logout, SSR guard.
+- `map-data-persistence.service.spec.ts`: guardado escribe cache y limpia draft;
+  fallo del POST → no toca cache ni draft.
 
 ### Backend (JUnit + Testcontainers, ver AGENTS.md raíz)
 - `ReportRepository`: versions solo territorios con reporte NO vacío; version =
   id del último reporte por `fecha DESC NULLS LAST, id DESC`; territorios sin
   reporte (o con reporte vacío) no aparecen.
 - `ReportService`/controller: `/versions` auth requerida; >100 → 400; shape del Map.
-- Regresión WhatsApp: idempotencia sigue evitando duplicados.
 
 ---
 
 ## 8. Open Questions / Decisions flagged
 
-- **Umbral de localStorage para screenshot**: se dimensiona en implementación con
-  el tamaño real del canvas (objetivo: pack < ~1.5 MB para dejar margen en 5 MB).
-- **Timeout de polling WhatsApp**: se valida en implementación; ver punto 4.7.
+- **Re-pintado tras guardar**: con cache-first, `restaurarMarcadoDesdeDB` solo se
+  conserva donde hace falta re-pintar estado de sesión; se decide caso por caso en el
+  plan de implementación.
+- **Interacción draft ↔ report-cache**: territorio con draft no se pisa por la
+  revalidación `/versions`; el draft se trata como "visto" en la sesión actual.
+- (*Diferido a iteración 2:* umbral de localStorage para screenshot, timeout de
+  polling WhatsApp, camino doble executor/cola.)
 
 ---
 
 ## 9. Risks
 
-- **Tamaño de localStorage (~5 MB)**: mitigado con screenshot comprimido y fallback
-  a IndexedDB para blobs grandes.
+- **Tamaño/localStorage (~5 MB)**: en esta iteración solo se guardan reportes con
+  marcas (sin screenshots) y el borrador (datos puros); cabe con holgura. El
+  screenshot/IndexedDB es riesgo diferido a iteración 2.
 - **Datos viejos visibles si otro encargado cambia el territorio desde otro
   dispositivo**: la revalidación por versiones lo resuelve (solo baja los cambiados).
-- **Cola offline por navegador**: no es multi-dispositivo; cada dispositivo sincroniza
-  sus propios pendientes al reconectar. Riesgo de conflicto si dos encargados marcan
-  el mismo territorio sin conexión → aceptado (documentado).
-- **SSR**: todo acceso a `localStorage`/`IndexedDB`/`navigator`/`window` va detrás de
-  guards de plataforma (el build de producción incluye SSR).
+- **Draft por navegador**: no es multi-dispositivo; el draft refleja marcas sin
+  guardar de una sola sesión/navegador. Si otro dispositivo guardó en el backend, la
+  revalidación lo aplica solo si no hay draft local (el draft manda en la sesión).
+- **SSR**: todo acceso a `localStorage`/`window` va detrás de guards de plataforma
+  (el build de producción incluye SSR).
