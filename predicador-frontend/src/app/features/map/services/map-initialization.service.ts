@@ -2,10 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
+import { DraftMarksService } from '../../../core/services/map-draft';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
+import type { MapDraft } from '../../../core/services/map-draft';
+import type { Reporte } from '../../../core/models/models';
+import type { FeatureLayer } from '../types/map.types';
 
 @Injectable({ providedIn: 'root' })
 export class MapInitializationService {
@@ -14,6 +18,7 @@ export class MapInitializationService {
   private readonly state = inject(MapStateService);
   private readonly territorioService = inject(TerritorioService);
   private readonly toastService = inject(Toast);
+  private readonly draftService = inject(DraftMarksService);
 
   async initialize(el: HTMLElement, onMapClick: (e: L.LeafletMouseEvent) => void): Promise<void> {
     this.rendering.initializeMap(el);
@@ -96,16 +101,89 @@ export class MapInitializationService {
 
   private async restoreAllMarks(): Promise<void> {
     const layers = this.rendering.getAllTerritoriesLayer();
+    if (layers.length === 0) return;
+
+    const draft = this.draftService.cargar();
+    const territoriosConDraft = new Set(draft?.territoriosSeleccionados ?? []);
+
     const territorios = layers.map(fl => fl.territorioPadre);
+    const sinDraft = territorios.filter(n => !territoriosConDraft.has(n));
 
-    if (territorios.length === 0) return;
-
-    const reportesPorTerritorio = await this.territorioService.getReportesPorTerritorios(territorios);
-
+    // 1) Pintado instantáneo desde localStorage (draft mandó en su territorio).
+    const instantaneo = this.territorioService.getReportesDesdeCache(sinDraft);
     for (const fl of layers) {
-      const reportes = reportesPorTerritorio.get(fl.territorioPadre) ?? [];
-      this.selection.restaurarMarcadoConReportes(fl.territorioPadre, reportes, fl.color, { actualizarEstadoMarcado: false });
+      if (territoriosConDraft.has(fl.territorioPadre)) continue;
+      this.selection.restaurarMarcadoConReportes(
+        fl.territorioPadre,
+        instantaneo.get(fl.territorioPadre) ?? [],
+        fl.color,
+        { actualizarEstadoMarcado: false }
+      );
     }
+
+    // 2) Restaurar draft (geom por id + territoriosSeleccionados + modo).
+    if (draft) {
+      this.restaurarMarcadoDesdeDraft(draft, layers);
+    }
+
+    // 3) Revalidación de fondo: solo territorios sin draft.
+    if (sinDraft.length > 0) {
+      try {
+        const revalidado = await this.territorioService.revalidarReportes(sinDraft);
+        for (const [num, reportes] of revalidado) {
+          const fl = layers.find(f => f.territorioPadre === num);
+          this.selection.restaurarMarcadoConReportes(num, reportes, fl?.color, { actualizarEstadoMarcado: false });
+        }
+      } catch {
+        // Offline/backend caído: el mapa ya pintó desde el cache; sin reintento.
+      }
+    } else {
+      this.selection.reaplicarMarcasSeleccionadas();
+    }
+  }
+
+  private restaurarMarcadoDesdeDraft(draft: MapDraft, layers: FeatureLayer[]): void {
+    this.state.manzanasById.set(
+      new Map(Object.entries(draft.manzanasById).map(([id, m]) => [id, m]))
+    );
+    this.state.territoriosSeleccionados.set(draft.territoriosSeleccionados);
+    this.state.territorioSeleccionado.set(draft.territorioSeleccionado);
+    this.state.modoMarcado.set(draft.modoMarcado);
+    this.state.predicacion.set(draft.predicacion);
+
+    for (const num of draft.territoriosSeleccionados) {
+      const fl = layers.find(f => f.territorioPadre === num);
+      this.selection.restaurarMarcadoConReportes(
+        num,
+        [this.reporteDesdeDraft(draft, num)],
+        fl?.color,
+        { actualizarEstadoMarcado: false }
+      );
+    }
+  }
+
+  private reporteDesdeDraft(draft: MapDraft, territorioNumero: number): Reporte {
+    const manzanas = Object.values(draft.manzanasById)
+      .filter(m => m.territorioNumero === territorioNumero)
+      .map(m => m.id);
+    const parcial = draft.datosParcialesGuardados[territorioNumero];
+    return {
+      id: 0,
+      manzanaId: manzanas.filter(id => !id.startsWith('parcial-'))[0] ?? null,
+      fecha: new Date(draft.savedAt).toISOString(),
+      encargadoId: 0,
+      encargadoNombre: '',
+      encargadoApellido: '',
+      sessionTime: '',
+      estado: draft.modoMarcado === 'completa' ? 'completed' : 'incomplete',
+      territorioNumero,
+      totalManzanas: 0,
+      manzanasMarcadas: manzanas.length,
+      tipoSesion: draft.modoMarcado === 'completa' ? 'completa' : 'parcial',
+      geometriaParcial: parcial?.geometria ?? null,
+      puntosParciales: parcial ? JSON.stringify(parcial.puntos.map(p => ({ lat: p.lat, lng: p.lng }))) : null,
+      manzanasIds: manzanas.filter(id => !id.startsWith('parcial-')).join(',') || null,
+    };
   }
 
   async reloadAllTerritories(): Promise<void> {

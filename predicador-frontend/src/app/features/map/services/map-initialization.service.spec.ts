@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import * as L from 'leaflet';
 import { MapInitializationService } from './map-initialization.service';
@@ -6,11 +6,13 @@ import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { TerritorioService } from '../../../core/services/territorio';
+import { DraftMarksService } from '../../../core/services/map-draft';
 import { Toast } from '../../../core/services/toast';
 
 describe('MapInitializationService', () => {
   let service: MapInitializationService;
   let state: MapStateService;
+  let drafts: DraftMarksService;
   let rendering: {
     initializeMap: ReturnType<typeof vi.fn>;
     getMap: ReturnType<typeof vi.fn>;
@@ -25,10 +27,13 @@ describe('MapInitializationService', () => {
     toggleManzana: ReturnType<typeof vi.fn>;
     restaurarMarcadoDesdeDB: ReturnType<typeof vi.fn>;
     restaurarMarcadoConReportes: ReturnType<typeof vi.fn>;
+    reaplicarMarcasSeleccionadas: ReturnType<typeof vi.fn>;
   };
   let territorioService: {
-    getReportesPorTerritorios: ReturnType<typeof vi.fn>;
+    getReportesDesdeCache: ReturnType<typeof vi.fn>;
+    revalidarReportes: ReturnType<typeof vi.fn>;
     limpiarCache: ReturnType<typeof vi.fn>;
+    logout: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
   let fakeMap: { on: ReturnType<typeof vi.fn> };
@@ -50,16 +55,20 @@ describe('MapInitializationService', () => {
       toggleManzana: vi.fn(),
       restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined),
       restaurarMarcadoConReportes: vi.fn(),
+      reaplicarMarcasSeleccionadas: vi.fn(),
     };
     territorioService = {
-      getReportesPorTerritorios: vi.fn().mockResolvedValue(new Map()),
+      getReportesDesdeCache: vi.fn(() => new Map()),
+      revalidarReportes: vi.fn(async () => new Map()),
       limpiarCache: vi.fn(),
+      logout: vi.fn(),
     };
     toast = { show: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         MapInitializationService,
         MapStateService,
+        DraftMarksService,
         { provide: MapRenderingFacade, useValue: rendering },
         { provide: MapSelectionService, useValue: selection },
         { provide: TerritorioService, useValue: territorioService },
@@ -68,7 +77,11 @@ describe('MapInitializationService', () => {
     });
     service = TestBed.inject(MapInitializationService);
     state = TestBed.inject(MapStateService);
+    drafts = TestBed.inject(DraftMarksService);
+    localStorage.clear();
   });
+
+  afterEach(() => localStorage.clear());
 
   it('initializes the map and registers click/zoom/move handlers', async () => {
     const el = document.createElement('div');
@@ -128,20 +141,55 @@ describe('MapInitializationService', () => {
     expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
   });
 
-  it('restores all marks from the last reports after load', async () => {
+  it('restores all marks from cache and revalidates territories without a draft', async () => {
     rendering.getAllTerritoriesLayer.mockReturnValue([
       { territorioPadre: 1, color: '#00ff00', layer: {} },
       { territorioPadre: 2, color: '#0000ff', layer: {} },
     ]);
-    territorioService.getReportesPorTerritorios.mockResolvedValue(
+    territorioService.getReportesDesdeCache.mockReturnValue(
       new Map([[1, [{ id: 1 }] as never]])
+    );
+    territorioService.revalidarReportes.mockResolvedValue(
+      new Map([[2, [{ id: 2 }] as never]])
     );
 
     await service.initialize(document.createElement('div'), vi.fn());
 
-    expect(territorioService.getReportesPorTerritorios).toHaveBeenCalledWith([1, 2]);
+    expect(territorioService.getReportesDesdeCache).toHaveBeenCalledWith([1, 2]);
+    expect(territorioService.revalidarReportes).toHaveBeenCalledWith([1, 2]);
     expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(1, [{ id: 1 }], '#00ff00', { actualizarEstadoMarcado: false });
-    expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(2, [], '#0000ff', { actualizarEstadoMarcado: false });
+    expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(2, [{ id: 2 }], '#0000ff', { actualizarEstadoMarcado: false });
+  });
+
+  it('restores the draft when one exists and skips cache paint + revalidation for drafted territories', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 1, color: '#3b82f6', layer: {} },
+      { territorioPadre: 2, color: '#00ff00', layer: {} },
+    ]);
+    drafts.guardar({
+      manzanasById: { A: { id: 'A', nombreBloque: 'Bloque A', color: '#3b82f6', territorioNumero: 1 } },
+      territoriosSeleccionados: [1],
+      territorioSeleccionado: 1,
+      datosParcialesGuardados: {},
+      modoMarcado: 'completa',
+      predicacion: 'tarde',
+      savedAt: Date.now(),
+    });
+    territorioService.getReportesDesdeCache.mockReturnValue(
+      new Map([[2, [{ id: 2 }] as never]])
+    );
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    const reportes = selection.restaurarMarcadoConReportes;
+    const callPara1 = reportes.mock.calls.find(c => c[0] === 1);
+    expect(callPara1).toBeDefined();
+    expect(callPara1![1].length).toBe(1);
+    expect(callPara1![3]).toEqual({ actualizarEstadoMarcado: false });
+    expect(territorioService.revalidarReportes).not.toHaveBeenCalledWith(expect.arrayContaining([1]));
+    expect(state.territoriosSeleccionados()).toEqual([1]);
+    expect(state.modoMarcado()).toBe('completa');
+    expect(state.predicacion()).toBe('tarde');
   });
 
   it('shows a toast and clears the loading flag when territory loading fails after all retries', async () => {
