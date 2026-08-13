@@ -1374,7 +1374,7 @@ git commit -m "feat(frontend): debounced draft autosave from MapStateService"
 - Consumes: `saveToDatabase(): Promise<Reporte[]>` (Task 6), `ReportCacheService` (Task 4), `DraftMarksService` (Task 7).
 - Produces: `private persistirEnCacheYLimpiarDraft(reportes: Reporte[], territorios: number[])` helper.
 
-- [ ] **Step 1: Write the failing assertions**
+- [x] **Step 1: Write the failing assertions**
 
 In `map-data-persistence.service.spec.ts`, inject real `ReportCacheService` and a real `DraftMarksService` with a **spied** `guardar`/`eliminarTerritorios`. Update the `TerritorioService` mock (already done in Task 6). Add:
 
@@ -1425,13 +1425,13 @@ Then add tests (import `ReportCacheService` from `../../../core/services/report-
   }
 ```
 
-- [ ] **Step 2: Run the spec to verify it fails**
+- [x] **Step 2: Run the spec to verify it fails**
 
 Run: `pnpm test -- src/app/features/map/services/map-data-persistence.service.spec.ts`
 
 Expected: FAIL — service calls `invalidateReportCache`/`restaurarMarcadoDesdeDB`, no cache/draft writes.
 
-- [ ] **Step 3: Rewrite the two persistence methods**
+- [x] **Step 3: Rewrite the two persistence methods**
 
 In `map-data-persistence.service.ts`:
 
@@ -1488,19 +1488,19 @@ Add the private helper (before `prepararCaptura`):
 
 `restaurarMarcadoDesdeDB` is no longer called here — its remaining usage is the on-demand restore in `MapSelectionService` (unchanged). The custom `previousMarcadas`/`previousDatosParciales` restore-on-error block stays.
 
-- [ ] **Step 4: Run the full map persistence + related specs**
+- [x] **Step 4: Run the full map persistence + related specs**
 
 Run: `pnpm test -- src/app/features/map/services/map-data-persistence.service.spec.ts src/app/features/map/map-report.service.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Lint**
+- [x] **Step 5: Lint**
 
 Run: `pnpm run lint`
 
 Expected: no errors (unused imports in specs cleaned as needed).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add predicador-frontend/src/app/features/map/services/map-data-persistence.service.ts predicador-frontend/src/app/features/map/services/map-data-persistence.service.spec.ts
