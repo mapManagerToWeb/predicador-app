@@ -923,7 +923,7 @@ git commit -m "refactor(frontend): two-layer report cache with /versions revalid
 **Interfaces:**
 - Produces: `saveToDatabase(registros: RegistroReporte[]): Promise<Reporte[]>` (consumed by Task 9).
 
-- [ ] **Step 1: Update the code**
+- [x] **Step 1: Update the code**
 
 In `map-report.service.ts`, change `saveToDatabase` to:
 
@@ -941,13 +941,13 @@ Update the `TerritorioService` mock in `map-data-persistence.service.spec.ts` (l
 
 and the `saveToDatabase` mock in the `report` object (line 30) — keep `mockResolvedValue([])`; type changes to return `Reporte[]`.
 
-- [ ] **Step 2: Run the affected specs**
+- [x] **Step 2: Run the affected specs**
 
 Run: `pnpm test -- src/app/features/map/map-report.service.spec.ts src/app/features/map/services/map-data-persistence.service.spec.ts`
 
 Expected: PASS (both specs type-check and run).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add predicador-frontend/src/app/features/map/map-report.service.ts predicador-frontend/src/app/features/map/services/map-data-persistence.service.spec.ts
