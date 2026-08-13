@@ -109,7 +109,7 @@ export class MapInitializationService {
   }
 
   async reloadAllTerritories(): Promise<void> {
-    this.territorioService.invalidateAll();
+    this.territorioService.limpiarCache();
     await this.loadAllTerritories();
   }
 }

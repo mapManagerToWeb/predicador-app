@@ -5,6 +5,7 @@ import { Toast } from '../../core/services/toast';
 import { WhatsAppService } from '../../core/services/whatsapp';
 import type {
   RegistroReporte,
+  Reporte,
   WhatsAppSendRequest,
   TerritorioReporteEnvio
 } from '../../core/models/models';
@@ -149,8 +150,8 @@ export class MapReportService {
     };
   }
 
-  async saveToDatabase(registros: RegistroReporte[]): Promise<void> {
-    await this.territorioService.crearReportes(registros);
+  async saveToDatabase(registros: RegistroReporte[]): Promise<Reporte[]> {
+    return this.territorioService.crearReportes(registros);
   }
 
   private groupByTerritorio(marcadas: ManzanaMarcada[], seleccionados?: Set<number>): Map<number, ManzanaMarcada[]> {
