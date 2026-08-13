@@ -28,7 +28,7 @@ describe('MapInitializationService', () => {
   };
   let territorioService: {
     getReportesPorTerritorios: ReturnType<typeof vi.fn>;
-    invalidateAll: ReturnType<typeof vi.fn>;
+    limpiarCache: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
   let fakeMap: { on: ReturnType<typeof vi.fn> };
@@ -53,7 +53,7 @@ describe('MapInitializationService', () => {
     };
     territorioService = {
       getReportesPorTerritorios: vi.fn().mockResolvedValue(new Map()),
-      invalidateAll: vi.fn(),
+      limpiarCache: vi.fn(),
     };
     toast = { show: vi.fn() };
     TestBed.configureTestingModule({
@@ -179,10 +179,10 @@ describe('MapInitializationService', () => {
     }
   });
 
-  it('reloadAllTerritories invalidates caches and reloads', async () => {
+  it('reloadAllTerritories clears the report cache and reloads', async () => {
     await service.reloadAllTerritories();
 
-    expect(territorioService.invalidateAll).toHaveBeenCalled();
+    expect(territorioService.limpiarCache).toHaveBeenCalled();
     expect(rendering.loadAllTerritories).toHaveBeenCalledWith(territorioService);
   });
 });

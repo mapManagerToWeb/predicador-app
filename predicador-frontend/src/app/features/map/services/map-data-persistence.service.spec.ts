@@ -37,7 +37,7 @@ describe('MapDataPersistenceService', () => {
         { provide: MapReportService, useValue: report },
         { provide: MapRenderingFacade, useValue: { getAllTerritoriesLayer: vi.fn().mockReturnValue([]) } },
         { provide: MapSelectionService, useValue: { reaplicarMarcasSeleccionadas: vi.fn(), restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined) } },
-        { provide: TerritorioService, useValue: { invalidateReportCache: vi.fn() } },
+        { provide: TerritorioService, useValue: { crearReportes: vi.fn().mockResolvedValue([]) } },
         { provide: Toast, useValue: { show: vi.fn() } },
       ],
     });
