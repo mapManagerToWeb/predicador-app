@@ -106,4 +106,22 @@ describe('AuthTokenService', () => {
     expect(svc.role()).toBeNull();
     expect(localStorage.getItem('predicador_role')).toBeNull();
   });
+
+  it('clear() propagates logout hygiene to the territory service when present', () => {
+    const territorioService = { logout: vi.fn() };
+    const svc = new AuthTokenService(undefined, undefined, territorioService as never);
+    svc.set('admin');
+    svc.clear();
+
+    expect(territorioService.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('logout() propagates logout hygiene to the territory service when present', () => {
+    const territorioService = { logout: vi.fn() };
+    const svc = new AuthTokenService(undefined, undefined, territorioService as never);
+    svc.set('admin');
+    svc.logout();
+
+    expect(territorioService.logout).toHaveBeenCalledTimes(1);
+  });
 });
