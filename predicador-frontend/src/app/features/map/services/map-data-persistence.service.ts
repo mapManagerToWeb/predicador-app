@@ -6,7 +6,10 @@ import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { MapCaptureService } from './map-capture.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
+import { ReportCacheService } from '../../../core/services/report-cache';
+import { DraftMarksService } from '../../../core/services/map-draft';
 import type { ManzanaMarcada } from '../types/map.types';
+import type { Reporte } from '../../../core/models/models';
 
 @Injectable({ providedIn: 'root' })
 export class MapDataPersistenceService {
@@ -16,6 +19,8 @@ export class MapDataPersistenceService {
   private readonly toastService = inject(Toast);
   private readonly reportService = inject(MapReportService);
   private readonly captureService = inject(MapCaptureService);
+  private readonly reportCacheService = inject(ReportCacheService);
+  private readonly draftMarksService = inject(DraftMarksService);
 
   async guardarEnBaseDeDatos(): Promise<void> {
     const perfil = this.reportService.getProfile();
@@ -47,11 +52,10 @@ export class MapDataPersistenceService {
       previousDatosParciales = new Map(this.state.datosParcialesGuardados);
       this.toastService.show(TOAST_MESSAGES.saving);
       this.state.clearDatosParciales();
-      await this.reportService.saveToDatabase(registros);
+      const saved = await this.reportService.saveToDatabase(registros);
 
-      for (const num of this.state.territoriosSeleccionados()) {
-        await this.selection.restaurarMarcadoDesdeDB(num, undefined, { actualizarEstadoMarcado: true });
-      }
+      const territoriosGuardados = this.state.territoriosSeleccionados();
+      this.persistirEnCacheYLimpiarDraft(saved, territoriosGuardados);
 
       this.selection.reaplicarMarcasSeleccionadas();
       this.toastService.show(TOAST_MESSAGES.saveSuccess);
@@ -126,11 +130,10 @@ export class MapDataPersistenceService {
         this.state.territoriosSeleccionados(),
         this.state.datosParcialesGuardados
       );
-      await this.reportService.saveToDatabase(registros);
+      const saved = await this.reportService.saveToDatabase(registros);
 
-      for (const num of this.state.territoriosSeleccionados()) {
-        await this.selection.restaurarMarcadoDesdeDB(num, undefined, { actualizarEstadoMarcado: true });
-      }
+      const territoriosGuardados = this.state.territoriosSeleccionados();
+      this.persistirEnCacheYLimpiarDraft(saved, territoriosGuardados);
 
       this.selection.reaplicarMarcasSeleccionadas();
 
@@ -171,6 +174,15 @@ export class MapDataPersistenceService {
       this.state.enviando.set(false);
       this.state.screenshotPreview.set(null);
     }
+  }
+
+  private persistirEnCacheYLimpiarDraft(reportes: Reporte[], territorios: number[]): void {
+    for (const reporte of reportes) {
+      if (reporte.territorioNumero) {
+        this.reportCacheService.setTerritorio(reporte.territorioNumero, reporte);
+      }
+    }
+    this.draftMarksService.eliminarTerritorios(territorios);
   }
 
   prepararCaptura(): Promise<void> {
