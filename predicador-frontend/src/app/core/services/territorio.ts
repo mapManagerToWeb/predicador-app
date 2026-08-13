@@ -135,6 +135,7 @@ export class TerritorioService {
 
   async getReportesPorTerritorio(territorioNumero: number): Promise<Reporte[]> {
     const cacheado = this.reportCache.getCache().get(territorioNumero);
+    if (this.versionsSeen.get(territorioNumero) === -1 && !cacheado) return [];
     if (cacheado && this.versionsSeen.get(territorioNumero) === cacheado.id) return [cacheado];
 
     const dtos = await firstValueFrom(
