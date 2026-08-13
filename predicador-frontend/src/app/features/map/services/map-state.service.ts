@@ -1,6 +1,7 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import type { SnappedPoint, Edge } from '../map-geometry';
 import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
+import { DraftMarksService, MapDraft } from '../../../core/services/map-draft';
 
 @Injectable({ providedIn: 'root' })
 export class MapStateService {
@@ -45,6 +46,58 @@ export class MapStateService {
 
   private _datosParcialesGuardados: Map<number, { puntos: SnappedPoint[]; geometria: string }> = new Map();
 
+  private readonly draftService = inject(DraftMarksService);
+  /** Bumped whenever the (non-signal) partial-marks map changes so the draft effect re-runs. */
+  private readonly draftRevision = signal(0);
+  private draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    effect(() => {
+      this.manzanasById();
+      this.territoriosSeleccionados();
+      this.modoMarcado();
+      this.predicacion();
+      this.draftRevision();
+      this.scheduleDraftSave();
+    });
+  }
+
+  private scheduleDraftSave(): void {
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    this.draftTimer = setTimeout(() => {
+      const draft = this.snapshotToDraft();
+      this.draftService.guardar(draft);
+    }, 400);
+  }
+
+  snapshotToDraft(): MapDraft {
+    const manzanasById: Record<string, ManzanaMarcada> = {};
+    this.manzanasById().forEach((m, id) => { manzanasById[id] = m; });
+
+    const datosParcialesGuardados: MapDraft['datosParcialesGuardados'] = {};
+    for (const [num, parcial] of this._datosParcialesGuardados) {
+      datosParcialesGuardados[num] = {
+        puntos: parcial.puntos.map(p => ({
+          lat: p.latlng.lat,
+          lng: p.latlng.lng,
+          edgeIdx: p.edgeIdx,
+          t: p.t,
+        })),
+        geometria: parcial.geometria,
+      };
+    }
+
+    return {
+      manzanasById,
+      territoriosSeleccionados: this.territoriosSeleccionados(),
+      territorioSeleccionado: this.territorioSeleccionado(),
+      datosParcialesGuardados,
+      modoMarcado: this.modoMarcado(),
+      predicacion: this.predicacion(),
+      savedAt: Date.now(),
+    };
+  }
+
   get datosParcialesGuardados(): Map<number, { puntos: SnappedPoint[]; geometria: string }> { return this._datosParcialesGuardados; }
   set datosParcialesGuardados(val: Map<number, { puntos: SnappedPoint[]; geometria: string }>) { this._datosParcialesGuardados = val; }
 
@@ -53,6 +106,7 @@ export class MapStateService {
   }
   setDatosParciales(territorio: number, val: { puntos: SnappedPoint[]; geometria: string }): void {
     this._datosParcialesGuardados.set(territorio, val);
+    this.draftRevision.update(v => v + 1);
   }
   clearDatosParciales(territorio?: number): void {
     if (territorio === undefined) {
@@ -60,6 +114,7 @@ export class MapStateService {
     } else {
       this._datosParcialesGuardados.delete(territorio);
     }
+    this.draftRevision.update(v => v + 1);
   }
 
   resetUIState(): void {
