@@ -6,6 +6,8 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
+import { ReportCacheService } from '../../../core/services/report-cache';
+import { DraftMarksService } from '../../../core/services/map-draft';
 
 describe('MapDataPersistenceService', () => {
   let service: MapDataPersistenceService;
@@ -39,6 +41,11 @@ describe('MapDataPersistenceService', () => {
         { provide: MapSelectionService, useValue: { reaplicarMarcasSeleccionadas: vi.fn(), restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined) } },
         { provide: TerritorioService, useValue: { crearReportes: vi.fn().mockResolvedValue([]) } },
         { provide: Toast, useValue: { show: vi.fn() } },
+        { provide: ReportCacheService, useValue: {
+            setTerritorio: vi.fn(), getCache: vi.fn(() => new Map()), clear: vi.fn(),
+            setTerritorios: vi.fn(), removeTerritorios: vi.fn(), hasData: vi.fn(() => false),
+        } },
+        { provide: DraftMarksService, useValue: { eliminarTerritorios: vi.fn(), clear: vi.fn(), cargar: vi.fn(() => null), guardar: vi.fn() } },
       ],
     });
     service = TestBed.inject(MapDataPersistenceService);
@@ -107,4 +114,39 @@ describe('MapDataPersistenceService', () => {
     expect(show).toHaveBeenCalledWith(expect.stringContaining('*incompleto*'));
     expect(show).not.toHaveBeenCalledWith(expect.stringContaining('*faltante*'));
   });
+
+  it('writes the report cache and clears the draft for saved territories', async () => {
+    const saved = [{ id: 10, ...reporteShape(1) }];
+    report.saveToDatabase.mockResolvedValue(saved);
+
+    await service.guardarEnBaseDeDatos();
+
+    const cache = TestBed.inject(ReportCacheService) as unknown as { setTerritorio: ReturnType<typeof vi.fn> };
+    const drafts = TestBed.inject(DraftMarksService) as unknown as { eliminarTerritorios: ReturnType<typeof vi.fn> };
+    expect(cache.setTerritorio).toHaveBeenCalledWith(1, saved[0]);
+    expect(drafts.eliminarTerritorios).toHaveBeenCalledWith([1]);
+    expect(report.saveToDatabase).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not touch cache or draft when the POST fails', async () => {
+    report.saveToDatabase.mockRejectedValue(new Error('boom'));
+
+    await service.guardarEnBaseDeDatos();
+
+    const cache = TestBed.inject(ReportCacheService) as unknown as { setTerritorio: ReturnType<typeof vi.fn> };
+    const drafts = TestBed.inject(DraftMarksService) as unknown as { eliminarTerritorios: ReturnType<typeof vi.fn> };
+    expect(cache.setTerritorio).not.toHaveBeenCalled();
+    expect(drafts.eliminarTerritorios).not.toHaveBeenCalled();
+    expect(state.enviando()).toBe(false);
+  });
+
+  function reporteShape(territorio: number) {
+    return {
+      manzanaId: null, fecha: '2026-08-12T10:00:00Z', encargadoId: 1,
+      encargadoNombre: 'A', encargadoApellido: 'B', sessionTime: '06:00',
+      estado: 'completed', territorioNumero: territorio, totalManzanas: 3,
+      manzanasMarcadas: 3, tipoSesion: 'completa', geometriaParcial: null,
+      puntosParciales: null, manzanasIds: 'A,B,C',
+    };
+  }
 });
