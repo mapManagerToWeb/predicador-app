@@ -1,6 +1,7 @@
 import { Injectable, Optional, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from './auth.service';
+import { TerritorioService } from './territorio';
 
 /** Tracks only reactive UI auth state; the HMAC is held by an HttpOnly cookie. */
 export type SessionRole = 'encargado' | 'admin';
@@ -17,8 +18,13 @@ function loadRole(): SessionRole | null {
 export class AuthTokenService {
   private roleSignal = signal<SessionRole | null>(loadRole());
   // Optional keeps this state service directly constructible in SSR/unit tests.
-  // eslint-disable-next-line @angular-eslint/prefer-inject
-  constructor(@Optional() private http?: HttpClient, @Optional() private authService?: AuthService) {}
+  /* eslint-disable @angular-eslint/prefer-inject */
+  constructor(
+    @Optional() private http?: HttpClient,
+    @Optional() private authService?: AuthService,
+    @Optional() private territorioService?: TerritorioService,
+  ) {}
+  /* eslint-enable @angular-eslint/prefer-inject */
 
   readonly role = this.roleSignal.asReadonly();
   readonly hasToken = computed(() => this.roleSignal() !== null);
@@ -33,6 +39,7 @@ export class AuthTokenService {
     this.roleSignal.set(null);
     this.persist(null);
     this.authService?.invalidateCache();
+    this.territorioService?.logout();
   }
 
   logout(): void {

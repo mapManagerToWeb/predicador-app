@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { Reporte, RegistroReporte, EstadoReporte, TipoSesion } from '../models/models';
 import { ReportCacheService } from './report-cache';
+import { DraftMarksService } from './map-draft';
 
 interface ReportDto {
   id?: number;
@@ -31,6 +32,7 @@ export class TerritorioService {
   private readonly apiUrl = `${environment.apiUrl}/territories`;
   private readonly reportesUrl = `${environment.apiUrl}/reports`;
   private readonly reportCache = inject(ReportCacheService);
+  private readonly draftMarksService = inject(DraftMarksService);
 
   /** Versions already validated this session (territorio -> id of last report). */
   private readonly versionsSeen = new Map<number, number>();
@@ -158,10 +160,11 @@ export class TerritorioService {
     this.versionsSeen.clear();
   }
 
-  /** Logout hygiene: clears report cache + marks draft. Draft hook lands in Task 10. */
+  /** Logout hygiene: clears report cache + marks draft. */
   logout(): void {
     this.reportCache.clear();
     this.versionsSeen.clear();
+    this.draftMarksService.clear();
   }
 
   private elegirUltimo(reportes: Reporte[]): Reporte | undefined {
