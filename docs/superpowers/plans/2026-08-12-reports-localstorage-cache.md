@@ -903,7 +903,7 @@ Run: `pnpm test -- src/app/core/services/territorio.spec.ts`
 
 Expected: PASS. If a stale import of removed methods appears in another spec, fix in Task 6's spec update.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add predicador-frontend/src/app/core/services/territorio.ts predicador-frontend/src/app/core/services/territorio.spec.ts
@@ -976,7 +976,7 @@ Pure-data draft persistence in localStorage (key `predicador_map_draft`). No fea
   - `DraftMarksService.tieneDraft(): boolean`
 - Consumed by: Task 8 (MapStateService effect calls `guardar`), Task 9 (persistence calls `eliminarTerritorios`), Task 10 (init restore calls `cargar`; logout calls `clear`).
 
-- [ ] **Step 1: Write the failing spec**
+- [x] **Step 1: Write the failing spec**
 
 Create `map-draft.service.spec.ts`:
 
@@ -1065,13 +1065,13 @@ describe('DraftMarksService', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm test -- src/app/core/services/map-draft.service.spec.ts`
 
 Expected: FAIL — `map-draft.ts` doesn't exist.
 
-- [ ] **Step 3: Implement `map-draft.ts`**
+- [x] **Step 3: Implement `map-draft.ts`**
 
 Create the file:
 
@@ -1193,13 +1193,13 @@ export class DraftMarksService {
 
 > `eliminarTerritorios` removes by manzana **id** (`manzanasById` is keyed by manzana id, not territory number). Because manzana ids are prefixed by territory in this app, deletion per manzana from the provided territory is correct; if ids were ambiguous, apply exact-id deletion only (current ids are per-territory unique in practice).
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test -- src/app/core/services/map-draft.service.spec.ts`
 
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add predicador-frontend/src/app/core/services/map-draft.ts predicador-frontend/src/app/core/services/map-draft.service.spec.ts
@@ -1219,7 +1219,7 @@ Keep the draft fresh while the encargado marks. Installs an `effect()` in `MapSt
 - Consumes: `DraftMarksService.guardar(MapDraft)` and `DraftPoint`/`MapDraft` types from Task 7.
 - Produces: `private draftRevision = signal(0)` bumped by `setDatosParciales`/`clearDatosParciales`; `snapshotToDraft()` helper used by Task 10 to restore (or re-documented inline there).
 
-- [ ] **Step 1: Update imports + service**
+- [x] **Step 1: Update imports + service**
 
 In `map-state.service.ts`:
 
@@ -1303,7 +1303,7 @@ Bump the revision in the partial setters:
   }
 ```
 
-- [ ] **Step 2: Add/update a spec for the draft persistence**
+- [x] **Step 2: Add/update a spec for the draft persistence**
 
 Append to the existing `map-state.service.spec.ts` (create it if it does not exist; otherwise add a describe block — check file first):
 
@@ -1347,13 +1347,13 @@ describe('MapStateService draft effect', () => {
 
 > `effect()` inside `inject()` in a root service runs in an injection context; Vitest/TestBed supports it. `nextParcialId` import is unused in this block — drop it from the import list to keep lint clean.
 
-- [ ] **Step 3: Run the spec**
+- [x] **Step 3: Run the spec**
 
 Run: `pnpm test -- src/app/features/map/services/map-state.service.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add predicador-frontend/src/app/features/map/services/map-state.service.ts predicador-frontend/src/app/features/map/services/map-state.service.spec.ts
