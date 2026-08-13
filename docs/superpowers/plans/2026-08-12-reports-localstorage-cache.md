@@ -1522,7 +1522,7 @@ git commit -m "perf(frontend): seed report cache and drop draft on save instead 
 **Interfaces:**
 - Consumes: `TerritorioService.getReportesDesdeCache`, `revalidarReportes`, `limpiarCache`, `logout` (Tasks 5/7); `DraftMarksService.cargar` (Task 7); `MapSelectionService`/`MapRenderingFacade` existing APIs.
 
-- [ ] **Step 1: Write/extend tests**
+- [x] **Step 1: Write/extend tests**
 
 Check for `map-initialization.service.spec.ts`; if absent, create:
 
@@ -1606,13 +1606,13 @@ describe('MapInitializationService', () => {
 
 > This spec pokes at `restoreAllMarks` through the async `initialize`. Because `initialize` needs `loadAllTerritories` to resolve without network in the fake facade, keep the mock for `loadAllTerritories` resolving to `Promise.resolve()` — add it to the facade mock above if the spec fails on it.
 
-- [ ] **Step 2: Run the spec to verify it fails**
+- [x] **Step 2: Run the spec to verify it fails**
 
 Run: `pnpm test -- src/app/features/map/services/map-initialization.service.spec.ts`
 
 Expected: FAIL — current `restoreAllMarks` calls `getReportesPorTerritorios` (absent in mock) and revalidates regardless of draft.
 
-- [ ] **Step 3: Rewrite `restoreAllMarks` + `reloadAllTerritories`**
+- [x] **Step 3: Rewrite `restoreAllMarks` + `reloadAllTerritories`**
 
 In `map-initialization.service.ts`:
 
@@ -1740,7 +1740,7 @@ Replace `reloadAllTerritories`:
 
 > `restaurarMarcadoConReportes(…, [synthetic report with the draft's partials])` lets the existing restoration service resolve geometry by id (partials via `geometriaParcial`) without duplicating Leaflet logic. Draft data is pure; `MapDraft`/`FeatureLayer`/`Reporte` imports are type-only.
 
-- [ ] **Step 4: Wire `logout()` on `TerritorioService`**
+- [x] **Step 4: Wire `logout()` on `TerritorioService`**
 
 In `territorio.ts`, add `DraftMarksService` import + dependency and extend `logout`:
 
@@ -1754,7 +1754,7 @@ import { DraftMarksService } from './map-draft';
   }
 ```
 
-- [ ] **Step 5: Hook logout at the auth boundary**
+- [x] **Step 5: Hook logout at the auth boundary**
 
 In `auth-token.ts`, inject `TerritorioService` and clear local caches on logout (fires on explicit logout AND 401 session-expiry via the interceptor's `authToken.clear()` — the interceptor already calls `profile.clear()` and navigates to login; hooking here guarantees cache+draft hygiene for both paths):
 
@@ -1784,13 +1784,13 @@ import { TerritorioService } from './territorio';
 
 > Using `@Optional` keeps `AuthTokenService` directly constructible in SSR/unit tests (existing pattern). Admin page's `logout()` calls `authToken.logout()` which now cascades into `TerritorioService.logout()`.
 
-- [ ] **Step 6: Run affected specs + lint**
+- [x] **Step 6: Run affected specs + lint**
 
 Run: `pnpm test -- src/app/features/map/services/map-initialization.service.spec.ts src/app/core/services/territorio.spec.ts src/app/core/services/auth-token.ts src/app/core/services/auth-token.spec.ts` then `pnpm run lint`
 
 Expected: PASS, no lint errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add predicador-frontend/src/app/features/map/services/map-initialization.service.ts predicador-frontend/src/app/features/map/services/map-initialization.service.spec.ts predicador-frontend/src/app/core/services/territorio.ts predicador-frontend/src/app/core/services/auth-token.ts
