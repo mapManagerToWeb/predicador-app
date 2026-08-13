@@ -1,5 +1,4 @@
 import { Injectable, inject } from '@angular/core';
-import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { MapReportService } from '../map-report.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -14,7 +13,6 @@ export class MapDataPersistenceService {
   private readonly state = inject(MapStateService);
   private readonly rendering = inject(MapRenderingFacade);
   private readonly selection = inject(MapSelectionService);
-  private readonly territorioService = inject(TerritorioService);
   private readonly toastService = inject(Toast);
   private readonly reportService = inject(MapReportService);
   private readonly captureService = inject(MapCaptureService);
@@ -52,7 +50,6 @@ export class MapDataPersistenceService {
       await this.reportService.saveToDatabase(registros);
 
       for (const num of this.state.territoriosSeleccionados()) {
-        this.territorioService.invalidateReportCache(num);
         await this.selection.restaurarMarcadoDesdeDB(num, undefined, { actualizarEstadoMarcado: true });
       }
 
@@ -132,7 +129,6 @@ export class MapDataPersistenceService {
       await this.reportService.saveToDatabase(registros);
 
       for (const num of this.state.territoriosSeleccionados()) {
-        this.territorioService.invalidateReportCache(num);
         await this.selection.restaurarMarcadoDesdeDB(num, undefined, { actualizarEstadoMarcado: true });
       }
 
