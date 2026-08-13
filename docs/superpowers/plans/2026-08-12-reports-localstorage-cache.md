@@ -1806,7 +1806,7 @@ Final gate before marking the plan complete. Runs the exact CI check sequence fr
 **Files:**
 - (no source changes expected — fix only genuine regressions if the suites fail)
 
-- [ ] **Step 1: Frontend checks (CI order)**
+- [x] **Step 1: Frontend checks (CI order)**
 
 From `predicador-frontend/`:
 
@@ -1819,7 +1819,9 @@ pnpm run build
 
 Expected: all green. `pnpm run lint` must be clean (zero warnings — the repo's ESLint config treats warnings as errors). Coverage thresholds are the low defaults (30/30/30/20); passing thresholds does **not** mean good coverage — rely on the per-task specs from Tasks 4–10 for behavioral verification.
 
-- [ ] **Step 2: Backend checks**
+- [x] **Step 2: Backend checks**
+
+Ran `mvn -pl reporting-service test -Ddocker.available=true`: 27 non-DB unit tests pass; `ReportRepositoryIntegrationTest` (5 tests) fails to start its ApplicationContext because Testcontainers 1.20.1 cannot connect to Docker Desktop 4.83's socket (docker-java receives HTTP 400 stubs from the Docker Desktop compat layer even though `docker info`/`_ping` work; this is a docker-java/Testcontainers vs Docker Desktop socket incompatibility, not a code regression). Used the plan's documented fallback: `mvn -pl reporting-service -Dtest='ReportServiceTest,ReportControllerTest' test -Dsurefire.failIfNoSpecifiedTests=false` → 27/27 PASS. The integration test is gated by `@EnabledIfSystemProperty(named = "docker.available", matches = "true")` and runs in CI against the `postgis/postgis` service, so it is not a blocking gap for this plan.
 
 From `backend/`, run the focused suites for the modules touched (reporting `findVersions` + controller + service). Integration tests use Testcontainers, so Postgres/PostGIS is needed:
 
