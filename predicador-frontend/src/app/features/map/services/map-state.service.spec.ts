@@ -1,12 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { MapStateService } from './map-state.service';
+import { DraftMarksService } from '../../../core/services/map-draft';
 import { makeLatLng } from '../map-geometry';
+import type { ManzanaMarcada } from '../types/map.types';
 
 describe('MapStateService', () => {
   let service: MapStateService;
 
   beforeEach(() => {
-    service = new MapStateService();
+    TestBed.configureTestingModule({ providers: [MapStateService] });
+    service = TestBed.inject(MapStateService);
   });
 
   it('starts with empty, unselected state', () => {
@@ -101,5 +105,35 @@ describe('MapStateService', () => {
     expect(service.manzanaSeleccionadaNombre()).toBe('');
     expect(service.manzanaSeleccionadaTerritorio()).toBeNull();
     expect(service.manzanaEdges()).toEqual([]);
+  });
+});
+
+describe('MapStateService draft effect', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    localStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it('persists marks to the draft after the debounce window', () => {
+    TestBed.configureTestingModule({ providers: [MapStateService] });
+    const state = TestBed.inject(MapStateService);
+    const drafts = TestBed.inject(DraftMarksService);
+
+    state.manzanasById.set(new Map<string, ManzanaMarcada>([
+      ['A', { id: 'A', nombreBloque: 'Bloque A', color: '#3b82f6', territorioNumero: 1 }],
+    ]));
+    state.territoriosSeleccionados.set([1]);
+    state.modoMarcado.set('completa');
+
+    vi.advanceTimersByTime(500);
+
+    const restored = drafts.cargar();
+    expect(restored?.manzanasById['A'].territorioNumero).toBe(1);
+    expect(restored?.territoriosSeleccionados).toEqual([1]);
+    expect(restored?.modoMarcado).toBe('completa');
   });
 });
