@@ -7,6 +7,7 @@ import { MapLayerRegistry } from './map-layer-registry.service';
 import {
   getBaseTerritoryStyle,
   getCaptureUnmarkedStyle,
+  getCaptureIncompleteStyle,
   getHiddenStyle,
   getMarkedManzanaStyle,
   getPartialPolygonCompleteStyle,
@@ -89,7 +90,7 @@ if (incompletos.size === 0) return Promise.resolve();
     const territoryLabels = this.territories.getTerritoryLabels();
 
     // Ocultar territorios completados
-    this.styleTerritoryLayersSoloIncompletos(allTerritoriesLayer, incompletos);
+    this.styleTerritoryLayersSoloIncompletos(allTerritoriesLayer, incompletos, manzanasMarcadas);
     this.stylePartialMarks(manzanasMarcadas, allTerritoriesLayer);
     this.updateLabelVisibility(territoryLabels, incompletos);
     this.fitBoundsToSelection(map, incompletos, manzanasMarcadas, allTerritoriesLayer);
@@ -104,19 +105,23 @@ if (incompletos.size === 0) return Promise.resolve();
 
   /**
    * Aplica estilos de captura SOLO a territorios incompletos.
-   * Los completados se ocultan.
+   * Los completados se ocultan. Las manzanas ya marcadas se resaltan
+   * con getMarkedManzanaStyle y las no marcadas con getCaptureIncompleteStyle.
    */
   private styleTerritoryLayersSoloIncompletos(
     allTerritoriesLayer: FeatureLayer[],
-    incompletos: Set<number>
+    incompletos: Set<number>,
+    manzanasMarcadas: ManzanaMarcada[]
   ): void {
+    const markedLayers = new Set<L.Path>(
+      manzanasMarcadas.map(m => this.registry.get(m.id)).filter((l): l is L.Path => Boolean(l))
+    );
+
     for (const fl of allTerritoriesLayer) {
       if (incompletos.has(fl.territorioPadre)) {
-        // Incompleto: estilo de captura (no marcado)
         fl.layer.eachLayer(l => {
-          if (l instanceof L.Path) {
-            l.setStyle({ opacity: 0.6, fillOpacity: 0.05, color: fl.color, weight: 1.5 });
-          }
+          if (!(l instanceof L.Path)) return;
+          l.setStyle(markedLayers.has(l) ? getMarkedManzanaStyle(fl.color) : getCaptureIncompleteStyle(fl.color));
         });
       } else {
         // Completado: ocultar
