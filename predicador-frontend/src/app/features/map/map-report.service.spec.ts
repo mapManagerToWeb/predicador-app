@@ -8,8 +8,8 @@ import type { ManzanaMarcada, FeatureLayer, DatosParciales } from './types/map.t
 import { makeLatLng } from './map-geometry';
 import type { UserProfile } from '../../core/models/models';
 
-vi.mock('html2canvas', () => ({
-  default: vi.fn().mockRejectedValue(new Error('capture failed')),
+vi.mock('html-to-image', () => ({
+  toPng: vi.fn().mockRejectedValue(new Error('capture failed')),
 }));
 
 describe('MapReportService', () => {
@@ -59,6 +59,20 @@ describe('MapReportService', () => {
         'capture failed',
       );
 
+      expect(restoreMap).toHaveBeenCalledOnce();
+      mapElement.remove();
+    });
+
+    it('returns the base64 body of the captured element', async () => {
+      const mapElement = document.createElement('div');
+      mapElement.id = 'map';
+      document.body.appendChild(mapElement);
+      const toPng = (await import('html-to-image')).toPng as ReturnType<typeof vi.fn>;
+      toPng.mockResolvedValue('data:image/png;base64,ABC123');
+
+      await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe('ABC123');
+
+      expect(toPng).toHaveBeenCalledWith(mapElement, expect.objectContaining({ pixelRatio: expect.any(Number) }));
       expect(restoreMap).toHaveBeenCalledOnce();
       mapElement.remove();
     });
