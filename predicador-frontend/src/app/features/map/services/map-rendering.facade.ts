@@ -218,6 +218,31 @@ export class MapRenderingFacade {
     });
   }
 
+  /**
+   * Restores the full map view (every territory visible) while re-applying the
+   * marked-manzana styles. Used after a save/send so the user keeps seeing their
+   * marks without an active territory selection.
+   */
+  restaurarVistaConMarcas(manzanasMarcadaList: ManzanaMarcada[]): void {
+    this.styles.cancelPendingStyleUpdates();
+
+    this.styles.queueStyleUpdate(() => {
+      for (const fl of this.territories.getAllTerritoriesLayer()) {
+        this.styles.applyStyleToFeatureLayer(fl, this.computeBaseStyle(fl.territorioPadre, manzanasMarcadaList));
+      }
+
+      for (const m of manzanasMarcadaList) {
+        const layer = this.registry.get(m.id);
+        if (!layer) continue;
+        const featureLayer = this.territories.getFeatureLayerByTerritorio(m.territorioNumero);
+        if (!featureLayer) continue;
+        layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
+      }
+
+      this.territories.updateLabelsVisibility();
+    });
+  }
+
   // ─── Capture ─────────────────────────────────────────────────────
 
   prepararCaptura(manzanasMarcadaList: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
