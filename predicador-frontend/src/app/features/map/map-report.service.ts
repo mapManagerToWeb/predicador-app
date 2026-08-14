@@ -112,7 +112,7 @@ export class MapReportService {
       if (!mapElement) return null;
 
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(mapElement, { useCORS: true, pixelRatio: 2, cacheBust: true });
+      const dataUrl = await toPng(mapElement, { pixelRatio: 2, cacheBust: true });
       return dataUrl.split(',')[1];
     } finally {
       try {
