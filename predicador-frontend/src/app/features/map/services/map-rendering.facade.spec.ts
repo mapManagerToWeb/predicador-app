@@ -9,7 +9,9 @@ import { MapStyleService } from './map-style.service';
 import { MapCaptureService } from './map-capture.service';
 import { MapPartialDrawService } from './map-partial-draw.service';
 import { MapStateService } from './map-state.service';
-import type { FeatureLayer } from '../types/map.types';
+import { MapLayerRegistry } from './map-layer-registry.service';
+import { getMarkedManzanaStyle } from './map-style.service';
+import type { FeatureLayer, ManzanaMarcada } from '../types/map.types';
 
 describe('MapRenderingFacade', () => {
   let facade: MapRenderingFacade;
@@ -118,6 +120,54 @@ describe('MapRenderingFacade', () => {
       facade.ocultarPoligonosNoSeleccionados([2]);
 
       expect(territories.updateLabelsForSelection).toHaveBeenCalledWith(new Set([2]));
+    });
+  });
+
+  describe('restaurarVistaConMarcas', () => {
+    it('re-applies marked styles for all territories and keeps layers visible', () => {
+      const registry = TestBed.inject(MapLayerRegistry);
+      const styles = TestBed.inject(MapStyleService);
+      const markedPath = new L.Polygon([
+        [
+          { lat: -1, lng: -1 },
+          { lat: 2, lng: -1 },
+          { lat: 2, lng: 2 },
+          { lat: -1, lng: 2 },
+        ],
+      ]);
+      registry.register('m1', markedPath);
+
+      const fl: FeatureLayer = {
+        territorioPadre: 5,
+        color: '#ff0000',
+        layer: {
+          eachLayer: vi.fn((cb: (layer: unknown) => void) => {
+            cb({ setStyle: vi.fn() });
+          }),
+        } as unknown as L.LayerGroup,
+      };
+      vi.spyOn(territories, 'getAllTerritoriesLayer').mockReturnValue([fl]);
+      vi.spyOn(territories, 'getFeatureLayerByTerritorio').mockReturnValue(fl);
+      vi.spyOn(territories, 'getManzanaCountByTerritorio').mockReturnValue(3);
+      vi.spyOn(territories, 'updateLabelsVisibility').mockImplementation(() => {});
+
+      let queued: (() => void) | undefined;
+      vi.spyOn(styles, 'queueStyleUpdate').mockImplementation(fn => {
+        queued = fn;
+      });
+
+      const marcadas: ManzanaMarcada[] = [
+        { id: 'm1', nombreBloque: 'A1', color: '#ff0000', territorioNumero: 5 },
+      ];
+
+      const cancelSpy = vi.spyOn(styles, 'cancelPendingStyleUpdates');
+
+      facade.restaurarVistaConMarcas(marcadas);
+
+      expect(cancelSpy).toHaveBeenCalled();
+      queued?.();
+      expect(markedPath.options.fillOpacity).toBe(getMarkedManzanaStyle('#ff0000').fillOpacity);
+      expect(territories.updateLabelsVisibility).toHaveBeenCalled();
     });
   });
 

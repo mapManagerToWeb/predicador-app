@@ -60,13 +60,12 @@ export class MapDataPersistenceService {
       this.selection.reaplicarMarcasSeleccionadas();
       this.toastService.show(TOAST_MESSAGES.saveSuccess);
 
-      // Guardar referencia ANTES de limpiar manzanasById
+      // Guardar referencia ANTES de restaurar la vista (manzanasById se conserva)
       const marcadasParaRestaurar = this.state.manzanasMarcadaList();
 
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
-      this.rendering.restaurarVisibilidadPoligonos(marcadasParaRestaurar, []);
-      this.state.manzanasById.set(new Map());
+      this.rendering.restaurarVistaConMarcas(marcadasParaRestaurar);
       this.state.totalManzanas.set(0);
     } catch {
       if (previousMarcadas && previousDatosParciales) {
@@ -147,14 +146,10 @@ export class MapDataPersistenceService {
         });
         this.toastService.show(mensajes.join('\n'));
 
-        // Guardar referencia ANTES de limpiar manzanasById
-        const marcadasParaRestaurar = this.state.manzanasMarcadaList();
-
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
-        this.rendering.restaurarVisibilidadPoligonos(marcadasParaRestaurar, []);
-        this.state.manzanasById.set(new Map());
+        this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
         this.state.totalManzanas.set(0);
       } else {
         this.toastService.show(TOAST_MESSAGES.sendError);
@@ -167,7 +162,7 @@ export class MapDataPersistenceService {
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
-        this.state.manzanasById.set(new Map());
+        this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
         this.state.totalManzanas.set(0);
       }
     } finally {
