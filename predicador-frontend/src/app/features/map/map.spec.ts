@@ -102,6 +102,7 @@ describe('MapPage', () => {
     restaurarMapaPostCaptura: ReturnType<typeof vi.fn>;
     guardarYEnviar: ReturnType<typeof vi.fn>;
   };
+  let toast: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     rendering = {
@@ -123,6 +124,7 @@ describe('MapPage', () => {
     };
     initialization = { reloadAllTerritories: vi.fn().mockResolvedValue(undefined) };
     partialMark = { deshacerPunto: vi.fn(), finalizarParcial: vi.fn(), cancelarParcial: vi.fn() };
+    toast = { show: vi.fn() };
     dataPersistence = {
       guardarEnBaseDeDatos: vi.fn().mockResolvedValue(undefined),
       prepararCaptura: vi.fn().mockResolvedValue(undefined),
@@ -140,7 +142,7 @@ describe('MapPage', () => {
         { provide: MapInitializationService, useValue: initialization },
         { provide: MapPartialMarkService, useValue: partialMark },
         { provide: MapDataPersistenceService, useValue: dataPersistence },
-        { provide: Toast, useValue: { show: vi.fn() } },
+        { provide: Toast, useValue: toast },
       ],
     }).compileComponents();
 
@@ -166,6 +168,25 @@ describe('MapPage', () => {
       expect(selection.prepareTerritorioSeleccionado).toHaveBeenCalledWith([5]);
       expect(rendering.getFeatureLayerByTerritorio).toHaveBeenCalledWith(5);
       expect(selection.restaurarMarcadoDesdeDB).toHaveBeenCalledWith(5, '#ff0000', { actualizarEstadoMarcado: true });
+    });
+
+    it('blocks selection via the search widget while a marking mode is active', async () => {
+      state.modoMarcado.set('completa');
+
+      await component.onTerritorioSeleccionado([5]);
+
+      expect(selection.prepareTerritorioSeleccionado).not.toHaveBeenCalled();
+      expect(toast.show).toHaveBeenCalled();
+    });
+
+    it('allows selection via the search widget in mode none', async () => {
+      selection.prepareTerritorioSeleccionado.mockReturnValue([5]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 5, color: '#ff0000', layer: {} });
+
+      await component.onTerritorioSeleccionado([5]);
+
+      expect(selection.prepareTerritorioSeleccionado).toHaveBeenCalledWith([5]);
+      expect(toast.show).not.toHaveBeenCalled();
     });
   });
 

@@ -63,6 +63,12 @@ export class MapPage implements OnDestroy {
 
 
   async onTerritorioSeleccionado(numeros: number[]): Promise<void> {
+    // Bloquear cambio de territorio mientras un modo de marcado está activo
+    if (numeros.length > 0 && this.modoMarcado() !== 'none') {
+      this.toastService.show(TOAST_MESSAGES.territoryLock);
+      return;
+    }
+
     // Si se recibe un array vacío, limpiar selección y restaurar visibilidad
     if (numeros.length === 0) {
       this.selection.limpiarMarcas();

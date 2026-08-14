@@ -3,7 +3,8 @@ import * as L from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
-import { MAX_PUNTOS_PARCIAL } from '../utils/map-constants';
+import { Toast } from '../../../core/services/toast';
+import { MAX_PUNTOS_PARCIAL, TOAST_MESSAGES } from '../utils/map-constants';
 import type { SnappedPoint, ManzanaIndex } from '../types/map.types';
 import { snapToContour, pointInPolygon, projectOnSegment } from '../map-geometry';
 
@@ -19,6 +20,7 @@ export class MapInteractionService {
   private readonly state = inject(MapStateService);
   private readonly rendering = inject(MapRenderingFacade);
   private readonly registry = inject(MapLayerRegistry);
+  private readonly toastService = inject(Toast);
 
   handleMapClick(e: L.LeafletMouseEvent): MapClickResult {
     const modo = this.state.modoMarcado();
@@ -47,7 +49,8 @@ export class MapInteractionService {
         if (this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
           return { action: 'toggle_manzana', manzana: hit };
         }
-        // Territorio no seleccionado: ignorar click
+        // Territorio no seleccionado: bloquear el cambio de territorio
+        this.toastService.show(TOAST_MESSAGES.territoryLock);
         return { action: 'none' };
       }
       return { action: 'none' };
@@ -56,14 +59,14 @@ export class MapInteractionService {
     if (modo === 'parcial') {
       const hit = this.findManzanaInside(e.latlng);
       if (hit) {
+        // Territorio no seleccionado: bloquear ANTES de cualquier toggle/select
+        if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
+          this.toastService.show(TOAST_MESSAGES.territoryLock);
+          return { action: 'none' };
+        }
         const isMarked = this.state.manzanasById().has(hit.id);
         if (isMarked) {
           return { action: 'toggle_manzana', manzana: hit };
-        }
-
-        // Territorio no seleccionado: ignorar click
-        if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-          return { action: 'none' };
         }
       }
 
