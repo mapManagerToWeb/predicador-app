@@ -57,5 +57,11 @@ yarn-error.log*
 .opencode/
 .superpowers/
 
+# AI-generated scaffolding (unwired placeholders, not part of the app)
+predicador-frontend/src/app/whatsapp-simulation/
+predicador-frontend/src/app/core/services/pending-reports-queue.ts
+backend/reporting-service/src/main/java/com/predicador/reporting/dto/EncargadoBuscarCrearRequest.java
+backend/reporting-service/src/main/java/com/predicador/reporting/dto/EncargadoLoginRequest.java
+
 # Local linked worktrees
 .worktrees/

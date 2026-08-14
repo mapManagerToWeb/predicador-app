@@ -20,11 +20,14 @@ describe('MapInitializationService', () => {
     loadAllTerritories: ReturnType<typeof vi.fn>;
     updateVisibleTerritories: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
+    getFeatureLayerByTerritorio: ReturnType<typeof vi.fn>;
+    getTerritoryDataCache: ReturnType<typeof vi.fn>;
     ocultarPoligonosNoSeleccionados: ReturnType<typeof vi.fn>;
     updateLabelsVisibility: ReturnType<typeof vi.fn>;
   };
   let selection: {
     toggleManzana: ReturnType<typeof vi.fn>;
+    marcarManzana: ReturnType<typeof vi.fn>;
     restaurarMarcadoDesdeDB: ReturnType<typeof vi.fn>;
     restaurarMarcadoConReportes: ReturnType<typeof vi.fn>;
     reaplicarMarcasSeleccionadas: ReturnType<typeof vi.fn>;
@@ -48,11 +51,13 @@ describe('MapInitializationService', () => {
       updateVisibleTerritories: vi.fn().mockReturnValue([]),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
+      getTerritoryDataCache: vi.fn().mockReturnValue(new Map()),
       ocultarPoligonosNoSeleccionados: vi.fn(),
       updateLabelsVisibility: vi.fn(),
     };
     selection = {
       toggleManzana: vi.fn(),
+      marcarManzana: vi.fn(),
       restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined),
       restaurarMarcadoConReportes: vi.fn(),
       reaplicarMarcasSeleccionadas: vi.fn(),
@@ -105,7 +110,7 @@ describe('MapInitializationService', () => {
     expect(fakeMap.on).not.toHaveBeenCalled();
   });
 
-  it('toggles a manzana from the click handler only in completa mode and only for selected territories', async () => {
+  it('only marks manzanas from the click handler in completa mode, for selected territories, never unmarking', async () => {
     await service.initialize(document.createElement('div'), vi.fn());
     const handler = rendering.setManzanaClickHandler.mock.calls[0][0];
     const event = {
@@ -116,49 +121,104 @@ describe('MapInitializationService', () => {
     // Territorio NO seleccionado: el click debe ignorarse (bloquea seleccionar
     // territorios ajenos desde el modo marcar-completo).
     handler('m0', 'Otro', {} as L.Polygon, '#0000ff', 99, event as L.LeafletMouseEvent);
-    expect(selection.toggleManzana).not.toHaveBeenCalled();
+    expect(selection.marcarManzana).not.toHaveBeenCalled();
 
-    // Territorio seleccionado: sí permite marcar/desmarcar manzanas.
+    // Territorio seleccionado, manzana NO marcada: se marca.
     state.territoriosSeleccionados.set([5]);
     handler('m1', 'A', {} as L.Polygon, '#ff0000', 5, event as L.LeafletMouseEvent);
-    expect(selection.toggleManzana).toHaveBeenCalledWith('m1', 'A', {}, '#ff0000', 5);
+    expect(selection.marcarManzana).toHaveBeenCalledWith('m1', 'A', {}, '#ff0000', 5);
 
-    selection.toggleManzana.mockClear();
+    // Manzana YA marcada del territorio seleccionado: no-op (nunca desmarcar).
+    selection.marcarManzana.mockClear();
+    state.manzanasById.set(new Map([['m2', { id: 'm2', nombreBloque: 'B', color: '#ff0000', territorioNumero: 5 }]]));
+    handler('m2', 'B', {} as L.Polygon, '#ff0000', 5, event as L.LeafletMouseEvent);
+    expect(selection.marcarManzana).not.toHaveBeenCalled();
+
+    // Fuera del modo completa: el handler no debe intervenir.
+    selection.marcarManzana.mockClear();
     state.modoMarcado.set('none');
-    handler('m2', 'B', {} as L.Polygon, '#00ff00', 6, event as L.LeafletMouseEvent);
-    expect(selection.toggleManzana).not.toHaveBeenCalled();
+    handler('m3', 'C', {} as L.Polygon, '#00ff00', 6, event as L.LeafletMouseEvent);
+    expect(selection.marcarManzana).not.toHaveBeenCalled();
   });
 
-  it('restores marks for newly visible territories and hides the rest while marking', async () => {
+  it('restores marks for newly visible territories from cache without hitting the db', async () => {
     rendering.updateVisibleTerritories.mockReturnValue([3]);
     rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#ff0000', layer: {} });
-    state.modoMarcado.set('completa');
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map([[3, [{ id: 7 } as never]]]));
 
     await service.initialize(document.createElement('div'), vi.fn());
 
     expect(rendering.getFeatureLayerByTerritorio).toHaveBeenCalledWith(3);
-    expect(selection.restaurarMarcadoDesdeDB).toHaveBeenCalledWith(3, '#ff0000', { actualizarEstadoMarcado: false });
-    expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
+    expect(territorioService.getReportesDesdeCache).toHaveBeenCalledWith([3]);
+    expect(selection.restaurarMarcadoDesdeDB).not.toHaveBeenCalled();
+    expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(3, [{ id: 7 }], '#ff0000', { actualizarEstadoMarcado: false });
+    // Sin selección activa no se oculta nada.
+    expect(rendering.ocultarPoligonosNoSeleccionados).not.toHaveBeenCalled();
   });
 
-  it('restores all marks from cache and revalidates territories without a draft', async () => {
+  it('hides unselected territories on pan whenever a selection is active (also in mode none)', async () => {
+    rendering.updateVisibleTerritories.mockReturnValue([3]);
+    rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#ff0000', layer: {} });
+    state.modoMarcado.set('none');
+    state.territoriosSeleccionados.set([3]);
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalledWith([3]);
+  });
+
+  it('restores draft marks for a newly visible territory during a pan', async () => {
+    rendering.updateVisibleTerritories.mockReturnValue([3]);
+    rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#3b82f6', layer: {} });
+    drafts.guardar({
+      manzanasById: { A: { id: 'A', nombreBloque: 'Bloque A', color: '#3b82f6', territorioNumero: 3 } },
+      territoriosSeleccionados: [3],
+      territorioSeleccionado: 3,
+      datosParcialesGuardados: {},
+      modoMarcado: 'completa',
+      predicacion: 'tarde',
+      savedAt: Date.now(),
+    });
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    const reportes = selection.restaurarMarcadoConReportes;
+    const callPara3 = reportes.mock.calls.find(c => c[0] === 3);
+    expect(callPara3).toBeDefined();
+    expect(callPara3![1].length).toBe(1);
+    expect(callPara3![1][0].territorioNumero).toBe(3);
+    expect(callPara3![3]).toEqual({ actualizarEstadoMarcado: false });
+    expect(territorioService.getReportesDesdeCache).not.toHaveBeenCalledWith([3]);
+  });
+
+  it('restores all marks from cache and revalidates every territory (loaded or not)', async () => {
     rendering.getAllTerritoriesLayer.mockReturnValue([
       { territorioPadre: 1, color: '#00ff00', layer: {} },
       { territorioPadre: 2, color: '#0000ff', layer: {} },
     ]);
+    rendering.getTerritoryDataCache.mockReturnValue(
+      new Map([[1, {}], [2, {}], [3, {}]] as never)
+    );
     territorioService.getReportesDesdeCache.mockReturnValue(
       new Map([[1, [{ id: 1 }] as never]])
     );
     territorioService.revalidarReportes.mockResolvedValue(
-      new Map([[2, [{ id: 2 }] as never]])
+      new Map([
+        [2, [{ id: 2 }] as never],
+        [3, [{ id: 3 }] as never],
+      ])
     );
 
     await service.initialize(document.createElement('div'), vi.fn());
 
+    // El pintado instantáneo solo cubre las capas cargadas.
     expect(territorioService.getReportesDesdeCache).toHaveBeenCalledWith([1, 2]);
-    expect(territorioService.revalidarReportes).toHaveBeenCalledWith([1, 2]);
+    // La revalidación de fondo cubre TODOS los territorios (incluido el 3, que
+    // aún no tiene capa: solo se siembra su cache de localStorage).
+    expect(territorioService.revalidarReportes).toHaveBeenCalledWith([1, 2, 3]);
     expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(1, [{ id: 1 }], '#00ff00', { actualizarEstadoMarcado: false });
     expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(2, [{ id: 2 }], '#0000ff', { actualizarEstadoMarcado: false });
+    expect(selection.restaurarMarcadoConReportes).not.toHaveBeenCalledWith(3, expect.anything(), expect.anything(), expect.anything());
   });
 
   it('restores the draft when one exists and skips cache paint + revalidation for drafted territories', async () => {
@@ -166,6 +226,9 @@ describe('MapInitializationService', () => {
       { territorioPadre: 1, color: '#3b82f6', layer: {} },
       { territorioPadre: 2, color: '#00ff00', layer: {} },
     ]);
+    rendering.getTerritoryDataCache.mockReturnValue(
+      new Map([[1, {}], [2, {}]] as never)
+    );
     drafts.guardar({
       manzanasById: { A: { id: 'A', nombreBloque: 'Bloque A', color: '#3b82f6', territorioNumero: 1 } },
       territoriosSeleccionados: [1],

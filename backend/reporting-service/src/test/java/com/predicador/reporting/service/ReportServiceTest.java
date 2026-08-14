@@ -289,6 +289,35 @@ class ReportServiceTest {
         verify(repository).findVersions(List.of(1L, 2L));
     }
 
+    @Test
+    void deleteReports_shouldDeleteOwnedReports() {
+        Report owned = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+        owned.setEncargadoId(7L);
+        when(repository.findAllById(List.of(1))).thenReturn(List.of(owned));
+
+        reportService.deleteReports(List.of(1), encargado("7"));
+
+        verify(repository).deleteAll(List.of(owned));
+    }
+
+    @Test
+    void deleteReports_shouldRejectReportOwnedByAnotherEncargado() {
+        Report foreign = createReport(2, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+        foreign.setEncargadoId(8L);
+        when(repository.findAllById(List.of(2))).thenReturn(List.of(foreign));
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> reportService.deleteReports(List.of(2), encargado("7")));
+        verify(repository, never()).deleteAll(anyList());
+    }
+
+    @Test
+    void deleteReports_shouldRejectEmptyIds() {
+        assertThrows(IllegalArgumentException.class,
+                () -> reportService.deleteReports(List.of(), admin));
+        verify(repository, never()).findAllById(anyIterable());
+    }
+
     private SessionToken encargado(String subject) {
         return new SessionToken(subject, SessionToken.ROLE_ENCARGADO, 1L, 2L);
     }

@@ -45,13 +45,16 @@ export class MapInteractionService {
     if (modo === 'completa') {
       const hit = this.findManzanaInside(e.latlng);
       if (hit) {
-        // Solo permitir toggle en territorios YA seleccionados
-        if (this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-          return { action: 'toggle_manzana', manzana: hit };
-        }
         // Territorio no seleccionado: bloquear el cambio de territorio
-        this.toastService.show(TOAST_MESSAGES.territoryLock);
-        return { action: 'none' };
+        if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
+          this.toastService.show(TOAST_MESSAGES.territoryLock);
+          return { action: 'none' };
+        }
+        // En modo marcar-completo solo se marca, nunca se desmarca.
+        if (this.state.manzanasById().has(hit.id)) {
+          return { action: 'none' };
+        }
+        return { action: 'toggle_manzana', manzana: hit };
       }
       return { action: 'none' };
     }
@@ -64,9 +67,9 @@ export class MapInteractionService {
           this.toastService.show(TOAST_MESSAGES.territoryLock);
           return { action: 'none' };
         }
-        const isMarked = this.state.manzanasById().has(hit.id);
-        if (isMarked) {
-          return { action: 'toggle_manzana', manzana: hit };
+        // En modo marcado parcial solo se marca, nunca se desmarca.
+        if (this.state.manzanasById().has(hit.id)) {
+          return { action: 'none' };
         }
       }
 
