@@ -37,7 +37,11 @@ describe('MapDataPersistenceService', () => {
         MapDataPersistenceService,
         MapStateService,
         { provide: MapReportService, useValue: report },
-        { provide: MapRenderingFacade, useValue: { getAllTerritoriesLayer: vi.fn().mockReturnValue([]) } },
+        { provide: MapRenderingFacade, useValue: {
+            getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
+            restaurarVistaConMarcas: vi.fn(),
+            restaurarVisibilidadPoligonos: vi.fn(),
+        } },
         { provide: MapSelectionService, useValue: { reaplicarMarcasSeleccionadas: vi.fn(), restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined) } },
         { provide: TerritorioService, useValue: { crearReportes: vi.fn().mockResolvedValue([]) } },
         { provide: Toast, useValue: { show: vi.fn() } },
@@ -138,6 +142,69 @@ describe('MapDataPersistenceService', () => {
     expect(cache.setTerritorio).not.toHaveBeenCalled();
     expect(drafts.eliminarTerritorios).not.toHaveBeenCalled();
     expect(state.enviando()).toBe(false);
+  });
+
+  it('restores the full view with marks (no active selection) after a successful save', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    const marcadas = state.manzanasMarcadaList();
+
+    await service.guardarEnBaseDeDatos();
+
+    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
+      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
+      restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
+    };
+    expect(rendering.restaurarVistaConMarcas).toHaveBeenCalledWith(expect.arrayContaining(marcadas));
+    expect(rendering.restaurarVisibilidadPoligonos).not.toHaveBeenCalled();
+    expect(state.territoriosSeleccionados()).toEqual([]);
+    expect(state.territorioSeleccionado()).toBeNull();
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+  });
+
+  it('restores the full view with marks after a successful send', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([
+      { numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 },
+    ]);
+    report.sendWhatsApp.mockResolvedValue(true);
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A', encargadoApellido: 'B', fechaRegistro: '01-08-2026',
+      predicacion: 'tarde', territorios: [], screenshotBase64: null, destinationNumber: '56912345678',
+    });
+
+    await service.guardarYEnviar();
+
+    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
+      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
+      restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
+    };
+    expect(rendering.restaurarVistaConMarcas).toHaveBeenCalled();
+    expect(rendering.restaurarVisibilidadPoligonos).not.toHaveBeenCalled();
+    expect(state.territoriosSeleccionados()).toEqual([]);
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+  });
+
+  it('restores the full view with marks in the whatsapp-sent catch branch', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([
+      { numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 },
+    ]);
+    report.sendWhatsApp.mockResolvedValue(true);
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A', encargadoApellido: 'B', fechaRegistro: '01-08-2026',
+      predicacion: 'tarde', territorios: [], screenshotBase64: null, destinationNumber: '56912345678',
+    });
+    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
+      restaurarVistaConMarcas: { mockImplementationOnce: (fn: () => void) => void };
+    };
+    rendering.restaurarVistaConMarcas.mockImplementationOnce(() => {
+      throw new Error('boom');
+    });
+
+    await service.guardarYEnviar();
+
+    expect(state.territoriosSeleccionados()).toEqual([]);
+    expect(state.manzanasById().size).toBeGreaterThan(0);
   });
 
   function reporteShape(territorio: number) {
