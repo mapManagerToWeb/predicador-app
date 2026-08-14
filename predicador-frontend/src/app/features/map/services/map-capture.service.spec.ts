@@ -8,6 +8,7 @@ import { MapLayerRegistry } from './map-layer-registry.service';
 import {
   getBaseTerritoryStyle,
   getCaptureUnmarkedStyle,
+  getCaptureIncompleteStyle,
   getHiddenStyle,
   getMarkedManzanaStyle,
   getPartialPolygonCompleteStyle,
@@ -134,6 +135,63 @@ describe('MapCaptureService', () => {
 
       expect(label1.setOpacity).toHaveBeenCalledWith(1);
       expect(label2.setOpacity).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe('prepararCapturaSoloIncompletos', () => {
+    it('styles incomplete territories with marked layers highlighted and thick unmarked strokes', async () => {
+      engine.getMap.mockReturnValue(fakeMap);
+      const markedPath = makePath();
+      const unmarkedPath = makePath();
+      const hiddenPath = makePath();
+      const partialPath = makePath();
+      registry.register('m1', markedPath);
+      registry.register('parcial-9', partialPath);
+
+      territories.getAllTerritoriesLayer.mockReturnValue([
+        fakeFeatureLayer(1, '#ff0000', [markedPath, unmarkedPath]),
+        fakeFeatureLayer(2, '#00ff00', [hiddenPath]),
+      ]);
+      territories.getTerritoryLabels.mockReturnValue([fakeLabel('1'), fakeLabel('2')]);
+      territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
+        if (num === 1) return fakeFeatureLayer(1, '#ff0000', [markedPath, unmarkedPath]);
+        if (num === 2) return fakeFeatureLayer(2, '#00ff00', [hiddenPath]);
+        return undefined;
+      });
+      const getCount = vi.fn().mockImplementation((num: number) => (num === 1 ? 3 : 0));
+
+      const marcadas = [
+        { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 },
+        { id: 'parcial-9', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
+      ];
+
+      vi.useFakeTimers();
+      const promise = service.prepararCapturaSoloIncompletos(marcadas, [1, 2], territories.getAllTerritoriesLayer(), getCount);
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      expect(markedPath.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
+      expect(unmarkedPath.setStyle).toHaveBeenCalledWith(getCaptureIncompleteStyle('#ff0000'));
+      expect(hiddenPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+      expect(partialPath.setStyle).toHaveBeenCalledWith(getPartialPolygonCompleteStyle('#ff0000'));
+      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50] });
+    });
+
+    it('resolves immediately when no incomplete territory is selected', async () => {
+      engine.getMap.mockReturnValue(fakeMap);
+      territories.getAllTerritoriesLayer.mockReturnValue([]);
+      territories.getTerritoryLabels.mockReturnValue([]);
+      const getCount = vi.fn().mockReturnValue(2);
+
+      const promise = service.prepararCapturaSoloIncompletos(
+        [{ id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 }],
+        [1],
+        territories.getAllTerritoriesLayer(),
+        getCount
+      );
+
+      await promise;
+      expect(getCount).toHaveBeenCalled();
     });
   });
 

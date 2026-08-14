@@ -7,6 +7,7 @@ import {
   getPartialPolygonStyle,
   getPartialPolygonCompleteStyle,
   getCaptureUnmarkedStyle,
+  getCaptureIncompleteStyle,
 } from './map-style.service';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
 
@@ -95,6 +96,16 @@ describe('MapStyleService — pure style functions', () => {
       expect(style.opacity).toBe(0.6);
       expect(style.fillOpacity).toBe(0.05);
       expect(style.weight).toBe(1.5);
+    });
+  });
+
+  describe('getCaptureIncompleteStyle', () => {
+    it('should use a larger stroke width for incomplete territories', () => {
+      const style = getCaptureIncompleteStyle('#123456');
+      expect(style.color).toBe('#123456');
+      expect(style.opacity).toBe(0.8);
+      expect(style.fillOpacity).toBe(0.05);
+      expect(style.weight).toBe(4);
     });
   });
 });
