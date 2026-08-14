@@ -94,81 +94,105 @@ export class MapDataPersistenceService {
     if (this.state.enviando()) return;
     this.state.enviando.set(true);
 
-    let whatsappSent = false;
+    let guardados: Reporte[] = [];
+    let envioConfirmado = false;
     try {
-      // Filtrar solo territorios INCOMPLETOS para envío
-      const territorios = this.reportService.buildTerritoriosEnvioSoloIncompletos(marcadas, this.rendering.getAllTerritoriesLayer());
+      // Definir qué territorios se envían: un único territorio completado se
+      // anuncia con la imagen oficial (sin captura); si hay incompletos, se
+      // envían con captura de pantalla.
+      const envio = this.reportService.buildTerritoriosParaEnvio(
+        marcadas,
+        this.rendering.getAllTerritoriesLayer()
+      );
 
-      if (territorios.length === 0) {
-        this.toastService.show('No hay territorios incompletos para enviar');
+      if (envio.territorios.length === 0) {
+        this.toastService.show(TOAST_MESSAGES.noSendableTerritories);
         this.state.enviando.set(false);
         return;
       }
 
-      // Captura SOLO de territorios incompletos
-      const screenshotBase64 = await this.reportService.captureScreenshot(
-        () => this.captureService.prepararCapturaSoloIncompletos(
-          marcadas,
-          this.state.territoriosSeleccionados(),
-          this.rendering.getAllTerritoriesLayer(),
-          (num: number) => this.rendering.getManzanaCountByTerritorio(num)
-        ),
-        () => this.restaurarMapaPostCaptura()
-      );
+      const screenshotBase64 = envio.requiereScreenshot
+        ? await this.reportService.captureScreenshot(
+            () => this.captureService.prepararCapturaSoloIncompletos(
+              marcadas,
+              this.state.territoriosSeleccionados(),
+              this.rendering.getAllTerritoriesLayer(),
+              (num: number) => this.rendering.getManzanaCountByTerritorio(num)
+            ),
+            () => this.restaurarMapaPostCaptura()
+          )
+        : null;
 
       const request = this.reportService.buildWhatsAppRequest(
         perfil,
-        territorios,
+        envio.territorios,
         screenshotBase64,
         this.state.predicacion()
       );
 
+      // ACID bidireccional:
+      // 1) Persistir primero; si el guardado falla, el envío NO se intenta.
+      // 2) Enviar solo si el guardado en BD fue exitoso.
+      // 3) Si el envío falla, revertir el guardado (compensación) para que no
+      //    quede un reporte persistido sin su envío por WhatsApp.
       const registros = this.reportService.buildRegistros(
         this.state.manzanasMarcadaList(),
         this.rendering.getAllTerritoriesLayer(),
         this.state.territoriosSeleccionados(),
         this.state.datosParcialesGuardados
       );
-      const saved = await this.reportService.saveToDatabase(registros);
+      guardados = await this.reportService.saveToDatabase(registros);
+
+      const success = await this.reportService.sendWhatsApp(request);
+
+      if (!success) {
+        await this.revertirGuardado(guardados);
+        this.toastService.show(TOAST_MESSAGES.sendRollbackError);
+        return;
+      }
+      envioConfirmado = true;
 
       const territoriosGuardados = this.state.territoriosSeleccionados();
-      this.persistirEnCacheYLimpiarDraft(saved, territoriosGuardados);
+      this.persistirEnCacheYLimpiarDraft(guardados, territoriosGuardados);
 
       this.selection.reaplicarMarcasSeleccionadas();
 
-      const success = await this.reportService.sendWhatsApp(request);
-      whatsappSent = success;
+      const mensajes = envio.territorios.map(t => {
+        const estado = t.finalizado ? '*terminado*' : '*incompleto*';
+        return `Territorio ${t.numero} ${estado}`;
+      });
+      this.toastService.show(mensajes.join('\n'));
 
-      if (success) {
-        const mensajes = territorios.map(t => {
-          const estado = t.finalizado ? '*terminado*' : '*incompleto*';
-          return `Territorio ${t.numero} ${estado}`;
-        });
-        this.toastService.show(mensajes.join('\n'));
-
-        this.state.clearDatosParciales();
-        this.state.territoriosSeleccionados.set([]);
-        this.state.territorioSeleccionado.set(null);
-        this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
-        this.state.totalManzanas.set(0);
-      } else {
-        this.toastService.show(TOAST_MESSAGES.sendError);
-      }
+      this.state.clearDatosParciales();
+      this.state.territoriosSeleccionados.set([]);
+      this.state.territorioSeleccionado.set(null);
+      this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
+      this.state.totalManzanas.set(0);
     } catch {
-      if (!whatsappSent) {
-        this.toastService.show(TOAST_MESSAGES.processError);
-      } else {
+      if (guardados.length > 0 && !envioConfirmado) {
+        // Quedó guardado sin envío confirmado: revertir para cumplir ACID.
+        await this.revertirGuardado(guardados);
+        this.toastService.show(TOAST_MESSAGES.sendRollbackError);
+      } else if (envioConfirmado) {
+        // Guardado y enviado OK; falló un paso posterior (restauración).
         this.toastService.show(TOAST_MESSAGES.saveSuccess);
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
         this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
         this.state.totalManzanas.set(0);
+      } else {
+        // El guardado en BD nunca se completó: no se envió nada.
+        this.toastService.show(TOAST_MESSAGES.saveError);
       }
     } finally {
       this.state.enviando.set(false);
       this.state.screenshotPreview.set(null);
     }
+  }
+
+  private async revertirGuardado(guardados: Reporte[]): Promise<void> {
+    await this.reportService.eliminarReportes(guardados);
   }
 
   private persistirEnCacheYLimpiarDraft(reportes: Reporte[], territorios: number[]): void {

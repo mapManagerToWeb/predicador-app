@@ -66,6 +66,7 @@ class ReportSendServiceTest {
         );
 
         when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
+        when(messageService.requiereScreenshot(request)).thenReturn(true);
         when(mediaClient.uploadImage("base64image", "image/jpeg")).thenReturn("media_123");
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
@@ -98,6 +99,7 @@ class ReportSendServiceTest {
         );
 
         when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
+        when(messageService.requiereScreenshot(request)).thenReturn(false);
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
         when(props.templateName()).thenReturn("asignacion_territorio");
@@ -110,6 +112,37 @@ class ReportSendServiceTest {
 
         assertTrue(response.success());
         assertEquals("msg_default", response.messageId());
+        verify(mediaClient, never()).uploadImage(anyString(), anyString());
+    }
+
+    @Test
+    void sendReport_territorioUnicoCompletado_ignoraScreenshotYUsaImagenPorDefecto() {
+        var request = new WhatsAppSendRequest(
+            "Daniel", "Uribe", "21-07-2026", "tarde",
+            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
+            "base64image", null
+        );
+
+        Map<String, String> templateParams = Map.of(
+            "fecha", "21-07-2026",
+            "encargado", "Daniel Uribe",
+            "territorio", "1",
+            "estado", "tarde"
+        );
+
+        when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
+        when(messageService.requiereScreenshot(request)).thenReturn(false);
+        when(props.apiVersion()).thenReturn("v21.0");
+        when(props.phoneNumberId()).thenReturn("123");
+        when(props.templateName()).thenReturn("asignacion_territorio");
+        when(props.languageCode()).thenReturn("es_CL");
+        when(props.destinationNumber()).thenReturn("56936577203");
+        when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
+            .thenReturn(new WhatsAppMessageResponse(null, "msg_default"));
+
+        WhatsAppSendResponse response = sendService.sendReport(request);
+
+        assertTrue(response.success());
         verify(mediaClient, never()).uploadImage(anyString(), anyString());
     }
 

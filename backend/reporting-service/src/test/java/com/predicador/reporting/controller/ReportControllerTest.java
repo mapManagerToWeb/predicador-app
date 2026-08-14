@@ -25,8 +25,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -139,5 +142,24 @@ class ReportControllerTest {
                         .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin)
                         .param("territorios", tooMany.stream().map(String::valueOf).toArray(String[]::new)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteReports_shouldReturn204() throws Exception {
+        mockMvc.perform(delete("/api/v1/reports")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin)
+                        .param("ids", "1", "2"))
+                .andExpect(status().isNoContent());
+
+        verify(reportService).deleteReports(java.util.List.of(1, 2), admin);
+    }
+
+    @Test
+    void deleteReports_shouldReturn400WhenNoIds() throws Exception {
+        mockMvc.perform(delete("/api/v1/reports")
+                        .requestAttr(SessionAuthFilter.ATTR_TOKEN, admin))
+                .andExpect(status().isBadRequest());
+
+        verify(reportService, never()).deleteReports(anyList(), any());
     }
 }

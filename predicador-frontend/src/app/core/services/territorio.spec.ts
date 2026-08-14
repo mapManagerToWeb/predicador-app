@@ -141,4 +141,20 @@ describe('TerritorioService', () => {
     expect(saved).toHaveLength(1);
     expect(saved[0].id).toBe(10);
   });
+
+  it('eliminarReportes deletes the reports by id', async () => {
+    const promise = service.eliminarReportes([10, 11]);
+    const req = httpMock.expectOne(r =>
+      r.method === 'DELETE' && r.url.includes('/reports') && r.params.get('ids') === '10,11'
+    );
+    req.flush(null);
+
+    await promise;
+  });
+
+  it('eliminarReportes does not call the API with empty ids', async () => {
+    await service.eliminarReportes([]);
+
+    httpMock.expectNone(r => r.method === 'DELETE' && r.url.includes('/reports'));
+  });
 });

@@ -7,7 +7,8 @@ import type {
   RegistroReporte,
   Reporte,
   WhatsAppSendRequest,
-  TerritorioReporteEnvio
+  TerritorioReporteEnvio,
+  TerritoriosEnvio
 } from '../../core/models/models';
 import type { ManzanaMarcada, FeatureLayer, DatosParciales } from './types/map.types';
 
@@ -71,14 +72,20 @@ export class MapReportService {
   }
 
   /**
-   * Construye lista de territorios SOLO incompletos para envío por WhatsApp.
-   * Los territorios completados NO se envían.
+   * Construye la lista de territorios a enviar por WhatsApp y si el envío
+   * requiere captura de pantalla.
+   *
+   * - Un único territorio marcado y completo: se envía con la imagen
+   *   predeterminada (sin captura), anunciando el cierre del territorio.
+   * - Si hay territorios incompletos: se envían esos con captura de pantalla;
+   *   los territorios completados se excluyen del mensaje.
    */
-  buildTerritoriosEnvioSoloIncompletos(
+  buildTerritoriosParaEnvio(
     marcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[]
-  ): TerritorioReporteEnvio[] {
+  ): TerritoriosEnvio {
     const porTerritorio = this.groupByTerritorio(marcadas);
+    const esUnicoTerritorio = porTerritorio.size === 1;
 
     const territorios: TerritorioReporteEnvio[] = [];
     for (const [territorioNum, marcadasTerritorio] of porTerritorio) {
@@ -88,18 +95,19 @@ export class MapReportService {
       const nonPartial = marcadasTerritorio.filter(m => !m.id.startsWith('parcial-'));
       const finalizado = nonPartial.length >= total && total > 0;
 
-      // Solo incluir territorios INCOMPLETOS
-      if (!finalizado) {
+      if (esUnicoTerritorio || !finalizado) {
         territorios.push({
           numero: territorioNum,
-          finalizado: false,
+          finalizado,
           totalManzanas: total,
           manzanasMarcadas: marcadasTerritorio.length
         });
       }
     }
 
-    return territorios;
+    const soloTerritorioCompleto =
+      esUnicoTerritorio && territorios.length === 1 && territorios[0].finalizado;
+    return { territorios, requiereScreenshot: territorios.length > 0 && !soloTerritorioCompleto };
   }
 
   async captureScreenshot(
@@ -111,8 +119,11 @@ export class MapReportService {
       const mapElement = typeof document === 'undefined' ? null : document.getElementById('map');
       if (!mapElement) return null;
 
-      const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(mapElement, { pixelRatio: 2, cacheBust: true });
+      const { toJpeg } = await import('html-to-image');
+      // JPEG (no PNG): coincide con el content-type image/jpeg que el backend
+      // usa al subir a WhatsApp y mantiene el payload dentro de los límites del
+      // gateway (10MB) incluso con pantallas grandes.
+      const dataUrl = await toJpeg(mapElement, { quality: 0.85, pixelRatio: 2, cacheBust: true });
       return dataUrl.split(',')[1];
     } finally {
       try {
@@ -146,6 +157,15 @@ export class MapReportService {
 
   async saveToDatabase(registros: RegistroReporte[]): Promise<Reporte[]> {
     return this.territorioService.crearReportes(registros);
+  }
+
+  /**
+   * Compensación ACID: revierte reportes recién guardados si el envío por
+   * WhatsApp no se confirma, para que no quede un reporte sin enviar.
+   */
+  async eliminarReportes(reportes: Reporte[]): Promise<void> {
+    const ids = reportes.map(r => r.id).filter(id => id > 0);
+    await this.territorioService.eliminarReportes(ids);
   }
 
   private groupByTerritorio(marcadas: ManzanaMarcada[], seleccionados?: Set<number>): Map<number, ManzanaMarcada[]> {

@@ -87,7 +87,13 @@ public class ReportSendService {
 
             List<Map<String, Object>> components = new ArrayList<>();
 
-            if (request.screenshotBase64() != null) {
+            // Un único territorio completado se anuncia con la imagen por
+            // defecto (link) en lugar de subir la captura: el mensaje es
+            // liviano y no depende de la subida de media a WhatsApp.
+            boolean requiereScreenshot = messageService.requiereScreenshot(request)
+                    && request.screenshotBase64() != null;
+
+            if (requiereScreenshot) {
                 String mediaId = mediaClient.uploadImage(
                     request.screenshotBase64(), "image/jpeg");
 

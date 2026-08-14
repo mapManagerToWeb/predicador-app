@@ -82,6 +82,20 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getReportVersions(territorios, token(request)));
     }
 
+    @DeleteMapping
+    public ResponseEntity<?> deleteReports(
+            @RequestParam(required = false) List<Integer> ids, HttpServletRequest request) {
+        if (ids == null || ids.isEmpty()) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.BAD_REQUEST, "Debe indicar al menos un id de reporte");
+            problem.setTitle("Datos inválidos");
+            problem.setType(URI.create("https://api.predicador.com/errors/bad-request"));
+            return ResponseEntity.badRequest().body(problem);
+        }
+        reportService.deleteReports(ids, token(request));
+        return ResponseEntity.noContent().build();
+    }
+
     private SessionToken token(HttpServletRequest request) {
         return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
     }
