@@ -111,14 +111,8 @@ export class MapReportService {
       const mapElement = typeof document === 'undefined' ? null : document.getElementById('map');
       if (!mapElement) return null;
 
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(mapElement, {
-        useCORS: true,
-        scale: 1,
-        backgroundColor: null,
-        logging: false
-      });
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(mapElement, { useCORS: true, pixelRatio: 2, cacheBust: true });
       return dataUrl.split(',')[1];
     } finally {
       try {
