@@ -115,6 +115,35 @@ class WhatsAppSendServiceTest {
     }
 
     @Test
+    void process_unexpectedRuntimeError_marksDeliveryAsFailed() {
+        WhatsAppDelivery inProgress = new WhatsAppDelivery("key-error");
+        doThrow(new IllegalStateException("boom"))
+                .when(sendService).sendReport(any(), anyString());
+        when(deliveryRepository.findById("key-error")).thenReturn(Optional.of(inProgress));
+
+        assertDoesNotThrow(() -> whatsAppSendService.process(request, "key-error"));
+
+        verify(deliveryRepository).save(argThat(d ->
+                d.getIdempotencyKey().equals("key-error") &&
+                d.getStatus() == WhatsAppDeliveryStatus.FAILED &&
+                d.getError().equals("boom") &&
+                d.getStatusCode() == 502));
+    }
+
+    @Test
+    void process_unexpectedRuntimeError_skipsCompletedDelivery() {
+        WhatsAppDelivery completed = new WhatsAppDelivery("key-done");
+        completed.markSucceeded("msg_123");
+        doThrow(new IllegalStateException("boom"))
+                .when(sendService).sendReport(any(), anyString());
+        when(deliveryRepository.findById("key-done")).thenReturn(Optional.of(completed));
+
+        assertDoesNotThrow(() -> whatsAppSendService.process(request, "key-done"));
+
+        verify(deliveryRepository, never()).save(any());
+    }
+
+    @Test
     void sendTemplateMessage_newKey_sendsAndPersistsSuccess() {
         when(deliveryRepository.findById("key-new")).thenReturn(Optional.empty());
         when(deliveryRepository.saveAndFlush(any(WhatsAppDelivery.class)))

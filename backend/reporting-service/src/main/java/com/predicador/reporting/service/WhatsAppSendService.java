@@ -132,6 +132,29 @@ public class WhatsAppSendService {
                     idempotencyKey, exception.status());
         } catch (RuntimeException exception) {
             log.error("Error inesperado durante el envío WhatsApp key={}", idempotencyKey, exception);
+            terminalizeUnexpectedFailure(idempotencyKey, exception);
+        }
+    }
+
+    /**
+     * Garantiza que un envío que falló con un error inesperado (no
+     * {@link WhatsAppIntegrationException}) termine en estado {@code FAILED}.
+     * Sin esto la entrega quedaría {@code IN_PROGRESS} para siempre y el
+     * cliente esperaría un timeout en lugar de recibir el error real.
+     */
+    private void terminalizeUnexpectedFailure(String idempotencyKey, RuntimeException exception) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) return;
+        try {
+            find(idempotencyKey).ifPresent(delivery -> {
+                if (!delivery.isCompleted()) {
+                    delivery.markFailed(
+                            exception.getMessage() != null ? exception.getMessage() : "Error inesperado durante el envío",
+                            502);
+                    deliveryRepository.save(delivery);
+                }
+            });
+        } catch (WhatsAppIntegrationException ignored) {
+            log.warn("No se pudo registrar el fallo inesperado del envío key={}", idempotencyKey);
         }
     }
 

@@ -100,12 +100,6 @@ export class MapSelectionService {
     } else {
       this.marcarManzana(id, nombreBloque, layer, color, territorioNumero);
     }
-
-    this.state.totalManzanas.set(
-      this.state.territoriosSeleccionados().reduce(
-        (sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n), 0
-      )
-    );
   }
 
   private desmarcarManzana(
@@ -128,9 +122,11 @@ export class MapSelectionService {
       this.state.territorioSeleccionado.set(seleccionados.length === 1 ? seleccionados[0] : null);
       this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     }
+
+    this.updateTotalManzanas(this.state.territoriosSeleccionados());
   }
 
-  private marcarManzana(
+  marcarManzana(
     id: string,
     nombreBloque: string,
     layer: L.Path,
@@ -157,6 +153,7 @@ export class MapSelectionService {
     }
 
     this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
+    this.updateTotalManzanas(this.state.territoriosSeleccionados());
   }
 
   prepareTerritorioSeleccionado(numeros: number[]): number[] {

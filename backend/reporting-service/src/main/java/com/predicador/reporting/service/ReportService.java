@@ -129,6 +129,23 @@ public class ReportService {
                         (first, ignored) -> first));
     }
 
+    /**
+     * Elimina reportes recién creados. Se usa como compensación del flujo
+     * ACID de "guardar y enviar": si el envío por WhatsApp falla, se revierte
+     * la persistencia para que no quede un reporte sin enviar.
+     */
+    @Transactional
+    public void deleteReports(List<Integer> ids, SessionToken token) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("No se indicaron reportes para eliminar");
+        }
+        List<Report> reports = repository.findAllById(ids);
+        for (Report report : reports) {
+            authorization.authorizeOwner(token, report.getEncargadoId());
+        }
+        repository.deleteAll(reports);
+    }
+
     private Report toEntity(ReportDto dto) {
         Report report = new Report();
         report.setManzanaId(dto.manzanaId());

@@ -64,6 +64,14 @@ export class TerritorioService {
     ) ?? []).map(d => this.toReporte(d, d.territorioNumero ?? 0));
   }
 
+  /** Compensación ACID: borra reportes recién creados si el envío por WhatsApp falla. */
+  async eliminarReportes(ids: number[]): Promise<void> {
+    if (!ids.length) return;
+    await firstValueFrom(
+      this.http.delete<void>(this.reportesUrl, { params: { ids: ids.join(',') } })
+    );
+  }
+
   /** Synchronous snapshot from localStorage — paint the map instantly. */
   getReportesDesdeCache(nums: number[]): Map<number, Reporte[]> {
     const result = new Map<number, Reporte[]>();

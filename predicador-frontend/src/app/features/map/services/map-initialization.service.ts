@@ -26,20 +26,21 @@ export class MapInitializationService {
     if (!map) return;
 
     this.rendering.setManzanaClickHandler((id, nombreBloque, polygon, color, territorioNumero, e) => {
-      if (this.state.modoMarcado() === 'completa') {
-        L.DomEvent.stop(e);
-        // En modo marcar-completo solo se marcan manzanas de territorios YA
-        // seleccionados. Togglear un territorio ajeno desde aquí lo agregaría
-        // a la selección, igual que el parcial bloquea clicks fuera del suyo.
-        if (this.state.territoriosSeleccionados().includes(territorioNumero)) {
-          this.selection.toggleManzana(id, nombreBloque, polygon, color, territorioNumero);
-        }
-      }
+      if (this.state.modoMarcado() !== 'completa') return;
+
+      L.DomEvent.stop(e);
+      // En modo marcar-completo solo se marcan manzanas de territorios YA
+      // seleccionados y nunca se desmarcan: un manzana ya marcada es un no-op,
+      // y un click sobre un territorio ajeno lo agregaría a la selección
+      // (igual que el parcial bloquea clicks fuera del suyo).
+      if (!this.state.territoriosSeleccionados().includes(territorioNumero)) return;
+      if (this.state.manzanasById().has(id)) return;
+      this.selection.marcarManzana(id, nombreBloque, polygon, color, territorioNumero);
     });
 
     map.on('click', onMapClick);
     map.on('zoomend', () => this.rendering.updateLabelsVisibility());
-    map.on('moveend', () => void this.onMoveEnd());
+    map.on('moveend', () => this.onMoveEnd());
 
     await this.loadAllTerritories();
   }
@@ -50,7 +51,7 @@ export class MapInitializationService {
 
     try {
       await this.loadTerritoriesWithRetry();
-      await this.onMoveEnd();
+      this.onMoveEnd();
       await this.restoreAllMarks();
     } catch {
       this.toastService.show(TOAST_MESSAGES.loadError);
@@ -84,61 +85,91 @@ export class MapInitializationService {
     }
   }
 
-  private async onMoveEnd(): Promise<void> {
+  private onMoveEnd(): void {
     const newlyLoaded = this.rendering.updateVisibleTerritories();
+    if (newlyLoaded.length === 0) return;
+
+    const draft = this.draftService.cargar();
 
     for (const num of newlyLoaded) {
       const fl = this.rendering.getFeatureLayerByTerritorio(num);
-      if (fl) {
-        await this.selection.restaurarMarcadoDesdeDB(num, fl.color, { actualizarEstadoMarcado: false });
+      if (!fl) continue;
+
+      // Sin red: los territorios recién visibles se pintan desde el cache de
+      // localStorage (sembrado por la revalidación de restoreAllMarks) o desde
+      // el draft si están en borrador. El revalidador ya marcó los vacíos como
+      // -1, así que un territorio sin cache no pinta nada y no pide reportes.
+      if (draft?.territoriosSeleccionados.includes(num)) {
+        this.selection.restaurarMarcadoConReportes(
+          num,
+          [this.reporteDesdeDraft(draft, num)],
+          fl.color,
+          { actualizarEstadoMarcado: false }
+        );
+        continue;
       }
+
+      const cached = this.territorioService.getReportesDesdeCache([num]).get(num) ?? [];
+      this.selection.restaurarMarcadoConReportes(num, cached, fl.color, { actualizarEstadoMarcado: false });
     }
 
-    if (this.state.modoMarcado() !== 'none' && newlyLoaded.length > 0) {
+    // Ocultar los no seleccionados siempre que haya una selección activa
+    // (no solo en modo marcado), para que no reaparezcan al navegar el mapa.
+    if (this.state.territoriosSeleccionados().length > 0) {
       this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
     }
   }
 
   private async restoreAllMarks(): Promise<void> {
     const layers = this.rendering.getAllTerritoriesLayer();
-    if (layers.length === 0) return;
-
     const draft = this.draftService.cargar();
     const territoriosConDraft = new Set(draft?.territoriosSeleccionados ?? []);
 
-    const territorios = layers.map(fl => fl.territorioPadre);
-    const sinDraft = territorios.filter(n => !territoriosConDraft.has(n));
-
-    // 1) Pintado instantáneo desde localStorage (draft mandó en su territorio).
-    const instantaneo = this.territorioService.getReportesDesdeCache(sinDraft);
-    for (const fl of layers) {
-      if (territoriosConDraft.has(fl.territorioPadre)) continue;
-      this.selection.restaurarMarcadoConReportes(
-        fl.territorioPadre,
-        instantaneo.get(fl.territorioPadre) ?? [],
-        fl.color,
-        { actualizarEstadoMarcado: false }
-      );
-    }
-
-    // 2) Restaurar draft (geom por id + territoriosSeleccionados + modo).
-    if (draft) {
-      this.restaurarMarcadoDesdeDraft(draft, layers);
-    }
-
-    // 3) Revalidación de fondo: solo territorios sin draft.
-    if (sinDraft.length > 0) {
-      try {
-        const revalidado = await this.territorioService.revalidarReportes(sinDraft);
-        for (const [num, reportes] of revalidado) {
-          const fl = layers.find(f => f.territorioPadre === num);
-          this.selection.restaurarMarcadoConReportes(num, reportes, fl?.color, { actualizarEstadoMarcado: false });
-        }
-      } catch {
-        // Offline/backend caído: el mapa ya pintó desde el cache; sin reintento.
+    if (layers.length > 0) {
+      // 1) Pintado instantáneo desde localStorage (draft mandó en su territorio).
+      const instantaneo = this.territorioService.getReportesDesdeCache(layers.map(fl => fl.territorioPadre));
+      for (const fl of layers) {
+        if (territoriosConDraft.has(fl.territorioPadre)) continue;
+        this.selection.restaurarMarcadoConReportes(
+          fl.territorioPadre,
+          instantaneo.get(fl.territorioPadre) ?? [],
+          fl.color,
+          { actualizarEstadoMarcado: false }
+        );
       }
-    } else {
+
+      // 2) Restaurar draft (geom por id + territoriosSeleccionados + modo).
+      if (draft) {
+        this.restaurarMarcadoDesdeDraft(draft, layers);
+      }
+    }
+
+    // 3) Revalidación de fondo de TODOS los territorios (no solo los cargados):
+    // el `/versions` filtra a no-vacíos, siembra el cache de localStorage y
+    // marca los vacíos como -1, así los pan/zoom posteriores no hacen red.
+    await this.revalidarTodos(layers);
+  }
+
+  private async revalidarTodos(layers: FeatureLayer[]): Promise<void> {
+    const todos = Array.from(this.rendering.getTerritoryDataCache().keys());
+    const draft = this.draftService.cargar();
+    const territoriosConDraft = new Set(draft?.territoriosSeleccionados ?? []);
+    const sinDraft = todos.filter(n => !territoriosConDraft.has(n));
+
+    if (sinDraft.length === 0) {
       this.selection.reaplicarMarcasSeleccionadas();
+      return;
+    }
+
+    try {
+      const revalidado = await this.territorioService.revalidarReportes(sinDraft);
+      for (const [num, reportes] of revalidado) {
+        const fl = layers.find(f => f.territorioPadre === num);
+        if (!fl) continue; // Aún sin capa: el cache ya quedó sembrado para cuando se cargue.
+        this.selection.restaurarMarcadoConReportes(num, reportes, fl.color, { actualizarEstadoMarcado: false });
+      }
+    } catch {
+      // Offline/backend caído: el mapa ya pintó desde el cache; sin reintento.
     }
   }
 

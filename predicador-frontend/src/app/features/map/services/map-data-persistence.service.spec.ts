@@ -8,6 +8,7 @@ import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { ReportCacheService } from '../../../core/services/report-cache';
 import { DraftMarksService } from '../../../core/services/map-draft';
+import { TOAST_MESSAGES } from '../utils/map-constants';
 
 describe('MapDataPersistenceService', () => {
   let service: MapDataPersistenceService;
@@ -15,22 +16,24 @@ describe('MapDataPersistenceService', () => {
   let report: {
     getProfile: ReturnType<typeof vi.fn>;
     buildRegistros: ReturnType<typeof vi.fn>;
-    buildTerritoriosEnvioSoloIncompletos: ReturnType<typeof vi.fn>;
+    buildTerritoriosParaEnvio: ReturnType<typeof vi.fn>;
     captureScreenshot: ReturnType<typeof vi.fn>;
     buildWhatsAppRequest: ReturnType<typeof vi.fn>;
     saveToDatabase: ReturnType<typeof vi.fn>;
     sendWhatsApp: ReturnType<typeof vi.fn>;
+    eliminarReportes: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
     report = {
       getProfile: vi.fn().mockReturnValue({ name: 'A', lastName: 'B', avatar: 0, telefono: '56912345678' }),
       buildRegistros: vi.fn().mockReturnValue([]),
-      buildTerritoriosEnvioSoloIncompletos: vi.fn().mockReturnValue([]),
+      buildTerritoriosParaEnvio: vi.fn().mockReturnValue({ territorios: [], requiereScreenshot: false }),
       captureScreenshot: vi.fn().mockResolvedValue('screenshot-base64'),
       buildWhatsAppRequest: vi.fn().mockReturnValue({}),
       saveToDatabase: vi.fn().mockResolvedValue([]),
-      sendWhatsApp: vi.fn().mockResolvedValue({ success: true }),
+      sendWhatsApp: vi.fn().mockResolvedValue(true),
+      eliminarReportes: vi.fn().mockResolvedValue(undefined),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -69,7 +72,7 @@ describe('MapDataPersistenceService', () => {
   });
 
   it('clears loading when WhatsApp territory construction fails', async () => {
-    report.buildTerritoriosEnvioSoloIncompletos.mockImplementation(() => {
+    report.buildTerritoriosParaEnvio.mockImplementation(() => {
       throw new Error('build failed');
     });
 
@@ -79,8 +82,8 @@ describe('MapDataPersistenceService', () => {
     expect(report.captureScreenshot).not.toHaveBeenCalled();
   });
 
-  it('does NOT capture or send when every territory is finished', async () => {
-    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([]);
+  it('does NOT capture or send when every territory is finished (more than one marked)', async () => {
+    report.buildTerritoriosParaEnvio.mockReturnValue({ territorios: [], requiereScreenshot: false });
     const toast = TestBed.inject(Toast);
     const show = toast.show as ReturnType<typeof vi.fn>;
 
@@ -88,14 +91,95 @@ describe('MapDataPersistenceService', () => {
 
     expect(report.captureScreenshot).not.toHaveBeenCalled();
     expect(report.sendWhatsApp).not.toHaveBeenCalled();
-    expect(show).toHaveBeenCalledWith(expect.stringContaining('No hay territorios incompletos para enviar'));
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.noSendableTerritories);
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('envía un único territorio completado con la imagen oficial (sin captura)', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    const territorios = [{ numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 }];
+    report.buildTerritoriosParaEnvio.mockReturnValue({ territorios, requiereScreenshot: false });
+
+    await service.guardarYEnviar();
+
+    expect(report.captureScreenshot).not.toHaveBeenCalled();
+    expect(report.buildWhatsAppRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'A' }),
+      territorios,
+      null,
+      expect.any(String),
+    );
+    expect(report.sendWhatsApp).toHaveBeenCalledTimes(1);
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('ACID: does NOT send via WhatsApp when the database save fails (persist-first)', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: true,
+    });
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A', encargadoApellido: 'B', fechaRegistro: '01-08-2026',
+      predicacion: 'tarde', territorios: [], screenshotBase64: null, destinationNumber: '56912345678',
+    });
+    report.saveToDatabase.mockRejectedValue(new Error('boom'));
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
+      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
+    };
+
+    await service.guardarYEnviar();
+
+    expect(report.sendWhatsApp).not.toHaveBeenCalled();
+    expect(report.eliminarReportes).not.toHaveBeenCalled();
+    expect(rendering.restaurarVistaConMarcas).not.toHaveBeenCalled();
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.territoriosSeleccionados()).toEqual([1]);
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('ACID: rolls back the saved reports when the WhatsApp send fails (compensation)', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: true,
+    });
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A', encargadoApellido: 'B', fechaRegistro: '01-08-2026',
+      predicacion: 'tarde', territorios: [], screenshotBase64: null, destinationNumber: '56912345678',
+    });
+    const guardado = { id: 10, ...reporteShape(1) };
+    report.saveToDatabase.mockResolvedValue([guardado]);
+    report.sendWhatsApp.mockResolvedValue(false);
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+    const cache = TestBed.inject(ReportCacheService) as unknown as { setTerritorio: ReturnType<typeof vi.fn> };
+    const drafts = TestBed.inject(DraftMarksService) as unknown as { eliminarTerritorios: ReturnType<typeof vi.fn> };
+    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
+      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
+    };
+
+    await service.guardarYEnviar();
+
+    expect(report.saveToDatabase).toHaveBeenCalledTimes(1);
+    expect(report.eliminarReportes).toHaveBeenCalledWith([guardado]);
+    expect(cache.setTerritorio).not.toHaveBeenCalled();
+    expect(drafts.eliminarTerritorios).not.toHaveBeenCalled();
+    expect(rendering.restaurarVistaConMarcas).not.toHaveBeenCalled();
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.territoriosSeleccionados()).toEqual([1]);
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.sendRollbackError);
     expect(state.enviando()).toBe(false);
   });
 
   it('reports incomplete territories with the *incompleto* wording on success', async () => {
-    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([
-      { numero: 2, finalizado: false, totalManzanas: 1, manzanasMarcadas: 0 },
-    ]);
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 2, finalizado: false, totalManzanas: 1, manzanasMarcadas: 0 }],
+      requiereScreenshot: true,
+    });
     report.captureScreenshot.mockResolvedValue('screenshot-base64');
     report.buildWhatsAppRequest.mockReturnValue({
       encargadoNombre: 'A',
@@ -163,9 +247,10 @@ describe('MapDataPersistenceService', () => {
 
   it('restores the full view with marks after a successful send', async () => {
     state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
-    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([
-      { numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 },
-    ]);
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: true,
+    });
     report.sendWhatsApp.mockResolvedValue(true);
     report.buildWhatsAppRequest.mockReturnValue({
       encargadoNombre: 'A', encargadoApellido: 'B', fechaRegistro: '01-08-2026',
@@ -186,9 +271,10 @@ describe('MapDataPersistenceService', () => {
 
   it('restores the full view with marks in the whatsapp-sent catch branch', async () => {
     state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
-    report.buildTerritoriosEnvioSoloIncompletos.mockReturnValue([
-      { numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 },
-    ]);
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: true,
+    });
     report.sendWhatsApp.mockResolvedValue(true);
     report.buildWhatsAppRequest.mockReturnValue({
       encargadoNombre: 'A', encargadoApellido: 'B', fechaRegistro: '01-08-2026',

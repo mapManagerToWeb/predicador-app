@@ -9,7 +9,7 @@ import { makeLatLng } from './map-geometry';
 import type { UserProfile } from '../../core/models/models';
 
 vi.mock('html-to-image', () => ({
-  toPng: vi.fn().mockRejectedValue(new Error('capture failed')),
+  toJpeg: vi.fn().mockRejectedValue(new Error('capture failed')),
 }));
 
 describe('MapReportService', () => {
@@ -63,16 +63,16 @@ describe('MapReportService', () => {
       mapElement.remove();
     });
 
-    it('returns the base64 body of the captured element', async () => {
+    it('returns the base64 body of the captured element (JPEG)', async () => {
       const mapElement = document.createElement('div');
       mapElement.id = 'map';
       document.body.appendChild(mapElement);
-      const toPng = (await import('html-to-image')).toPng as ReturnType<typeof vi.fn>;
-      toPng.mockResolvedValue('data:image/png;base64,ABC123');
+      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
+      toJpeg.mockResolvedValue('data:image/jpeg;base64,ABC123');
 
       await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe('ABC123');
 
-      expect(toPng).toHaveBeenCalledWith(mapElement, expect.objectContaining({ pixelRatio: expect.any(Number) }));
+      expect(toJpeg).toHaveBeenCalledWith(mapElement, expect.objectContaining({ pixelRatio: expect.any(Number) }));
       expect(restoreMap).toHaveBeenCalledOnce();
       mapElement.remove();
     });
@@ -138,19 +138,43 @@ describe('MapReportService', () => {
     });
   });
 
-  describe('buildTerritoriosEnvioSoloIncompletos', () => {
-    it('excludes territories that are fully marked', () => {
+  describe('buildTerritoriosParaEnvio', () => {
+    it('envía un único territorio completo con la imagen predeterminada (sin screenshot)', () => {
       const marcadas = [makeMarcada('m1', 1)];
-      const territorios = service.buildTerritoriosEnvioSoloIncompletos(marcadas, [makeTerritoryLayer(1, 1)]);
+      const envio = service.buildTerritoriosParaEnvio(marcadas, [makeTerritoryLayer(1, 1)]);
 
-      expect(territorios).toEqual([]);
+      expect(envio.territorios).toEqual([{ numero: 1, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 }]);
+      expect(envio.requiereScreenshot).toBe(false);
     });
 
-    it('includes territories as unfinished when coverage is partial', () => {
+    it('requiere captura para un único territorio incompleto', () => {
       const marcadas = [makeMarcada('parcial-1', 1)];
-      const territorios = service.buildTerritoriosEnvioSoloIncompletos(marcadas, [makeTerritoryLayer(1, 4)]);
+      const envio = service.buildTerritoriosParaEnvio(marcadas, [makeTerritoryLayer(1, 4)]);
 
-      expect(territorios).toEqual([{ numero: 1, finalizado: false, totalManzanas: 4, manzanasMarcadas: 1 }]);
+      expect(envio.territorios).toEqual([{ numero: 1, finalizado: false, totalManzanas: 4, manzanasMarcadas: 1 }]);
+      expect(envio.requiereScreenshot).toBe(true);
+    });
+
+    it('excluye los territorios completados cuando hay más de uno marcado', () => {
+      const marcadas = [makeMarcada('m1', 1), makeMarcada('m2', 2)];
+      const envio = service.buildTerritoriosParaEnvio(
+        marcadas,
+        [makeTerritoryLayer(1, 1), makeTerritoryLayer(2, 4)],
+      );
+
+      expect(envio.territorios).toEqual([{ numero: 2, finalizado: false, totalManzanas: 4, manzanasMarcadas: 1 }]);
+      expect(envio.requiereScreenshot).toBe(true);
+    });
+
+    it('no deja territorios cuando todos los marcados están completos y son varios', () => {
+      const marcadas = [makeMarcada('m1', 1), makeMarcada('m2', 2)];
+      const envio = service.buildTerritoriosParaEnvio(
+        marcadas,
+        [makeTerritoryLayer(1, 1), makeTerritoryLayer(2, 1)],
+      );
+
+      expect(envio.territorios).toEqual([]);
+      expect(envio.requiereScreenshot).toBe(false);
     });
   });
 
@@ -179,6 +203,56 @@ describe('MapReportService', () => {
   describe('getProfile', () => {
     it('returns the current profile', () => {
       expect(service.getProfile()).toEqual(profile);
+    });
+  });
+
+  describe('persistencia y compensación', () => {
+    let territorioService: {
+      crearReportes: ReturnType<typeof vi.fn>;
+      eliminarReportes: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      territorioService = {
+        crearReportes: vi.fn().mockResolvedValue([]),
+        eliminarReportes: vi.fn().mockResolvedValue(undefined),
+      };
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          MapReportService,
+          { provide: TerritorioService, useValue: territorioService },
+          { provide: Profile, useValue: { currentUser: () => profile } },
+          { provide: Toast, useValue: {} },
+          { provide: WhatsAppService, useValue: {} },
+        ],
+      });
+      service = TestBed.inject(MapReportService);
+    });
+
+    it('delegates persistence to TerritorioService', async () => {
+      territorioService.crearReportes.mockResolvedValue([{ id: 1 }]);
+
+      const result = await service.saveToDatabase([]);
+
+      expect(territorioService.crearReportes).toHaveBeenCalledWith([]);
+      expect(result).toEqual([{ id: 1 }]);
+    });
+
+    it('eliminarReportes only deletes newly saved reports', async () => {
+      await service.eliminarReportes([
+        { id: 10 },
+        { id: -1, fechaRegistro: 'x' },
+        {},
+      ] as never[]);
+
+      expect(territorioService.eliminarReportes).toHaveBeenCalledWith([10]);
+    });
+
+    it('eliminarReportes forwards an empty list to TerritorioService (guarded there)', async () => {
+      await service.eliminarReportes([]);
+
+      expect(territorioService.eliminarReportes).toHaveBeenCalledWith([]);
     });
   });
 });

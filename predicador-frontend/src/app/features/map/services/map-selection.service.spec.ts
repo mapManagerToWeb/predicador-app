@@ -159,6 +159,44 @@ describe('MapSelectionService', () => {
     });
   });
 
+  describe('marcarManzana', () => {
+    it('marks a manzana, registers its layer, selects its territory and updates totalManzanas', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+      const layer = fakePath();
+
+      service.marcarManzana('m1', 'Bloque-m1', layer as never, '#ff0000', 1);
+
+      expect(state.manzanasMarcadaList()).toEqual([
+        { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 1 },
+      ]);
+      expect(registry.get('m1')).toBe(layer);
+      expect(layer.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
+      expect(state.territoriosSeleccionados()).toContain(1);
+      expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
+      expect(state.totalManzanas()).toBe(10);
+    });
+
+    it('does not unmark an already-marked manzana (mark-only)', () => {
+      rendering.getManzanaCountByTerritorio.mockReturnValue(5);
+      const layer = fakePath();
+      registry.register('m1', layer as never);
+      state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 }]]));
+      state.territoriosSeleccionados.set([1]);
+      state.totalManzanas.set(7);
+
+      service.marcarManzana('m1', 'A', layer as never, '#ff0000', 1);
+
+      expect(state.manzanasMarcadaList()).toEqual([
+        { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 },
+      ]);
+      expect(registry.get('m1')).not.toBeNull();
+      expect(state.territoriosSeleccionados()).toEqual([1]);
+      // La selección no cambió, así que el total permanece intacto.
+      expect(state.totalManzanas()).toBe(7);
+    });
+  });
+
   describe('seleccionarManzana', () => {
     it('tracks the selected manzana and its edges and selects its territory', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);

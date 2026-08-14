@@ -113,7 +113,7 @@ describe('MapInteractionService', () => {
   });
 
   describe('modo completa', () => {
-    it('toggles a manzana of the already selected territory', () => {
+    it('marks an unmarked manzana of the already selected territory', () => {
       state.modoMarcado.set('completa');
       state.territoriosSeleccionados.set([5]);
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
@@ -121,6 +121,19 @@ describe('MapInteractionService', () => {
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
       expect(result.action).toBe('toggle_manzana');
+      expect(toast.show).not.toHaveBeenCalled();
+    });
+
+    it('never unmarks an already-marked manzana (only marks while marking)', () => {
+      state.modoMarcado.set('completa');
+      state.territoriosSeleccionados.set([5]);
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
+
+      const result = service.handleMapClick(clickAt(0.5, 0.5));
+
+      expect(result.action).toBe('none');
+      expect(result.manzana).toBeUndefined();
       expect(toast.show).not.toHaveBeenCalled();
     });
 
@@ -174,7 +187,7 @@ describe('MapInteractionService', () => {
       expect(result.partialId).toBe('parcial-123');
     });
 
-    it('toggles a manzana that is already marked', () => {
+    it('never unmarks an already-marked manzana while marking parcial', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
@@ -182,7 +195,8 @@ describe('MapInteractionService', () => {
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
-      expect(result.action).toBe('toggle_manzana');
+      expect(result.action).toBe('none');
+      expect(result.manzana).toBeUndefined();
       expect(toast.show).not.toHaveBeenCalled();
     });
 
