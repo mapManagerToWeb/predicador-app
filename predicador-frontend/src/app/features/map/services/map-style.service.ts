@@ -67,6 +67,10 @@ export function getCaptureUnmarkedStyle(color: string): L.PathOptions {
   return { opacity: 0.6, fillOpacity: 0.05, color, weight: 1.5 };
 }
 
+export function getCaptureIncompleteStyle(color: string): L.PathOptions {
+  return { opacity: 0.8, fillOpacity: 0.05, color, weight: 4 };
+}
+
 /**
  * Centralizes visual styles and requestAnimationFrame batching.
  *
