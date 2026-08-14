@@ -91,6 +91,7 @@ export const TOAST_MESSAGES = {
   selectManzana: (nombre: string) => `Manzana "${nombre}" — tocá para colocar puntos`,
   partialMode: 'Tocá en cualquier parte del mapa',
   completeMode: 'Tocá una manzana para marcarla',
+  territoryLock: 'No se puede cambiar de territorio mientras se marca',
 } as const;
 
 let parcialSeq = 0;

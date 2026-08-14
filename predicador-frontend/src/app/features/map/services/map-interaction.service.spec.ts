@@ -5,6 +5,7 @@ import { MapInteractionService } from './map-interaction.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
+import { Toast } from '../../../core/services/toast';
 import type { ManzanaIndex } from '../types/map.types';
 
 function containerPoint(lat: number, lng: number): { x: number; y: number; distanceTo: (p: { x: number; y: number }) => number } {
@@ -39,6 +40,7 @@ describe('MapInteractionService', () => {
   let service: MapInteractionService;
   let state: MapStateService;
   let registry: MapLayerRegistry;
+  let toast: { show: ReturnType<typeof vi.fn> };
   let rendering: {
     getManzanaIndex: ReturnType<typeof vi.fn>;
     getMap: ReturnType<typeof vi.fn>;
@@ -49,6 +51,7 @@ describe('MapInteractionService', () => {
   }
 
   beforeEach(() => {
+    toast = { show: vi.fn() };
     rendering = {
       getManzanaIndex: vi.fn(),
       getMap: vi.fn().mockReturnValue({
@@ -61,6 +64,7 @@ describe('MapInteractionService', () => {
         MapStateService,
         { provide: MapRenderingFacade, useValue: rendering },
         MapLayerRegistry,
+        { provide: Toast, useValue: toast },
       ],
     });
     service = TestBed.inject(MapInteractionService);
@@ -88,6 +92,7 @@ describe('MapInteractionService', () => {
 
       expect(result.action).toBe('select_territory');
       expect(result.manzana?.territorioNumero).toBe(5);
+      expect(toast.show).not.toHaveBeenCalled();
     });
 
     it('returns none when clicking empty space', () => {
@@ -95,6 +100,15 @@ describe('MapInteractionService', () => {
       rendering.getManzanaIndex.mockReturnValue([]);
 
       expect(service.handleMapClick(clickAt(50, 50)).action).toBe('none');
+    });
+  it('still selects a foreign territory in mode none', () => {
+      state.modoMarcado.set('none');
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m9', 9)]);
+
+      const result = service.handleMapClick(clickAt(0.5, 0.5));
+
+      expect(result.action).toBe('select_territory');
+      expect(toast.show).not.toHaveBeenCalled();
     });
   });
 
@@ -107,6 +121,7 @@ describe('MapInteractionService', () => {
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
       expect(result.action).toBe('toggle_manzana');
+      expect(toast.show).not.toHaveBeenCalled();
     });
 
     it('ignores click on unselected territory (no select_territory)', () => {
@@ -117,6 +132,17 @@ describe('MapInteractionService', () => {
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
       expect(result.action).toBe('none');
+    });
+
+    it('locks and toasts on a foreign-territory manzana click', () => {
+      state.modoMarcado.set('completa');
+      state.territoriosSeleccionados.set([5]);
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 9)]);
+
+      const result = service.handleMapClick(clickAt(0.5, 0.5));
+
+      expect(result.action).toBe('none');
+      expect(toast.show).toHaveBeenCalled();
     });
 
     it('returns none when clicking empty space', () => {
@@ -150,12 +176,38 @@ describe('MapInteractionService', () => {
 
     it('toggles a manzana that is already marked', () => {
       state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
       expect(result.action).toBe('toggle_manzana');
+      expect(toast.show).not.toHaveBeenCalled();
+    });
+
+    it('does NOT toggle an already-marked manzana of a foreign territory (lock + toast)', () => {
+      state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m9', 9)]);
+      state.manzanasById.set(new Map([['m9', { id: 'm9', nombreBloque: 'Bloque-m9', color: '#ff0000', territorioNumero: 9 }]]));
+
+      const result = service.handleMapClick(clickAt(0.5, 0.5));
+
+      expect(result.action).toBe('none');
+      expect(result.manzana).toBeUndefined();
+      expect(toast.show).toHaveBeenCalled();
+    });
+
+    it('locks and toasts on an unmarked foreign-territory manzana click', () => {
+      state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m9', 9)]);
+
+      const result = service.handleMapClick(clickAt(0.5, 0.5));
+
+      expect(result.action).toBe('none');
+      expect(toast.show).toHaveBeenCalled();
     });
 
     it('ignores click on unselected territory (no select_manzana)', () => {
