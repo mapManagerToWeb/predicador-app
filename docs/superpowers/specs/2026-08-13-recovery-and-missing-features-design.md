@@ -1,7 +1,7 @@
 # Recovery + Missing Features Design
 
 > **Date:** 2026-08-13
-> **Scope:** Recover accidentally-overwritten work from git HEAD, re-implement the two features that were never committed (`html-to-image` migration and marking-mode territory lock), and verify the full frontend.
+> **Scope:** Recover accidentally-overwritten work from git HEAD, re-implement the two features that were never committed (`html-to-image` migration and marking-mode territory lock), apply the post-review requirements (restore the view with marks after sending, better capture styling for incomplete territories), and verify the full marking → save → WhatsApp-send flow end-to-end.
 
 ## Context / Problem
 
@@ -24,7 +24,9 @@ Two requested features were **never present in any commit or branch**:
 
 ## Goal
 
-Restore the committed feature set to the working tree, then implement the two missing pieces with quality guards (clean code, tests, lint/build green).
+Restore the committed feature set to the working tree, implement the two missing pieces, apply the post-review
+requirements (marks stay visible after send with no active selection; capture shows marks + thick incomplete
+polygons), and verify the whole flow end-to-end — with quality guards (clean code, tests, lint/build green).
 
 ## Approach
 
@@ -48,13 +50,82 @@ Block territory select/deselect while `modoMarcado()` is `completa` or `parcial`
 - TDD: add specs in `map-interaction.service.spec.ts` covering: click on unmarked manzana in another territory while `completa` → `none` action + toast; same in `parcial` → `none`; mode `none` → still `select_territory` (unchanged).
 - Alternative considered: guard in `map.ts.handleTerritorySelection` — rejected because independent click paths already handle mode; the service-level guard is single-point and testable.
 
-### Step 4 — Verification
+### Step 4 — Restore the map view after sending (no active selection, marks kept)
+
+Currently `guardarYEnviar` (and `guardarEnBaseDeDatos`) wipe the marked state after success: it clears
+`manzanasById` and calls `restaurarVisibilidadPoligonos(marcadas, [])`, which with an empty selection only
+re-applies the territory base style — the individual marked manzanas lose their visual highlight, so "the change
+that was created" disappears from the map right after sending.
+
+User decision (option 2): after a successful send, **restore the full map view with the created marks still
+visible, but without an active territory selection** in the toolbar. The report stays saved in localStorage
+(already done via `persistirEnCacheYLimpiarDraft`). No re-fetch is needed — the marks already exist in memory.
+
+- Add a method to `MapRenderingFacade`, e.g. `restaurarVistaConMarcas(manzanasMarcadaList)`:
+  - `cancelPendingStyleUpdates()`; then in the queued update, for **every** feature layer apply `computeBaseStyle`
+    (unchanged territory-completeness fill), then re-apply `getMarkedManzanaStyle(color)` to every marked manzana of
+    every territory (not only the previously selected ones), and finally `updateLabelsVisibility()`.
+  - This is `restaurarVisibilidadPoligonos` with the mark re-application decoupled from the selection list — i.e. the
+    "previous view with the change" over the full map.
+- In `guardarEnBaseDeDatos` success path and `guardarYEnviar` success path (and its catch branch when
+  `whatsappSent`), replace:
+  `this.rendering.restaurarVisibilidadPoligonos(marcadas, [])` **followed by** `this.state.manzanasById.set(new Map())`
+  with:
+  - `this.rendering.restaurarVistaConMarcas(marcadas)` (capture the list before any clearing),
+  - **do not** clear `manzanasById` — the marks stay in memory so they render,
+  - keep clearing only the transient selection: `territoriosSeleccionados.set([])`,
+    `territorioSeleccionado.set(null)`, `totalManzanas.set(0)`, `clearDatosParciales()`.
+- Note: `guardarEnBaseDeDatos` also gets this consistent restore behavior (same wipe pattern today), though the user
+  requirement explicitly targets the send flow.
+- Specs: in `map-data-persistence.service.spec.ts` add cases asserting that after a successful send, the selection is
+  cleared, `manzanasById` retains the marks, and the facade's new `restaurarVistaConMarcas` is invoked with the
+  marked list (instead of `restaurarVisibilidadPoligonos`). Also assert the restore path in the `whatsappSent`-true
+  catch branch.
+- Facade spec: add `map-rendering.facade.spec.ts` case that `restaurarVistaConMarcas` queues a full-map restore that
+  re-applies marked styles for all territories.
+
+### Step 5 — Capture quality: visible marks + thicker incomplete polygons
+
+In the WhatsApp screenshot of incomplete territories (`prepararCapturaSoloIncompletos`), the current
+`styleTerritoryLayersSoloIncompletos` paints **every** layer of an incomplete territory with
+`{ opacity: 0.6, fillOpacity: 0.05, weight: 1.5 }` — so already-marked manzanas are indistinguishable from unmarked
+ones, and incomplete polygons are thin. User requirements: (a) marks look good in the capture, (b) incomplete
+polygons have a **larger stroke width** so it's obvious the territory is incomplete.
+
+- Pass the marked list into `styleTerritoryLayersSoloIncompletos` (it currently receives only layers + incomplete
+  set; the caller already has `manzanasMarcadas`). Build a `Set<L.Path>` of marked layers via `this.registry.get(m.id)`.
+- For incomplete territories, style each `L.Path`:
+  - marked layer → `getMarkedManzanaStyle(fl.color)` (keeps the highlight visible in the capture),
+  - unmarked layer → new `getCaptureIncompleteStyle(color)` with a clearly **larger weight** (e.g. `weight: 4`,
+    low `fillOpacity`, `opacity: 0.8`) so the unmarked/incomplete polygons stand out with a thick stroke.
+- Add `getCaptureIncompleteStyle` to `map-style.service.ts` next to `getCaptureUnmarkedStyle`; keep
+  `getCaptureUnmarkedStyle` unchanged for the non-incomplete capture path.
+- Keep the existing `stylePartialMarks` call after it so partial polygons still render with
+  `getPartialPolygonCompleteStyle`.
+- Specs: extend `map-capture.service.spec.ts` with a `prepararCapturaSoloIncompletos` describe block asserting that
+  marked layers get `getMarkedManzanaStyle`, unmarked layers in incomplete territories get `getCaptureIncompleteStyle`
+  (thick weight), completed territories stay hidden, and partial polygons keep their style. Add `map-style.spec.ts`
+  assertions for `getCaptureIncompleteStyle`.
+
+### Step 6 — Verification
 
 Run in CI order from `predicador-frontend/`:
 
 1. `pnpm run lint`
 2. `npx ng build --configuration=production`
 3. `pnpm test -- --run --coverage`
+
+**Functional (E2E) check of the full marking → save → WhatsApp send flow** (this is an explicit user requirement).
+With the backends up (`docker compose` or the configured local services) drive the real app and verify end-to-end:
+
+1. Select a territory and enter `completa` marking mode; mark some manzanas (marks highlight immediately).
+2. Try selecting/deselecting another territory while marking → locked with toast (Step 3 feature).
+3. Tap save → report saved, cache seeded, draft cleared, view restored **with the marks still visible** and **no
+   active selection**.
+4. Tap send → WhatsApp screenshot captured (incomplete territories with thick strokes + visible marks), message
+   reaches the simulation/whatsapp target, and afterwards the **mark/selected-polygon state is restored with the
+   change visible but selection cleared**, report present in localStorage.
+5. Re-load the app → saved marks restored from cache/localStorage.
 
 Fix anything that fails. Commit in repo style (lowercase Conventional Commits).
 
@@ -69,4 +140,9 @@ Fix anything that fails. Commit in repo style (lowercase Conventional Commits).
 - Working tree equals HEAD for the previously-overwritten committed features.
 - `html-to-image` replaces `html2canvas`, specs updated and green.
 - Territory cannot be selected/deselected while marking mode is active; toast informs the user; mode `none` behavior unchanged.
+- After a successful send (and after a successful save), the full map view is restored **with the created marks still
+  visible** and **no active territory selection**; the report is persisted in localStorage and is restored on app reload.
+- In the WhatsApp screenshot, marked manzanas keep their highlight and unmarked manzanas in incomplete territories
+  render with a thicker stroke so incompleteness is obvious.
+- The full marking → save → WhatsApp-send flow works correctly end-to-end (verified against the running app).
 - `lint`, production build, and full test suite all green.
