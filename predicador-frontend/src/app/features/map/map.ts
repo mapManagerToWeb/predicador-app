@@ -15,7 +15,7 @@ import { MapSelectionService } from './services/map-selection.service';
 import { MapInitializationService } from './services/map-initialization.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
-import { TOAST_MESSAGES } from './utils/map-constants';
+import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
 import type { ModoMarcado } from './types/map.types';
 
 @Component({
@@ -199,13 +199,11 @@ export class MapPage implements OnDestroy {
   }
 
   limpiarTodo(): void {
-    if (this.modoMarcado() !== 'none') {
-      this.setModoMarcado('none');
-      return;
-    }
-
     const hasData = this.state.manzanasById().size > 0 || this.state.territoriosSeleccionados().length > 0;
     this.limpiarMarcas();
+
+    // Volver a la vista de territorios (mapa inicial sin selección).
+    this.rendering.getMap()?.setView(MAP_DEFAULTS.initialView, MAP_DEFAULTS.initialZoom);
 
     if (hasData) {
       void this.initialization.reloadAllTerritories();
