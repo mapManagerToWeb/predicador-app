@@ -6,6 +6,7 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { Toast } from '../../../core/services/toast';
+import { DraftMarksService } from '../../../core/services/map-draft';
 import { getMarkedManzanaStyle, getSelectedManzanaStyle } from './map-style.service';
 
 function fakePath(): { setStyle: ReturnType<typeof vi.fn>; getLatLngs: ReturnType<typeof vi.fn> } {
@@ -64,6 +65,7 @@ describe('MapSelectionService', () => {
     restaurarDesdeDB: ReturnType<typeof vi.fn>;
     restaurarConReportes: ReturnType<typeof vi.fn>;
   };
+  let drafts: { clear: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     rendering = {
@@ -92,6 +94,7 @@ describe('MapSelectionService', () => {
       restaurarDesdeDB: vi.fn().mockResolvedValue(undefined),
       restaurarConReportes: vi.fn(),
     };
+    drafts = { clear: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         MapSelectionService,
@@ -100,6 +103,7 @@ describe('MapSelectionService', () => {
         MapLayerRegistry,
         { provide: MapMarkRestorationService, useValue: restoration },
         { provide: Toast, useValue: toast },
+        { provide: DraftMarksService, useValue: drafts },
       ],
     });
     service = TestBed.inject(MapSelectionService);
@@ -261,7 +265,7 @@ describe('MapSelectionService', () => {
   });
 
   describe('limpiarMarcas', () => {
-    it('clears the registry, the state and the visual marks', () => {
+    it('clears the registry, the state, the visual marks and the draft', () => {
       const layer = fakePath();
       registry.register('m1', layer as never);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
@@ -276,6 +280,7 @@ describe('MapSelectionService', () => {
       expect(state.totalManzanas()).toBe(0);
       expect(rendering.limpiarMarcasVisuales).toHaveBeenCalled();
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('');
+      expect(drafts.clear).toHaveBeenCalled();
     });
   });
 });

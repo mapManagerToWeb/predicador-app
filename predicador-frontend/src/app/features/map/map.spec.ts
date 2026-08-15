@@ -80,6 +80,7 @@ describe('MapPage', () => {
     toggleSatellite: ReturnType<typeof vi.fn>;
     isSatellite: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
+    getMap: ReturnType<typeof vi.fn>;
     restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
     cancelPendingStyleUpdates: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
@@ -110,6 +111,7 @@ describe('MapPage', () => {
       isSatellite: vi.fn().mockReturnValue(false),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
+      getMap: vi.fn().mockReturnValue(null),
       getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
       restaurarVisibilidadPoligonos: vi.fn(),
       ocultarPoligonosNoSeleccionados: vi.fn(),
@@ -256,13 +258,15 @@ describe('MapPage', () => {
   });
 
   describe('limpiarTodo', () => {
-    it('cancels the marking mode first when one is active', () => {
+    it('clears everything even when a marking mode is active', () => {
       state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([1]);
 
       component.limpiarTodo();
 
-      expect(selection.setModoMarcado).toHaveBeenCalledWith('none');
-      expect(selection.limpiarMarcas).not.toHaveBeenCalled();
+      expect(selection.limpiarMarcas).toHaveBeenCalled();
+      expect(initialization.reloadAllTerritories).toHaveBeenCalled();
+      expect(rendering.getMap).toHaveBeenCalled();
     });
 
     it('clears marks and reloads territories when there is data', () => {
