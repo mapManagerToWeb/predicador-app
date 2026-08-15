@@ -5,6 +5,7 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { Toast } from '../../../core/services/toast';
+import { DraftMarksService } from '../../../core/services/map-draft';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 import {
   getBaseTerritoryStyle,
@@ -22,6 +23,7 @@ export class MapSelectionService {
   private readonly registry = inject(MapLayerRegistry);
   private readonly restoration = inject(MapMarkRestorationService);
   private readonly toastService = inject(Toast);
+  private readonly draftService = inject(DraftMarksService);
 
   /** The currently selected manzana polygon (transient UI state, not in state). */
   private selectedPolygon: L.Polygon | null = null;
@@ -263,6 +265,7 @@ export class MapSelectionService {
     this.state.territorioSeleccionado.set(null);
     this.state.territoriosSeleccionados.set([]);
     this.rendering.setCurrentTerritoryColor('');
+    this.draftService.clear();
   }
 
   private reaplicarMarcasTerritorio(territorioNumero: number): void {
