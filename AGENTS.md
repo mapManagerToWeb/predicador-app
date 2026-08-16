@@ -19,9 +19,8 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 ## Layout
 
 - `backend/` is a Maven reactor (Java 25, Spring Boot 4.0, Spring Cloud 2025.1) with `shared`, `config-server`, `discovery-server`, `api-gateway`, `territory-service`, and `reporting-service`; run Maven commands from this directory. `shared/` holds cross-service security (HMAC tokens, `SessionAuthFilter`) used by gateway, territory, and reporting.
-- `predicador-frontend/` is a separate Angular 22 SSR/PWA app; its nested `AGENTS.md` contains frontend-specific guidance and applies to changes under that directory.
+- `predicador-frontend/` is a separate Angular 22 SSR/PWA app.
 - `docker-compose.yml` builds the five backend services **plus a `rabbitmq` broker** (territory and reporting depend on it; WhatsApp async sends flow through it). Observability services are opt-in via the `observability` profile.
-- `CLAUDE.md` holds the deeper context (security model, WhatsApp async flow, frontend conventions/gotchas); keep the two consistent when rules change.
 
 ## Verification
 
@@ -40,6 +39,42 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 - Auth is strict by default: outside the `local` profile the gateway and shared security throw at startup unless `SESSION_SECRET` is ≥32 bytes and `ADMIN_PASSWORD_BCRYPT` is set. Enforcement only soft-disables when the secret is empty AND the profile is non-strict/local.
 - `config-server` serves config from its classpath (`native` profile, the compose default); don't point its `SPRING_PROFILES_ACTIVE` elsewhere or it will try a git repo with no URI.
 - Start optional observability with `docker-compose --profile observability up -d`; OTLP export is disabled unless the relevant `OTEL_*` variables are set.
+
+## Frontend Conventions & Patterns
+
+### Scaffolding & Architecture
+- Feature-based structure under `predicador-frontend/src/app/`:
+  - `core/` — Singleton services (Profile, TerritorioService, Toast, WhatsAppService, EncargadoService), guards, interceptors, models.
+  - `features/` — Standalone lazy-loaded page components (auth/login, map, profile, admin).
+  - `shared/` — Reusable components (avatar-selector, screenshot-modal, toast, pipes).
+- Selector prefixes: Component `app-` (kebab-case), Directive `app` (camelCase).
+- Standalone components (no NgModule).
+- Route guards: `canActivate: [profileGuard]` protects `/map` route.
+- Lazy loading: `loadComponent: () => import('./features/...').then(m => m.PageComponent)`.
+
+### TypeScript & ESLint Rules
+- `noImplicitAny` — Use proper types; `@ts-expect-error` should only be used if strictly necessary.
+- `noImplicitReturns` — All code paths must return.
+- `noFallthroughCasesInSwitch` — Explicit breaks in switch cases.
+- `noPropertyAccessFromIndexSignature` — Type-safe property access.
+- `@typescript-eslint/no-explicit-any`: warn.
+- `@typescript-eslint/no-floating-promises`: error — Must `await` Promises or handle them.
+- `no-console`: warn (allow warn/error) — Debug logs should use `console.warn` or `console.error`.
+- Prettier enforced — Use `pnpm run lint:fix` to auto-format.
+
+### State & Reactivity
+- Angular 22, **zoneless** (using `provideZonelessChangeDetection`).
+- State is managed via plain signals in `providedIn: 'root'` services.
+- `HttpClient` + `firstValueFrom` is used for HTTP communication; `httpResource`/`resource`/`linkedSignal` are not used.
+
+### Testing
+- Vitest + jsdom (setup file: `src/test-setup.ts`).
+- Spec files: `*.spec.ts` co-located with source files.
+- Mock services with `vi.spyOn` or `vi.mock`.
+
+### Common Gotchas
+- **SSR Differences:** `window` / `document` don't exist in server context; wrap DOM access in platform/browser guards or use `afterNextRender()`.
+- **Map UI split:** The map feature is split into multiple single-responsibility services under `features/map/services/` (engine, tile layer, territory layer, selection, partial draw, capture, style, etc.). Put new map behavior in one of these services, not in `MapPage`.
 
 ## Repository Rules
 

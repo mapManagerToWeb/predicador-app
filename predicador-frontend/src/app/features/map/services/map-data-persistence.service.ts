@@ -60,13 +60,14 @@ export class MapDataPersistenceService {
       this.selection.reaplicarMarcasSeleccionadas();
       this.toastService.show(TOAST_MESSAGES.saveSuccess);
 
-      // Guardar referencia ANTES de restaurar la vista (manzanasById se conserva)
       const marcadasParaRestaurar = this.state.manzanasMarcadaList();
 
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
       this.rendering.restaurarVistaConMarcas(marcadasParaRestaurar);
       this.state.totalManzanas.set(0);
+      this.state.modoMarcado.set('none');
+      this.state.manzanasById.set(new Map());
     } catch {
       if (previousMarcadas && previousDatosParciales) {
         this.state.manzanasById.set(previousMarcadas);
@@ -157,17 +158,20 @@ export class MapDataPersistenceService {
 
       this.selection.reaplicarMarcasSeleccionadas();
 
-      const mensajes = envio.territorios.map(t => {
-        const estado = t.finalizado ? '*terminado*' : '*incompleto*';
-        return `Territorio ${t.numero} ${estado}`;
-      });
-      this.toastService.show(mensajes.join('\n'));
+      this.toastService.show(
+        TOAST_MESSAGES.sendSuccessTitle,
+        4000,
+        'sent',
+        TOAST_MESSAGES.sendSuccessSubtitle
+      );
 
       this.state.clearDatosParciales();
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
       this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
       this.state.totalManzanas.set(0);
+      this.state.modoMarcado.set('none');
+      this.state.manzanasById.set(new Map());
     } catch {
       if (guardados.length > 0 && !envioConfirmado) {
         // Quedó guardado sin envío confirmado: revertir para cumplir ACID.
@@ -181,6 +185,8 @@ export class MapDataPersistenceService {
         this.state.territorioSeleccionado.set(null);
         this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
         this.state.totalManzanas.set(0);
+        this.state.modoMarcado.set('none');
+        this.state.manzanasById.set(new Map());
       } else {
         // El guardado en BD nunca se completó: no se envió nada.
         this.toastService.show(TOAST_MESSAGES.saveError);

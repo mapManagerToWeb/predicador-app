@@ -82,6 +82,8 @@ export const TOAST_MESSAGES = {
   saving: 'Guardando reportes...',
   saveSuccess: 'Reportes guardados exitosamente',
   saveError: 'Error al guardar los reportes',
+  sendSuccessTitle: 'Territorio actualizado ',
+  sendSuccessSubtitle: 'Reporte enviado a WhatsApp',
   sendError: 'Error enviando WhatsApp',
   sendRollbackError: 'El reporte no se guardó porque falló el envío por WhatsApp',
   processError: 'Error al procesar el reporte',

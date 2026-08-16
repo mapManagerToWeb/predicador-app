@@ -12,6 +12,8 @@ import type {
 } from '../../core/models/models';
 import type { ManzanaMarcada, FeatureLayer, DatosParciales } from './types/map.types';
 
+const SCREENSHOT_RETRIES = 2;
+
 @Injectable({ providedIn: 'root' })
 export class MapReportService {
   private territorioService = inject(TerritorioService);
@@ -123,7 +125,11 @@ export class MapReportService {
       // JPEG (no PNG): coincide con el content-type image/jpeg que el backend
       // usa al subir a WhatsApp y mantiene el payload dentro de los límites del
       // gateway (10MB) incluso con pantallas grandes.
-      const dataUrl = await toJpeg(mapElement, { quality: 0.85, pixelRatio: 2, cacheBust: true });
+      const dataUrl = await this.renderScreenshot(mapElement, toJpeg, {
+        quality: 0.85,
+        pixelRatio: 2,
+        cacheBust: true,
+      });
       return dataUrl.split(',')[1];
     } finally {
       try {
@@ -182,6 +188,41 @@ export class MapReportService {
   private countTotalManzanas(featureLayer: FeatureLayer | undefined, fallback: number): number {
     if (!featureLayer) return fallback;
     return Array.from(featureLayer.layer.getLayers()).filter(l => 'setStyle' in l).length;
+  }
+
+  /**
+   * Captures the map element, keeping the largest result.
+   *
+   * <p>iOS Safari/WebKit has a known html-to-image bug: the SVG foreignObject
+   * decodes tile images in a separate context, so the FIRST capture after a
+   * DOM mutation (the capture refit/styles) can render with blank or missing
+   * tiles. Retrying once and keeping the largest dataUrl yields a complete
+   * screenshot <!-- see bubkoo/html-to-image#461 -->. UA-gated so Chrome,
+   * Firefox, Android and Windows/macOS browsers keep a single capture.
+   */
+  private async renderScreenshot(
+    mapElement: HTMLElement,
+    toJpeg: (node: HTMLElement, options: object) => Promise<string>,
+    options: object
+  ): Promise<string> {
+    const attempts = this.isSafari() ? SCREENSHOT_RETRIES : 1;
+    let best = '';
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const dataUrl = await toJpeg(mapElement, options);
+      // JPEG output size correlates with content richness: a blank/partial
+      // render compresses smaller than the complete one, so keep the largest.
+      if (dataUrl.length > best.length) {
+        best = dataUrl;
+      }
+    }
+    return best;
+  }
+
+  /** True for Safari (including iOS), excluding Chromium/Firefox impostors. */
+  private isSafari(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent;
+    return /AppleWebKit/.test(ua) && !/(Chrome|CriOS|Edg|OPR|Firefox|SamsungBrowser)/.test(ua);
   }
 
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {

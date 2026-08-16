@@ -5,17 +5,34 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import { Readable } from 'node:stream';
 import { join } from 'node:path';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
-const angularApp = new AngularNodeAppEngine();
+
+/**
+ * The API URL the frontend uses is relative (`/api/v1`), so every API call
+ * from the browser lands here on the SSR origin. Requests must be proxied to
+ * the API gateway. Point `GATEWAY_URL` at the gateway from the app host
+ * (e.g. `http://api-gateway:8080` when the SSR runs in Docker).
+ */
+const gatewayUrl = process.env['GATEWAY_URL'] || 'http://localhost:8080';
+
+/**
+ * Only requests whose Host header is listed here are accepted; anything else
+ * gets a 400 from the engine. Extend for the public hostname(s) served in
+ * production. Alternatively set `NG_ALLOWED_HOSTS` (comma-separated) without
+ * touching code.
+ */
+const allowedHosts = ['localhost', '127.0.0.1', 'shus3z-ip-191-116-92-175.tunnelmole.net'];
+const angularApp = new AngularNodeAppEngine({ allowedHosts });
 
 /**
  * Security hardening headers. Safe defaults that do not depend on the
- * deployment topology; a full CSP and an explicit `allowedHosts` list are
- * deploy-specific and must be configured with the serving infrastructure.
+ * deployment topology; a full CSP is deploy-specific and must be configured
+ * with the serving infrastructure.
  */
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -26,16 +43,99 @@ app.use((req, res, next) => {
 });
 
 /**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
+ * Reverse proxy for API calls: forwards `/api/v1/*` to the API gateway.
+ * Uses Node's native `fetch`, streaming the request/response bodies and
+ * passing session cookies through so authentication keeps working.
  */
+app.use('/api/v1', async (req, res) => {
+  const upstream = new URL(req.originalUrl, gatewayUrl);
+
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (value === undefined || DROPPED_HEADERS.has(name.toLowerCase())) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        headers.append(name, item);
+      }
+    } else {
+      headers.set(name, value);
+    }
+  }
+
+  let body: BodyInit | undefined;
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    body = Readable.toWeb(req) as unknown as BodyInit;
+  }
+
+  try {
+    const upstreamResponse = await fetch(upstream, {
+      method: req.method,
+      headers,
+      body,
+      redirect: 'manual',
+      duplex: 'half',
+    } as RequestInit);
+
+    res.status(upstreamResponse.status);
+
+    for (const [name, value] of upstreamResponse.headers.entries()) {
+      if (DROPPED_HEADERS.has(name.toLowerCase())) {
+        continue;
+      }
+      if (name.toLowerCase() === 'set-cookie') {
+        for (const cookie of getSetCookies(upstreamResponse)) {
+          res.append('Set-Cookie', cookie);
+        }
+      } else {
+        res.setHeader(name, value);
+      }
+    }
+
+    if (upstreamResponse.body) {
+      Readable.fromWeb(
+        upstreamResponse.body as unknown as import('node:stream/web').ReadableStream,
+      ).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (error) {
+    console.error('Proxy error to API gateway', error);
+    res.status(502).json({ detail: 'El servicio de datos no está disponible.', status: 502, title: 'Servicio no disponible' });
+  }
+});
+
+/**
+ * Headers never forwarded to the gateway: hop-by-hop headers that Node's
+ * `fetch` manages itself, plus browser-only headers that would make the
+ * gateway apply its CORS policy. The SSR is the browser's origin, so proxied
+ * calls are server-to-server: forwarding the browser `Origin` would trigger a
+ * 403 from the gateway's CORS filter for any origin outside `allowed-origins`.
+ */
+const DROPPED_HEADERS = new Set([
+  'host',
+  'connection',
+  'content-length',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'origin',
+  'referer',
+]);
+
+function getSetCookies(response: Response): string[] {
+  const withPlural = response.headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof withPlural.getSetCookie === 'function') {
+    return withPlural.getSetCookie();
+  }
+  const raw = withPlural.get('set-cookie');
+  return raw ? [raw] : [];
+}
 
 /**
  * Serve static files from /browser

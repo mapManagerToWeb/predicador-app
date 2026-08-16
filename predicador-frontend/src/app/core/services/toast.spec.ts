@@ -61,15 +61,32 @@ describe('Toast', () => {
       tick(1000);
       expect(service.visible()).toBeFalsy();
     }));
+
+    it('should show subtitle and toast type', () => {
+      service.show('Title', 4000, 'sent', 'Subtitle');
+
+      expect(service.visible()).toBeTruthy();
+      expect(service.message()).toBe('Title');
+      expect(service.subtitle()).toBe('Subtitle');
+      expect(service.type()).toBe('sent');
+    });
+
+    it('should default subtitle to empty and keep existing types working', () => {
+      service.show('Some warning', 2000, 'warning');
+
+      expect(service.subtitle()).toBe('');
+      expect(service.type()).toBe('warning');
+    });
   });
 
   describe('hide', () => {
     it('should hide toast', () => {
-      service.show('Test message');
+      service.show('Test message', 3000, 'success', 'Subtitle');
       service.hide();
 
       expect(service.visible()).toBeFalsy();
       expect(service.message()).toBe('');
+      expect(service.subtitle()).toBe('');
     });
   });
 });

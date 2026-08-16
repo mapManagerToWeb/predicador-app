@@ -2,6 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import {
+  REVALIDATION_RETRY_DELAY_MS,
+  MUTATION_RETRY_DELAY_MS,
+  retryTransient,
+} from '../utils/http-retry';
 import type { Reporte, RegistroReporte, EstadoReporte, TipoSesion } from '../models/models';
 import { ReportCacheService } from './report-cache';
 import { DraftMarksService } from './map-draft';
@@ -61,6 +66,7 @@ export class TerritorioService {
     const dtos = registros.map(r => this.toReportDto(r));
     return (await firstValueFrom(
       this.http.post<ReportDto[]>(this.reportesUrl, dtos)
+        .pipe(retryTransient(1, MUTATION_RETRY_DELAY_MS))
     ) ?? []).map(d => this.toReporte(d, d.territorioNumero ?? 0));
   }
 
@@ -69,6 +75,7 @@ export class TerritorioService {
     if (!ids.length) return;
     await firstValueFrom(
       this.http.delete<void>(this.reportesUrl, { params: { ids: ids.join(',') } })
+        .pipe(retryTransient(1, MUTATION_RETRY_DELAY_MS))
     );
   }
 
@@ -89,20 +96,32 @@ export class TerritorioService {
     if (sinRevisar.length === 0) return result;
 
     const versiones = new Map<number, number>();
-    try {
-      for (let i = 0; i < sinRevisar.length; i += BATCH_SIZE) {
-        const chunk = sinRevisar.slice(i, i + BATCH_SIZE);
-        const query = chunk.map(n => `territorios=${n}`).join('&');
-        const response = (await firstValueFrom(
-          this.http.get<Record<string, number>>(`${this.reportesUrl}/versions?${query}`)
-        )) ?? {};
-        for (const [key, version] of Object.entries(response)) {
-          versiones.set(Number(key), Number(version));
-        }
-      }
-    } catch {
+    const chunks: number[][] = [];
+    for (let i = 0; i < sinRevisar.length; i += BATCH_SIZE) {
+      chunks.push(sinRevisar.slice(i, i + BATCH_SIZE));
+    }
+
+    // Fetch all chunks in parallel instead of serially awaiting each one,
+    // so the revalidation network chain is one round-trip deep, not N deep.
+    const responses = await Promise.allSettled(
+      chunks.map(chunk =>
+        firstValueFrom(
+          this.http.get<Record<string, number>>(
+            `${this.reportesUrl}/versions?${chunk.map(n => `territorios=${n}`).join('&')}`
+          ).pipe(retryTransient(2, REVALIDATION_RETRY_DELAY_MS))
+        )
+      )
+    );
+    const allFailed = responses.every(r => r.status === 'rejected');
+    if (allFailed) {
       // Offline: skip revalidation, paint from the persistent cache.
       return result;
+    }
+    for (const response of responses) {
+      if (response.status !== 'fulfilled' || !response.value) continue;
+      for (const [key, version] of Object.entries(response.value)) {
+        versiones.set(Number(key), Number(version));
+      }
     }
 
     for (const num of sinRevisar) {
@@ -120,6 +139,7 @@ export class TerritorioService {
       const query = chunk.map(n => `territorios=${n}`).join('&');
       const response = (await firstValueFrom(
         this.http.get<Record<string, ReportDto[]>>(`${this.reportesUrl}/batch?${query}`)
+          .pipe(retryTransient(2, REVALIDATION_RETRY_DELAY_MS))
       )) ?? {};
       for (const num of chunk) {
         const reportes = (response[String(num)] ?? []).map(d => this.toReporte(d, num));

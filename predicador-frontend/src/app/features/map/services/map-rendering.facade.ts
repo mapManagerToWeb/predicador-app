@@ -175,10 +175,13 @@ export class MapRenderingFacade {
   ocultarPoligonosNoSeleccionados(seleccionados: number[]): void {
     const seleccionadosSet = new Set(seleccionados);
 
-    for (const fl of this.territories.getAllTerritoriesLayer()) {
-      if (seleccionadosSet.has(fl.territorioPadre)) continue;
-      this.styles.applyStyleToFeatureLayer(fl, getHiddenStyle());
-    }
+    this.styles.cancelPendingStyleUpdates();
+    this.styles.queueStyleUpdate(() => {
+      for (const fl of this.territories.getAllTerritoriesLayer()) {
+        if (seleccionadosSet.has(fl.territorioPadre)) continue;
+        this.styles.applyStyleToFeatureLayer(fl, getHiddenStyle());
+      }
+    });
 
     this.territories.updateLabelsForSelection(seleccionadosSet);
   }
@@ -274,6 +277,16 @@ export class MapRenderingFacade {
 
   updatePartialPolygonLatLngs(latlngs: L.LatLngExpression[], currentTerritoryColor: string): void {
     this.partialDraw.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
+  }
+
+  actualizarParcialEnDrag(
+    puntos: SnappedPoint[],
+    currentTerritoryColor: string,
+    manzanaEdges: Edge[],
+    index: number,
+    marker: L.Marker
+  ): void {
+    this.partialDraw.actualizarParcialEnDrag(puntos, currentTerritoryColor, manzanaEdges, index, marker);
   }
 
   limpiarCapasParciales(): void {

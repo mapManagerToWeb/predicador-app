@@ -175,7 +175,7 @@ describe('MapDataPersistenceService', () => {
     expect(state.enviando()).toBe(false);
   });
 
-  it('reports incomplete territories with the *incompleto* wording on success', async () => {
+  it('shows the WhatsApp confirmation toast when an incomplete territory is sent and saved', async () => {
     report.buildTerritoriosParaEnvio.mockReturnValue({
       territorios: [{ numero: 2, finalizado: false, totalManzanas: 1, manzanasMarcadas: 0 }],
       requiereScreenshot: true,
@@ -199,8 +199,12 @@ describe('MapDataPersistenceService', () => {
 
     expect(report.captureScreenshot).toHaveBeenCalledTimes(1);
     expect(report.sendWhatsApp).toHaveBeenCalledTimes(1);
-    expect(show).toHaveBeenCalledWith(expect.stringContaining('*incompleto*'));
-    expect(show).not.toHaveBeenCalledWith(expect.stringContaining('*faltante*'));
+    expect(show).toHaveBeenCalledWith(
+      TOAST_MESSAGES.sendSuccessTitle,
+      4000,
+      'sent',
+      TOAST_MESSAGES.sendSuccessSubtitle
+    );
   });
 
   it('writes the report cache and clears the draft for saved territories', async () => {
@@ -242,7 +246,8 @@ describe('MapDataPersistenceService', () => {
     expect(rendering.restaurarVisibilidadPoligonos).not.toHaveBeenCalled();
     expect(state.territoriosSeleccionados()).toEqual([]);
     expect(state.territorioSeleccionado()).toBeNull();
-    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.modoMarcado()).toBe('none');
+    expect(state.manzanasById().size).toBe(0);
   });
 
   it('restores the full view with marks after a successful send', async () => {
@@ -266,7 +271,8 @@ describe('MapDataPersistenceService', () => {
     expect(rendering.restaurarVistaConMarcas).toHaveBeenCalled();
     expect(rendering.restaurarVisibilidadPoligonos).not.toHaveBeenCalled();
     expect(state.territoriosSeleccionados()).toEqual([]);
-    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.modoMarcado()).toBe('none');
+    expect(state.manzanasById().size).toBe(0);
   });
 
   it('restores the full view with marks in the whatsapp-sent catch branch', async () => {
@@ -290,7 +296,8 @@ describe('MapDataPersistenceService', () => {
     await service.guardarYEnviar();
 
     expect(state.territoriosSeleccionados()).toEqual([]);
-    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.modoMarcado()).toBe('none');
+    expect(state.manzanasById().size).toBe(0);
   });
 
   function reporteShape(territorio: number) {

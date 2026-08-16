@@ -13,12 +13,33 @@ const { poly } = vi.hoisted(() => {
 vi.mock('leaflet', () => ({
   polygon: vi.fn(() => poly),
   marker: vi.fn(() => {
-    const m = { on: vi.fn(), addTo: vi.fn() };
+    const m = { on: vi.fn(), addTo: vi.fn(), setLatLng: vi.fn() };
     m.addTo.mockReturnValue(m);
     return m;
   }),
   divIcon: vi.fn(() => ({})),
 }));
+
+let rafCallbacks: Array<() => void>;
+
+function flushRaf(): void {
+  const pending = rafCallbacks;
+  rafCallbacks = [];
+  for (const cb of pending) cb();
+}
+
+beforeEach(() => {
+  rafCallbacks = [];
+  vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+    rafCallbacks.push(cb);
+    return rafCallbacks.length;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function containerPoint(lat: number, lng: number): { x: number; y: number; distanceTo: (p: { x: number; y: number }) => number } {
   const x = lat * 1000;
@@ -95,7 +116,62 @@ describe('MapPartialDrawService', () => {
     const dragCallback = firstMarker.on.mock.calls.find(call => call[0] === 'drag')?.[1];
     expect(dragCallback).toBeDefined();
     dragCallback();
+    flushRaf();
     expect(onMarkerDrag).toHaveBeenCalledWith(0, firstMarker);
+  });
+
+  it('throttles marker drag events to a single callback per frame', () => {
+    const onMarkerDrag = vi.fn();
+    service.redibujarParcial(PUNTOS, '#ff0000', [], onMarkerDrag);
+
+    const firstMarker = markerMock.mock.results[0].value as { on: ReturnType<typeof vi.fn> };
+    const secondMarker = markerMock.mock.results[1].value as { on: ReturnType<typeof vi.fn> };
+    const firstDrag = firstMarker.on.mock.calls.find(call => call[0] === 'drag')?.[1];
+    const secondDrag = secondMarker.on.mock.calls.find(call => call[0] === 'drag')?.[1];
+
+    firstDrag();
+    secondDrag();
+    secondDrag();
+
+    expect(onMarkerDrag).not.toHaveBeenCalled();
+    flushRaf();
+    expect(onMarkerDrag).toHaveBeenCalledTimes(1);
+    expect(onMarkerDrag).toHaveBeenCalledWith(1, secondMarker);
+  });
+
+  it('cancels a pending drag callback when the partial layers are cleared', () => {
+    const onMarkerDrag = vi.fn();
+    service.redibujarParcial(PUNTOS, '#ff0000', [], onMarkerDrag);
+
+    const firstMarker = markerMock.mock.results[0].value as { on: ReturnType<typeof vi.fn> };
+    const dragCallback = firstMarker.on.mock.calls.find(call => call[0] === 'drag')?.[1];
+    dragCallback();
+
+    service.limpiarCapasParciales();
+    flushRaf();
+    expect(onMarkerDrag).not.toHaveBeenCalled();
+  });
+
+  it('actualizarParcialEnDrag moves the dragged marker and updates the polygon in place', () => {
+    service.redibujarParcial(PUNTOS, '#ff0000', [], vi.fn());
+    const firstMarker = markerMock.mock.results[0].value as { setLatLng: ReturnType<typeof vi.fn> };
+    poly.setLatLngs.mockClear();
+    firstMarker.setLatLng.mockClear();
+
+    service.actualizarParcialEnDrag(
+      [
+        { latlng: { lat: 5, lng: 5 }, edgeIdx: -1, t: 0 },
+        { latlng: { lat: 1, lng: 0 }, edgeIdx: -1, t: 0 },
+      ],
+      '#ff0000',
+      [],
+      0,
+      firstMarker as never,
+    );
+
+    expect(firstMarker.setLatLng).toHaveBeenCalledWith({ lat: 5, lng: 5 });
+    expect(poly.setLatLngs).toHaveBeenCalled();
+    expect(fakeMap.removeLayer).not.toHaveBeenCalled();
   });
 
   it('updatePartialPolygonLatLngs updates an existing polygon', () => {
