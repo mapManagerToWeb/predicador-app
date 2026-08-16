@@ -106,6 +106,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **Captura de pantalla**: Screenshot automático del mapa para envío por WhatsApp
 - **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada; el reporte se envía **siempre con la captura** (aunque todos los territorios estén completos) y cada territorio se lista como `*terminado*` o `*incompleto*`, dirigido al teléfono del encargado logueado
 - **Guardado local**: Marcado persistido en base de datos, restauración al recargar
+- **Notificaciones responsivas**: Toast notifications adaptables con soporte para multilínea en pantallas móviles y modo claro/oscuro
 - **Modo oscuro**: Soporte completo de temas claro/oscuro
 - **PWA**: Instalable, funciona offline con Service Worker
 - **SSR**: Server-Side Rendering para SEO y performance inicial

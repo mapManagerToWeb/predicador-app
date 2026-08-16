@@ -217,7 +217,7 @@ img {
   will-change: transform;
 }
 
-:root[data-theme="light"] .leaflet-container {
+:root[data-theme="light"] .leaflet-tile-pane {
   filter: brightness(0.92);
 }
 
@@ -256,9 +256,9 @@ img {
   height: 24px;
   padding: 0 6px;
   border-radius: 12px;
-  background: rgba(253, 251, 247, 0.9);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* Sin backdrop-filter: los labels se mueven con el mapa y el blur fuerza
+     re-rasterización en cada pan. Fondo casi opaco consigue el mismo look. */
+  background: rgba(253, 251, 247, 0.96);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -271,7 +271,7 @@ img {
 }
 
 :root[data-theme="dark"] .territory-label__text {
-  background: rgba(36, 34, 32, 0.9);
+  background: rgba(36, 34, 32, 0.96);
   color: #F5F2EB;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }

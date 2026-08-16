@@ -51,6 +51,76 @@
   border-color: var(--clip-metal);
 }
 
+/* ── Toast confirmación de envío por WhatsApp ── */
+.toast--sent {
+  background: #ffffff;
+  color: #075E54;
+  border: 1.5px solid #A8E6C3;
+  padding: 10px 20px 10px 12px;
+  box-shadow: 0 8px 28px rgba(18, 140, 126, 0.28);
+}
+
+.toast--sent .toast-badge {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  box-shadow: 0 4px 12px rgba(18, 140, 126, 0.45);
+}
+
+.toast--sent .toast-badge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(37, 211, 102, 0.65);
+  animation: wa-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.toast--sent .toast-badge svg {
+  width: 20px;
+  height: 20px;
+  fill: #ffffff;
+}
+
+.toast--sent .toast-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.toast--sent .toast-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.toast--sent .toast-subtitle {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: #2E7D5B;
+  white-space: normal;
+}
+
+@keyframes wa-ping {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  75%, 100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
 .toast-icon {
   width: 18px;
   height: 18px;
@@ -58,7 +128,7 @@
 }
 
 .toast-text {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 @keyframes toast-in {
@@ -95,4 +165,21 @@
   background: #3D2E0A;
   color: #D4A843;
   border-color: #B8860B;
+}
+
+:root[data-theme="dark"] .toast--sent {
+  background: #12231B;
+  color: #8FE0A8;
+  border-color: rgba(37, 211, 102, 0.35);
+  box-shadow: 0 8px 28px rgba(37, 211, 102, 0.22);
+}
+
+:root[data-theme="dark"] .toast--sent .toast-subtitle {
+  color: #A8A39C;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast--sent .toast-badge::before {
+    animation: none;
+  }
 }

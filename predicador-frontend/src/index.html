@@ -13,21 +13,21 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-    <!--
-      Warm up TCP + TLS to the tile providers antes de que MapPage se hidrate.
-      preconnect es más caro que dns-prefetch pero se paga una sola vez y
-      elimina ~200-400ms del primer tile visible en móviles.
-      Los subdominios de OSM y CartoDB rotan (a/b/c/d), pero el handshake se
-      reutiliza con HTTP/2 por origen efectivo.
-    -->
     <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
-    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
-    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
+    <link rel="dns-prefetch" href="https://a.basemaps.cartocdn.com" />
+    <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
     <link rel="dns-prefetch" href="https://b.basemaps.cartocdn.com" />
     <link rel="dns-prefetch" href="https://c.basemaps.cartocdn.com" />
     <link rel="dns-prefetch" href="https://d.basemaps.cartocdn.com" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    <!--
+      Warm up TCP + TLS to the tile provider antes de que MapPage se hidrate.
+      El handshake de OSM se reutiliza con HTTP/2 para los subdominios a/b/c.
+      CartoDB y ArcGIS (modos oscuro / satélite) solo se usan si el usuario
+      cambia de capa: un preconnect activo allí es caro sin beneficio inmediato,
+      así que solo hacemos dns-prefetch.
+    -->
   </head>
   <body>
     <app-root></app-root>

@@ -82,9 +82,38 @@ export function snapToContour(
   let bestT = 0;
   let bestDist = Infinity;
 
+  // Las aristas consecutivas comparten vértice (anillo cerrado), así que se
+  // cachea el punto contenedor por vértice para evitar reproyectar. En el hot
+  // path del drag esto reduce ~2 proyecciones por arista.
+  const containerCache = new Map<L.LatLng, { x: number; y: number }>();
+  const containerPointOf = (ll: L.LatLng): { x: number; y: number } => {
+    let pt = containerCache.get(ll);
+    if (!pt) {
+      pt = map.latLngToContainerPoint(ll);
+      containerCache.set(ll, pt);
+    }
+    return pt;
+  };
+
   for (let i = 0; i < edges.length; i++) {
     const edge = edges[i];
-    const projected = projectOnSegment(latlng, edge.from, edge.to, map);
+    const pa = containerPointOf(edge.from);
+    const pb = containerPointOf(edge.to);
+
+    const abx = pb.x - pa.x;
+    const aby = pb.y - pa.y;
+    const apx = clickPt.x - pa.x;
+    const apy = clickPt.y - pa.y;
+
+    const ab2 = abx * abx + aby * aby;
+    if (ab2 === 0) continue;
+
+    const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2));
+
+    const projected = makeLatLng(
+      edge.from.lat + t * (edge.to.lat - edge.from.lat),
+      edge.from.lng + t * (edge.to.lng - edge.from.lng)
+    );
     const projPt = map.latLngToContainerPoint(projected);
     const d = clickPt.distanceTo(projPt);
 
@@ -92,7 +121,7 @@ export function snapToContour(
       bestDist = d;
       bestPoint = projected;
       bestEdgeIdx = i;
-      bestT = computeT(latlng, edge.from, edge.to, map);
+      bestT = t;
     }
   }
 

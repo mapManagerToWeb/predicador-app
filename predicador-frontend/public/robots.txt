@@ -1,0 +1,5 @@
+# Predicador — acceso restringido por perfil.
+# La vista de mapa requiere autenticación; no tiene sentido indexarla.
+User-agent: *
+Disallow: /map
+Allow: /

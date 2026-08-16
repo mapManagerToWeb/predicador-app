@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { vi } from 'vitest';
 import { EncargadoService, EncargadoDto } from './encargado';
 import { AuthTokenService } from './auth-token';
 import { environment } from '../../../environments/environment';
@@ -69,6 +70,25 @@ describe('EncargadoService', () => {
 
       await expect(promise).rejects.toBeTruthy();
       expect(authToken.role()).toBeNull();
+    });
+
+    it('retries a transient 503 (cold start) and succeeds', async () => {
+      vi.useFakeTimers();
+      try {
+        const promise = service.loginByPhone('56912345678');
+
+        let req = httpMock.expectOne(`${environment.apiUrl}/encargados/login`);
+        req.flush('', { status: 503, statusText: 'Service Unavailable' });
+
+        await vi.advanceTimersByTimeAsync(1500);
+        req = httpMock.expectOne(`${environment.apiUrl}/encargados/login`);
+        req.flush({ encargado, token: null });
+
+        await expect(promise).resolves.toEqual(encargado);
+        expect(authToken.role()).toBe('encargado');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

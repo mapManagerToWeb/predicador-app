@@ -8,22 +8,21 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Base64;
-import java.util.Map;
 
 @Component
 public class WhatsAppMediaClient {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppMediaClient.class);
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final WhatsAppProperties props;
 
-    public WhatsAppMediaClient(RestTemplate restTemplate, WhatsAppProperties props) {
-        this.restTemplate = restTemplate;
+    public WhatsAppMediaClient(RestClient restClient, WhatsAppProperties props) {
+        this.restClient = restClient;
         this.props = props;
     }
 
@@ -33,26 +32,26 @@ public class WhatsAppMediaClient {
 
         byte[] imageBytes = Base64.getDecoder().decode(base64Image);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setBearerAuth(props.accessToken());
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("messaging_product", "whatsapp");
-        body.add("type", mimeType);
-        body.add("file", new ByteArrayResource(imageBytes) {
+        MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+        multipart.add("messaging_product", "whatsapp");
+        multipart.add("type", mimeType);
+        multipart.add("file", new ByteArrayResource(imageBytes) {
             @Override
             public String getFilename() {
                 return "screenshot.jpg";
             }
         });
 
-        HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<WhatsAppMediaResponse> response = restTemplate.exchange(
-                    url, HttpMethod.POST, request, WhatsAppMediaResponse.class);
-            WhatsAppMediaResponse responseBody = response.getBody();
+            WhatsAppMediaResponse responseBody = restClient.post()
+                    .uri(url)
+                    .headers(headers -> {
+                        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+                        headers.setBearerAuth(props.accessToken());
+                    })
+                    .body(multipart)
+                    .retrieve()
+                    .body(WhatsAppMediaResponse.class);
             if (responseBody == null || responseBody.id() == null || responseBody.id().isBlank()) {
                 throw new WhatsAppIntegrationException("WhatsApp devolvió una respuesta sin media id", 502, null);
             }

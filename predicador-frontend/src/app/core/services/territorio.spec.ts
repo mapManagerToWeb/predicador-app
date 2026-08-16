@@ -1,8 +1,18 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { vi } from 'vitest';
 import { TerritorioService } from './territorio';
-import type { Reporte } from '../models/models';
+import type { RegistroReporte, Reporte } from '../models/models';
+
+function registro(territorio: number): RegistroReporte {
+  return {
+    territorioNumero: territorio, manzanaId: null, encargadoId: 1, encargadoNombre: 'Daniel',
+    encargadoApellido: 'Uribe', sessionTime: '06:00', estado: 'completed',
+    totalManzanas: 3, manzanasMarcadas: 3, tipoSesion: 'completa',
+    geometriaParcial: null, puntosParciales: null, manzanasIds: 'A,B,C',
+  };
+}
 
 function reporte(id: number, territorio: number): Reporte {
   return {
@@ -95,6 +105,33 @@ describe('TerritorioService', () => {
     expect(after.get(1)?.[0]?.id).toBe(10);
   });
 
+  it('fetches all /versions chunks in parallel and tolerates a failed chunk', async () => {
+    // 55 territories -> 2 chunks of 50 + 5. Both requests must fire before any flush,
+    // proving the chunks are fetched in parallel rather than serially.
+    const nums = Array.from({ length: 55 }, (_, i) => i);
+    const promise = service.revalidarReportes(nums);
+
+    const versionsReqs = httpMock.match(isVersions);
+    expect(versionsReqs).toHaveLength(2);
+    const sorted = versionsReqs.sort((a, b) => territoriosFrom(a.request.url).length - territoriosFrom(b.request.url).length);
+    const chunkDe50 = sorted[1];
+    const chunkDe5 = sorted[0];
+    expect(territoriosFrom(chunkDe5.request.url)).toContain('54');
+
+    // Larger chunk fails (offline blip); smaller succeeds. Revalidation must continue.
+    chunkDe50.error(new ProgressEvent('error'), { status: 0, statusText: 'Offline' });
+    chunkDe5.flush({ 54: 7 });
+    await Promise.resolve();
+
+    const batchReq = httpMock.expectOne(isBatch);
+    expect(territoriosFrom(batchReq.request.url)).toEqual(['54']);
+    batchReq.flush({ 54: [reporte(2, 54)] });
+
+    const result = await promise;
+    expect(result.get(54)?.[0]?.id).toBe(2);
+    expect(service['versionsSeen'].get(54)).toBe(7);
+  });
+
   it('does not request territories that have no backend version and no cache', async () => {
     const promise = service.getReportesPorTerritorios([99]);
     const versionsReq = httpMock.expectOne(isVersions);
@@ -156,5 +193,84 @@ describe('TerritorioService', () => {
     await service.eliminarReportes([]);
 
     httpMock.expectNone(r => r.method === 'DELETE' && r.url.includes('/reports'));
+  });
+
+  it('crearReportes retries a transient 503 and succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = service.crearReportes([registro(1)]);
+
+      let req = httpMock.expectOne(r => r.method === 'POST' && r.url.includes('/reports'));
+      req.flush('', { status: 503, statusText: 'Service Unavailable' });
+
+      await vi.advanceTimersByTimeAsync(1500);
+      req = httpMock.expectOne(r => r.method === 'POST' && r.url.includes('/reports'));
+      req.flush([{ ...reporte(10, 1) }]);
+
+      const saved = await promise;
+      expect(saved).toHaveLength(1);
+      expect(saved[0].id).toBe(10);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('crearReportes propagates the error after exhausting transient retries', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = service.crearReportes([registro(1)]);
+
+      let req = httpMock.expectOne(r => r.method === 'POST' && r.url.includes('/reports'));
+      req.flush('', { status: 503, statusText: 'Service Unavailable' });
+      await vi.advanceTimersByTimeAsync(1500);
+
+      req = httpMock.expectOne(r => r.method === 'POST' && r.url.includes('/reports'));
+      req.flush('', { status: 503, statusText: 'Service Unavailable' });
+
+      await expect(promise).rejects.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('revalidarReportes retries a transient 503 on /versions before continuing', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = service.revalidarReportes([1]);
+
+      let req = httpMock.expectOne(isVersions);
+      req.flush('', { status: 503, statusText: 'Service Unavailable' });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      req = httpMock.expectOne(isVersions);
+      req.flush({ 1: 10 });
+      await Promise.resolve();
+
+      const batchReq = httpMock.expectOne(isBatch);
+      batchReq.flush({ 1: [reporte(10, 1)] });
+
+      const result = await promise;
+      expect(result.get(1)?.[0]?.id).toBe(10);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('eliminarReportes retries a transient 503', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = service.eliminarReportes([10]);
+
+      let req = httpMock.expectOne(r => r.method === 'DELETE' && r.url.includes('/reports'));
+      req.flush('', { status: 503, statusText: 'Service Unavailable' });
+
+      await vi.advanceTimersByTimeAsync(1500);
+      req = httpMock.expectOne(r => r.method === 'DELETE' && r.url.includes('/reports'));
+      req.flush(null);
+
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

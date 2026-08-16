@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -16,11 +16,11 @@ import java.util.Map;
 public class WhatsAppMessageClient {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppMessageClient.class);
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final WhatsAppProperties props;
 
-    public WhatsAppMessageClient(RestTemplate restTemplate, WhatsAppProperties props) {
-        this.restTemplate = restTemplate;
+    public WhatsAppMessageClient(RestClient restClient, WhatsAppProperties props) {
+        this.restClient = restClient;
         this.props = props;
     }
 
@@ -44,17 +44,17 @@ public class WhatsAppMessageClient {
             )
         );
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(props.accessToken());
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
-
         log.info("Enviando mensaje WhatsApp outcome=pending");
         try {
-            ResponseEntity<WhatsAppMessageResponse> response = restTemplate.exchange(
-                    url, HttpMethod.POST, request, WhatsAppMessageResponse.class);
-            WhatsAppMessageResponse body = response.getBody();
+            WhatsAppMessageResponse body = restClient.post()
+                    .uri(url)
+                    .headers(h -> {
+                        h.setContentType(MediaType.APPLICATION_JSON);
+                        h.setBearerAuth(props.accessToken());
+                    })
+                    .body(payload)
+                    .retrieve()
+                    .body(WhatsAppMessageResponse.class);
             if (body == null || body.stableMessageId() == null || body.stableMessageId().isBlank()) {
                 throw new WhatsAppIntegrationException("WhatsApp devolvió una respuesta sin message id", 502, null);
             }

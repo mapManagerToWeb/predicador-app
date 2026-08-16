@@ -15,7 +15,9 @@ import type { SnappedPoint, Edge } from '../map-geometry';
 export class MapPartialDrawService {
   private engine = inject(MapEngineService);
   private poligonoParcial: L.Polygon | null = null;
-  private markersParciales: L.Layer[] = [];
+  private markersParciales: L.Marker[] = [];
+  private dragRaf = 0;
+  private pendingDrag: { index: number; marker: L.Marker } | null = null;
 
   getPoligonoParcial(): L.Polygon | null {
     return this.poligonoParcial;
@@ -26,6 +28,7 @@ export class MapPartialDrawService {
   }
 
   limpiarCapasParciales(): void {
+    this.cancelPendingDrag();
     const map = this.engine.getMap();
     this.removePartialPolygon(map);
     this.removePartialMarkers(map);
@@ -56,6 +59,56 @@ export class MapPartialDrawService {
     const latlngs = this.buildContourPolygon(puntos, manzanaEdges);
     this.createPartialPolygonIfValid(latlngs, currentTerritoryColor);
     this.agregarMarkersParciales(puntos, onMarkerDrag);
+  }
+
+  /**
+   * Actualiza el dibujo parcial durante el arrastre de un marker SIN destruir ni
+   * recrear ninguna capa. Recorre el contorno de nuevo y mueve el polígono con
+   * setLatLngs y el marker arrastrado con setLatLng. Esto elimina el churn de
+   * teardown/recreate por frame que era la principal fuente de jank en móvil.
+   *
+   * <p>La llamada llega ya throttled por rAF desde el handler de drag, así que
+   * nunca se ejecuta más de una vez por frame.</p>
+   */
+  actualizarParcialEnDrag(
+    puntos: SnappedPoint[],
+    currentTerritoryColor: string,
+    manzanaEdges: Edge[],
+    index: number,
+    marker: L.Marker
+  ): void {
+    const map = this.engine.getMap();
+    if (!map) return;
+
+    const snapped = puntos[index];
+    if (snapped) marker.setLatLng(snapped.latlng);
+
+    const latlngs = this.buildContourPolygon(puntos, manzanaEdges);
+    this.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
+  }
+
+  private scheduleMarkerDrag(
+    index: number,
+    marker: L.Marker,
+    onMarkerDrag: (index: number, marker: L.Marker) => void
+  ): void {
+    this.pendingDrag = { index, marker };
+    if (this.dragRaf === 0) {
+      this.dragRaf = requestAnimationFrame(() => {
+        this.dragRaf = 0;
+        const pending = this.pendingDrag;
+        this.pendingDrag = null;
+        if (pending) onMarkerDrag(pending.index, pending.marker);
+      });
+    }
+  }
+
+  private cancelPendingDrag(): void {
+    if (this.dragRaf !== 0) {
+      cancelAnimationFrame(this.dragRaf);
+      this.dragRaf = 0;
+    }
+    this.pendingDrag = null;
   }
 
   private createPartialPolygonIfValid(latlngs: L.LatLng[], color: string): void {
@@ -186,7 +239,7 @@ export class MapPartialDrawService {
     if (!map) return;
 
     const icon = this.createMarkerIcon();
-    const markers: L.Layer[] = [];
+    const markers: L.Marker[] = [];
 
     for (let i = 0; i < puntos.length; i++) {
       const marker = this.createDraggableMarker(puntos[i].latlng, icon, map, i, onMarkerDrag);
@@ -213,7 +266,7 @@ export class MapPartialDrawService {
     onMarkerDrag: (index: number, marker: L.Marker) => void
   ): L.Marker {
     const m = L.marker(latlng, { icon, draggable: true }).addTo(map);
-    m.on('drag', () => onMarkerDrag(idx, m));
+    m.on('drag', () => this.scheduleMarkerDrag(idx, m, onMarkerDrag));
     return m;
   }
 }
