@@ -17,9 +17,11 @@ describe('MapReportService', () => {
   let restoreMap: ReturnType<typeof vi.fn>;
   let profile: UserProfile | null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     restoreMap = vi.fn();
     profile = { name: 'Daniel', lastName: 'Uribe', avatar: 3, telefono: '56912345678', encargadoId: 7 };
+    const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
+    toJpeg.mockClear();
     TestBed.configureTestingModule({
       providers: [
         MapReportService,
@@ -74,6 +76,48 @@ describe('MapReportService', () => {
 
       expect(toJpeg).toHaveBeenCalledWith(mapElement, expect.objectContaining({ pixelRatio: expect.any(Number) }));
       expect(restoreMap).toHaveBeenCalledOnce();
+      mapElement.remove();
+    });
+
+    it('warm-up capture on Safari returns the largest dataUrl (iOS blank-first-capture bug)', async () => {
+      const mapElement = document.createElement('div');
+      mapElement.id = 'map';
+      document.body.appendChild(mapElement);
+      const uaSpy = vi
+        .spyOn(window.navigator, 'userAgent', 'get')
+        .mockReturnValue(
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        );
+      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
+      toJpeg
+        .mockResolvedValueOnce('data:image/jpeg;base64,' + 'AA'.repeat(24))
+        .mockResolvedValueOnce('data:image/jpeg;base64,' + 'BB'.repeat(96));
+
+      await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe(
+        'BB'.repeat(96),
+      );
+
+      expect(toJpeg).toHaveBeenCalledTimes(2);
+      uaSpy.mockRestore();
+      mapElement.remove();
+    });
+
+    it('single capture outside Safari (Chrome/Windows)', async () => {
+      const mapElement = document.createElement('div');
+      mapElement.id = 'map';
+      document.body.appendChild(mapElement);
+      const uaSpy = vi
+        .spyOn(window.navigator, 'userAgent', 'get')
+        .mockReturnValue(
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        );
+      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
+      toJpeg.mockResolvedValue('data:image/jpeg;base64,ABC123');
+
+      await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe('ABC123');
+
+      expect(toJpeg).toHaveBeenCalledTimes(1);
+      uaSpy.mockRestore();
       mapElement.remove();
     });
   });

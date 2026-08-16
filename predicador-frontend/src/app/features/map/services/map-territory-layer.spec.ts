@@ -77,4 +77,74 @@ describe('MapTerritoryLayerService', () => {
       expect(() => service.setManzanaClickHandler(null)).not.toThrow();
     });
   });
+
+  describe('loadAllTerritories', () => {
+    const geoJson = JSON.stringify({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { id: 'm1', territorio_padre: 1, color: '#ff0000' },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-58.5, -34.5],
+                [-58.4, -34.5],
+                [-58.4, -34.4],
+                [-58.5, -34.4],
+              ],
+            ],
+          },
+        },
+      ],
+    });
+
+    function makeService() {
+      return { getAllGeoJson: vi.fn().mockResolvedValue(geoJson) };
+    }
+
+    beforeEach(() => {
+      sessionStorage.clear();
+    });
+
+    it('should throw on invalid input', async () => {
+      const territorioService = { getAllGeoJson: vi.fn().mockResolvedValue('{ broken') };
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await expect(service.loadAllTerritories(territorioService)).rejects.toThrow();
+      spy.mockRestore();
+    });
+
+    it('should fetch, parse and populate the cache when session cache is empty', async () => {
+      const territorioService = makeService();
+      await service.loadAllTerritories(territorioService);
+
+      expect(territorioService.getAllGeoJson).toHaveBeenCalled();
+      expect(service.getTerritoryDataCache().size).toBe(1);
+      const cached = sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY);
+      expect(cached).toBeTruthy();
+    });
+
+    it('should reuse the session cache and skip the fetch on subsequent loads', async () => {
+      const territorioService = makeService();
+      await service.loadAllTerritories(territorioService);
+      expect(territorioService.getAllGeoJson).toHaveBeenCalledTimes(1);
+
+      const secondService = makeService();
+      await service.loadAllTerritories(secondService);
+
+      expect(secondService.getAllGeoJson).not.toHaveBeenCalled();
+      expect(service.getTerritoryDataCache().size).toBe(1);
+    });
+
+    it('should ignore a corrupt session cache and fall back to fetching', async () => {
+      sessionStorage.setItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY, '{ not json');
+      const territorioService = makeService();
+
+      await service.loadAllTerritories(territorioService);
+
+      expect(territorioService.getAllGeoJson).toHaveBeenCalled();
+      expect(service.getTerritoryDataCache().size).toBe(1);
+    });
+  });
 });

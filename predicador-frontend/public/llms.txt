@@ -1,0 +1,11 @@
+# Predicador
+
+Aplicación para encargados de grupos de predicación: seguimiento de territorios,
+manzanas y reportes con base en un mapa (Leaflet), integración con WhatsApp y
+modo offline (PWA con service worker).
+
+Esta es una aplicación autenticada para uso interno; la mayor parte del contenido
+de negocio no es accesible sin iniciar sesión.
+
+- SPA: `/`
+- Mapa (requiere autenticación): `/map`

@@ -259,11 +259,15 @@ export class MapSelectionService {
   limpiarMarcas(): void {
     this.registry.clear();
     this.state.manzanasById.set(new Map());
+    // Vaciar la selección ANTES de restaurar la visibilidad: resetUIState()
+    // pasa territoriosSeleccionados() a restaurarVisibilidadPoligonos, y si la
+    // selección vieja sigue poblada se recalcula hayFiltroActivo=true y se
+    // vuelven a ocultar los no seleccionados (nunca reaparecen tras el reload).
+    this.state.territorioSeleccionado.set(null);
+    this.state.territoriosSeleccionados.set([]);
     this.resetUIState();
     this.rendering.limpiarMarcasVisuales();
     this.state.totalManzanas.set(0);
-    this.state.territorioSeleccionado.set(null);
-    this.state.territoriosSeleccionados.set([]);
     this.rendering.setCurrentTerritoryColor('');
     this.draftService.clear();
   }

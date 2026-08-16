@@ -25,6 +25,10 @@ export type ManzanaClickHandler = (
  */
 @Injectable({ providedIn: 'root' })
 export class MapTerritoryLayerService {
+  // sessionStorage key — full parsed GeoJSON. Avoids the 412 KB round-trip
+  // and re-parse on every navigation/reload. Miss-safes to a plain fetch.
+  static readonly GEOJSON_CACHE_KEY = 'predicador.territories.geojson.v1';
+
   // O(1) territory → layer lookup; replaces signal<FeatureLayer[]>
   private layerByTerritory = new Map<number, FeatureLayer>();
 
@@ -71,11 +75,45 @@ export class MapTerritoryLayerService {
   async loadAllTerritories(territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
     this.clearAllLayers();
 
+    const features = this.getCachedFeatures() ?? (await this.fetchAndCacheFeatures(territorioService));
+    if (!features) return;
+
+    const byTerritorio = this.groupFeaturesByTerritorio(features);
+    this.dataCache = this.buildTerritorioCache(byTerritorio);
+  }
+
+  private getCachedFeatures(): GeoJSON.Feature[] | null {
+    if (typeof sessionStorage === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { features: GeoJSON.Feature[] };
+      if (!Array.isArray(parsed.features) || parsed.features.length === 0) return null;
+      return parsed.features;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchAndCacheFeatures(territorioService: {
+    getAllGeoJson(): Promise<string>;
+  }): Promise<GeoJSON.Feature[] | null> {
     const geoJsonText = await territorioService.getAllGeoJson();
     const geoJson = JSON.parse(geoJsonText) as GeoJSON.FeatureCollection;
+    const features = geoJson.features;
 
-    const byTerritorio = this.groupFeaturesByTerritorio(geoJson.features);
-    this.dataCache = this.buildTerritorioCache(byTerritorio);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(
+          MapTerritoryLayerService.GEOJSON_CACHE_KEY,
+          JSON.stringify({ features })
+        );
+      } catch {
+        // Quota exceeded / storage disabled — cache is best-effort only.
+      }
+    }
+
+    return features;
   }
 
   private groupFeaturesByTerritorio(features: GeoJSON.Feature[]): Map<number, GeoJSON.Feature[]> {

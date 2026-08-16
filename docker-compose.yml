@@ -73,7 +73,7 @@ services:
       # BCrypt es obligatorio fuera de local; plaintext sólo se usa con perfil local.
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200,https://shus3z-ip-191-116-92-175.tunnelmole.net}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # HMAC secret compartido con reporting-service para emitir/verificar tokens.
       # El secret es obligatorio para evitar iniciar servicios sin enforcement.

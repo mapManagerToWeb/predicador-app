@@ -28,6 +28,7 @@ describe('MapPartialMarkService', () => {
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getCurrentTerritoryColor: ReturnType<typeof vi.fn>;
     redibujarParcial: ReturnType<typeof vi.fn>;
+    actualizarParcialEnDrag: ReturnType<typeof vi.fn>;
     getPoligonoParcial: ReturnType<typeof vi.fn>;
     addExtraLayer: ReturnType<typeof vi.fn>;
     clearPoligonoParcialRef: ReturnType<typeof vi.fn>;
@@ -51,6 +52,7 @@ describe('MapPartialMarkService', () => {
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getCurrentTerritoryColor: vi.fn().mockReturnValue('#22c55e'),
       redibujarParcial: vi.fn(),
+      actualizarParcialEnDrag: vi.fn(),
       getPoligonoParcial: vi.fn().mockReturnValue(null),
       addExtraLayer: vi.fn(),
       clearPoligonoParcialRef: vi.fn(),
@@ -100,6 +102,43 @@ describe('MapPartialMarkService', () => {
       service.agregarPunto({ latlng: { lat: 0.001, lng: 0 }, edgeIdx: -1, t: 0 });
 
       expect(state.puntosParciales()).toHaveLength(1);
+      expect(rendering.redibujarParcial).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('marker drag', () => {
+    function invocarDragCallback(
+      onMarkerDrag: (index: number, marker: { getLatLng(): { lat: number; lng: number } }) => void,
+      marker = { getLatLng: () => ({ lat: 2, lng: 0 }) }
+    ): void {
+      onMarkerDrag(0, marker);
+    }
+
+    it('actualiza el punto en el estado y redibuja en-place sin recrear capas', () => {
+      const interaccion = TestBed.inject(MapInteractionService) as unknown as {
+        handleMarkerDrag: ReturnType<typeof vi.fn>;
+      };
+      interaccion.handleMarkerDrag.mockReturnValue([
+        { latlng: { lat: 2, lng: 0 }, edgeIdx: 0, t: 0.5 },
+        { latlng: { lat: 1, lng: 0 }, edgeIdx: -1, t: 0 },
+      ]);
+      state.puntosParciales.set([
+        { latlng: { lat: 1, lng: 0 }, edgeIdx: -1, t: 0 },
+        { latlng: { lat: 0, lng: 0 }, edgeIdx: -1, t: 0 },
+      ]);
+
+      service.agregarPunto({ latlng: { lat: 1, lng: 1 }, edgeIdx: -1, t: 0 });
+      const onMarkerDrag = rendering.redibujarParcial.mock.calls[0][3] as (
+        index: number,
+        marker: { getLatLng(): { lat: number; lng: number } }
+      ) => void;
+      rendering.redibujarParcial.mockClear();
+      rendering.actualizarParcialEnDrag.mockClear();
+
+      invocarDragCallback(onMarkerDrag);
+
+      expect(state.puntosParciales()[0]).toEqual({ latlng: { lat: 2, lng: 0 }, edgeIdx: 0, t: 0.5 });
+      expect(rendering.actualizarParcialEnDrag).toHaveBeenCalledTimes(1);
       expect(rendering.redibujarParcial).not.toHaveBeenCalled();
     });
   });

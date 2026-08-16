@@ -282,5 +282,16 @@ describe('MapSelectionService', () => {
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('');
       expect(drafts.clear).toHaveBeenCalled();
     });
+
+    it('restores polygon visibility with an empty selection so ALL territories reappear', () => {
+      state.territoriosSeleccionados.set([1, 2]);
+      state.manzanasById.set(
+        new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]])
+      );
+
+      service.limpiarMarcas();
+
+      expect(rendering.restaurarVisibilidadPoligonos).toHaveBeenCalledWith([], []);
+    });
   });
 });

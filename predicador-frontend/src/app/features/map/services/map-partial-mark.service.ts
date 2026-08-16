@@ -75,7 +75,13 @@ export class MapPartialMarkService {
       (index, marker) => {
         const actualizados = this.interaction.handleMarkerDrag(marker, index);
         this.state.puntosParciales.set(actualizados);
-        this.redibujarParcial();
+        this.rendering.actualizarParcialEnDrag(
+          actualizados,
+          this.colorTerritorioActivo(),
+          this.state.manzanaEdges(),
+          index,
+          marker
+        );
       }
     );
   }

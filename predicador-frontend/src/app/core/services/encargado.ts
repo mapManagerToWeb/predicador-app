@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthTokenService } from './auth-token';
+import { MUTATION_RETRY_DELAY_MS, retryTransient } from '../utils/http-retry';
 
 export interface EncargadoDto {
   id: number | null;
@@ -39,14 +40,15 @@ export class EncargadoService {
         nombre,
         apellido,
         telefono,
-      }),
+      }).pipe(retryTransient(1, MUTATION_RETRY_DELAY_MS)),
     );
     return this.extract(response);
   }
 
   async loginByPhone(telefono: string): Promise<EncargadoDto> {
     const response = await firstValueFrom(
-      this.http.post<LoginResponse | EncargadoDto>(`${this.apiUrl}/login`, { telefono }),
+      this.http.post<LoginResponse | EncargadoDto>(`${this.apiUrl}/login`, { telefono })
+        .pipe(retryTransient(1, MUTATION_RETRY_DELAY_MS)),
     );
     return this.extract(response);
   }

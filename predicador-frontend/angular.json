@@ -55,7 +55,11 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": ["c8ezso-ip-191-116-89-215.tunnelmole.net"]
+              "allowedHosts": [
+                "localhost",
+                "127.0.0.1",
+                "shus3z-ip-191-116-92-175.tunnelmole.net"
+              ]
             },
             "ssr": {
               "entry": "src/server.ts"
@@ -93,7 +97,11 @@
           "builder": "@angular/build:dev-server",
           "options": {
             "proxyConfig": "proxy.conf.json",
-            "allowedHosts": ["c8ezso-ip-191-116-89-215.tunnelmole.net"]
+            "allowedHosts": [
+              "localhost",
+              "127.0.0.1",
+              "shus3z-ip-191-116-92-175.tunnelmole.net"
+            ]
           },
           "configurations": {
             "production": {

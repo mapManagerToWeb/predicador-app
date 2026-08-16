@@ -8,13 +8,18 @@ spring:
       discovery:
         locator:
           enabled: false
+    loadbalancer:
+      cache:
+        # No servir listas de instancias vacías/obsoletas durante ~30s+ tras un
+        # re-arranque; el gateway recupera el routing apenas el servicio existe.
+        ttl: 10s
 
 server:
   port: 8080
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,https://shus3z-ip-191-116-92-175.tunnelmole.net}
   admin:
     username: ${ADMIN_USERNAME}
     password: ${ADMIN_PASSWORD:}
@@ -31,6 +36,9 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+    # Detecta re-registros de territorios/reporting antes (default 30s): reduce
+    # la ventana de arranque en frío en la que el LB no encuentra instancia.
+    registry-fetch-interval-seconds: 10
   instance:
     prefer-ip-address: true
 
