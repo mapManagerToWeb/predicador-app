@@ -1,4 +1,4 @@
-import { Injectable, inject, DestroyRef } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import * as L from 'leaflet';
 import { MAP_DEFAULTS } from '../utils/map-constants';
 import { MapEngineService } from './map-engine.service';
@@ -25,14 +25,6 @@ export class MapCaptureService {
   private engine = inject(MapEngineService);
   private territories = inject(MapTerritoryLayerService);
   private registry = inject(MapLayerRegistry);
-  private readonly destroyRef = inject(DestroyRef);
-  private captureTimer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor() {
-    this.destroyRef.onDestroy(() => {
-      if (this.captureTimer !== null) clearTimeout(this.captureTimer);
-    });
-  }
 
   /**
    * Waits for all visible tile images to finish loading.
@@ -107,12 +99,7 @@ export class MapCaptureService {
     this.updateLabelVisibility(territoryLabels, seleccionados);
     this.fitBoundsToSelection(map, seleccionados, manzanasMarcadas, allTerritoriesLayer);
 
-    return new Promise<void>((resolve) => {
-      this.captureTimer = setTimeout(() => {
-        this.captureTimer = null;
-        resolve();
-      }, MAP_DEFAULTS.captureDelayMs);
-    });
+    return this.waitForTiles(map);
   }
 
   /**
@@ -138,7 +125,7 @@ export class MapCaptureService {
       }
     }
 
-if (incompletos.size === 0) return Promise.resolve();
+    if (incompletos.size === 0) return Promise.resolve();
 
     const territoryLabels = this.territories.getTerritoryLabels();
 
@@ -148,12 +135,7 @@ if (incompletos.size === 0) return Promise.resolve();
     this.updateLabelVisibility(territoryLabels, incompletos);
     this.fitBoundsToSelection(map, incompletos, manzanasMarcadas, allTerritoriesLayer);
 
-    return new Promise<void>((resolve) => {
-      this.captureTimer = setTimeout(() => {
-        this.captureTimer = null;
-        resolve();
-      }, MAP_DEFAULTS.captureDelayMs);
-    });
+    return this.waitForTiles(map);
   }
 
   /**

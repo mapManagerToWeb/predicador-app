@@ -53,10 +53,10 @@ describe('MapCaptureService', () => {
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getTerritoryLabels: ReturnType<typeof vi.fn>;
   };
-  let fakeMap: { fitBounds: ReturnType<typeof vi.fn>; getZoom: ReturnType<typeof vi.fn> };
+  let fakeMap: { fitBounds: ReturnType<typeof vi.fn>; getZoom: ReturnType<typeof vi.fn>; getContainer: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    fakeMap = { fitBounds: vi.fn(), getZoom: vi.fn().mockReturnValue(15) };
+    fakeMap = { fitBounds: vi.fn(), getZoom: vi.fn().mockReturnValue(15), getContainer: vi.fn().mockReturnValue(document.createElement('div')) };
     engine = { getMap: vi.fn() };
     territories = { getAllTerritoriesLayer: vi.fn(), getTerritoryLabels: vi.fn(), getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined), getManzanaCountByTerritorio: vi.fn().mockReturnValue(0) };
     TestBed.configureTestingModule({
@@ -109,9 +109,7 @@ describe('MapCaptureService', () => {
         { id: 'parcial-9', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
       ];
 
-      vi.useFakeTimers();
       const promise = service.prepararCaptura(marcadas, [1]);
-      vi.advanceTimersByTime(1000);
       await promise;
 
       expect(hiddenPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
@@ -128,9 +126,7 @@ describe('MapCaptureService', () => {
       territories.getAllTerritoriesLayer.mockReturnValue([fakeFeatureLayer(1, '#ff0000', [])]);
       territories.getTerritoryLabels.mockReturnValue([label1, label2]);
 
-      vi.useFakeTimers();
       const promise = service.prepararCaptura([], [1]);
-      vi.advanceTimersByTime(1000);
       await promise;
 
       expect(label1.setOpacity).toHaveBeenCalledWith(1);
@@ -165,9 +161,7 @@ describe('MapCaptureService', () => {
         { id: 'parcial-9', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
       ];
 
-      vi.useFakeTimers();
       const promise = service.prepararCapturaSoloIncompletos(marcadas, [1, 2], territories.getAllTerritoriesLayer(), getCount);
-      vi.advanceTimersByTime(1000);
       await promise;
 
       expect(markedPath.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
