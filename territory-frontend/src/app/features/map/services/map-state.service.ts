@@ -3,6 +3,8 @@ import type { SnappedPoint, Edge } from '../map-geometry';
 import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
 import { DraftMarksService, MapDraft } from '../../../core/services/map-draft';
 
+const SATELLITE_KEY = 'territory_satellite';
+
 @Injectable({ providedIn: 'root' })
 export class MapStateService {
   manzanasById = signal<Map<string, ManzanaMarcada>>(new Map());
@@ -24,7 +26,7 @@ export class MapStateService {
 
   enviando = signal(false);
   isLoading = signal(false);
-  isSatellite = signal(false);
+  isSatellite = signal(this.loadSatellite());
   predicacion = signal<string>('tarde');
   screenshotPreview = signal<string | null>(null);
   currentTerritoryColor = signal('');
@@ -60,6 +62,24 @@ export class MapStateService {
       this.draftRevision();
       this.scheduleDraftSave();
     });
+
+    effect(() => {
+      const satellite = this.isSatellite();
+      this.saveSatellite(satellite);
+    });
+  }
+
+  private loadSatellite(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(SATELLITE_KEY) === 'true';
+  }
+
+  private saveSatellite(value: boolean): void {
+    try {
+      localStorage.setItem(SATELLITE_KEY, String(value));
+    } catch {
+      // Storage can be unavailable (private mode)
+    }
   }
 
   private scheduleDraftSave(): void {
@@ -126,7 +146,6 @@ export class MapStateService {
     this.puntosParciales.set([]);
     this.enviando.set(false);
     this.isLoading.set(false);
-    this.isSatellite.set(false);
     this.screenshotPreview.set(null);
     this.currentTerritoryColor.set('');
     this._datosParcialesGuardados = new Map();
