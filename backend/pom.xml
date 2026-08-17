@@ -92,7 +92,7 @@
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk18on</artifactId>
-                <version>1.81.1</version>
+                <version>1.85.2</version>
             </dependency>
             <!-- Spring Cloud Config Server 5.0.0 has CVEs (CVE-2026-40982 CRITICAL, CVE-2026-22739 HIGH, CVE-2026-40981 HIGH, CVE-2026-41002 HIGH). Fixed in 5.0.3. -->
             <dependency>
