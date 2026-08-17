@@ -12,6 +12,10 @@ vi.mock('html-to-image', () => ({
   toJpeg: vi.fn().mockRejectedValue(new Error('capture failed')),
 }));
 
+vi.mock('./utils/ios-detection', () => ({
+  isIOS: vi.fn().mockReturnValue(false),
+}));
+
 describe('MapReportService', () => {
   let service: MapReportService;
   let restoreMap: ReturnType<typeof vi.fn>;
@@ -118,6 +122,45 @@ describe('MapReportService', () => {
 
       expect(toJpeg).toHaveBeenCalledTimes(1);
       uaSpy.mockRestore();
+      mapElement.remove();
+    });
+
+    it('uses captureMapComposite on iOS instead of html-to-image', async () => {
+      const { isIOS } = await import('./utils/ios-detection');
+      (isIOS as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mapElement = document.createElement('div');
+      mapElement.id = 'map';
+      Object.defineProperty(mapElement, 'clientWidth', { value: 800 });
+      Object.defineProperty(mapElement, 'clientHeight', { value: 600 });
+      document.body.appendChild(mapElement);
+
+      vi.spyOn(mapElement, 'querySelectorAll').mockReturnValue([] as any);
+
+      const origCreate = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'canvas') {
+          const mockCanvas = origCreate('canvas');
+          mockCanvas.width = 1600;
+          mockCanvas.height = 1200;
+          vi.spyOn(mockCanvas, 'getContext').mockReturnValue({
+            drawImage: vi.fn(),
+            scale: vi.fn(),
+          } as any);
+          vi.spyOn(mockCanvas, 'toDataURL').mockReturnValue('data:image/jpeg;base64,iosresult');
+          return mockCanvas;
+        }
+        return origCreate(tag);
+      });
+
+      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
+      toJpeg.mockClear();
+
+      const result = await service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap);
+
+      expect(result).toBe('iosresult');
+      expect(toJpeg).not.toHaveBeenCalled();
+      expect(restoreMap).toHaveBeenCalledOnce();
       mapElement.remove();
     });
   });
