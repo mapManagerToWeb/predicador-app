@@ -1,5 +1,5 @@
 {
-  "name": "predicador-frontend",
+  "name": "territory-frontend",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
@@ -11,7 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "serve:ssr:predicador-frontend": "node dist/predicador-frontend/server/server.mjs"
+    "serve:ssr:territory-frontend": "node dist/territory-frontend/server/server.mjs"
   },
   "private": true,
   "packageManager": "pnpm@9.15.0",
