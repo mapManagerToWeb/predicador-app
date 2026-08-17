@@ -1,6 +1,6 @@
 {
-  "name": "predicador-frontend",
-  "short_name": "predicador-frontend",
+  "name": "territory-frontend",
+  "short_name": "Territory",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
