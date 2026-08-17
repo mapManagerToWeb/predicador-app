@@ -67,7 +67,11 @@ app.use('/api/v1', async (req, res) => {
 
   let body: BodyInit | undefined;
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    body = Readable.toWeb(req) as unknown as BodyInit;
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(chunk as Buffer);
+    }
+    body = Buffer.concat(chunks);
   }
 
   try {
@@ -76,7 +80,6 @@ app.use('/api/v1', async (req, res) => {
       headers,
       body,
       redirect: 'manual',
-      duplex: 'half',
     } as RequestInit);
 
     res.status(upstreamResponse.status);
