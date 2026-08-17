@@ -195,6 +195,79 @@ describe('MapCaptureService', () => {
     });
   });
 
+  describe('waitForTiles', () => {
+    function fakeTileMap() {
+      const container = document.createElement('div');
+      return {
+        getContainer: () => container,
+        fitBounds: vi.fn(),
+        getZoom: vi.fn().mockReturnValue(15),
+      };
+    }
+
+    it('resolves immediately when there are no tiles', async () => {
+      const map = fakeTileMap();
+      await expect((service as any).waitForTiles(map)).resolves.toBeUndefined();
+    });
+
+    it('resolves immediately when all tiles are complete', async () => {
+      const map = fakeTileMap();
+      const tilePane = document.createElement('div');
+      tilePane.classList.add('leaflet-tile-pane');
+      const img1 = document.createElement('img');
+      const img2 = document.createElement('img');
+      Object.defineProperty(img1, 'complete', { value: true });
+      Object.defineProperty(img2, 'complete', { value: true });
+      tilePane.appendChild(img1);
+      tilePane.appendChild(img2);
+      map.getContainer().appendChild(tilePane);
+
+      await expect((service as any).waitForTiles(map)).resolves.toBeUndefined();
+    });
+
+    it('resolves after tiles load within timeout', async () => {
+      vi.useFakeTimers();
+      const map = fakeTileMap();
+      const tilePane = document.createElement('div');
+      tilePane.classList.add('leaflet-tile-pane');
+      const img1 = document.createElement('img');
+      const img2 = document.createElement('img');
+      Object.defineProperty(img1, 'complete', { value: true });
+      Object.defineProperty(img2, 'complete', { value: false, writable: true });
+      tilePane.appendChild(img1);
+      tilePane.appendChild(img2);
+      map.getContainer().appendChild(tilePane);
+
+      const promise = (service as any).waitForTiles(map);
+
+      // Simulate tile loading after 200ms
+      vi.advanceTimersByTime(200);
+      (img2 as any).complete = true;
+      img2.dispatchEvent(new Event('load'));
+
+      await promise;
+      vi.useRealTimers();
+    });
+
+    it('resolves after timeout even if tiles never load', async () => {
+      vi.useFakeTimers();
+      const map = fakeTileMap();
+      const tilePane = document.createElement('div');
+      tilePane.classList.add('leaflet-tile-pane');
+      const img = document.createElement('img');
+      Object.defineProperty(img, 'complete', { value: false, writable: true });
+      tilePane.appendChild(img);
+      map.getContainer().appendChild(tilePane);
+
+      const promise = (service as any).waitForTiles(map);
+
+      vi.advanceTimersByTime(6000);
+
+      await promise;
+      vi.useRealTimers();
+    });
+  });
+
   describe('restaurarMapaPostCaptura', () => {
     it('does nothing when there is no map', () => {
       engine.getMap.mockReturnValue(null);

@@ -34,6 +34,59 @@ export class MapCaptureService {
     });
   }
 
+  /**
+   * Waits for all visible tile images to finish loading.
+   * Returns when every <img> in the tile pane has complete=true,
+   * or after MAX_TILE_WAIT_MS (whichever comes first).
+   */
+  waitForTiles(map: L.Map): Promise<void> {
+    const container = map.getContainer();
+    const tiles = Array.from(
+      container.querySelectorAll('.leaflet-tile-pane img')
+    ) as HTMLImageElement[];
+
+    if (tiles.length === 0) return Promise.resolve();
+
+    const allLoaded = () => tiles.every(t => t.complete);
+    if (allLoaded()) return Promise.resolve();
+
+    return new Promise<void>((resolve) => {
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve();
+      };
+
+      const timeout = setTimeout(done, MAP_DEFAULTS.maxTileWaitMs);
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        for (const tile of tiles) {
+          tile.removeEventListener('load', check);
+          tile.removeEventListener('error', check);
+        }
+      };
+
+      const check = () => {
+        if (allLoaded()) done();
+      };
+
+      for (const tile of tiles) {
+        if (!tile.complete) {
+          tile.addEventListener('load', check);
+          tile.addEventListener('error', check);
+        }
+      }
+
+      // Also check after a frame (in case tiles finish between checks)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(check);
+      });
+    });
+  }
+
   getAllTerritoriesLayer(): FeatureLayer[] {
     return this.territories.getAllTerritoriesLayer();
   }

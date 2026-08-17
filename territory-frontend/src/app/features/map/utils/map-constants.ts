@@ -2,6 +2,7 @@ export const DEDUP_THRESHOLD_PX = 2;
 export const MAX_PUNTOS_PARCIAL = 6;
 export const LABEL_MIN_ZOOM = 14;
 export const CAPTURE_DELAY_MS = 400;
+export const MAX_TILE_WAIT_MS = 5000;
 
 export const MAP_DEFAULTS = {
   initialView: { lat: -37.4779, lng: -73.345 },
@@ -12,6 +13,7 @@ export const MAP_DEFAULTS = {
   mapBoundsPadFactor: 0.15,
   labelMinZoom: LABEL_MIN_ZOOM,
   captureDelayMs: CAPTURE_DELAY_MS,
+  maxTileWaitMs: MAX_TILE_WAIT_MS,
 } as const;
 
 
