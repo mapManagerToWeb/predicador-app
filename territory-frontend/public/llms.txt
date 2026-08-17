@@ -1,4 +1,4 @@
-# Predicador
+# Territory
 
 Aplicación para encargados de grupos de predicación: seguimiento de territorios,
 manzanas y reportes con base en un mapa (Leaflet), integración con WhatsApp y
