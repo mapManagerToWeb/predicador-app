@@ -49,7 +49,7 @@
     "@types/geojson": "^7946.0.16",
     "@types/node": "^20.17.19",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
-    "@typescript-eslint/parser": "^8.65.0",
+    "@typescript-eslint/parser": "^8.67.0",
     "@vitest/coverage-v8": "^4.1.10",
     "angular-eslint": "^22.1.0",
     "eslint": "^10.8.0",
