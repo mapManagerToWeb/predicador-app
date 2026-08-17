@@ -52,11 +52,11 @@ describe('DraftMarksService', () => {
   });
 
   it('discards corrupt payloads', () => {
-    localStorage.setItem('predicador_map_draft', '{ not json');
+    localStorage.setItem('territory_map_draft', '{ not json');
     const fresh = TestBed.inject(DraftMarksService);
     expect(fresh.cargar()).toBeNull();
     expect(fresh.tieneDraft()).toBe(false);
-    expect(localStorage.getItem('predicador_map_draft')).toBeNull();
+    expect(localStorage.getItem('territory_map_draft')).toBeNull();
   });
 
   it('clear removes everything', () => {

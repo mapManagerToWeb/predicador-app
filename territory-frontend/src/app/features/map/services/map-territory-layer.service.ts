@@ -27,7 +27,7 @@ export type ManzanaClickHandler = (
 export class MapTerritoryLayerService {
   // sessionStorage key — full parsed GeoJSON. Avoids the 412 KB round-trip
   // and re-parse on every navigation/reload. Miss-safes to a plain fetch.
-  static readonly GEOJSON_CACHE_KEY = 'predicador.territories.geojson.v1';
+  static readonly GEOJSON_CACHE_KEY = 'territory.territories.geojson.v1';
 
   // O(1) territory → layer lookup; replaces signal<FeatureLayer[]>
   private layerByTerritory = new Map<number, FeatureLayer>();
