@@ -2,6 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "angular",
   "buildCommand": "ng build --configuration=production",
-  "outputDirectory": "dist/territory-frontend",
-  "installCommand": "pnpm install --frozen-lockfile"
+  "outputDirectory": "dist/territory-frontend/browser",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "rewrites": [
+    { "source": "/", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/api" }
+  ],
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "dist/territory-frontend/**"
+    }
+  }
 }
