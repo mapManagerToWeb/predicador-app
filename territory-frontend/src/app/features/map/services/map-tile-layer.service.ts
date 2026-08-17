@@ -3,6 +3,8 @@ import * as L from 'leaflet';
 import { MAP_DEFAULTS, TILE_LAYERS, ATTRIBUTIONS } from '../utils/map-constants';
 import { MapEngineService } from './map-engine.service';
 
+const SATELLITE_KEY = 'territory_satellite';
+
 /**
  * Manages tile layers (base, satellite) and theme switching.
  *
@@ -37,6 +39,17 @@ export class MapTileLayerService implements OnDestroy {
 
     this.tileLayer.set(tileLayer);
     this.satelliteLayer.set(satelliteLayer);
+
+    if (this.loadSatellite()) {
+      map.removeLayer(tileLayer);
+      satelliteLayer.addTo(map);
+      this.isSatelliteView = true;
+    }
+  }
+
+  private loadSatellite(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(SATELLITE_KEY) === 'true';
   }
 
   isSatellite(): boolean {
