@@ -1,4 +1,4 @@
-# Arquitectura y Patrones de Diseño - Predicador Frontend
+# Arquitectura y Patrones de Diseño - Territory Frontend
 
 ## 📋 Análisis de Arquitectura Actual
 
