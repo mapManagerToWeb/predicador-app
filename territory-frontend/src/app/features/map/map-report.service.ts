@@ -225,6 +225,58 @@ export class MapReportService {
     return /AppleWebKit/.test(ua) && !/(Chrome|CriOS|Edg|OPR|Firefox|SamsungBrowser)/.test(ua);
   }
 
+  /**
+   * Manually composes the map screenshot by drawing tiles and the Leaflet
+   * Canvas onto a temporary Canvas element.
+   *
+   * Used on iOS where html-to-image cannot capture the Leaflet Canvas
+   * (SVG foreignObject limitation in WebKit).
+   */
+  private captureMapComposite(mapElement: HTMLElement): string | null {
+    const width = mapElement.clientWidth;
+    const height = mapElement.clientHeight;
+    if (width === 0 || height === 0) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.scale(2, 2);
+
+    const tiles = Array.from(
+      mapElement.querySelectorAll('.leaflet-tile-pane img')
+    ) as HTMLImageElement[];
+
+    for (const tile of tiles) {
+      if (!tile.complete || tile.naturalWidth === 0) continue;
+      const rect = tile.getBoundingClientRect();
+      const mapRect = mapElement.getBoundingClientRect();
+      const x = rect.left - mapRect.left;
+      const y = rect.top - mapRect.top;
+      try {
+        ctx.drawImage(tile, x, y, rect.width, rect.height);
+      } catch {
+        // CORS or tainted canvas — skip this tile
+      }
+    }
+
+    const leafletCanvas = mapElement.querySelector(
+      '.leaflet-canvas-pane canvas'
+    ) as HTMLCanvasElement | null;
+
+    if (leafletCanvas) {
+      try {
+        ctx.drawImage(leafletCanvas, 0, 0, width, height);
+      } catch {
+        // Canvas tainted — skip overlay
+      }
+    }
+
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  }
+
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {
     const response = await this.whatsappService.sendReport(request);
     return response.success;
