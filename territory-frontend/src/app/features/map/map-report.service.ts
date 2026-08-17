@@ -11,6 +11,7 @@ import type {
   TerritoriosEnvio
 } from '../../core/models/models';
 import type { ManzanaMarcada, FeatureLayer, DatosParciales } from './types/map.types';
+import { isIOS } from './utils/ios-detection';
 
 const SCREENSHOT_RETRIES = 2;
 
@@ -120,6 +121,10 @@ export class MapReportService {
       await prepararCaptura();
       const mapElement = typeof document === 'undefined' ? null : document.getElementById('map');
       if (!mapElement) return null;
+
+      if (isIOS()) {
+        return this.captureMapComposite(mapElement);
+      }
 
       const { toJpeg } = await import('html-to-image');
       // JPEG (no PNG): coincide con el content-type image/jpeg que el backend
