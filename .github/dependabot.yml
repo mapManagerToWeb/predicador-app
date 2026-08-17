@@ -3,7 +3,7 @@ version: 2
 updates:
   # Frontend npm dependencies
   - package-ecosystem: npm
-    directory: /predicador-frontend
+    directory: /territory-frontend
     schedule:
       interval: weekly
       day: monday
