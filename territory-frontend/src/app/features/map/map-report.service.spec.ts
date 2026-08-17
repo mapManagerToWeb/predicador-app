@@ -250,6 +250,67 @@ describe('MapReportService', () => {
     });
   });
 
+  describe('captureMapComposite', () => {
+    it('returns a data URL string from canvas composition', () => {
+      const mockCanvas = document.createElement('canvas');
+      mockCanvas.width = 800;
+      mockCanvas.height = 600;
+      vi.spyOn(mockCanvas, 'getContext').mockReturnValue({
+        drawImage: vi.fn(),
+        fillRect: vi.fn(),
+        scale: vi.fn(),
+      } as any);
+      vi.spyOn(mockCanvas, 'toDataURL').mockReturnValue('data:image/jpeg;base64,fake');
+
+      const mapElement = document.createElement('div');
+      Object.defineProperty(mapElement, 'clientWidth', { value: 800 });
+      Object.defineProperty(mapElement, 'clientHeight', { value: 600 });
+
+      const tile1 = document.createElement('img');
+      tile1.style.position = 'absolute';
+      tile1.style.left = '0px';
+      tile1.style.top = '0px';
+      tile1.style.width = '256px';
+      tile1.style.height = '256px';
+
+      const tile2 = document.createElement('img');
+      tile2.style.position = 'absolute';
+      tile2.style.left = '256px';
+      tile2.style.top = '0px';
+      tile2.style.width = '256px';
+      tile2.style.height = '256px';
+
+      vi.spyOn(mapElement, 'getBoundingClientRect').mockReturnValue({
+        x: 0, y: 0, width: 800, height: 600, top: 0, left: 0, right: 800, bottom: 600, toJSON() {},
+      });
+      Object.defineProperty(tile1, 'complete', { value: true });
+      Object.defineProperty(tile1, 'naturalWidth', { value: 256 });
+      Object.defineProperty(tile2, 'complete', { value: true });
+      Object.defineProperty(tile2, 'naturalWidth', { value: 256 });
+      vi.spyOn(tile1, 'getBoundingClientRect').mockReturnValue({
+        x: 0, y: 0, width: 256, height: 256, top: 0, left: 0, right: 256, bottom: 256, toJSON() {},
+      });
+      vi.spyOn(tile2, 'getBoundingClientRect').mockReturnValue({
+        x: 256, y: 0, width: 256, height: 256, top: 0, left: 256, right: 512, bottom: 256, toJSON() {},
+      });
+
+      vi.spyOn(mapElement, 'querySelectorAll').mockImplementation((selector: string) => {
+        if (selector === '.leaflet-tile-pane img') return [tile1, tile2] as any;
+        if (selector === '.leaflet-canvas-pane canvas') return [mockCanvas] as any;
+        return [] as any;
+      });
+
+      const origCreate = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'canvas') return mockCanvas;
+        return origCreate(tag);
+      });
+
+      const result = (service as any).captureMapComposite(mapElement);
+      expect(result).toBe('fake');
+    });
+  });
+
   describe('persistencia y compensación', () => {
     let territorioService: {
       crearReportes: ReturnType<typeof vi.fn>;
