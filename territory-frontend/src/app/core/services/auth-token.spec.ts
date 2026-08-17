@@ -23,11 +23,11 @@ describe('AuthTokenService', () => {
 
     expect(svc.role()).toBe('encargado');
     expect(svc.hasToken()).toBe(true);
-    expect(localStorage.getItem('predicador_role')).toBe('encargado');
+    expect(localStorage.getItem('territory_role')).toBe('encargado');
   });
 
   it('rehydrates the role from localStorage on a fresh page load', () => {
-    localStorage.setItem('predicador_role', 'encargado');
+    localStorage.setItem('territory_role', 'encargado');
 
     const svc = new AuthTokenService();
     expect(svc.role()).toBe('encargado');
@@ -48,12 +48,12 @@ describe('AuthTokenService', () => {
 
     expect(svc.role()).toBeNull();
     expect(svc.hasToken()).toBe(false);
-    expect(localStorage.getItem('predicador_role')).toBeNull();
+    expect(localStorage.getItem('territory_role')).toBeNull();
   });
 
   it('ignores legacy/stale storage keys', () => {
-    localStorage.setItem('predicador_session_token', 'stored.token');
-    localStorage.setItem('predicador_session_role', 'admin');
+    localStorage.setItem('territory_session_token', 'stored.token');
+    localStorage.setItem('territory_session_role', 'admin');
 
     const svc = new AuthTokenService();
     expect(svc.role()).toBeNull();
@@ -93,7 +93,7 @@ describe('AuthTokenService', () => {
 
     expect(svc.role()).toBeNull();
     expect(svc.hasToken()).toBe(false);
-    expect(localStorage.getItem('predicador_role')).toBeNull();
+    expect(localStorage.getItem('territory_role')).toBeNull();
     expect(postSpy).toHaveBeenCalledWith('/api/v1/auth/logout', {});
   });
 
@@ -104,7 +104,7 @@ describe('AuthTokenService', () => {
 
     expect(svc.hasToken()).toBe(false);
     expect(svc.role()).toBeNull();
-    expect(localStorage.getItem('predicador_role')).toBeNull();
+    expect(localStorage.getItem('territory_role')).toBeNull();
   });
 
   it('clear() propagates logout hygiene to the territory service when present', () => {

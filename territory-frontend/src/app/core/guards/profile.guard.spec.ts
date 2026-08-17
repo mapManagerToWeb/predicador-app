@@ -52,7 +52,7 @@ describe('profileGuard', () => {
   });
 
   it('redirects when the persisted session token is empty', async () => {
-    localStorage.setItem('predicador_role', '');
+    localStorage.setItem('territory_role', '');
 
     const result = await TestBed.runInInjectionContext(() => profileGuard({} as never, {} as never));
 

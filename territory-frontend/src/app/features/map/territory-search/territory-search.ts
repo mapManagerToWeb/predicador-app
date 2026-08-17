@@ -4,7 +4,7 @@ import { TerritorioService } from '../../../core/services/territorio';
 import { Profile } from '../../../core/services/profile';
 import { AuthTokenService } from '../../../core/services/auth-token';
 
-const THEME_KEY = 'predicador_theme';
+const THEME_KEY = 'territory_theme';
 
 @Component({
   selector: 'app-territory-search',

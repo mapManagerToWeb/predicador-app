@@ -46,10 +46,10 @@ describe('ReportCacheService', () => {
   });
 
   it('discards corrupt payloads and keeps the service usable', () => {
-    localStorage.setItem('predicador_reports_cache', ONLY_PLAIN);
+    localStorage.setItem('territory_reports_cache', ONLY_PLAIN);
     service = new ReportCacheService();
     expect(service.hasData()).toBe(false);
-    expect(localStorage.getItem('predicador_reports_cache')).toBeNull();
+    expect(localStorage.getItem('territory_reports_cache')).toBeNull();
 
     service.setTerritorio(1, reporte(10, 1));
     expect(service.getCache().get(1)?.id).toBe(10);

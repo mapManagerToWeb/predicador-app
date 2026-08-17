@@ -91,13 +91,13 @@ describe('AdminPage', () => {
   describe('logout', () => {
     it('should logout and clear admin state and user profile', () => {
       localStorage.setItem('isAdmin', 'true');
-      localStorage.setItem('predicador_profile', JSON.stringify({ name: 'Test' }));
+      localStorage.setItem('territory_profile', JSON.stringify({ name: 'Test' }));
       component.isLoggedIn.set(true);
 
       component.logout();
 
       expect(component.isLoggedIn()).toBeFalsy();
-      expect(localStorage.getItem('predicador_profile')).toBeNull();
+      expect(localStorage.getItem('territory_profile')).toBeNull();
       expect(component.username()).toBe('');
       expect(component.password()).toBe('');
     });

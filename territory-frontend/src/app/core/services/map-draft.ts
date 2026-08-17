@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import type { ManzanaMarcada, ModoMarcado } from '../../features/map/types/map.types';
 
-const STORAGE_KEY = 'predicador_map_draft';
+const STORAGE_KEY = 'territory_map_draft';
 
 export interface DraftPoint {
   lat: number;
