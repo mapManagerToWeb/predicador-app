@@ -18,7 +18,7 @@ jobs:
     name: Gitleaks (secret detection)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -32,7 +32,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           java-version: "25"
@@ -60,7 +60,7 @@ jobs:
           - config-server
           - discovery-server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build Docker image
         working-directory: backend
         run: docker build -t predicador/${{ matrix.service }}:scan -f ${{ matrix.service }}/Dockerfile .
