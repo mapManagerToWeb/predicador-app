@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: territory-frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm/action-setup instala la versión declarada en `packageManager`
       # (pnpm@9.15.0) sin depender de npm.
