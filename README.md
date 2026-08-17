@@ -7,7 +7,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   Frontend (Angular 22)                      │
-│                  predicador-frontend/                         │
+│                  territory-frontend/                         │
 │            PWA + SSR + Service Worker                         │
 └──────────────────────┬──────────────────────────────────────┘
                        │ /api
@@ -178,7 +178,7 @@ mvn -pl reporting-service spring-boot:run      # :8082
 
 **Frontend:**
 ```bash
-cd predicador-frontend
+cd territory-frontend
 
 # Instalar dependencias (pnpm; se instala automáticamente vía Corepack
 # desde el campo `packageManager` de package.json)
@@ -190,12 +190,12 @@ pnpm start                   # http://localhost:4200
 
 # SSR producción
 pnpm run build
-pnpm run serve:ssr:predicador-frontend  # http://localhost:4000
+pnpm run serve:ssr:territory-frontend  # http://localhost:4000
 ```
 
 ## Comandos
 
-### Frontend (`predicador-frontend/`)
+### Frontend (`territory-frontend/`)
 
 | Comando | Descripción |
 |---|---|
@@ -207,7 +207,7 @@ pnpm run serve:ssr:predicador-frontend  # http://localhost:4000
 | `pnpm run test:coverage` | Tests con cobertura V8 |
 | `pnpm run lint` | Verificar lint (ESLint) |
 | `pnpm run lint:fix` | Auto-fix lint + Prettier |
-| `pnpm run serve:ssr:predicador-frontend` | Servidor SSR producción |
+| `pnpm run serve:ssr:territory-frontend` | Servidor SSR producción |
 
 ### Backend (`backend/`)
 
@@ -234,7 +234,7 @@ pnpm run serve:ssr:predicador-frontend  # http://localhost:4000
 
 ```bash
 # Escanear frontend
-cd predicador-frontend
+cd territory-frontend
 pnpm run build
 npx sonar-scanner
 
@@ -343,7 +343,7 @@ Ver `.env.example` para la lista completa.
 ### Frontend
 
 ```bash
-cd predicador-frontend
+cd territory-frontend
 
 # Ejecutar tests
 pnpm test                     # Ejecución única
@@ -463,7 +463,7 @@ predicador-app/
 │   ├── territory-service/         # Servicio de territorios
 │   ├── reporting-service/         # Servicio de reportes
 │   └── pom.xml                    # Parent POM
-├── predicador-frontend/
+├── territory-frontend/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── core/              # Servicios, guards, interceptors, utils

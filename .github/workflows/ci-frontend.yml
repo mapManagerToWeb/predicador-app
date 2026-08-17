@@ -4,12 +4,12 @@ on:
   push:
     branches: [main, chore/production-quality-hardening]
     paths:
-      - "predicador-frontend/**"
+      - "territory-frontend/**"
       - ".github/workflows/ci-frontend.yml"
   pull_request:
     branches: [main]
     paths:
-      - "predicador-frontend/**"
+      - "territory-frontend/**"
 
 concurrency:
   group: ci-frontend-${{ github.ref }}
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: predicador-frontend
+        working-directory: territory-frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: predicador-frontend/pnpm-lock.yaml
+          cache-dependency-path: territory-frontend/pnpm-lock.yaml
 
       - name: Install dependencies
         # pnpm 9 no tiene `pnpm ci` (llegó en pnpm 11); el equivalente CI
@@ -56,7 +56,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage
-          path: predicador-frontend/coverage/
+          path: territory-frontend/coverage/
           retention-days: 7
 
       - name: Build production
