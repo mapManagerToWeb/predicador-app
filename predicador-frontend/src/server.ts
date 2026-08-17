@@ -26,7 +26,8 @@ const gatewayUrl = process.env['GATEWAY_URL'] || 'http://localhost:8080';
  * production. Alternatively set `NG_ALLOWED_HOSTS` (comma-separated) without
  * touching code.
  */
-const allowedHosts = ['localhost', '127.0.0.1', 'shus3z-ip-191-116-92-175.tunnelmole.net'];
+const allowedHosts =
+  process.env['NG_ALLOWED_HOSTS']?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
 const angularApp = new AngularNodeAppEngine({ allowedHosts });
 
 /**
