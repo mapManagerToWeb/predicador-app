@@ -34,7 +34,7 @@ describe('Profile', () => {
 
       expect(service.currentUser()).toEqual(profile);
 
-      const stored = JSON.parse(localStorage.getItem('predicador_profile') || '{}');
+      const stored = JSON.parse(localStorage.getItem('territory_profile') || '{}');
       expect(stored).toEqual(profile);
     });
 
@@ -52,14 +52,14 @@ describe('Profile', () => {
       service.clear();
 
       expect(service.currentUser()).toBeNull();
-      expect(localStorage.getItem('predicador_profile')).toBeNull();
+      expect(localStorage.getItem('territory_profile')).toBeNull();
     });
   });
 
   describe('currentUser signal', () => {
     it('should load existing profile on init', () => {
       const profile = { name: 'Daniel', lastName: 'Uribe', avatar: 0 };
-      localStorage.setItem('predicador_profile', JSON.stringify(profile));
+      localStorage.setItem('territory_profile', JSON.stringify(profile));
 
       const newService = new Profile();
       expect(newService.currentUser()).toEqual(profile);
@@ -71,12 +71,12 @@ describe('Profile', () => {
     });
 
     it('clears malformed JSON instead of throwing', () => {
-      localStorage.setItem('predicador_profile', '{not-json');
+      localStorage.setItem('territory_profile', '{not-json');
 
       const newService = new Profile();
 
       expect(newService.currentUser()).toBeNull();
-      expect(localStorage.getItem('predicador_profile')).toBeNull();
+      expect(localStorage.getItem('territory_profile')).toBeNull();
     });
 
     it.each([
@@ -85,12 +85,12 @@ describe('Profile', () => {
       { name: 'Daniel', lastName: 'Uribe', avatar: '0' },
       { name: '', lastName: 'Uribe', avatar: 0 },
     ])('clears a profile with invalid required fields: %j', invalidProfile => {
-      localStorage.setItem('predicador_profile', JSON.stringify(invalidProfile));
+      localStorage.setItem('territory_profile', JSON.stringify(invalidProfile));
 
       const newService = new Profile();
 
       expect(newService.currentUser()).toBeNull();
-      expect(localStorage.getItem('predicador_profile')).toBeNull();
+      expect(localStorage.getItem('territory_profile')).toBeNull();
     });
 
     it('does not access browser storage during SSR', () => {

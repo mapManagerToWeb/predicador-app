@@ -6,7 +6,7 @@ import { TerritorioService } from './territorio';
 /** Tracks only reactive UI auth state; the HMAC is held by an HttpOnly cookie. */
 export type SessionRole = 'encargado' | 'admin';
 
-const ROLE_KEY = 'predicador_role';
+const ROLE_KEY = 'territory_role';
 
 function loadRole(): SessionRole | null {
   if (typeof localStorage === 'undefined') return null;

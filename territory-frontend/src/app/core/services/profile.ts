@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { UserProfile } from '../models/models';
 
-const STORAGE_KEY = 'predicador_profile';
+const STORAGE_KEY = 'territory_profile';
 
 function isUserProfile(value: unknown): value is UserProfile {
   if (typeof value !== 'object' || value === null) return false;

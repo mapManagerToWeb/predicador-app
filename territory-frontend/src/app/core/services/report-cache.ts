@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import type { Reporte } from '../models/models';
 
-const STORAGE_KEY = 'predicador_reports_cache';
+const STORAGE_KEY = 'territory_reports_cache';
 
 interface ReportCacheEntry {
   report: Reporte;
