@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "predicador-frontend": {
+    "territory-frontend": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:class": {
@@ -105,10 +105,10 @@
           },
           "configurations": {
             "production": {
-              "buildTarget": "predicador-frontend:build:production"
+              "buildTarget": "territory-frontend:build:production"
             },
             "development": {
-              "buildTarget": "predicador-frontend:build:development"
+              "buildTarget": "territory-frontend:build:development"
             }
           },
           "defaultConfiguration": "development"
