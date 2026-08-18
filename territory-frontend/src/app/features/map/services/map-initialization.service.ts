@@ -50,6 +50,7 @@ export class MapInitializationService {
     this.state.isLoading.set(true);
 
     try {
+      await this.reconciliarCaches();
       await this.loadTerritoriesWithRetry();
       this.onMoveEnd();
       await this.restoreAllMarks();
@@ -58,6 +59,18 @@ export class MapInitializationService {
     } finally {
       this.state.isLoading.set(false);
     }
+  }
+
+  /**
+   * Detecta territorios borrados en el backend y poda los caches del navegador
+   * (reportes en localStorage + snapshot de GeoJSON en sessionStorage) para que
+   * el mapa vuelva a la normalidad sin recargar a mano. Best-effort: si no hay
+   * datos cacheados o el backend no responde no hace nada (modo offline).
+   */
+  private async reconciliarCaches(): Promise<void> {
+    if (!this.rendering.hasCachedGeojson() && !this.territorioService.hasCacheReportes()) return;
+    const vigentes = await this.territorioService.reconciliarCacheConBackend();
+    if (vigentes) this.rendering.podarGeojsonCache(vigentes);
   }
 
   /**

@@ -188,6 +188,33 @@ export class TerritorioService {
     this.versionsSeen.clear();
   }
 
+  /** True when the persistent report cache holds any entry (used before reconciling). */
+  hasCacheReportes(): boolean {
+    return this.reportCache.hasData();
+  }
+
+  /**
+   * Detecta territorios borrados en el backend y los elimina del cache de
+   * localStorage (y del guard de versiones en sesión), devolviendo el conjunto
+   * de números todavía vigentes. Best-effort: si el backend no responde se
+   * devuelve null y no se poda nada — el modo offline depende del cache.
+   */
+  async reconciliarCacheConBackend(): Promise<Set<number> | null> {
+    let numeros: number[];
+    try {
+      numeros = await this.getNumerosTerritorios();
+    } catch {
+      return null;
+    }
+    const vigentes = new Set(numeros);
+    const obsoletos = [...this.reportCache.getCache().keys()].filter(n => !vigentes.has(n));
+    if (obsoletos.length > 0) {
+      this.reportCache.removeTerritorios(obsoletos);
+      for (const n of obsoletos) this.versionsSeen.delete(n);
+    }
+    return vigentes;
+  }
+
   /** Logout hygiene: clears report cache + marks draft. */
   logout(): void {
     this.reportCache.clear();
