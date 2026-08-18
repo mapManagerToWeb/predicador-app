@@ -84,6 +84,22 @@ describe('MapCaptureService', () => {
       expect(territories.getAllTerritoriesLayer).not.toHaveBeenCalled();
     });
 
+    it('regression: fits bounds WITHOUT animation so the map settles before capture', async () => {
+      engine.getMap.mockReturnValue(fakeMap);
+      territories.getAllTerritoriesLayer.mockReturnValue([fakeFeatureLayer(1, '#ff0000', [])]);
+      territories.getTerritoryLabels.mockReturnValue([]);
+      territories.getFeatureLayerByTerritorio.mockReturnValue(
+        fakeFeatureLayer(1, '#ff0000', [])
+      );
+
+      await service.prepararCaptura([], [1]);
+
+      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), {
+        padding: [50, 50],
+        animate: false,
+      });
+    });
+
     it('hides unselected territories, styles the selection, updates labels and fits bounds', async () => {
       engine.getMap.mockReturnValue(fakeMap);
       const markedPath = makePath();
@@ -116,7 +132,7 @@ describe('MapCaptureService', () => {
       expect(markedPath.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
       expect(unmarkedPath.setStyle).toHaveBeenCalledWith(getCaptureUnmarkedStyle('#ff0000'));
       expect(partialPath.setStyle).toHaveBeenCalledWith(getPartialPolygonCompleteStyle('#ff0000'));
-      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50] });
+      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50], animate: false });
     });
 
     it('updates label opacity to reflect the selection', async () => {
@@ -168,7 +184,7 @@ describe('MapCaptureService', () => {
       expect(unmarkedPath.setStyle).toHaveBeenCalledWith(getCaptureIncompleteStyle('#ff0000'));
       expect(hiddenPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
       expect(partialPath.setStyle).toHaveBeenCalledWith(getPartialPolygonCompleteStyle('#ff0000'));
-      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50] });
+      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50], animate: false });
     });
 
     it('resolves immediately when no incomplete territory is selected', async () => {

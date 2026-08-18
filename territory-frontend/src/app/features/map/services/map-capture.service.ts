@@ -239,7 +239,11 @@ export class MapCaptureService {
   ): void {
     const combined = this.calculateCombinedBounds(seleccionados, manzanasMarcadas, allTerritoriesLayer);
     if (combined) {
-      map.fitBounds(combined, { padding: MAP_DEFAULTS.capturePadding });
+      // animate: false — the map must settle instantly before the tile waiter
+      // snapshot; an animated fitBounds keeps the OLD tiles in the pane while
+      // transforming, so waitForTiles resolves on them and the screenshot is
+      // captured mid-animation (shifted/skewed territory on mobile).
+      map.fitBounds(combined, { padding: MAP_DEFAULTS.capturePadding, animate: false });
     }
   }
 
