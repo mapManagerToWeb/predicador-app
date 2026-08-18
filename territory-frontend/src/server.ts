@@ -153,6 +153,26 @@ app.use(
 );
 
 /**
+ * Explicit favicon handlers — Angular's SSR engine would otherwise
+ * intercept these requests before express.static can serve them.
+ */
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(join(browserDistFolder, 'favicon.ico'));
+});
+app.get('/favicon.svg', (req, res) => {
+  res.sendFile(join(browserDistFolder, 'favicon.svg'));
+});
+app.get('/favicon-96x96.png', (req, res) => {
+  res.sendFile(join(browserDistFolder, 'favicon-96x96.png'));
+});
+app.get('/apple-touch-icon.png', (req, res) => {
+  res.sendFile(join(browserDistFolder, 'apple-touch-icon.png'));
+});
+app.get('/site.webmanifest', (req, res) => {
+  res.sendFile(join(browserDistFolder, 'site.webmanifest'));
+});
+
+/**
  * Handle all other requests by rendering the Angular application.
  */
 app.use((req, res, next) => {
