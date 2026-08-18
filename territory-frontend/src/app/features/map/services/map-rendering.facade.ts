@@ -101,6 +101,14 @@ export class MapRenderingFacade {
     return this.territories.getTerritoryDataCache();
   }
 
+  hasCachedGeojson(): boolean {
+    return this.territories.hasCachedGeojson();
+  }
+
+  podarGeojsonCache(vigentes: Set<number>): void {
+    this.territories.podarGeojsonCache(vigentes);
+  }
+
   getFeatureLayerByTerritorio(territorioNum: number): FeatureLayer | undefined {
     return this.territories.getFeatureLayerByTerritorio(territorioNum);
   }

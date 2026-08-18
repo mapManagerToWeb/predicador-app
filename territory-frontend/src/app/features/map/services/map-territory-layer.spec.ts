@@ -147,4 +147,57 @@ describe('MapTerritoryLayerService', () => {
       expect(service.getTerritoryDataCache().size).toBe(1);
     });
   });
+
+  describe('cache reconciliation', () => {
+    beforeEach(() => sessionStorage.clear());
+
+    const geoJson = JSON.stringify({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { id: 'm1', territorio_padre: 1, color: '#ff0000' },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-58.5, -34.5],
+                [-58.4, -34.5],
+                [-58.4, -34.4],
+                [-58.5, -34.4],
+              ],
+            ],
+          },
+        },
+      ],
+    });
+
+    it('hasCachedGeojson reflects whether a usable snapshot is cached', async () => {
+      expect(service.hasCachedGeojson()).toBe(false);
+      await service.loadAllTerritories({ getAllGeoJson: vi.fn().mockResolvedValue(geoJson) });
+      expect(service.hasCachedGeojson()).toBe(true);
+    });
+
+    it('prunes the snapshot when it references territories deleted in the backend', async () => {
+      await service.loadAllTerritories({ getAllGeoJson: vi.fn().mockResolvedValue(geoJson) });
+      expect(sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY)).toBeTruthy();
+
+      service.podarGeojsonCache(new Set([2]));
+
+      expect(sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY)).toBeNull();
+    });
+
+    it('keeps the snapshot when all cached territories still exist', async () => {
+      await service.loadAllTerritories({ getAllGeoJson: vi.fn().mockResolvedValue(geoJson) });
+
+      service.podarGeojsonCache(new Set([1]));
+
+      expect(sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY)).toBeTruthy();
+    });
+
+    it('is a no-op when there is no cached snapshot', () => {
+      expect(() => service.podarGeojsonCache(new Set([1, 2]))).not.toThrow();
+      expect(sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY)).toBeNull();
+    });
+  });
 });

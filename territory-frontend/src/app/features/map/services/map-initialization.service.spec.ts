@@ -24,6 +24,8 @@ describe('MapInitializationService', () => {
     getTerritoryDataCache: ReturnType<typeof vi.fn>;
     ocultarPoligonosNoSeleccionados: ReturnType<typeof vi.fn>;
     updateLabelsVisibility: ReturnType<typeof vi.fn>;
+    hasCachedGeojson: ReturnType<typeof vi.fn>;
+    podarGeojsonCache: ReturnType<typeof vi.fn>;
   };
   let selection: {
     toggleManzana: ReturnType<typeof vi.fn>;
@@ -37,6 +39,8 @@ describe('MapInitializationService', () => {
     revalidarReportes: ReturnType<typeof vi.fn>;
     limpiarCache: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
+    hasCacheReportes: ReturnType<typeof vi.fn>;
+    reconciliarCacheConBackend: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
   let fakeMap: { on: ReturnType<typeof vi.fn> };
@@ -54,6 +58,8 @@ describe('MapInitializationService', () => {
       getTerritoryDataCache: vi.fn().mockReturnValue(new Map()),
       ocultarPoligonosNoSeleccionados: vi.fn(),
       updateLabelsVisibility: vi.fn(),
+      hasCachedGeojson: vi.fn(() => false),
+      podarGeojsonCache: vi.fn(),
     };
     selection = {
       toggleManzana: vi.fn(),
@@ -67,6 +73,8 @@ describe('MapInitializationService', () => {
       revalidarReportes: vi.fn(async () => new Map()),
       limpiarCache: vi.fn(),
       logout: vi.fn(),
+      hasCacheReportes: vi.fn(() => false),
+      reconciliarCacheConBackend: vi.fn(async () => new Set<number>()),
     };
     toast = { show: vi.fn() };
     TestBed.configureTestingModule({
@@ -288,6 +296,36 @@ describe('MapInitializationService', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('skips reconciliation when neither cache holds data', async () => {
+    rendering.hasCachedGeojson.mockReturnValue(false);
+    territorioService.hasCacheReportes.mockReturnValue(false);
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    expect(territorioService.reconciliarCacheConBackend).not.toHaveBeenCalled();
+    expect(rendering.podarGeojsonCache).not.toHaveBeenCalled();
+  });
+
+  it('prunes caches when the backend confirms deleted territories', async () => {
+    rendering.hasCachedGeojson.mockReturnValue(true);
+    const vigentes = new Set([1, 2]);
+    territorioService.reconciliarCacheConBackend.mockResolvedValue(vigentes);
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    expect(territorioService.reconciliarCacheConBackend).toHaveBeenCalled();
+    expect(rendering.podarGeojsonCache).toHaveBeenCalledWith(vigentes);
+  });
+
+  it('keeps caches when the backend is unreachable during reconciliation', async () => {
+    rendering.hasCachedGeojson.mockReturnValue(true);
+    territorioService.reconciliarCacheConBackend.mockResolvedValue(null);
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    expect(rendering.podarGeojsonCache).not.toHaveBeenCalled();
   });
 
   it('reloadAllTerritories clears the report cache and reloads', async () => {

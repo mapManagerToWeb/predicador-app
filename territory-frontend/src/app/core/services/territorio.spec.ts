@@ -164,6 +164,50 @@ describe('TerritorioService', () => {
     expect(service['versionsSeen'].get(98)).toBe(20);
   });
 
+  describe('reconciliarCacheConBackend', () => {
+    it('prunes cache entries (and versionsSeen) for territories deleted in the backend', async () => {
+      service['reportCache'].setTerritorio(1, reporte(10, 1));
+      service['reportCache'].setTerritorio(2, reporte(11, 2));
+      service['versionsSeen'].set(2, 11);
+
+      const promise = service.reconciliarCacheConBackend();
+      const req = httpMock.expectOne(r => r.method === 'GET' && r.url.includes('/territories'));
+      req.flush([1]);
+      const vigentes = await promise;
+
+      expect(vigentes).toEqual(new Set([1]));
+      expect(service['reportCache'].getCache().has(1)).toBe(true);
+      expect(service['reportCache'].getCache().has(2)).toBe(false);
+      expect(service['versionsSeen'].has(2)).toBe(false);
+      expect(service.hasCacheReportes()).toBe(true);
+    });
+
+    it('keeps the cache untouched and returns null when the backend is unreachable', async () => {
+      service['reportCache'].setTerritorio(1, reporte(10, 1));
+
+      const promise = service.reconciliarCacheConBackend();
+      const req = httpMock.expectOne(r => r.method === 'GET' && r.url.includes('/territories'));
+      req.error(new ProgressEvent('error'), { status: 0, statusText: 'Offline' });
+      const vigentes = await promise;
+
+      expect(vigentes).toBeNull();
+      expect(service['reportCache'].getCache().has(1)).toBe(true);
+    });
+
+    it('prunes everything when the backend has no territories at all', async () => {
+      service['reportCache'].setTerritorio(1, reporte(10, 1));
+
+      const promise = service.reconciliarCacheConBackend();
+      const req = httpMock.expectOne(r => r.method === 'GET' && r.url.includes('/territories'));
+      req.flush([]);
+      const vigentes = await promise;
+
+      expect(vigentes).toEqual(new Set());
+      expect(service['reportCache'].hasData()).toBe(false);
+      expect(service.hasCacheReportes()).toBe(false);
+    });
+  });
+
   it('crearReportes returns the saved reports with ids', async () => {
     const promise = service.crearReportes([{
       territorioNumero: 1, manzanaId: null, encargadoId: 1, encargadoNombre: 'Daniel',

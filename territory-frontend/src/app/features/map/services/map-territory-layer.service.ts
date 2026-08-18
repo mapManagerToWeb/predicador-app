@@ -72,6 +72,35 @@ export class MapTerritoryLayerService {
     return this.dataCache;
   }
 
+  /** True when a usable GeoJSON snapshot is cached in sessionStorage. */
+  hasCachedGeojson(): boolean {
+    if (typeof sessionStorage === 'undefined') return false;
+    try {
+      const raw = sessionStorage.getItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw) as { features: GeoJSON.Feature[] };
+      return Array.isArray(parsed.features) && parsed.features.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Descarta el snapshot de sessionStorage si referencia territorios que ya no
+   * existen en el backend, forzando un refetch autoritativo en el próximo load.
+   */
+  podarGeojsonCache(vigentes: Set<number>): void {
+    if (!this.hasCachedGeojson()) return;
+    const features = this.getCachedFeatures() ?? [];
+    const obsoleto = features.some(f => !vigentes.has(Number(f.properties?.['territorio_padre'])));
+    if (!obsoleto) return;
+    try {
+      sessionStorage.removeItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY);
+    } catch {
+      // Storage no disponible — el refetch igualmente ocurrirá en memoria.
+    }
+  }
+
   async loadAllTerritories(territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
     this.clearAllLayers();
 
