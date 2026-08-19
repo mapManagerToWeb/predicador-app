@@ -39,58 +39,78 @@ export class MapMarkRestorationService {
     options: { actualizarEstadoMarcado?: boolean } = {}
   ): void {
     try {
-      const featureLayerColor = this.rendering.getFeatureLayerByTerritorio(territorioNumero)?.color;
-      const color = colorOverride ?? featureLayerColor ?? this.rendering.getCurrentTerritoryColor();
+      const color = this.resolveColor(territorioNumero, colorOverride);
       const { actualizarEstadoMarcado = true } = options;
 
       if (actualizarEstadoMarcado) {
-        const previosParciales = this.state.manzanasByTerritorio().get(territorioNumero)?.filter(m => m.id.startsWith('parcial-')) ?? [];
-        for (const p of previosParciales) {
-          const layer = this.registry.get(p.id);
-          if (layer) this.rendering.removeExtraLayer(layer);
-          this.registry.unregister(p.id);
-        }
-        if (previosParciales.length > 0) {
-          const newMap = new Map(this.state.manzanasById());
-          for (const p of previosParciales) newMap.delete(p.id);
-          this.state.manzanasById.set(newMap);
-        }
+        this.limpiarMarcasParcialesPrevias(territorioNumero);
       }
 
       const ultimo = elegirUltimoReporte(reportes);
       const ids = ultimo?.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
-      const total = this.rendering.getManzanaCountByTerritorio(territorioNumero);
-      const marcadas = ids.length;
-      const isComplete = total > 0 && marcadas >= total;
-
-      this.rendering.applyBaseTerritoryStyle(territorioNumero, color, marcadas, { total, isComplete });
+      this.aplicarEstiloBase(territorioNumero, color, ids);
 
       if (!reportes.length || !ultimo) return;
 
-      const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
-      const existingIds = new Set(
-        this.state.manzanasByTerritorio().get(territorioNumero)?.map(m => m.id) ?? []
-      );
-
-      for (const mc of this.rendering.getManzanaIndex()) {
-        if (mc.territorioNumero !== territorioNumero) continue;
-        const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
-        if (isMarked) {
-          mc.polygon.setStyle(getMarkedManzanaStyle(color));
-          if (actualizarEstadoMarcado && !existingIds.has(mc.id)) {
-            this.registry.register(mc.id, mc.polygon);
-            const newMap = new Map(this.state.manzanasById());
-            newMap.set(mc.id, { id: mc.id, nombreBloque: mc.nombreBloque, color, territorioNumero });
-            this.state.manzanasById.set(newMap);
-          }
-        }
-      }
+      this.aplicarMarcas(territorioNumero, color, ultimo, ids, actualizarEstadoMarcado);
 
       if (ultimo.geometriaParcial) {
         this.restaurarGeometriaParcial(ultimo.geometriaParcial, color, territorioNumero, actualizarEstadoMarcado);
       }
     } catch {
       this.toastService.show(TOAST_MESSAGES.restoreError);
+    }
+  }
+
+  private resolveColor(territorioNumero: number, colorOverride?: string): string {
+    const featureLayerColor = this.rendering.getFeatureLayerByTerritorio(territorioNumero)?.color;
+    return colorOverride ?? featureLayerColor ?? this.rendering.getCurrentTerritoryColor();
+  }
+
+  private limpiarMarcasParcialesPrevias(territorioNumero: number): void {
+    const previosParciales = this.state.manzanasByTerritorio().get(territorioNumero)?.filter(m => m.id.startsWith('parcial-')) ?? [];
+    for (const p of previosParciales) {
+      const layer = this.registry.get(p.id);
+      if (layer) this.rendering.removeExtraLayer(layer);
+      this.registry.unregister(p.id);
+    }
+    if (previosParciales.length === 0) return;
+    const newMap = new Map(this.state.manzanasById());
+    for (const p of previosParciales) newMap.delete(p.id);
+    this.state.manzanasById.set(newMap);
+  }
+
+  private aplicarEstiloBase(territorioNumero: number, color: string, ids: string[]): void {
+    const total = this.rendering.getManzanaCountByTerritorio(territorioNumero);
+    const marcadas = ids.length;
+    const isComplete = total > 0 && marcadas >= total;
+    this.rendering.applyBaseTerritoryStyle(territorioNumero, color, marcadas, { total, isComplete });
+  }
+
+  private aplicarMarcas(
+    territorioNumero: number,
+    color: string,
+    ultimo: Reporte,
+    ids: string[],
+    actualizarEstadoMarcado: boolean
+  ): void {
+    const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
+    const existingIds = new Set(
+      this.state.manzanasByTerritorio().get(territorioNumero)?.map(m => m.id) ?? []
+    );
+
+    for (const mc of this.rendering.getManzanaIndex()) {
+      if (mc.territorioNumero !== territorioNumero) continue;
+      const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
+      if (isMarked) {
+        mc.polygon.setStyle(getMarkedManzanaStyle(color));
+        if (actualizarEstadoMarcado && !existingIds.has(mc.id)) {
+          this.registry.register(mc.id, mc.polygon);
+          const newMap = new Map(this.state.manzanasById());
+          newMap.set(mc.id, { id: mc.id, nombreBloque: mc.nombreBloque, color, territorioNumero });
+          this.state.manzanasById.set(newMap);
+        }
+      }
     }
   }
 

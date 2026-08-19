@@ -7,6 +7,7 @@ import {
 import express from 'express';
 import { Readable } from 'node:stream';
 import { join } from 'node:path';
+import type { IncomingHttpHeaders } from 'node:http';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
@@ -51,51 +52,16 @@ app.use((req, res, next) => {
 app.use('/api/v1', async (req, res) => {
   const upstream = new URL(req.originalUrl, gatewayUrl);
 
-  const headers = new Headers();
-  for (const [name, value] of Object.entries(req.headers)) {
-    if (value === undefined || DROPPED_HEADERS.has(name.toLowerCase())) {
-      continue;
-    }
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        headers.append(name, item);
-      }
-    } else {
-      headers.set(name, value);
-    }
-  }
-
-  let body: BodyInit | undefined;
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(chunk as Buffer);
-    }
-    body = Buffer.concat(chunks);
-  }
-
   try {
     const upstreamResponse = await fetch(upstream, {
       method: req.method,
-      headers,
-      body,
+      headers: buildForwardHeaders(req.headers),
+      body: await readRequestBody(req),
       redirect: 'manual',
     } as RequestInit);
 
     res.status(upstreamResponse.status);
-
-    for (const [name, value] of upstreamResponse.headers.entries()) {
-      if (DROPPED_HEADERS.has(name.toLowerCase())) {
-        continue;
-      }
-      if (name.toLowerCase() === 'set-cookie') {
-        for (const cookie of getSetCookies(upstreamResponse)) {
-          res.append('Set-Cookie', cookie);
-        }
-      } else {
-        res.setHeader(name, value);
-      }
-    }
+    writeResponseHeaders(upstreamResponse, res);
 
     if (upstreamResponse.body) {
       Readable.fromWeb(
@@ -132,13 +98,54 @@ const DROPPED_HEADERS = new Set([
   'referer',
 ]);
 
-function getSetCookies(response: Response): string[] {
+export function getSetCookies(response: Response): string[] {
   const withPlural = response.headers as Headers & { getSetCookie?: () => string[] };
   if (typeof withPlural.getSetCookie === 'function') {
     return withPlural.getSetCookie();
   }
   const raw = withPlural.get('set-cookie');
   return raw ? [raw] : [];
+}
+
+export function buildForwardHeaders(source: IncomingHttpHeaders): Headers {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(source)) {
+    if (value === undefined || DROPPED_HEADERS.has(name.toLowerCase())) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        headers.append(name, item);
+      }
+    } else {
+      headers.set(name, value);
+    }
+  }
+  return headers;
+}
+
+export async function readRequestBody(req: express.Request): Promise<BodyInit | undefined> {
+  if (req.method === 'GET' || req.method === 'HEAD') return undefined;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req as AsyncIterable<Buffer>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+export function writeResponseHeaders(upstreamResponse: Response, res: express.Response): void {
+  for (const [name, value] of upstreamResponse.headers.entries()) {
+    if (DROPPED_HEADERS.has(name.toLowerCase())) {
+      continue;
+    }
+    if (name.toLowerCase() === 'set-cookie') {
+      for (const cookie of getSetCookies(upstreamResponse)) {
+        res.append('Set-Cookie', cookie);
+      }
+    } else {
+      res.setHeader(name, value);
+    }
+  }
 }
 
 /**

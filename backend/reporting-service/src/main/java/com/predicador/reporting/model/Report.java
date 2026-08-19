@@ -56,7 +56,9 @@ public class Report {
     @Column(name = "creado_en")
     private Instant creadoEn;
 
-    public Report() {}
+    public Report() {
+        // No-arg constructor requerido por JPA.
+    }
 
     @PrePersist
     protected void onCreate() {

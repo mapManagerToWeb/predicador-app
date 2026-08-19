@@ -30,76 +30,75 @@ export class MapInteractionService {
       return { action: 'remove_partial', partialId: hitParcial.id };
     }
 
-    if (modo === 'none') {
-      const hit = this.findManzanaInside(e.latlng);
-      if (hit) {
-        const isMarked = this.state.manzanasById().has(hit.id);
-        if (isMarked) {
-          return { action: 'toggle_manzana', manzana: hit };
-        }
-        return { action: 'select_territory', manzana: hit };
-      }
-      return { action: 'none' };
-    }
-
-    if (modo === 'completa') {
-      const hit = this.findManzanaInside(e.latlng);
-      if (hit) {
-        // Territorio no seleccionado: bloquear el cambio de territorio
-        if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-          this.toastService.show(TOAST_MESSAGES.territoryLock);
-          return { action: 'none' };
-        }
-        // En modo marcar-completo solo se marca, nunca se desmarca.
-        if (this.state.manzanasById().has(hit.id)) {
-          return { action: 'none' };
-        }
-        return { action: 'toggle_manzana', manzana: hit };
-      }
-      return { action: 'none' };
-    }
-
-    if (modo === 'parcial') {
-      const hit = this.findManzanaInside(e.latlng);
-      if (hit) {
-        // Territorio no seleccionado: bloquear ANTES de cualquier toggle/select
-        if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-          this.toastService.show(TOAST_MESSAGES.territoryLock);
-          return { action: 'none' };
-        }
-        // En modo marcado parcial solo se marca, nunca se desmarca.
-        if (this.state.manzanasById().has(hit.id)) {
-          return { action: 'none' };
-        }
-      }
-
-      if (!this.state.manzanaSeleccionadaTerritorio()) {
-        const nearest = hit ?? this.findNearestManzana(e.latlng);
-        if (nearest) {
-          return { action: 'select_manzana', manzana: nearest };
-        }
-        return { action: 'none' };
-      }
-
-      // Restringir el marcado parcial SOLO a la manzana seleccionada
-      const map = this.rendering.getMap();
-      if (!map) return { action: 'none' };
-
-      const snapped = snapToContour(e.latlng, this.state.manzanaEdges(), map);
-      
-      // Si el punto no está en los bordes de la manzana seleccionada y tampoco está dentro, ignorar
-      if (snapped.edgeIdx === -1) {
-        return { action: 'none' };
-      }
-
-      if (this.state.puntosCount() >= MAX_PUNTOS_PARCIAL) {
-        return { action: 'none' };
-      }
-
-      return { action: 'add_partial_point', snappedPoint: snapped };
-    }
-
+    if (modo === 'none') return this.handleClickModoNone(e);
+    if (modo === 'completa') return this.handleClickModoCompleta(e);
+    if (modo === 'parcial') return this.handleClickModoParcial(e);
     return { action: 'none' };
+  }
+
+  private handleClickModoNone(e: L.LeafletMouseEvent): MapClickResult {
+    const hit = this.findManzanaInside(e.latlng);
+    if (!hit) return { action: 'none' };
+    if (this.state.manzanasById().has(hit.id)) {
+      return { action: 'toggle_manzana', manzana: hit };
+    }
+    return { action: 'select_territory', manzana: hit };
+  }
+
+  private handleClickModoCompleta(e: L.LeafletMouseEvent): MapClickResult {
+    const hit = this.findManzanaInside(e.latlng);
+    if (!hit) return { action: 'none' };
+
+    // Territorio no seleccionado: bloquear el cambio de territorio
+    if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
+      this.toastService.show(TOAST_MESSAGES.territoryLock);
+      return { action: 'none' };
+    }
+    // En modo marcar-completo solo se marca, nunca se desmarca.
+    if (this.state.manzanasById().has(hit.id)) {
+      return { action: 'none' };
+    }
+    return { action: 'toggle_manzana', manzana: hit };
+  }
+
+  private handleClickModoParcial(e: L.LeafletMouseEvent): MapClickResult {
+    const hit = this.findManzanaInside(e.latlng);
+    if (hit) {
+      // Territorio no seleccionado: bloquear ANTES de cualquier toggle/select
+      if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
+        this.toastService.show(TOAST_MESSAGES.territoryLock);
+        return { action: 'none' };
+      }
+      // En modo marcado parcial solo se marca, nunca se desmarca.
+      if (this.state.manzanasById().has(hit.id)) {
+        return { action: 'none' };
+      }
+    }
+
+    if (!this.state.manzanaSeleccionadaTerritorio()) {
+      const nearest = hit ?? this.findNearestManzana(e.latlng);
+      if (nearest) {
+        return { action: 'select_manzana', manzana: nearest };
+      }
+      return { action: 'none' };
+    }
+
+    // Restringir el marcado parcial SOLO a la manzana seleccionada
+    const map = this.rendering.getMap();
+    if (!map) return { action: 'none' };
+
+    const snapped = snapToContour(e.latlng, this.state.manzanaEdges(), map);
+
+    // Si el punto no está en los bordes de la manzana seleccionada y tampoco está dentro, ignorar
+    if (snapped.edgeIdx === -1) {
+      return { action: 'none' };
+    }
+
+    if (this.state.puntosCount() >= MAX_PUNTOS_PARCIAL) {
+      return { action: 'none' };
+    }
+
+    return { action: 'add_partial_point', snappedPoint: snapped };
   }
 
   handleMarkerDrag(marker: L.Marker, index: number): SnappedPoint[] {

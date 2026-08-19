@@ -71,3 +71,45 @@ jobs:
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    permissions:
+      security-events: write
+      contents: read
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scan completo: genera SARIF con TODOS los hallazgos (no usa --error
+      # para no abortar por WARNING/MEDIUM) y se sube al Code Scanning.
+      - name: Run Semgrep scan (SARIF)
+        run: semgrep scan \
+          --config p/security-audit \
+          --config p/owasp-top-ten \
+          --config p/github-actions \
+          --sarif \
+          --output semgrep.sarif \
+          --metrics=off \
+          .
+
+      - name: Upload SARIF to GitHub Advanced Security Dashboard
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+      # Gate de CI: bloquea únicamente hallazgos de severidad ERROR.
+      # (No vuelve a emitir SARIF; --severity ERROR filtra también el output.)
+      - name: Gate on ERROR findings
+        run: semgrep scan \
+          --config p/security-audit \
+          --config p/owasp-top-ten \
+          --config p/github-actions \
+          --severity ERROR \
+          --error \
+          --metrics=off \
+          .

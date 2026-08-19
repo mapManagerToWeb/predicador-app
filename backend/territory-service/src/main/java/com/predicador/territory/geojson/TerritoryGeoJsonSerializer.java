@@ -1,6 +1,5 @@
 package com.predicador.territory.geojson;
 
-import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.repository.TerritoryRepository.ManzanaGeoJsonProjection;
 
 import java.util.List;

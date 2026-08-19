@@ -104,5 +104,66 @@ describe('MapMarkRestorationService', () => {
 
       expect(rendering.applyBaseTerritoryStyle).toHaveBeenCalledWith(1, '#fff', 0, { total: 0, isComplete: false });
     });
+
+    it('cleans up previous partial marks before restoring fresh ones', () => {
+      rendering.getManzanaIndex.mockReturnValue([
+        { territorioNumero: 1, id: 'm1', nombreBloque: 'A', polygon: fakePath() },
+      ]);
+      const prevLayer = fakePath();
+      state.manzanasById.set(
+        new Map([
+          ['parcial-1', { id: 'parcial-1', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 }],
+        ]),
+      );
+      registry.register('parcial-1', prevLayer as never);
+
+      service.restaurarConReportes(1, [
+        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: 'm1', manzanaId: null } as never,
+      ]);
+
+      expect(rendering.removeExtraLayer).toHaveBeenCalledWith(prevLayer);
+      expect(registry.get('parcial-1')).toBeNull();
+      expect(state.manzanasById().has('parcial-1')).toBe(false);
+      expect(state.manzanasById().has('m1')).toBe(true);
+    });
+
+    it('restores a partial geometry drawn in the last report', () => {
+      rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
+      const geometriaParcial = JSON.stringify({
+        type: 'Polygon',
+        coordinates: [[[0, 0], [0, 1], [1, 1], [0, 0]]],
+      });
+
+      service.restaurarConReportes(1, [
+        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: '', manzanaId: null, geometriaParcial } as never,
+      ]);
+
+      expect(rendering.addExtraLayer).toHaveBeenCalled();
+      expect([...state.manzanasById().keys()].some(k => k.startsWith('parcial-'))).toBe(true);
+    });
+
+    it('restores a multipolygon partial geometry from the last report', () => {
+      rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
+      const geometriaParcial = JSON.stringify({
+        type: 'MultiPolygon',
+        coordinates: [[[[0, 0], [0, 1], [1, 1], [0, 0]]]],
+      });
+
+      service.restaurarConReportes(1, [
+        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: '', manzanaId: null, geometriaParcial } as never,
+      ]);
+
+      expect(rendering.addExtraLayer).toHaveBeenCalled();
+    });
+
+    it('shows an error toast when restoring a report fails', () => {
+      rendering.getManzanaCountByTerritorio.mockImplementation(() => {
+        throw new Error('boom');
+      });
+
+      service.restaurarConReportes(1, []);
+
+      expect(toast.show).toHaveBeenCalled();
+    });
   });
 });

@@ -141,18 +141,8 @@ export function traceContourBetween(
     return [a.latlng, b.latlng];
   }
 
-  const startEdge = edges[a.edgeIdx];
-  const endEdge = edges[b.edgeIdx];
-
-  const startLatLng = makeLatLng(
-    startEdge.from.lat + a.t * (startEdge.to.lat - startEdge.from.lat),
-    startEdge.from.lng + a.t * (startEdge.to.lng - startEdge.from.lng)
-  );
-
-  const endLatLng = makeLatLng(
-    endEdge.from.lat + b.t * (endEdge.to.lat - endEdge.from.lat),
-    endEdge.from.lng + b.t * (endEdge.to.lng - endEdge.from.lng)
-  );
+  const startLatLng = pointOnEdge(edges[a.edgeIdx], a.t);
+  const endLatLng = pointOnEdge(edges[b.edgeIdx], b.t);
 
   if (a.edgeIdx === b.edgeIdx) {
     return [startLatLng, endLatLng];
@@ -162,33 +152,65 @@ export function traceContourBetween(
   const stepsForward = (b.edgeIdx - a.edgeIdx + n) % n;
   const stepsBackward = (a.edgeIdx - b.edgeIdx + n) % n;
 
+  if (stepsForward <= stepsBackward) {
+    return buildForwardPath(a, edges, map, stepsForward, startLatLng, endLatLng);
+  }
+  return buildBackwardPath(a, edges, map, stepsBackward, startLatLng, endLatLng);
+}
+
+function pointOnEdge(edge: Edge, t: number): L.LatLng {
+  return makeLatLng(
+    edge.from.lat + t * (edge.to.lat - edge.from.lat),
+    edge.from.lng + t * (edge.to.lng - edge.from.lng)
+  );
+}
+
+function buildForwardPath(
+  a: SnappedPoint,
+  edges: Edge[],
+  map: L.Map,
+  stepsForward: number,
+  startLatLng: L.LatLng,
+  endLatLng: L.LatLng
+): L.LatLng[] {
+  const n = edges.length;
   const result: L.LatLng[] = [startLatLng];
 
-  if (stepsForward <= stepsBackward) {
-    const nextVertex = edges[a.edgeIdx].to;
-    if (latLngDist(startLatLng, nextVertex, map) > 1) {
-      result.push(nextVertex);
-    }
-    for (let step = 1; step < stepsForward; step++) {
-      const idx = (a.edgeIdx + step) % n;
-      result.push(edges[idx].to);
-    }
-    if (latLngDist(result[result.length - 1], endLatLng, map) > 1) {
-      result.push(endLatLng);
-    }
-  } else {
-    const prevVertex = edges[a.edgeIdx].from;
-    if (latLngDist(startLatLng, prevVertex, map) > 1) {
-      result.push(prevVertex);
-    }
-    for (let step = 1; step < stepsBackward; step++) {
-      const idx = (a.edgeIdx - step + n) % n;
-      result.push(edges[idx].from);
-    }
-    if (latLngDist(result[result.length - 1], endLatLng, map) > 1) {
-      result.push(endLatLng);
-    }
+  const nextVertex = edges[a.edgeIdx].to;
+  if (latLngDist(startLatLng, nextVertex, map) > 1) {
+    result.push(nextVertex);
   }
+  for (let step = 1; step < stepsForward; step++) {
+    const idx = (a.edgeIdx + step) % n;
+    result.push(edges[idx].to);
+  }
+  if (latLngDist(result[result.length - 1], endLatLng, map) > 1) {
+    result.push(endLatLng);
+  }
+  return result;
+}
 
+function buildBackwardPath(
+  a: SnappedPoint,
+  edges: Edge[],
+  map: L.Map,
+  stepsBackward: number,
+  startLatLng: L.LatLng,
+  endLatLng: L.LatLng
+): L.LatLng[] {
+  const n = edges.length;
+  const result: L.LatLng[] = [startLatLng];
+
+  const prevVertex = edges[a.edgeIdx].from;
+  if (latLngDist(startLatLng, prevVertex, map) > 1) {
+    result.push(prevVertex);
+  }
+  for (let step = 1; step < stepsBackward; step++) {
+    const idx = (a.edgeIdx - step + n) % n;
+    result.push(edges[idx].from);
+  }
+  if (latLngDist(result[result.length - 1], endLatLng, map) > 1) {
+    result.push(endLatLng);
+  }
   return result;
 }
