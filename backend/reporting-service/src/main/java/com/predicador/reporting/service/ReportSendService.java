@@ -33,6 +33,9 @@ public class ReportSendService {
     private static final String DEFAULT_IMAGE_URL =
         "https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png";
     private static final Duration DELIVERY_LEASE = Duration.ofMinutes(5);
+    private static final String PARAMETERS = "parameters";
+    private static final String IMAGE = "image";
+    private static final String PARAMETER_NAME = "parameter_name";
 
     private final ReportMessageService messageService;
     private final WhatsAppMediaClient mediaClient;
@@ -99,37 +102,37 @@ public class ReportSendService {
 
                 components.add(Map.of(
                     "type", "header",
-                    "parameters", List.of(
+                    PARAMETERS, List.of(
                         Map.of(
-                            "type", "image",
-                            "image", Map.of("id", mediaId)
+                            "type", IMAGE,
+                            IMAGE, Map.of("id", mediaId)
                         )
                     )
                 ));
             } else {
                 components.add(Map.of(
                     "type", "header",
-                    "parameters", List.of(
+                    PARAMETERS, List.of(
                         Map.of(
-                            "type", "image",
-                            "image", Map.of("link", DEFAULT_IMAGE_URL)
+                            "type", IMAGE,
+                            IMAGE, Map.of("link", DEFAULT_IMAGE_URL)
                         )
                     )
                 ));
             }
 
             List<Map<String, Object>> bodyParams = List.of(
-                Map.of("type", "text", "parameter_name", "fecha_registro",
+                Map.of("type", "text", PARAMETER_NAME, "fecha_registro",
                        "text", templateParams.get("fecha")),
-                Map.of("type", "text", "parameter_name", "nombre_encargado",
+                Map.of("type", "text", PARAMETER_NAME, "nombre_encargado",
                        "text", templateParams.get("encargado")),
-                Map.of("type", "text", "parameter_name", "numero_territorio",
+                Map.of("type", "text", PARAMETER_NAME, "numero_territorio",
                        "text", templateParams.get("territorio")),
-                Map.of("type", "text", "parameter_name", "detalle_estado",
+                Map.of("type", "text", PARAMETER_NAME, "detalle_estado",
                        "text", templateParams.get("estado"))
             );
 
-            components.add(Map.of("type", "body", "parameters", bodyParams));
+            components.add(Map.of("type", "body", PARAMETERS, bodyParams));
 
             String destination = request.destinationNumber() != null
                 ? PhoneUtil.normalize(request.destinationNumber())

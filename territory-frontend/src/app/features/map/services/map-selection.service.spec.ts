@@ -167,6 +167,7 @@ describe('MapSelectionService', () => {
     it('marks a manzana, registers its layer, selects its territory and updates totalManzanas', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
       rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
       const layer = fakePath();
 
       service.marcarManzana('m1', 'Bloque-m1', layer as never, '#ff0000', 1);
@@ -207,6 +208,8 @@ describe('MapSelectionService', () => {
       rendering.getAllTerritoriesLayer.mockReturnValue([
         { territorioPadre: 1, color: '#ff0000', layer: {} },
       ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
       const polygon = fakePath();
 
       service.seleccionarManzana(polygon as never, '#ff0000', 'Bloque-m1', 1);
@@ -242,6 +245,20 @@ describe('MapSelectionService', () => {
 
       expect(result).toEqual([1, 5]);
       expect(state.territoriosSeleccionados()).toEqual([1, 5]);
+    });
+
+    it('fits the map to the combined bounds of the selected territories', () => {
+      const fitBounds = vi.fn();
+      rendering.getMap.mockReturnValue({ fitBounds } as never);
+      rendering.getFeatureLayerByTerritorio.mockImplementation(() => ({
+        color: '#ff0000',
+        layer: { getBounds: () => ({ isValid: () => true, extend: vi.fn() }) },
+      }));
+
+      const result = service.prepareTerritorioSeleccionado([5, 6]);
+
+      expect(result).toEqual([5, 6]);
+      expect(fitBounds).toHaveBeenCalled();
     });
   });
 

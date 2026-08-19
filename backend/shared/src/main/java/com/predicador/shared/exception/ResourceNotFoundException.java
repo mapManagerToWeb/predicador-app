@@ -1,11 +1,13 @@
 package com.predicador.shared.exception;
 
+import java.io.Serializable;
+
 public class ResourceNotFoundException extends RuntimeException {
 
     private final String resource;
-    private final Object id;
+    private final Serializable id;
 
-    public ResourceNotFoundException(String resource, Object id) {
+    public ResourceNotFoundException(String resource, Serializable id) {
         super(String.format("%s con id %s no encontrado", resource, id));
         this.resource = resource;
         this.id = id;
@@ -15,7 +17,7 @@ public class ResourceNotFoundException extends RuntimeException {
         return resource;
     }
 
-    public Object getId() {
+    public Serializable getId() {
         return id;
     }
 }
