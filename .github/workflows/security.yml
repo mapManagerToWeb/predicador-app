@@ -18,12 +18,13 @@ jobs:
     name: Gitleaks (secret detection)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   dependency-check:
     name: OWASP Dependency Check
@@ -32,17 +33,19 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           java-version: "25"
           distribution: temurin
           cache: maven
       - name: Run OWASP dependency-check
-        run: mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=7
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=7 -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: owasp-report
           path: backend/**/target/dependency-check-report.html
@@ -60,11 +63,11 @@ jobs:
           - config-server
           - discovery-server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build Docker image
         working-directory: backend
         run: docker build -t predicador/${{ matrix.service }}:scan -f ${{ matrix.service }}/Dockerfile .
-      - uses: aquasecurity/trivy-action@master
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: predicador/${{ matrix.service }}:scan
           format: table
@@ -82,7 +85,7 @@ jobs:
       contents: read
     if: github.actor != 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Scan completo: genera SARIF con TODOS los hallazgos (no usa --error
       # para no abortar por WARNING/MEDIUM) y se sube al Code Scanning.
@@ -98,7 +101,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Advanced Security Dashboard
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
 

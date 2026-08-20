@@ -35,6 +35,12 @@
         <opentelemetry.version>1.64.0</opentelemetry.version>
         <opentelemetry-instrumentation.version>2.30.0</opentelemetry-instrumentation.version>
         <logstash-logback.version>8.0</logstash-logback.version>
+        <!--
+            Override for known CVEs in httpcore5 (CVE-2026-54399,
+            CVE-2026-54428, both HIGH) affecting 5.3.6 and earlier 5.4.x.
+            Spring Boot 4.0.7 manages httpcore5 via ${httpcore5.version}.
+        -->
+        <httpcore5.version>5.4.3</httpcore5.version>
     </properties>
 
     <modules>
