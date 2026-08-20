@@ -9,6 +9,12 @@ on:
     # Weekly scan on Sundays at 03:00 UTC
     - cron: "0 3 * * 0"
 
+# Principio de mínimo privilegio: cada job recibe únicamente acceso de lectura
+# al contenido del repositorio. Los jobs que necesitan permisos extra los
+# declaran explícitamente dentro del job, con su justificación.
+permissions:
+  contents: read
+
 concurrency:
   group: security-${{ github.ref }}
   cancel-in-progress: true
@@ -17,40 +23,47 @@ jobs:
   gitleaks:
     name: Gitleaks (secret detection)
     runs-on: ubuntu-latest
+    # pull-requests: read es necesario: gitleaks-action@v3 lista los commits del
+    # PR vía API (GET /pulls/{n}/commits) en eventos pull_request.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
-  dependency-check:
-    name: OWASP Dependency Check
+  trivy-fs:
+    name: Trivy filesystem scan
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          java-version: "25"
-          distribution: temurin
-          cache: maven
-      - name: Run OWASP dependency-check
-        run: mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=7
-      - name: Upload report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: owasp-report
-          path: backend/**/target/dependency-check-report.html
-          retention-days: 7
+          fetch-depth: 0
 
-  trivy:
-    name: Trivy (Docker image scan)
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+  trivy-image:
+    name: Trivy Docker image scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         service:
@@ -60,14 +73,64 @@ jobs:
           - config-server
           - discovery-server
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Build Docker image
         working-directory: backend
         run: docker build -t predicador/${{ matrix.service }}:scan -f ${{ matrix.service }}/Dockerfile .
-      - uses: aquasecurity/trivy-action@master
+
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: predicador/${{ matrix.service }}:scan
           format: table
-          exit-code: 1
+          exit-code: "1"
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a # semgrep/semgrep (digest inmutable para resultados reproducibles)
+    # security-events: write es necesario para subir el SARIF al GitHub
+    # Advanced Security Dashboard (upload-sarif).
+    permissions:
+      security-events: write
+      contents: read
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Scan completo: genera SARIF con TODOS los hallazgos (no usa --error
+      # para no abortar por WARNING/MEDIUM) y se sube al Code Scanning.
+      - name: Run Semgrep scan (SARIF)
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/github-actions \
+            --sarif \
+            --output semgrep.sarif \
+            --metrics=off \
+            .
+
+      - name: Upload SARIF to GitHub Advanced Security Dashboard
+        if: always()
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        with:
+          sarif_file: semgrep.sarif
+
+      # Gate de CI: bloquea únicamente hallazgos de severidad ERROR.
+      # (No vuelve a emitir SARIF; --severity ERROR filtra también el output.)
+      - name: Gate on ERROR findings
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/github-actions \
+            --severity ERROR \
+            --error \
+            --metrics=off \
+            .

@@ -32,7 +32,9 @@ public class Encargado {
     @Column(name = "actualizado_en")
     private Instant actualizadoEn;
 
-    public Encargado() {}
+    public Encargado() {
+        // No-arg constructor requerido por JPA.
+    }
 
     @PrePersist
     protected void onCreate() {

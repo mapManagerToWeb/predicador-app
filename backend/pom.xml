@@ -24,7 +24,13 @@
         <springdoc.version>3.1.0</springdoc.version>
         <testcontainers.version>1.20.1</testcontainers.version>
         <netty.version>4.2.16.Final</netty.version>
-        <tomcat.version>11.0.24</tomcat.version>
+        <!--
+            Override for CVE-2026-66299 (HIGH, Uncontrolled Resource
+            Consumption in Tomcat's WebSocket chat example) affecting
+            tomcat-embed-core 11.0.0-M20 through 11.0.24. Bumped to the
+            patched release via ${tomcat.version}.
+        -->
+        <tomcat.version>11.0.25</tomcat.version>
         <!--
             Observability stack. OpenTelemetry Spring Boot starter uses the
             OTel BOM to align every otel-* artifact on the same generation.
@@ -35,6 +41,19 @@
         <opentelemetry.version>1.64.0</opentelemetry.version>
         <opentelemetry-instrumentation.version>2.30.0</opentelemetry-instrumentation.version>
         <logstash-logback.version>8.0</logstash-logback.version>
+        <!--
+            Override for known CVEs in httpcore5 (CVE-2026-54399,
+            CVE-2026-54428, both HIGH) affecting 5.3.6 and earlier 5.4.x.
+            Spring Boot 4.0.7 manages httpcore5 via ${httpcore5.version}.
+        -->
+        <httpcore5.version>5.4.3</httpcore5.version>
+        <!--
+            Override for known CVEs in amqp-client (CVE-2026-63337,
+            CVE-2026-69219, CVE-2026-69220, all HIGH) affecting 5.27.x.
+            Spring Boot 4.0.7 manages amqp-client via
+            ${rabbit-amqp-client.version}.
+        -->
+        <rabbit-amqp-client.version>5.33.1</rabbit-amqp-client.version>
     </properties>
 
     <modules>
@@ -138,7 +157,7 @@
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.8.12</version>
+                        <version>0.8.14</version>
                         <executions>
                             <execution>
                                 <id>prepare-agent</id>

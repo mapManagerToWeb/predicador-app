@@ -2,10 +2,10 @@ title = "Predicador Gitleaks Config"
 
 [allowlist]
 paths = [
-    "backend/api-gateway/src/test/**",
-    "backend/reporting-service/src/test/**",
-    "backend/config-server/src/main/resources/config/*.yml",
-    "backend/reporting-service/src/main/resources/application.yml",
-    "backend/territory-service/src/main/resources/application.yml",
-    "docs/superpowers/plans/2026-08-03-rabbitmq-whatsapp-integration.md",
+    "backend/api-gateway/src/test/.*",
+    "backend/reporting-service/src/test/.*",
+    "backend/config-server/src/main/resources/config/.*\\.yml",
+    "backend/reporting-service/src/main/resources/application\\.yml",
+    "backend/territory-service/src/main/resources/application\\.yml",
+    "docs/superpowers/plans/2026-08-03-rabbitmq-whatsapp-integration\\.md",
 ]
