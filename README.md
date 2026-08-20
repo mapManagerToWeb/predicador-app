@@ -397,6 +397,23 @@ GitHub Actions ejecuta automáticamente:
 - **docker.yml**: Build de imágenes Docker
 - **security.yml**: Análisis de seguridad
 
+Política de seguridad en **security.yml**:
+
+- **Secretos**: Gitleaks detecta secretos expuestos y bloquea la PR/commit si
+  encuentra un secreto real (`.gitleaks.toml` + `.gitleaksignore`).
+- **SAST**: Semgrep aplica reglas `p/security-audit`, `p/owasp-top-ten` y
+  `p/github-actions`; sube el SARIF a Code Scanning y bloquea la CI únicamente
+  con hallazgos de severidad `ERROR`.
+- **Vulnerabilidades**: Trivy **filesystem** (dependencias, secretos y
+  misconfiguraciones del checkout) y Trivy **image** (paquetes del SO e imagen
+  base de las 5 imágenes Docker). El gate bloquea por severidad
+  `HIGH`/`CRITICAL` solucionables (`ignore-unfixed: true`); las vulnerabilidades
+  sin fix disponible no bloquean.
+- **Dependencias**: Dependabot y GitHub Dependabot alerts complementan el
+  análisis de Trivy. Las excepciones a estos gates deben ser específicas,
+  justificadas, con propietario y fecha de vencimiento — nunca se suprimen
+  familias completas de CVEs de forma permanente.
+
 ## Observability
 
 ### Stack (docker-compose profile: `observability`)
