@@ -41,6 +41,13 @@
             Spring Boot 4.0.7 manages httpcore5 via ${httpcore5.version}.
         -->
         <httpcore5.version>5.4.3</httpcore5.version>
+        <!--
+            Override for known CVEs in amqp-client (CVE-2026-63337,
+            CVE-2026-69219, CVE-2026-69220, all HIGH) affecting 5.27.x.
+            Spring Boot 4.0.7 manages amqp-client via
+            ${rabbit-amqp-client.version}.
+        -->
+        <rabbit-amqp-client.version>5.33.1</rabbit-amqp-client.version>
     </properties>
 
     <modules>
