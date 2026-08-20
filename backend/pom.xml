@@ -24,7 +24,13 @@
         <springdoc.version>3.1.0</springdoc.version>
         <testcontainers.version>1.20.1</testcontainers.version>
         <netty.version>4.2.16.Final</netty.version>
-        <tomcat.version>11.0.24</tomcat.version>
+        <!--
+            Override for CVE-2026-66299 (HIGH, Uncontrolled Resource
+            Consumption in Tomcat's WebSocket chat example) affecting
+            tomcat-embed-core 11.0.0-M20 through 11.0.24. Bumped to the
+            patched release via ${tomcat.version}.
+        -->
+        <tomcat.version>11.0.25</tomcat.version>
         <!--
             Observability stack. OpenTelemetry Spring Boot starter uses the
             OTel BOM to align every otel-* artifact on the same generation.
