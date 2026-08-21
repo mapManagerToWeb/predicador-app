@@ -11,7 +11,6 @@ import type {
   TerritoriosEnvio
 } from '../../core/models/models';
 import type { ManzanaMarcada, FeatureLayer, DatosParciales } from './types/map.types';
-import { isIOS } from './utils/ios-detection';
 
 const SCREENSHOT_RETRIES = 2;
 
@@ -122,10 +121,6 @@ export class MapReportService {
       const mapElement = typeof document === 'undefined' ? null : document.getElementById('map');
       if (!mapElement) return null;
 
-      if (isIOS()) {
-        return this.captureMapComposite(mapElement);
-      }
-
       const { toJpeg } = await import('html-to-image');
       // JPEG (no PNG): coincide con el content-type image/jpeg que el backend
       // usa al subir a WhatsApp y mantiene el payload dentro de los límites del
@@ -228,58 +223,6 @@ export class MapReportService {
     if (typeof navigator === 'undefined') return false;
     const ua = navigator.userAgent;
     return /AppleWebKit/.test(ua) && !/(Chrome|CriOS|Edg|OPR|Firefox|SamsungBrowser)/.test(ua);
-  }
-
-  /**
-   * Manually composes the map screenshot by drawing tiles and the Leaflet
-   * Canvas onto a temporary Canvas element.
-   *
-   * Used on iOS where html-to-image cannot capture the Leaflet Canvas
-   * (SVG foreignObject limitation in WebKit).
-   */
-  private captureMapComposite(mapElement: HTMLElement): string | null {
-    const width = mapElement.clientWidth;
-    const height = mapElement.clientHeight;
-    if (width === 0 || height === 0) return null;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width * 2;
-    canvas.height = height * 2;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.scale(2, 2);
-
-    const tiles = Array.from(
-      mapElement.querySelectorAll('.leaflet-tile-pane img')
-    ) as HTMLImageElement[];
-
-    for (const tile of tiles) {
-      if (!tile.complete || tile.naturalWidth === 0) continue;
-      const rect = tile.getBoundingClientRect();
-      const mapRect = mapElement.getBoundingClientRect();
-      const x = rect.left - mapRect.left;
-      const y = rect.top - mapRect.top;
-      try {
-        ctx.drawImage(tile, x, y, rect.width, rect.height);
-      } catch {
-        // CORS or tainted canvas — skip this tile
-      }
-    }
-
-    const leafletCanvas = mapElement.querySelector(
-      '.leaflet-canvas-pane canvas'
-    ) as HTMLCanvasElement | null;
-
-    if (leafletCanvas) {
-      try {
-        ctx.drawImage(leafletCanvas, 0, 0, width, height);
-      } catch {
-        // Canvas tainted — skip overlay
-      }
-    }
-
-    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
   }
 
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {
