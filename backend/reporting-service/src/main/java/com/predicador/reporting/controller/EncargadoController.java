@@ -33,6 +33,8 @@ public class EncargadoController {
     private final SessionTokenService tokens;
     private final boolean sessionCookieSecure;
 
+    private static final String NOMBRE = "nombre";
+
     public EncargadoController(EncargadoService encargadoService, SessionTokenService tokens,
             @Value("${app.session.cookie-secure:false}") boolean sessionCookieSecure) {
         this.encargadoService = encargadoService;
@@ -49,7 +51,7 @@ public class EncargadoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
         }
         return ResponseEntity.ok(encargadoService.listarActivos(
-                PageRequest.of(page, size, Sort.by("nombre").ascending().and(Sort.by("id").ascending())), token(request)).getContent());
+                PageRequest.of(page, size, Sort.by(NOMBRE).ascending().and(Sort.by("id").ascending())), token(request)).getContent());
     }
 
     @PostMapping
@@ -72,12 +74,12 @@ public class EncargadoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
         }
         return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre,
-                PageRequest.of(page, size, Sort.by("nombre").ascending().and(Sort.by("id").ascending())), token(request)).getContent());
+                PageRequest.of(page, size, Sort.by(NOMBRE).ascending().and(Sort.by("id").ascending())), token(request)).getContent());
     }
 
     @PostMapping("/buscar-crear")
     public ResponseEntity<?> buscarOCrear(@RequestBody Map<String, String> body) {
-        String nombre = body.getOrDefault("nombre", "");
+        String nombre = body.getOrDefault(NOMBRE, "");
         String apellido = body.getOrDefault("apellido", "");
         String telefono = body.get("telefono");
         var result = encargadoService.buscarOCrear(nombre, apellido, telefono);

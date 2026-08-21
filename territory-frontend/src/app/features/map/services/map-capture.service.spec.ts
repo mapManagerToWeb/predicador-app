@@ -255,7 +255,7 @@ describe('MapCaptureService', () => {
       (img2 as any).complete = true;
       img2.dispatchEvent(new Event('load'));
 
-      await promise;
+      await expect(promise).resolves.toBeUndefined();
       vi.useRealTimers();
     });
 
@@ -273,7 +273,7 @@ describe('MapCaptureService', () => {
 
       vi.advanceTimersByTime(6000);
 
-      await promise;
+      await expect(promise).resolves.toBeUndefined();
       vi.useRealTimers();
     });
   });

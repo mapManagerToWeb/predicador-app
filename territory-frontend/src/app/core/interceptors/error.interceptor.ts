@@ -25,6 +25,12 @@ const LOGIN_URL_PATTERNS = ['/encargados/login', '/encargados/buscar-crear', '/a
  */
 const AUTH_URL_PATTERNS = [...LOGIN_URL_PATTERNS, '/encargados/session'];
 
+/**
+ * Endpoints whose callers handle errors themselves (guardarYEnviar, etc.).
+ * Showing a generic toast here would duplicate the caller's own messaging.
+ */
+const SELF_HANDLED_PATTERNS = ['/reports/send', '/reports?'];
+
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(Toast);
   const authToken = inject(AuthTokenService);
@@ -34,6 +40,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const path = req.url.split('?')[0];
   const isLoginRequest = LOGIN_URL_PATTERNS.some(p => path === p || path.endsWith(p));
   const isAuthRequest = AUTH_URL_PATTERNS.some(p => path === p || path.endsWith(p));
+  const isSelfHandled = SELF_HANDLED_PATTERNS.some(p => req.url.includes(p));
 
   return next(req).pipe(
     catchError(error => {
@@ -58,7 +65,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
 
-      if (!isAuthRequest) {
+      if (!isAuthRequest && !isSelfHandled) {
         let message = 'Error de conexion';
 
         if (error.status === 0) {

@@ -230,13 +230,14 @@ describe('TerritorioService', () => {
     );
     req.flush(null);
 
-    await promise;
+    await expect(promise).resolves.toBeUndefined();
   });
 
   it('eliminarReportes does not call the API with empty ids', async () => {
     await service.eliminarReportes([]);
 
-    httpMock.expectNone(r => r.method === 'DELETE' && r.url.includes('/reports'));
+    const deleteCalls = httpMock.match(r => r.method === 'DELETE' && r.url.includes('/reports'));
+    expect(deleteCalls).toHaveLength(0);
   });
 
   it('crearReportes retries a transient 503 and succeeds', async () => {
@@ -312,7 +313,7 @@ describe('TerritorioService', () => {
       req = httpMock.expectOne(r => r.method === 'DELETE' && r.url.includes('/reports'));
       req.flush(null);
 
-      await promise;
+      await expect(promise).resolves.toBeUndefined();
     } finally {
       vi.useRealTimers();
     }

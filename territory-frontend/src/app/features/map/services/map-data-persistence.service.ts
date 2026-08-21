@@ -68,7 +68,8 @@ export class MapDataPersistenceService {
       this.state.totalManzanas.set(0);
       this.state.modoMarcado.set('none');
       this.state.manzanasById.set(new Map());
-    } catch {
+    } catch (error) {
+      console.error('[guardarEnBaseDeDatos] Error:', error);
       if (previousMarcadas && previousDatosParciales) {
         this.state.manzanasById.set(previousMarcadas);
         this.state.datosParcialesGuardados = previousDatosParciales;
@@ -172,7 +173,8 @@ export class MapDataPersistenceService {
       this.state.totalManzanas.set(0);
       this.state.modoMarcado.set('none');
       this.state.manzanasById.set(new Map());
-    } catch {
+    } catch (error) {
+      console.error('[guardarYEnviar] Error:', error);
       if (guardados.length > 0 && !envioConfirmado) {
         // Quedó guardado sin envío confirmado: revertir para cumplir ACID.
         await this.revertirGuardado(guardados);
