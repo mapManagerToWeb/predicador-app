@@ -41,6 +41,8 @@ public class RouteConfig {
     private static final String RUM_CB = "rumCB";
     private static final String REPORTING_FALLBACK = "forward:/fallback/reporting";
     private static final String REPORTING_SERVICE_URI = "lb://reporting-service";
+    private static final String TERRITORY_FALLBACK = "forward:/fallback/territory";
+    private static final String TERRITORY_SERVICE_URI = "lb://territory-service";
 
     @Value("${app.cors.allowed-origins:}")
     private String allowedOrigins;
@@ -57,32 +59,32 @@ public class RouteConfig {
                         .path("/api/v1/territories/colors")
                         .filters(f -> f
                                 .circuitBreaker(c -> c.setName("territoryCB-colors")
-                                        .setFallbackUri("forward:/fallback/territory"))
+                                        .setFallbackUri(TERRITORY_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(2)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
-                        .uri("lb://territory-service"))
+                        .uri(TERRITORY_SERVICE_URI))
                 .route("territory-geojson-all", r -> r
                         .path("/api/v1/territories/all/geojson")
                         .filters(f -> f
                                 .circuitBreaker(c -> c.setName("territoryCB-geojson")
-                                        .setFallbackUri("forward:/fallback/territory"))
+                                        .setFallbackUri(TERRITORY_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(2)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
-                        .uri("lb://territory-service"))
+                        .uri(TERRITORY_SERVICE_URI))
                 .route("territory-service", r -> r
                         .path("/api/v1/territories/**")
                         .filters(f -> f
                                 .circuitBreaker(c -> c.setName("territoryCB-default")
-                                        .setFallbackUri("forward:/fallback/territory"))
+                                        .setFallbackUri(TERRITORY_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(2)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
-                        .uri("lb://territory-service"))
+                        .uri(TERRITORY_SERVICE_URI))
                 .route("reporting-service", r -> r
                         .path("/api/v1/reports/**")
                         .filters(f -> f

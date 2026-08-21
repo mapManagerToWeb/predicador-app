@@ -22,6 +22,7 @@ public class WhatsAppMessageRequest {
     private List<Map<String, Object>> components;
 
     public WhatsAppMessageRequest() {
+        // No-arg constructor requerido por Jackson para deserializar el JSON entrante.
     }
 
     public String getIdempotencyKey() {

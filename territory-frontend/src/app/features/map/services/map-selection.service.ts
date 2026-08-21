@@ -167,17 +167,10 @@ export class MapSelectionService {
 
     if (!estabaEnModoMarcado) {
       this.resetUIState();
+      this.reemplazarSeleccionTerritorios(numeros);
     } else {
       this.rendering.clearExtraLayers();
-    }
-
-    if (estabaEnModoMarcado) {
-      const existentes = new Set(this.state.territoriosSeleccionados());
-      for (const n of numeros) existentes.add(n);
-      this.state.territoriosSeleccionados.set(Array.from(existentes));
-    } else {
-      this.state.modoMarcado.set('none');
-      this.state.territoriosSeleccionados.set(numeros);
+      this.acumularSeleccionTerritorios(numeros);
     }
 
     this.state.territorioSeleccionado.set(
@@ -189,9 +182,34 @@ export class MapSelectionService {
     }
 
     const numsAConsiderar = estabaEnModoMarcado ? this.state.territoriosSeleccionados() : numeros;
+    const combinedBounds = this.aplicarMarcasYCrearBounds(numsAConsiderar);
 
+    const map = this.rendering.getMap();
+    if (combinedBounds && combinedBounds.isValid() && map) {
+      map.fitBounds(combinedBounds, { padding: [30, 30] });
+    }
+
+    this.rendering.cancelPendingStyleUpdates();
+    this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
+    this.updateTotalManzanas(numsAConsiderar);
+
+    return numsAConsiderar;
+  }
+
+  private acumularSeleccionTerritorios(numeros: number[]): void {
+    const existentes = new Set(this.state.territoriosSeleccionados());
+    for (const n of numeros) existentes.add(n);
+    this.state.territoriosSeleccionados.set(Array.from(existentes));
+  }
+
+  private reemplazarSeleccionTerritorios(numeros: number[]): void {
+    this.state.modoMarcado.set('none');
+    this.state.territoriosSeleccionados.set(numeros);
+  }
+
+  private aplicarMarcasYCrearBounds(nums: number[]): L.LatLngBounds | null {
     let combinedBounds: L.LatLngBounds | null = null;
-    for (const numero of numsAConsiderar) {
+    for (const numero of nums) {
       const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero);
       if (!featureLayer) continue;
 
@@ -204,17 +222,7 @@ export class MapSelectionService {
         else combinedBounds.extend(bounds);
       }
     }
-
-    const map = this.rendering.getMap();
-    if (combinedBounds && combinedBounds.isValid() && map) {
-      map.fitBounds(combinedBounds, { padding: [30, 30] });
-    }
-
-    this.rendering.cancelPendingStyleUpdates();
-    this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-    this.updateTotalManzanas(numsAConsiderar);
-
-    return numsAConsiderar;
+    return combinedBounds;
   }
 
   private updateTotalManzanas(numsAConsiderar: number[]): void {

@@ -95,45 +95,67 @@ export class TerritorioService {
     const sinRevisar = nums.filter(n => !this.versionsSeen.has(n));
     if (sinRevisar.length === 0) return result;
 
-    const versiones = new Map<number, number>();
-    const chunks: number[][] = [];
-    for (let i = 0; i < sinRevisar.length; i += BATCH_SIZE) {
-      chunks.push(sinRevisar.slice(i, i + BATCH_SIZE));
-    }
-
     // Fetch all chunks in parallel instead of serially awaiting each one,
     // so the revalidation network chain is one round-trip deep, not N deep.
     const responses = await Promise.allSettled(
-      chunks.map(chunk =>
+      this.batchChunks(sinRevisar).map(chunk =>
         firstValueFrom(
-          this.http.get<Record<string, number>>(
-            `${this.reportesUrl}/versions?${chunk.map(n => `territorios=${n}`).join('&')}`
-          ).pipe(retryTransient(2, REVALIDATION_RETRY_DELAY_MS))
+          this.http.get<Record<string, number>>(this.buildVersionsUrl(chunk))
+            .pipe(retryTransient(2, REVALIDATION_RETRY_DELAY_MS))
         )
       )
     );
-    const allFailed = responses.every(r => r.status === 'rejected');
-    if (allFailed) {
+    if (responses.every(r => r.status === 'rejected')) {
       // Offline: skip revalidation, paint from the persistent cache.
       return result;
     }
+
+    const versiones = this.parseVersions(responses);
+    for (const num of sinRevisar) {
+      this.versionsSeen.set(num, versiones.get(num) ?? -1);
+    }
+
+    await this.actualizarReportesCambiados(this.calcularCambiados(versiones), result);
+    return result;
+  }
+
+  private batchChunks(nums: number[]): number[][] {
+    const chunks: number[][] = [];
+    for (let i = 0; i < nums.length; i += BATCH_SIZE) {
+      chunks.push(nums.slice(i, i + BATCH_SIZE));
+    }
+    return chunks;
+  }
+
+  private buildVersionsUrl(chunk: number[]): string {
+    const query = chunk.map(n => `territorios=${n}`).join('&');
+    return `${this.reportesUrl}/versions?${query}`;
+  }
+
+  private parseVersions(responses: PromiseSettledResult<Record<string, number>>[]): Map<number, number> {
+    const versiones = new Map<number, number>();
     for (const response of responses) {
       if (response.status !== 'fulfilled' || !response.value) continue;
       for (const [key, version] of Object.entries(response.value)) {
         versiones.set(Number(key), Number(version));
       }
     }
+    return versiones;
+  }
 
-    for (const num of sinRevisar) {
-      this.versionsSeen.set(num, versiones.get(num) ?? -1);
-    }
-
+  private calcularCambiados(versiones: Map<number, number>): Map<number, number> {
     const cambiados = new Map<number, number>();
     for (const [num, version] of versiones) {
       const cacheado = this.reportCache.getCache().get(num);
       if (!cacheado || cacheado.id !== version) cambiados.set(num, version);
     }
+    return cambiados;
+  }
 
+  private async actualizarReportesCambiados(
+    cambiados: Map<number, number>,
+    result: Map<number, Reporte[]>
+  ): Promise<void> {
     for (let i = 0; i < cambiados.size; i += BATCH_SIZE) {
       const chunk = Array.from(cambiados.keys()).slice(i, i + BATCH_SIZE);
       const query = chunk.map(n => `territorios=${n}`).join('&');
@@ -152,7 +174,6 @@ export class TerritorioService {
         }
       }
     }
-    return result;
   }
 
   async getReportesPorTerritorios(territorios: number[]): Promise<Map<number, Reporte[]>> {

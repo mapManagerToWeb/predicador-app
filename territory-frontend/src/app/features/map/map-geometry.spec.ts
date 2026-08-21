@@ -154,4 +154,37 @@ describe('traceContourBetween', () => {
     const result = traceContourBetween(a, b, edges, mockMap);
     expect(result).toHaveLength(2);
   });
+
+  it('traces a forward path through intermediate vertices', () => {
+    const a = pointOn(0, 0.5);
+    const b = pointOn(2, 0.5);
+    const result = traceContourBetween(a, b, edges, mockMap);
+    expect(result).toHaveLength(4);
+    expect(result[0].lng).toBeCloseTo(5);
+    expect(result[1].lat).toBeCloseTo(0);
+    expect(result[1].lng).toBeCloseTo(10);
+    expect(result[2].lat).toBeCloseTo(10);
+    expect(result[2].lng).toBeCloseTo(10);
+    expect(result[3].lat).toBeCloseTo(10);
+    expect(result[3].lng).toBeCloseTo(5);
+  });
+
+  it('traces the backward path when it is shorter', () => {
+    const hexEdges: Edge[] = [
+      { from: makeLatLng(0, 0), to: makeLatLng(0, 10) },
+      { from: makeLatLng(0, 10), to: makeLatLng(10, 10) },
+      { from: makeLatLng(10, 10), to: makeLatLng(20, 10) },
+      { from: makeLatLng(20, 10), to: makeLatLng(20, 0) },
+      { from: makeLatLng(20, 0), to: makeLatLng(10, 0) },
+      { from: makeLatLng(10, 0), to: makeLatLng(0, 0) },
+    ];
+    const a = pointOn(0, 0.5);
+    const b = pointOn(4, 0.5);
+    const result = traceContourBetween(a, b, hexEdges, mockMap);
+    expect(result).toHaveLength(4);
+    expect(result[1].lat).toBeCloseTo(0);
+    expect(result[1].lng).toBeCloseTo(0);
+    expect(result[3].lat).toBeCloseTo(15);
+    expect(result[3].lng).toBeCloseTo(0);
+  });
 });

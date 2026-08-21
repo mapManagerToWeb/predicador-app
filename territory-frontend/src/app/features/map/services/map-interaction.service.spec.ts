@@ -240,6 +240,38 @@ describe('MapInteractionService', () => {
       expect(service.handleMapClick(clickAt(50, 50)).action).toBe('none');
     });
 
+    it('selects the manzana to partially mark when clicking it in parcial mode', () => {
+      state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+
+      const result = service.handleMapClick(clickAt(0.5, 0.5));
+
+      expect(result.action).toBe('select_manzana');
+      expect(result.manzana?.id).toBe('m1');
+    });
+
+    it('selects the nearest manzana when clicking near but outside it', () => {
+      state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+
+      const result = service.handleMapClick(clickAt(2.5, 0));
+
+      expect(result.action).toBe('select_manzana');
+      expect(result.manzana?.id).toBe('m1');
+    });
+
+    it('snaps a dragged marker onto the selected manzana contour', () => {
+      state.modoMarcado.set('parcial');
+      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
+      const marker = { getLatLng: () => ({ lat: 0.5, lng: 0 }) };
+
+      const result = service.handleMarkerDrag(marker as L.Marker, 0);
+
+      expect(result[0].edgeIdx).toBe(0);
+    });
+
     it('adds a snapped point on the edge of the selected manzana', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
