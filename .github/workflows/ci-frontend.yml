@@ -26,7 +26,7 @@ jobs:
 
       # pnpm/action-setup instala la versión declarada en `packageManager`
       # (pnpm@9.15.0) sin depender de npm.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9.15.0
 
