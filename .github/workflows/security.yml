@@ -51,7 +51,7 @@ jobs:
         continue-on-error: true
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: owasp-report
           path: backend/**/target/dependency-check-report.html
