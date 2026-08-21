@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
@@ -89,7 +89,7 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep:v1.56.0
+      image: semgrep/semgrep:1.174.0
     permissions:
       security-events: write
       contents: read
