@@ -6,8 +6,10 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Weekly scan on Sundays at 03:00 UTC
     - cron: "0 3 * * 0"
+
+permissions:
+  contents: read
 
 concurrency:
   group: security-${{ github.ref }}
@@ -17,7 +19,9 @@ jobs:
   gitleaks:
     name: Gitleaks (secret detection)
     runs-on: ubuntu-latest
-    if: ${{ secrets.GITLEAKS_LICENSE != '' }}
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,6 +61,8 @@ jobs:
   trivy:
     name: Trivy (Docker image scan)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -91,10 +97,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Scan completo: genera SARIF con la totalidad de hallazgos (no usa --error
-      # para no abortar por WARNING/MEDIUM) y se sube al Code Scanning.
       - name: Run Semgrep scan (SARIF)
-        run: semgrep scan --config p/security-audit --config p/owasp-top-ten --config p/github-actions --sarif --output semgrep.sarif --metrics=off .
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/github-actions \
+            --sarif \
+            --output semgrep.sarif \
+            --metrics=off \
+            .
 
       - name: Upload SARIF to GitHub Advanced Security Dashboard
         if: always()
@@ -102,6 +114,13 @@ jobs:
         with:
           sarif_file: semgrep.sarif
 
-      # Gate de CI: bloquea únicamente hallazgos de severidad ERROR.
       - name: Gate on ERROR findings
-        run: semgrep scan --config p/security-audit --config p/owasp-top-ten --config p/github-actions --severity ERROR --error --metrics=off .
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/github-actions \
+            --severity ERROR \
+            --error \
+            --metrics=off \
+            .
