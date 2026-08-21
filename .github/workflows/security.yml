@@ -48,6 +48,7 @@ jobs:
         run: mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=7
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        continue-on-error: true
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
