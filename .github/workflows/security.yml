@@ -41,7 +41,7 @@ jobs:
           distribution: temurin
           cache: maven
       - name: Run OWASP dependency-check
-        run: mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=7 -DnvdApiKey=${{ secrets.NVD_API_KEY }}
+        run: mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=7
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         continue-on-error: true
@@ -83,7 +83,7 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep
+      image: semgrep/semgrep:v1.56.0
     permissions:
       security-events: write
       contents: read
@@ -91,7 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Scan completo: genera SARIF con TODOS los hallazgos (no usa --error
+      # Scan completo: genera SARIF con la totalidad de hallazgos (no usa --error
       # para no abortar por WARNING/MEDIUM) y se sube al Code Scanning.
       - name: Run Semgrep scan (SARIF)
         run: semgrep scan --config p/security-audit --config p/owasp-top-ten --config p/github-actions --sarif --output semgrep.sarif --metrics=off .
