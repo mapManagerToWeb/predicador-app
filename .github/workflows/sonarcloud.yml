@@ -1,0 +1,80 @@
+name: SonarCloud Analysis
+
+# Análisis CI-based: corre los tests primero para que el scanner importe
+# el coverage real (JaCoCo backend + lcov frontend). Reemplaza al análisis
+# automático de SonarCloud, que fue desactivado a nivel de proyecto.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: sonarcloud-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: predicador
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: predicador_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historial completo: necesario para atribución de issues en PRs
+          fetch-depth: 0
+
+      - name: Add Docker socket to Testcontainers
+        run: |
+          echo "unix:///var/run/docker.sock" > $HOME/.testcontainers.properties 2>/dev/null || true
+          mkdir -p $HOME/.testcontainers && echo "ryuk.container.image=ghcr.io/testcontainers/ryuk:0.11.0" >> $HOME/.testcontainers.properties
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "25"
+          distribution: temurin
+          cache: maven
+
+      # pnpm/action-setup instala la versión declarada en `packageManager`
+      - uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: territory-frontend/pnpm-lock.yaml
+
+      - name: Frontend tests with coverage
+        working-directory: territory-frontend
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm test -- --run --coverage
+
+      - name: Backend build and tests with coverage
+        working-directory: backend
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/predicador_test
+          DB_USERNAME: predicador
+          DB_PASSWORD: test
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+          DOCKER_HOST: unix:///var/run/docker.sock
+        run: mvn verify -Pcoverage -B
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
