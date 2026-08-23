@@ -1,7 +1,11 @@
 export const DEDUP_THRESHOLD_PX = 2;
 export const MAX_PUNTOS_PARCIAL = 6;
 export const LABEL_MIN_ZOOM = 14;
-export const MAX_TILE_WAIT_MS = 5000;
+export const MAX_TILE_WAIT_MS = typeof navigator !== 'undefined' &&
+  /AppleWebKit/.test(navigator.userAgent) &&
+  !/(Chrome|CriOS)/.test(navigator.userAgent)
+    ? 8000   // iOS Safari necesita más tiempo para tiles ArcGIS
+    : 5000;
 
 export const MAP_DEFAULTS = {
   initialView: { lat: -37.4779, lng: -73.345 },
