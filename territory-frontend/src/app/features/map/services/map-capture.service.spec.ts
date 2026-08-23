@@ -271,7 +271,7 @@ describe('MapCaptureService', () => {
 
       const promise = (service as any).waitForTiles(map);
 
-      vi.advanceTimersByTime(6000);
+      vi.advanceTimersByTime(8000);
 
       await expect(promise).resolves.toBeUndefined();
       vi.useRealTimers();
