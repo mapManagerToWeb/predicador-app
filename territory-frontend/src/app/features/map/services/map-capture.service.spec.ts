@@ -150,6 +150,175 @@ describe('MapCaptureService', () => {
     });
   });
 
+  describe('inlineTileImages (Safari)', () => {
+    const SAFARI_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+    const CHROME_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    class FakeImage {
+      static instances: FakeImage[] = [];
+      crossOrigin = '';
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      src = '';
+      constructor() {
+        FakeImage.instances.push(this);
+      }
+    }
+
+    function makeTile(src: string): HTMLImageElement {
+      const img = document.createElement('img');
+      img.src = src;
+      return img;
+    }
+
+    function fakeCanvas2d() {
+      return {
+        drawImage: vi.fn(),
+        toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,ABC'),
+      };
+    }
+
+    beforeEach(() => {
+      FakeImage.instances = [];
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    function mockTiles(tiles: HTMLImageElement[]) {
+      return vi
+        .spyOn(document, 'querySelectorAll')
+        .mockReturnValue(tiles as unknown as NodeListOf<HTMLImageElement>);
+    }
+
+    async function flush() {
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    function setupMap() {
+      engine.getMap.mockReturnValue(fakeMap);
+      territories.getAllTerritoriesLayer.mockReturnValue([]);
+      territories.getTerritoryLabels.mockReturnValue([]);
+    }
+
+    it('inlines cross-origin tiles as data URLs on Safari', async () => {
+      setupMap();
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(SAFARI_UA);
+      const ctx = fakeCanvas2d();
+      const realCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation(tag => {
+        if (tag === 'canvas') {
+          return {
+            width: 0,
+            height: 0,
+            getContext: () => ctx,
+            toDataURL: () => 'data:image/jpeg;base64,ABC',
+          } as unknown as HTMLCanvasElement;
+        }
+        return realCreateElement(tag);
+      });
+      const tiles = [
+        makeTile('https://tiles.example/a.png'),
+        makeTile('https://tiles.example/b.png?x=1'),
+      ];
+      mockTiles(tiles);
+      vi.stubGlobal('Image', FakeImage);
+
+      const promise = service.prepararCaptura([], []);
+      await flush();
+      expect(FakeImage.instances.length).toBe(2);
+      FakeImage.instances.forEach(i => i.onload?.());
+      await promise;
+
+      // Ambos tiles quedaron inlineados
+      expect(tiles[0].src).toBe('data:image/jpeg;base64,ABC');
+      expect(tiles[1].src).toBe('data:image/jpeg;base64,ABC');
+      // Cache-busting: '?' se agrega solo si el src no lo tenía
+      expect(FakeImage.instances[0].src).toContain('a.png?_cb=');
+      expect(FakeImage.instances[1].src).toContain('b.png?x=1&_cb=');
+      expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips tiles that are already data URLs', async () => {
+      setupMap();
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(SAFARI_UA);
+      const tile = makeTile('data:image/png;base64,XYZ');
+      mockTiles([tile]);
+      vi.stubGlobal('Image', FakeImage);
+
+      const promise = service.prepararCaptura([], []);
+      await flush();
+      await promise;
+
+      expect(FakeImage.instances).toHaveLength(0);
+      expect(tile.src).toBe('data:image/png;base64,XYZ');
+    });
+
+    it('leaves the tile untouched when canvas 2d context is unavailable', async () => {
+      setupMap();
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(SAFARI_UA);
+      // jsdom devuelve null en getContext salvo que se instale `canvas`
+      const tile = makeTile('https://tiles.example/a.png');
+      mockTiles([tile]);
+      vi.stubGlobal('Image', FakeImage);
+
+      const promise = service.prepararCaptura([], []);
+      await flush();
+      await promise;
+
+      expect(tile.src).toBe('https://tiles.example/a.png');
+      expect(FakeImage.instances).toHaveLength(0);
+    });
+
+    it('resolves without inlining when the re-encoded image fails to load', async () => {
+      setupMap();
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(SAFARI_UA);
+      const ctx = fakeCanvas2d();
+      const realCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation(tag => {
+        if (tag === 'canvas') {
+          return {
+            width: 0,
+            height: 0,
+            getContext: () => ctx,
+            toDataURL: () => 'data:image/jpeg;base64,ABC',
+          } as unknown as HTMLCanvasElement;
+        }
+        return realCreateElement(tag);
+      });
+      const tile = makeTile('https://tiles.example/a.png');
+      mockTiles([tile]);
+      vi.stubGlobal('Image', FakeImage);
+
+      const promise = service.prepararCaptura([], []);
+      await flush();
+      FakeImage.instances.forEach(i => i.onerror?.());
+      await promise;
+
+      expect(tile.src).toBe('https://tiles.example/a.png');
+      expect(ctx.toDataURL).not.toHaveBeenCalled();
+    });
+
+    it('does not touch tiles outside Safari', async () => {
+      setupMap();
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(CHROME_UA);
+      const qsa = mockTiles([]);
+      const tile = makeTile('https://tiles.example/a.png');
+
+      const promise = service.prepararCaptura([], []);
+      await flush();
+      await promise;
+
+      expect(qsa).not.toHaveBeenCalledWith('.leaflet-tile-pane img');
+      expect(tile.src).toBe('https://tiles.example/a.png');
+    });
+  });
+
   describe('prepararCapturaSoloIncompletos', () => {
     it('styles incomplete territories with marked layers highlighted and thick unmarked strokes', async () => {
       engine.getMap.mockReturnValue(fakeMap);
