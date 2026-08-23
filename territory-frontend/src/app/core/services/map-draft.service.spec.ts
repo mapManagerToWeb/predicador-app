@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { DraftMarksService, MapDraft } from './map-draft';
-import type { ManzanaMarcada } from '../../features/map/types/map.types';
+import type { ManzanaMarcada } from '../types/map.types';
 
 function sampleDraft(): MapDraft {
   const manzana: ManzanaMarcada = { id: 'A', nombreBloque: 'Bloque A', color: '#3b82f6', territorioNumero: 1 };

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Toast } from '../../../core/services/toast';
-import { MapReportService } from '../map-report.service';
+import { MapReportService } from './map-report.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ReportCacheService } from './report-cache';
-import type { Reporte } from '../models/models';
+import type { Reporte } from '../../../core/models/models';
 
 const ONLY_PLAIN = '{ "othermll": true }';
 
