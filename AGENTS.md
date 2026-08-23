@@ -44,8 +44,8 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 
 ### Scaffolding & Architecture
 - Feature-based structure under `predicador-frontend/src/app/`:
-  - `core/` — Singleton services (Profile, TerritorioService, Toast, WhatsAppService, EncargadoService), guards, interceptors, models.
-  - `features/` — Standalone lazy-loaded page components (auth/login, map, profile, admin).
+  - `core/` — Cross-cutting singleton services (Profile, TerritorioService, Toast, EncargadoService, DraftMarksService, ReportCacheService), guards, interceptors, models. Territorio/Encargado/DraftMarks/ReportCache live here because they are shared across features (e.g. `territorio.ts` uses ReportCache and DraftMarks); do not move them into a single feature.
+  - `features/` — Standalone lazy-loaded page components (auth/login, map, profile, admin). Feature-exclusive services live inside their feature: `features/map/services/` holds the map engine services plus `whatsapp.ts` (only used by map reporting).
   - `shared/` — Reusable components (avatar-selector, screenshot-modal, toast, pipes).
 - Selector prefixes: Component `app-` (kebab-case), Directive `app` (camelCase).
 - Standalone components (no NgModule).

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MapDataPersistenceService } from './map-data-persistence.service';
 import { MapStateService } from './map-state.service';
-import { MapReportService } from '../map-report.service';
+import { MapReportService } from './map-report.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { TerritorioService } from '../../../core/services/territorio';
