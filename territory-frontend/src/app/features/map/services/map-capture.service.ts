@@ -79,55 +79,6 @@ export class MapCaptureService {
     });
   }
 
-  /**
-   * Convierte todos los tiles visibles a data: URLs para evitar
-   * el CORS SecurityError de Safari al capturar con html-to-image.
-   * Solo aplica cuando el tile es cross-origin (satélite ArcGIS).
-   */
-  private async inlineTileImages(): Promise<void> {
-    if (typeof document === 'undefined') return;
-
-    const tiles = Array.from(
-      document.querySelectorAll('.leaflet-tile-pane img')
-    ) as HTMLImageElement[];
-
-    await Promise.all(
-      tiles.map(tile =>
-        new Promise<void>(resolve => {
-          if (!tile.src || tile.src.startsWith('data:')) {
-            resolve();
-            return;
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = tile.naturalWidth || 256;
-          canvas.height = tile.naturalHeight || 256;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve();
-            return;
-          }
-
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              ctx.drawImage(img, 0, 0);
-              tile.src = canvas.toDataURL('image/jpeg', 0.85);
-            } catch {
-              // Si ArcGIS rechaza CORS, dejamos el tile como está
-              // (aparecerá blanco, pero no rompe la captura completa)
-            }
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src =
-            tile.src + (tile.src.includes('?') ? '&' : '?') + '_cb=' + Date.now();
-        })
-      )
-    );
-  }
-
   getAllTerritoriesLayer(): FeatureLayer[] {
     return this.territories.getAllTerritoriesLayer();
   }
@@ -142,11 +93,6 @@ export class MapCaptureService {
     );
     const allTerritoriesLayer = this.territories.getAllTerritoriesLayer();
     const territoryLabels = this.territories.getTerritoryLabels();
-
-    // ← AGREGAR: inline tiles para Safari antes de capturar
-    if (this.isSafari()) {
-      await this.inlineTileImages();
-    }
 
     this.styleTerritoryLayers(allTerritoriesLayer, seleccionados, _markedLayers);
     this.stylePartialMarks(manzanasMarcadas, allTerritoriesLayer);
@@ -404,9 +350,4 @@ export class MapCaptureService {
     }
   }
 
-  private isSafari(): boolean {
-    if (typeof navigator === 'undefined') return false;
-    const ua = navigator.userAgent;
-    return /AppleWebKit/.test(ua) && !/(Chrome|CriOS|Edg|OPR|Firefox|SamsungBrowser)/.test(ua);
-  }
 }

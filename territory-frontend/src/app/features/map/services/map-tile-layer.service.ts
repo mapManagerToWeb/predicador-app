@@ -28,11 +28,15 @@ export class MapTileLayerService implements OnDestroy {
     const tileLayer = L.tileLayer(this.getTileLayerUrl(theme), {
       maxZoom: MAP_DEFAULTS.maxZoom,
       attribution: this.getMapAttribution(theme),
+      // CORS limpio para poder dibujar los tiles en el canvas de captura
+      // (los tres proveedores envían Access-Control-Allow-Origin: *).
+      crossOrigin: true,
     }).addTo(map);
 
     const satelliteLayer = L.tileLayer(TILE_LAYERS.satellite, {
       maxZoom: MAP_DEFAULTS.maxZoom,
       attribution: ATTRIBUTIONS.satellite,
+      crossOrigin: true,
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);

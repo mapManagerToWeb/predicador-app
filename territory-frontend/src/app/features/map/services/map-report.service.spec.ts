@@ -4,24 +4,21 @@ import { TerritorioService } from '../../../core/services/territorio';
 import { Profile } from '../../../core/services/profile';
 import { Toast } from '../../../core/services/toast';
 import { WhatsAppService } from './whatsapp';
+import { MapCanvasCaptureService } from './map-canvas-capture.service';
 import type { ManzanaMarcada, FeatureLayer, DatosParciales } from '../types/map.types';
 import { makeLatLng } from '../map-geometry';
 import type { UserProfile } from '../../../core/models/models';
 
-vi.mock('html-to-image', () => ({
-  toJpeg: vi.fn().mockRejectedValue(new Error('capture failed')),
-}));
-
 describe('MapReportService', () => {
   let service: MapReportService;
   let restoreMap: ReturnType<typeof vi.fn>;
+  let canvasCapture: { capture: ReturnType<typeof vi.fn> };
   let profile: UserProfile | null;
 
   beforeEach(async () => {
     restoreMap = vi.fn();
     profile = { name: 'Daniel', lastName: 'Uribe', avatar: 3, telefono: '56912345678', encargadoId: 7 };
-    const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
-    toJpeg.mockClear();
+    canvasCapture = { capture: vi.fn().mockReturnValue(null) };
     TestBed.configureTestingModule({
       providers: [
         MapReportService,
@@ -29,6 +26,7 @@ describe('MapReportService', () => {
         { provide: Profile, useValue: { currentUser: () => profile } },
         { provide: Toast, useValue: {} },
         { provide: WhatsAppService, useValue: {} },
+        { provide: MapCanvasCaptureService, useValue: canvasCapture },
       ],
     });
     service = TestBed.inject(MapReportService);
@@ -52,74 +50,25 @@ describe('MapReportService', () => {
       expect(restoreMap).toHaveBeenCalledOnce();
     });
 
-    it('restores map state when screenshot rendering fails', async () => {
-      const mapElement = document.createElement('div');
-      mapElement.id = 'map';
-      document.body.appendChild(mapElement);
+    it('restores map state when the canvas capture throws', async () => {
+      canvasCapture.capture.mockImplementation(() => {
+        throw new Error('capture failed');
+      });
 
       await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).rejects.toThrow(
         'capture failed',
       );
 
       expect(restoreMap).toHaveBeenCalledOnce();
-      mapElement.remove();
     });
 
-    it('returns the base64 body of the captured element (JPEG)', async () => {
-      const mapElement = document.createElement('div');
-      mapElement.id = 'map';
-      document.body.appendChild(mapElement);
-      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
-      toJpeg.mockResolvedValue('data:image/jpeg;base64,ABC123');
+    it('returns the base64 body produced by the canvas capture', async () => {
+      canvasCapture.capture.mockReturnValue('ABC123');
 
       await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe('ABC123');
 
-      expect(toJpeg).toHaveBeenCalledWith(mapElement, expect.objectContaining({ pixelRatio: expect.any(Number) }));
+      expect(canvasCapture.capture).toHaveBeenCalledOnce();
       expect(restoreMap).toHaveBeenCalledOnce();
-      mapElement.remove();
-    });
-
-    it('warm-up capture on Safari returns the largest dataUrl (iOS blank-first-capture bug)', async () => {
-      const mapElement = document.createElement('div');
-      mapElement.id = 'map';
-      document.body.appendChild(mapElement);
-      const uaSpy = vi
-        .spyOn(window.navigator, 'userAgent', 'get')
-        .mockReturnValue(
-          'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-        );
-      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
-      toJpeg
-        .mockResolvedValueOnce('data:image/jpeg;base64,' + 'AA'.repeat(24))
-        .mockResolvedValueOnce('data:image/jpeg;base64,' + 'BB'.repeat(96))
-        .mockResolvedValueOnce('data:image/jpeg;base64,' + 'CC'.repeat(128));
-
-      await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe(
-        'CC'.repeat(128),
-      );
-
-      expect(toJpeg).toHaveBeenCalledTimes(3);
-      uaSpy.mockRestore();
-      mapElement.remove();
-    });
-
-    it('single capture outside Safari (Chrome/Windows)', async () => {
-      const mapElement = document.createElement('div');
-      mapElement.id = 'map';
-      document.body.appendChild(mapElement);
-      const uaSpy = vi
-        .spyOn(window.navigator, 'userAgent', 'get')
-        .mockReturnValue(
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        );
-      const toJpeg = (await import('html-to-image')).toJpeg as ReturnType<typeof vi.fn>;
-      toJpeg.mockResolvedValue('data:image/jpeg;base64,ABC123');
-
-      await expect(service.captureScreenshot(vi.fn().mockResolvedValue(undefined), restoreMap)).resolves.toBe('ABC123');
-
-      expect(toJpeg).toHaveBeenCalledTimes(1);
-      uaSpy.mockRestore();
-      mapElement.remove();
     });
   });
 
@@ -270,6 +219,7 @@ describe('MapReportService', () => {
           { provide: Profile, useValue: { currentUser: () => profile } },
           { provide: Toast, useValue: {} },
           { provide: WhatsAppService, useValue: {} },
+          { provide: MapCanvasCaptureService, useValue: { capture: vi.fn() } },
         ],
       });
       service = TestBed.inject(MapReportService);
