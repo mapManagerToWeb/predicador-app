@@ -78,37 +78,52 @@ describe('MapCanvasCaptureService', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns null without a map', () => {
+  it('returns null without a map', async () => {
     (engine as Partial<MapEngineService>).getMap = () => null;
-    expect(service.capture()).toBeNull();
+    await expect(service.capture()).resolves.toBeNull();
   });
 
-  it('draws loaded tiles at their on-screen position and returns base64 jpeg', () => {
+  it('draws loaded tiles at their on-screen position and returns base64 jpeg', async () => {
     const tile = document.createElement('img');
     Object.defineProperty(tile, 'complete', { value: true });
     Object.defineProperty(tile, 'naturalWidth', { value: 256 });
+    Object.defineProperty(tile, 'decode', { value: vi.fn().mockResolvedValue(undefined) });
     vi.spyOn(container, 'querySelectorAll').mockReturnValue([tile] as unknown as NodeListOf<Element>);
     vi.spyOn(tile, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, 30, 256, 256));
 
-    const result = service.capture();
+    const result = await service.capture();
 
     expect(result).toBe('QUJD');
+    expect(tile.decode).toHaveBeenCalledOnce();
     expect(ctx.drawImage).toHaveBeenCalledWith(tile, 10, 20, 256, 256);
     expect(canvasEl.width).toBe(1600);
     expect(canvasEl.height).toBe(1200);
   });
 
-  it('skips tiles that are not complete', () => {
+  it('skips tiles that are not complete', async () => {
     const tile = document.createElement('img');
     Object.defineProperty(tile, 'complete', { value: false });
+    Object.defineProperty(tile, 'decode', { value: vi.fn().mockResolvedValue(undefined) });
     vi.spyOn(container, 'querySelectorAll').mockReturnValue([tile] as unknown as NodeListOf<Element>);
 
-    service.capture();
+    await service.capture();
 
     expect(ctx.drawImage).not.toHaveBeenCalled();
   });
 
-  it('draws visible paths with their live style options', () => {
+  it('keeps capturing when a tile decode rejects', async () => {
+    const broken = document.createElement('img');
+    Object.defineProperty(broken, 'complete', { value: true });
+    Object.defineProperty(broken, 'naturalWidth', { value: 256 });
+    Object.defineProperty(broken, 'decode', { value: vi.fn().mockRejectedValue(new Error('no data')) });
+    vi.spyOn(container, 'querySelectorAll').mockReturnValue([broken] as unknown as NodeListOf<Element>);
+    vi.spyOn(broken, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 256, 256));
+
+    await expect(service.capture()).resolves.toBe('QUJD');
+    expect(ctx.drawImage).toHaveBeenCalled();
+  });
+
+  it('draws visible paths with their live style options', async () => {
     const polygon = L.polygon([[0, 0], [0, 1], [1, 1]], {
       color: '#ff0000',
       fillColor: '#ff0000',
@@ -118,7 +133,7 @@ describe('MapCanvasCaptureService', () => {
     });
     polygon.addTo(map);
 
-    service.capture();
+    await service.capture();
 
     expect(ctx.fill).toHaveBeenCalled();
     expect(ctx.stroke).toHaveBeenCalled();
@@ -126,16 +141,16 @@ describe('MapCanvasCaptureService', () => {
     expect(ctx.lineWidth).toBe(4);
   });
 
-  it('skips hidden paths (opacity 0 and fillOpacity 0)', () => {
+  it('skips hidden paths (opacity 0 and fillOpacity 0)', async () => {
     const hidden = L.polygon([[0, 0], [0, 1], [1, 1]], { opacity: 0, fillOpacity: 0 });
     hidden.addTo(map);
 
-    service.capture();
+    await service.capture();
 
     expect(ctx.beginPath).not.toHaveBeenCalled();
   });
 
-  it('applies dashArray for partial polygons', () => {
+  it('applies dashArray for partial polygons', async () => {
     const partial = L.polygon([[0, 0], [0, 1], [1, 1]], {
       color: '#123456',
       weight: 4,
@@ -145,12 +160,12 @@ describe('MapCanvasCaptureService', () => {
     });
     partial.addTo(map);
 
-    service.capture();
+    await service.capture();
 
     expect(ctx.setLineDash).toHaveBeenCalledWith([8, 8]);
   });
 
-  it('draws only labels with opacity 1', () => {
+  it('draws only labels with opacity 1', async () => {
     const visible = L.marker([0, 0], { opacity: 1 });
     const hidden = L.marker([1, 1], { opacity: 0 });
     visible.addTo(map);
@@ -164,7 +179,7 @@ describe('MapCanvasCaptureService', () => {
     (territories as { getTerritoryLabels: () => L.Marker[] }).getTerritoryLabels =
       () => [visible, hidden];
 
-    service.capture();
+    await service.capture();
 
     expect(ctx.fillText).toHaveBeenCalledWith('7', expect.any(Number), expect.any(Number));
   });

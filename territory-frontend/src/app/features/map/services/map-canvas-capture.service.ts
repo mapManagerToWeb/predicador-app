@@ -24,7 +24,7 @@ export class MapCanvasCaptureService {
   private territories = inject(MapTerritoryLayerService);
 
   /** Returns JPEG base64 (no data: prefix) of the visible map, or null. */
-  capture(): string | null {
+  async capture(): Promise<string | null> {
     const map = this.engine.getMap();
     if (!map || typeof document === 'undefined') return null;
 
@@ -39,20 +39,39 @@ export class MapCanvasCaptureService {
 
     ctx.scale(CAPTURE_PIXEL_RATIO, CAPTURE_PIXEL_RATIO);
 
-    this.drawTiles(map, ctx);
+    await this.drawTiles(map, ctx);
     this.drawPaths(map, ctx);
     this.drawLabels(ctx);
 
     return canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1] ?? null;
   }
 
-  /** Tiles are already positioned by Leaflet; reuse their on-screen rects. */
-  private drawTiles(map: L.Map, ctx: CanvasRenderingContext2D): void {
+  /**
+   * Tiles are already positioned by Leaflet; reuse their on-screen rects.
+   *
+   * <p>Safari can report img.complete=true while the bitmap is not yet
+   * DECODED; drawImage then paints nothing (blank tiles). Chrome decodes
+   * eagerly, which is why captures worked there but not in Safari. An
+   * explicit decode() forces the pixels to be ready before drawing.</p>
+   */
+  private async drawTiles(map: L.Map, ctx: CanvasRenderingContext2D): Promise<void> {
     const container = map.getContainer();
     const origin = container.getBoundingClientRect();
-    const tiles = container.querySelectorAll('.leaflet-tile-pane img');
-    for (const tile of tiles) {
-      const img = tile as HTMLImageElement;
+    const tiles = Array.from(
+      container.querySelectorAll('.leaflet-tile-pane img')
+    ) as HTMLImageElement[];
+
+    await Promise.all(
+      tiles.map(async img => {
+        try {
+          await img.decode();
+        } catch {
+          // Tile roto o sin datos: se dibuja el hueco en blanco.
+        }
+      })
+    );
+
+    for (const img of tiles) {
       if (!img.complete || !img.naturalWidth) continue;
       const r = img.getBoundingClientRect();
       try {
