@@ -3,6 +3,7 @@ import { TerritorioService } from '../../../core/services/territorio';
 import { Profile } from '../../../core/services/profile';
 import { Toast } from '../../../core/services/toast';
 import { WhatsAppService } from './whatsapp';
+import { MapCanvasCaptureService } from './map-canvas-capture.service';
 import type {
   RegistroReporte,
   Reporte,
@@ -20,6 +21,7 @@ export class MapReportService {
   private profileService = inject(Profile);
   private toastService = inject(Toast);
   private whatsappService = inject(WhatsAppService);
+  private canvasCapture = inject(MapCanvasCaptureService);
 
   buildRegistros(
     marcadas: ManzanaMarcada[],
@@ -118,19 +120,10 @@ export class MapReportService {
   ): Promise<string | null> {
     try {
       await prepararCaptura();
-      const mapElement = typeof document === 'undefined' ? null : document.getElementById('map');
-      if (!mapElement) return null;
-
-      const { toJpeg } = await import('html-to-image');
-      // JPEG (no PNG): coincide con el content-type image/jpeg que el backend
-      // usa al subir a WhatsApp y mantiene el payload dentro de los límites del
-      // gateway (10MB) incluso con pantallas grandes.
-      const dataUrl = await this.renderScreenshot(mapElement, toJpeg, {
-        quality: 0.85,
-        pixelRatio: 2,
-        cacheBust: true,
-      });
-      return dataUrl.split(',')[1];
+      // Captura por canvas directo (tiles + vectores ya estilizados): sin
+      // serialización DOM, idéntico en iOS/Android/desktop. html-to-image
+      // quedaba en blanco en iOS WebKit <!-- bubkoo/html-to-image#461 -->.
+      return this.canvasCapture.capture();
     } finally {
       try {
         restaurarMapaPostCaptura();
@@ -188,45 +181,6 @@ export class MapReportService {
   private countTotalManzanas(featureLayer: FeatureLayer | undefined, fallback: number): number {
     if (!featureLayer) return fallback;
     return Array.from(featureLayer.layer.getLayers()).filter(l => 'setStyle' in l).length;
-  }
-
-  /**
-   * Captures the map element, keeping the largest result.
-   *
-   * <p>iOS Safari/WebKit has a known html-to-image bug: the SVG foreignObject
-   * decodes tile images in a separate context, so the FIRST capture after a
-   * DOM mutation (the capture refit/styles) can render with blank or missing
-   * tiles. Retrying once and keeping the largest dataUrl yields a complete
-   * screenshot <!-- see bubkoo/html-to-image#461 -->. UA-gated so Chrome,
-   * Firefox, Android and Windows/macOS browsers keep a single capture.
-   */
-private async renderScreenshot(
-    mapElement: HTMLElement,
-    toJpeg: (node: HTMLElement, options: object) => Promise<string>,
-    options: object
-): Promise<string> {
-    if (this.isSafari()) {
-      let best = '';
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-          await new Promise(r => setTimeout(r, 200));
-        }
-        const dataUrl = await toJpeg(mapElement, options);
-        if (dataUrl.length > best.length) {
-          best = dataUrl;
-        }
-      }
-      return best;
-    }
-    const dataUrl = await toJpeg(mapElement, options);
-    return dataUrl;
-  }
-
-  /** True for Safari (including iOS), excluding Chromium/Firefox impostors. */
-  private isSafari(): boolean {
-    if (typeof navigator === 'undefined') return false;
-    const ua = navigator.userAgent;
-    return /AppleWebKit/.test(ua) && !/(Chrome|CriOS|Edg|OPR|Firefox|SamsungBrowser)/.test(ua);
   }
 
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {

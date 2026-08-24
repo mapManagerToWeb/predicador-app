@@ -55,10 +55,12 @@ describe('MapTileLayerService', () => {
     expect(tileLayerMock).toHaveBeenCalledWith(TILE_LAYERS.light, {
       maxZoom: 18,
       attribution: ATTRIBUTIONS.light,
+      crossOrigin: true,
     });
     expect(tileLayerMock).toHaveBeenCalledWith(TILE_LAYERS.satellite, {
       maxZoom: 18,
       attribution: ATTRIBUTIONS.satellite,
+      crossOrigin: true,
     });
     expect(controlZoomMock.zoom).toHaveBeenCalledWith({ position: 'bottomright' });
     expect(service.isSatellite()).toBe(false);
@@ -72,6 +74,7 @@ describe('MapTileLayerService', () => {
     expect(tileLayerMock).toHaveBeenCalledWith(TILE_LAYERS.dark, {
       maxZoom: 18,
       attribution: ATTRIBUTIONS.dark,
+      crossOrigin: true,
     });
   });
 

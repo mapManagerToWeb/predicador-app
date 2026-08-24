@@ -27,7 +27,6 @@
     "@angular/ssr": "^22.0.8",
     "@types/leaflet": "^1.9.21",
     "express": "^5.1.0",
-    "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
     "polygon-clipping": "^0.15.7",
     "rxjs": "~7.8.0",
