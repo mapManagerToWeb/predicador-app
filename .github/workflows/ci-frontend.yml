@@ -2,12 +2,12 @@ name: CI Frontend
 
 on:
   push:
-    branches: [main, chore/production-quality-hardening]
+    branches: [main, chore/production-quality-hardening, feat/redesign]
     paths:
       - "territory-frontend/**"
       - ".github/workflows/ci-frontend.yml"
   pull_request:
-    branches: [main]
+    branches: [main, feat/redesign]
     paths:
       - "territory-frontend/**"
 

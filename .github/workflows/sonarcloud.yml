@@ -5,9 +5,9 @@ name: SonarCloud Analysis
 # automático de SonarCloud, que fue desactivado a nivel de proyecto.
 on:
   push:
-    branches: [main]
+    branches: [main, feat/redesign]
   pull_request:
-    branches: [main]
+    branches: [main, feat/redesign]
 
 concurrency:
   group: sonarcloud-${{ github.ref }}

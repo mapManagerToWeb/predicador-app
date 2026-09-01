@@ -10,5 +10,6 @@ public record WhatsAppProperties(
     String accessToken,
     String templateName,
     String languageCode,
-    String destinationNumber
+    String destinationNumber,
+    String defaultImageUrl
 ) {}

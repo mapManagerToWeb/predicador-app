@@ -56,7 +56,19 @@ yarn-error.log*
 .claude/
 .opencode/
 .superpowers/
+.superpowers/
 docs/
+openspec/
+skills-lock.json
+
+# AI agent configs
+AGENTS.md
+territory-frontend/.github/agents/
+
+# Audit/reports (generated, not source)
+CI_SECURITY_HARDENING_PLAN.md
+semgrep-security-report.md
+sonarqube-report.md
 
 # AI-generated scaffolding (unwired placeholders, not part of the app)
 predicador-frontend/src/app/whatsapp-simulation/
