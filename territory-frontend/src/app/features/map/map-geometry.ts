@@ -1,5 +1,20 @@
 import type * as L from 'leaflet';
 
+/**
+ * Map Geometry Utilities
+ *
+ * WEB WORKER PREPARATION:
+ * The following functions are pure computational functions that are candidates
+ * for migration to Web Workers to prevent UI blocking during map interactions:
+ *
+ * - snapToContour(): Heavy computation in interaction hot path (calculates nearest point on edges)
+ * - pointInPolygon(): Ray-casting algorithm called repeatedly during point-in-polygon checks
+ * - traceContourBetween(): Path calculation between two snapped points on polygon edges
+ *
+ * These functions are serializable (only use plain objects and numbers) and can be
+ * moved to Web Workers with postMessage communication.
+ */
+
 export interface SnappedPoint {
   latlng: L.LatLng;
   edgeIdx: number;
@@ -17,6 +32,11 @@ export function makeLatLng(lat: number, lng: number): L.LatLng {
 
 export const SNAP_THRESHOLD_PX = 100;
 
+/**
+ * Pure ray-casting algorithm for point-in-polygon detection.
+ * WEB WORKER CANDIDATE: This function performs repetitive geometric calculations
+ * that can block the UI during extensive manzana selection operations.
+ */
 export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
   const x = point.lat;
   const y = point.lng;
@@ -35,6 +55,10 @@ export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
   return inside;
 }
 
+/**
+ * Computes parameter t for projection of point onto segment AB.
+ * WEB WORKER CANDIDATE: Pure mathematical calculation used in projection logic.
+ */
 export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map): number {
   const p = map.latLngToContainerPoint(point);
   const pa = map.latLngToContainerPoint(a);
@@ -52,6 +76,10 @@ export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map):
   return Math.max(0, Math.min(1, t));
 }
 
+/**
+ * Projects a point onto a line segment using parameter t.
+ * WEB WORKER CANDIDATE: Geometric projection calculation used in snapping logic.
+ */
 export function projectOnSegment(
   point: L.LatLng,
   a: L.LatLng,
@@ -62,12 +90,27 @@ export function projectOnSegment(
   return makeLatLng(a.lat + t * (b.lat - a.lat), a.lng + t * (b.lng - a.lng));
 }
 
+/**
+ * Calculates pixel distance between two LatLng points.
+ * WEB WORKER CANDIDATE: Distance calculation used in path building logic.
+ */
 export function latLngDist(a: L.LatLng, b: L.LatLng, map: L.Map): number {
   const pa = map.latLngToContainerPoint(a);
   const pb = map.latLngToContainerPoint(b);
   return pa.distanceTo(pb);
 }
 
+/**
+ * Snaps a point to the nearest edge of a polygon within threshold.
+ * WEB WORKER CANDIDATE: This is the most computationally intensive function in the
+ * interaction hot path. It iterates through all edges of a polygon to find the nearest
+ * projection point, which can block the UI during complex map interactions.
+ *
+ * Performance considerations:
+ * - Uses container point caching to avoid repeated projections
+ * - Iterates through all edges to find minimum distance
+ * - Called frequently during drag operations and point selection
+ */
 export function snapToContour(
   latlng: L.LatLng,
   edges: Edge[],
@@ -131,6 +174,11 @@ export function snapToContour(
   return { latlng, edgeIdx: -1, t: 0 };
 }
 
+/**
+ * Traces the polygon contour between two snapped points.
+ * WEB WORKER CANDIDATE: Path calculation that determines the optimal route between
+ * two points on polygon edges, considering both forward and backward directions.
+ */
 export function traceContourBetween(
   a: SnappedPoint,
   b: SnappedPoint,
@@ -158,6 +206,10 @@ export function traceContourBetween(
   return buildBackwardPath(a, edges, map, stepsBackward, startLatLng, endLatLng);
 }
 
+/**
+ * Helper function to get a point on an edge using parameter t.
+ * WEB WORKER CANDIDATE: Simple interpolation calculation.
+ */
 function pointOnEdge(edge: Edge, t: number): L.LatLng {
   return makeLatLng(
     edge.from.lat + t * (edge.to.lat - edge.from.lat),
@@ -165,6 +217,10 @@ function pointOnEdge(edge: Edge, t: number): L.LatLng {
   );
 }
 
+/**
+ * Builds path forward from snapped point a to b.
+ * WEB WORKER CANDIDATE: Path construction with distance checks.
+ */
 function buildForwardPath(
   a: SnappedPoint,
   edges: Edge[],
@@ -190,6 +246,10 @@ function buildForwardPath(
   return result;
 }
 
+/**
+ * Builds path backward from snapped point a to b.
+ * WEB WORKER CANDIDATE: Path construction with distance checks.
+ */
 function buildBackwardPath(
   a: SnappedPoint,
   edges: Edge[],

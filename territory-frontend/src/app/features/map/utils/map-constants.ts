@@ -86,6 +86,8 @@ export const TOAST_MESSAGES = {
   saving: 'Guardando reportes...',
   saveSuccess: 'Reportes guardados exitosamente',
   saveError: 'Error al guardar los reportes',
+  reportingUnavailable:
+    'El servicio de reportes no está disponible — tus marcas se conservaron, reintentá más tarde',
   sendSuccessTitle: 'Territorio actualizado ',
   sendSuccessSubtitle: 'Reporte enviado a WhatsApp',
   sendError: 'Error enviando WhatsApp',
@@ -100,6 +102,21 @@ export const TOAST_MESSAGES = {
   partialMode: 'Tocá en cualquier parte del mapa',
   completeMode: 'Tocá una manzana para marcarla',
   territoryLock: 'No se puede cambiar de territorio mientras se marca',
+  locationDenied: 'Permiso de ubicación denegado — activalo en los ajustes del navegador',
+  locationUnavailable: 'No se pudo obtener tu ubicación',
+  locationUnsupported: 'Tu navegador no permite usar la ubicación aquí',
+  locationLowAccuracy: 'Ubicación con baja precisión — acercate a un lugar abierto',
+} as const;
+
+/** Opciones del seguimiento de ubicación (Geolocation API nativa). */
+export const LOCATION_DEFAULTS = {
+  enableHighAccuracy: true,
+  timeoutMs: 15000,
+  maximumAgeMs: 10000,
+  /** Por encima de este radio (m) se avisa una sola vez de baja precisión. */
+  lowAccuracyMeters: 200,
+  /** Recentra solo si la posición sale del viewport contraído este factor. */
+  recenterPadFactor: 0.05,
 } as const;
 
 let parcialSeq = 0;

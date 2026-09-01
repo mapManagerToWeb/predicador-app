@@ -9,22 +9,22 @@
   bottom: max(80px, calc(60px + var(--safe-bottom)));
   left: 50%;
   transform: translateX(-50%);
-  background: var(--paper);
+  background: var(--surface-1);
   color: var(--ink);
-  padding: 12px 20px;
+  padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
   font-family: var(--font-body);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   z-index: 3000;
   box-shadow: var(--elev-3);
-  border: 1px solid var(--clip-metal);
-  animation: toast-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid var(--color-border-solid);
+  animation: toast-in 0.3s var(--ease-spring);
   max-width: 90vw;
   text-align: center;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .toast--success {
@@ -46,9 +46,9 @@
 }
 
 .toast--info {
-  background: var(--paper);
+  background: var(--surface-1);
   color: var(--ink);
-  border-color: var(--clip-metal);
+  border-color: var(--color-border-solid);
 }
 
 /* ── Toast confirmación de envío por WhatsApp ── */
@@ -56,7 +56,7 @@
   background: #ffffff;
   color: #075E54;
   border: 1.5px solid #A8E6C3;
-  padding: 10px 20px 10px 12px;
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
   box-shadow: 0 8px 28px rgba(18, 140, 126, 0.28);
 }
 
@@ -98,14 +98,14 @@
 .toast--sent .toast-title {
   font-family: var(--font-display);
   font-size: 1.05rem;
-  font-weight: 400;
+  font-weight: var(--weight-normal);
   line-height: 1.15;
   white-space: normal;
 }
 
 .toast--sent .toast-subtitle {
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   color: #2E7D5B;
   white-space: normal;
 }
@@ -144,9 +144,9 @@
 
 /* ── Dark mode toast ── */
 :root[data-theme="dark"] .toast {
-  background: #2E2C28;
-  color: #F5F2EB;
-  border-color: #8B8680;
+  background: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--color-border-solid);
 }
 
 :root[data-theme="dark"] .toast--success {

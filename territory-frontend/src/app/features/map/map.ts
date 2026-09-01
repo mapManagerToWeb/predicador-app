@@ -13,6 +13,7 @@ import { MapRenderingFacade } from './services/map-rendering.facade';
 import { MapInteractionService } from './services/map-interaction.service';
 import { MapSelectionService } from './services/map-selection.service';
 import { MapInitializationService } from './services/map-initialization.service';
+import { MapLocationService } from './services/map-location.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
 import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
@@ -33,6 +34,7 @@ export class MapPage implements OnDestroy {
   private readonly initialization = inject(MapInitializationService);
   private readonly partialMark = inject(MapPartialMarkService);
   private readonly dataPersistence = inject(MapDataPersistenceService);
+  private readonly location = inject(MapLocationService);
   private readonly toastService = inject(Toast);
 
   manzanasCount = this.state.manzanasCount;
@@ -49,6 +51,7 @@ export class MapPage implements OnDestroy {
   isSatellite = this.state.isSatellite;
   predicacion = this.state.predicacion;
   screenshotPreview = this.state.screenshotPreview;
+  locationStatus = this.location.status;
 
   constructor() {
     afterNextRender(() => this.initMap());
@@ -154,6 +157,10 @@ export class MapPage implements OnDestroy {
     this.state.isSatellite.set(this.rendering.isSatellite());
   }
 
+  toggleUbicacion(): void {
+    this.location.toggle();
+  }
+
   onPredicacionChange(event: Event): void {
     this.state.predicacion.set((event.target as HTMLSelectElement).value);
   }
@@ -211,6 +218,7 @@ export class MapPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.location.destroy();
     this.rendering.cancelPendingStyleUpdates();
     this.rendering.destroy();
   }

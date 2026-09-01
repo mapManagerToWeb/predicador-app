@@ -8,6 +8,7 @@ services:
       - "8888"
     environment:
       - DB_URL=${DB_URL}
+      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       # El config-server materializa placeholders como ${SESSION_SECRET} en
@@ -73,7 +74,7 @@ services:
       # BCrypt es obligatorio fuera de local; plaintext sólo se usa con perfil local.
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200,https://shus3z-ip-191-116-92-175.tunnelmole.net}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # HMAC secret compartido con reporting-service para emitir/verificar tokens.
       # El secret es obligatorio para evitar iniciar servicios sin enforcement.
@@ -110,6 +111,7 @@ services:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
       - DB_URL=${DB_URL}
+      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       # Debe coincidir con el api-gateway y reporting-service: mismo HMAC
@@ -120,17 +122,20 @@ services:
       # RabbitMQ configuration
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
-      - SPRING_RABBITMQ_USERNAME=guest
-      - SPRING_RABBITMQ_PASSWORD=guest
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
       # Si el config-server exige auth, enviar las mismas credenciales.
       - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      # Intervalo de 60s para evitar que los health checks mantengan Neon
+      # despierto. Con 10s, los probes constantes a la DB impiden la
+      # suspensión de compute.
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   reporting-service:
     build:
@@ -149,6 +154,7 @@ services:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
       - DB_URL=${DB_URL}
+      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
@@ -163,17 +169,20 @@ services:
       # RabbitMQ configuration
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
-      - SPRING_RABBITMQ_USERNAME=guest
-      - SPRING_RABBITMQ_PASSWORD=guest
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
       # Si el config-server exige auth, enviar las mismas credenciales.
       - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      # Intervalo de 60s para evitar que los health checks mantengan Neon
+      # despierto. Con 10s, los probes constantes a la DB impiden la
+      # suspensión de compute.
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   rabbitmq:
     image: rabbitmq:4.3.4-management
@@ -182,8 +191,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 10s
@@ -200,7 +209,7 @@ services:
   # No arranca por defecto para no gastar RAM en desarrollo cotidiano.
   # Puertos expuestos:
   #   - Prometheus  :9090
-  #   - Grafana     :3000  (admin / admin)
+  #   - Grafana     :3000  (set GRAFANA_ADMIN_PASSWORD in .env)
   #   - Jaeger UI   :16686
   #   - OTel Collector debug metrics :8888 (colisiona con config-server; usa red interna)
   # --------------------------------------------------------------------------
@@ -247,7 +256,7 @@ services:
     profiles: [observability]
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:

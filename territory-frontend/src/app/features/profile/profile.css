@@ -1,18 +1,2 @@
 /* ── Profile-specific ── */
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.875rem;
-}
-
-.field-row .field {
-  min-width: 0;
-}
-
-/* ── Responsive (small screens) ── */
-@media (max-width: 360px) {
-  .field-row {
-    grid-template-columns: 1fr;
-    gap: 1.125rem;
-  }
-}
+/* All shared styles in auth.css */
