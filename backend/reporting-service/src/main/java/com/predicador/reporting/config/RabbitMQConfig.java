@@ -1,6 +1,7 @@
 package com.predicador.reporting.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.Generated;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
@@ -12,6 +13,7 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+@Generated("com.predicador.reporting.config.RabbitMQConfig")
 @Configuration
 public class RabbitMQConfig {
 

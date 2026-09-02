@@ -1,5 +1,6 @@
 package com.predicador.reporting.config;
 
+import jakarta.annotation.Generated;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -13,6 +14,7 @@ import java.util.concurrent.ThreadPoolExecutor;
  * request HTTP, así que se desacopla del hilo de la petición para que el
  * gateway no corte la llamada por timeout.
  */
+@Generated("com.predicador.reporting.config.AsyncConfig")
 @Configuration
 public class AsyncConfig {
 

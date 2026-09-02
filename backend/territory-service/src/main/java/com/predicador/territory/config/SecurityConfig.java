@@ -5,6 +5,7 @@ import com.predicador.shared.security.SecurityRules;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
+import jakarta.annotation.Generated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -21,6 +22,7 @@ import java.util.List;
  * and specifically only an <strong>admin</strong> token can change colors
  * (the admin panel is the sole consumer of this endpoint).</p>
  */
+@Generated("com.predicador.territory.config.SecurityConfig")
 @Configuration
 public class SecurityConfig {
 

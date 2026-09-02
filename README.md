@@ -244,6 +244,24 @@ mvn clean verify
 npx sonar-scanner
 ```
 
+### SonarCloud Coverage Exclusions
+
+The project excludes non-testable classes from SonarCloud coverage metrics to ensure accurate reporting. Configuration is in `sonar-project.properties`:
+
+**Backend exclusions** (`sonar.coverage.exclusions`):
+- `**/config/**` — Spring Boot configuration classes
+- `**/*Config.java` — Config class files
+- `**/*Application.java` — Application entry points
+- `**/model/**/*.java` — Model/DTO classes
+- `**/*Dto.java` — Data Transfer Objects
+
+**Frontend exclusions** (`sonar.javascript.lcov.exclusions`):
+- `**/app.routes.ts` — Angular routing configuration
+- `**/app.config*.ts` — Angular application config
+- `**/app.ts` — Application bootstrap
+
+Additionally, config classes are annotated with `@Generated` to signal SonarCloud they are infrastructure code.
+
 ## Base de datos (Neon + PostGIS) e importación de territorios
 
 La base de datos es PostgreSQL + PostGIS (Neon en producción). Los territorios
