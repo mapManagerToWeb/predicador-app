@@ -88,11 +88,11 @@ public class FallbackController {
         return "unknown";
     }
 
-    private static String tipoPrincipal(Throwable cause) {
+    static String tipoPrincipal(Throwable cause) {
         return cause == null ? "" : cause.getClass().getSimpleName();
     }
 
-    private static String mensajeRaiz(Throwable cause) {
+    static String mensajeRaiz(Throwable cause) {
         if (cause == null) {
             return "";
         }
@@ -104,7 +104,7 @@ public class FallbackController {
         return root.getMessage() == null ? "" : root.getMessage();
     }
 
-    private static String resumir(String message) {
+    static String resumir(String message) {
         String clean = message == null ? "" : message.replaceAll("[\\r\\n\\t]", " ").trim();
         return clean.length() <= MAX_LOGGED_MESSAGE_LENGTH ? clean
                 : clean.substring(0, MAX_LOGGED_MESSAGE_LENGTH) + "…";

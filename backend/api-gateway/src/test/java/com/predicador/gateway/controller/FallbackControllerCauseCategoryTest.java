@@ -69,6 +69,64 @@ class FallbackControllerCauseCategoryTest {
         assertThat(FallbackController.causa(new RuntimeException("boom"))).isEqualTo("unknown");
     }
 
+    // --- tipoPrincipal ---
+
+    @Test
+    void tipoPrincipal_nullCause_returnsEmpty() {
+        assertThat(FallbackController.tipoPrincipal(null)).isEmpty();
+    }
+
+    @Test
+    void tipoPrincipal_returnsSimpleClassName() {
+        assertThat(FallbackController.tipoPrincipal(new TimeoutException("x")))
+                .isEqualTo("TimeoutException");
+    }
+
+    // --- mensajeRaiz ---
+
+    @Test
+    void mensajeRaiz_nullCause_returnsEmpty() {
+        assertThat(FallbackController.mensajeRaiz(null)).isEmpty();
+    }
+
+    @Test
+    void mensajeRaiz_returnsRootMessage() {
+        var root = new RuntimeException("root cause");
+        var wrapper = new RuntimeException("wrapper", root);
+        assertThat(FallbackController.mensajeRaiz(wrapper)).isEqualTo("root cause");
+    }
+
+    @Test
+    void mensajeRaiz_nullMessage_returnsEmpty() {
+        assertThat(FallbackController.mensajeRaiz(new RuntimeException())).isEmpty();
+    }
+
+    // --- resumir ---
+
+    @Test
+    void resumir_nullMessage_returnsEmpty() {
+        assertThat(FallbackController.resumir(null)).isEmpty();
+    }
+
+    @Test
+    void resumir_shortMessage_returnedAsIs() {
+        assertThat(FallbackController.resumir("hello")).isEqualTo("hello");
+    }
+
+    @Test
+    void resumir_longMessage_truncatedTo200Chars() {
+        String longMsg = "x".repeat(300);
+        String result = FallbackController.resumir(longMsg);
+        assertThat(result).hasSize(201); // 200 chars + ellipsis
+        assertThat(result).endsWith("…");
+    }
+
+    @Test
+    void resumir_replacesWhitespaceAndTrims() {
+        assertThat(FallbackController.resumir("  line1\nline2\tline3  "))
+                .isEqualTo("line1 line2 line3");
+    }
+
     private static final class CallNotPermittedExceptionStub extends RuntimeException {
     }
 }
