@@ -1,13 +1,10 @@
 name: Setup Backend Test Environment
-description: Configures Postgres service container, Testcontainers, Java 25, and DB env vars for backend tests.
+description: Sets up Java, Testcontainers config, and DB env vars for backend tests. Postgres service must be declared in the caller workflow.
 
 inputs:
   java-version:
     description: Java version to set up
     default: "25"
-  postgres-image:
-    description: Postgres/PostGIS Docker image
-    default: postgis/postgis:16-3.4
 
 runs:
   using: composite
@@ -28,7 +25,7 @@ runs:
       shell: bash
       run: |
         echo "DB_URL=jdbc:postgresql://localhost:5432/predicador_test" >> $GITHUB_ENV
-        echo "DB_USERNAME=predicador" >> $GITHUB_ENV
-        echo "DB_PASSWORD=test" >> $GITHUB_ENV
+        echo "DB_USERNAME=${DB_USERNAME:-predicador}" >> $GITHUB_ENV
+        echo "DB_PASSWORD=${DB_PASSWORD:-test}" >> $GITHUB_ENV
         echo "TESTCONTAINERS_RYUK_DISABLED=true" >> $GITHUB_ENV
         echo "DOCKER_HOST=unix:///var/run/docker.sock" >> $GITHUB_ENV

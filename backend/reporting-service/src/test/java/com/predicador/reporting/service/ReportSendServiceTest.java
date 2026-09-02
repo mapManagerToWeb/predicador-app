@@ -73,6 +73,7 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
+        when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenReturn(new WhatsAppMessageResponse(null, "msg_456"));
 
@@ -105,6 +106,7 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
+        when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenReturn(new WhatsAppMessageResponse(null, "msg_default"));
 
@@ -137,6 +139,7 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
+        when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenReturn(new WhatsAppMessageResponse(null, "msg_default"));
 
@@ -168,6 +171,7 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56999999999");
+        when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenReturn(new WhatsAppMessageResponse(null, "msg_custom"));
 
