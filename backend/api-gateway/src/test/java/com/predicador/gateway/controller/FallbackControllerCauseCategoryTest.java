@@ -6,6 +6,11 @@ import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.support.NotFoundException;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -125,6 +130,60 @@ class FallbackControllerCauseCategoryTest {
     void resumir_replacesWhitespaceAndTrims() {
         assertThat(FallbackController.resumir("  line1\nline2\tline3  "))
                 .isEqualTo("line1 line2 line3");
+    }
+
+    // --- problem() integration ---
+
+    @Test
+    void problem_returns503WithServiceAndDetail() {
+        var controller = new FallbackController();
+        var request = MockServerHttpRequest.get("/fallback/territory").build();
+        var exchange = MockServerWebExchange.builder(request).build();
+
+        var response = controller.problem("territory-service", "El servicio de territorios no está disponible.", exchange);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getDetail()).isEqualTo("El servicio de territorios no está disponible.");
+        assertThat(response.getBody().getProperties()).containsEntry("service", "territory-service");
+    }
+
+    @Test
+    void problem_logsCauseFromExchangeAttribute() {
+        var controller = new FallbackController();
+        var request = MockServerHttpRequest.get("/fallback/reporting").build();
+        var exchange = MockServerWebExchange.builder(request).build();
+        exchange.getAttributes().put(
+                ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR,
+                new RuntimeException(new TimeoutException("timed out")));
+
+        var response = controller.problem("reporting-service", "down", exchange);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void territoryFallback_returns503() {
+        var controller = new FallbackController();
+        var request = MockServerHttpRequest.get("/fallback/territory").build();
+        var exchange = MockServerWebExchange.builder(request).build();
+
+        var result = controller.territoryFallback(exchange).block();
+
+        assertThat(result).isNotNull();
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void reportingFallback_returns503() {
+        var controller = new FallbackController();
+        var request = MockServerHttpRequest.get("/fallback/reporting").build();
+        var exchange = MockServerWebExchange.builder(request).build();
+
+        var result = controller.reportingFallback(exchange).block();
+
+        assertThat(result).isNotNull();
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     private static final class CallNotPermittedExceptionStub extends RuntimeException {
