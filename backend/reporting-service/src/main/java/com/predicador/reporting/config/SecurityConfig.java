@@ -3,6 +3,7 @@ package com.predicador.reporting.config;
 import com.predicador.shared.security.SecurityRules;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionTokenService;
+import jakarta.annotation.Generated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
  * excluded so a fresh client can still authenticate. GETs on encargados stay
  * behind auth because the list exposes phone numbers.</p>
  */
+@Generated("com.predicador.reporting.config.SecurityConfig")
 @Configuration
 public class SecurityConfig {
 

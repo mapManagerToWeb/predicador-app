@@ -30,8 +30,11 @@ import java.util.concurrent.TimeUnit;
 public class ReportSendService {
 
     private static final Logger log = LoggerFactory.getLogger(ReportSendService.class);
+<<<<<<< HEAD
     private static final String DEFAULT_IMAGE_URL =
         "https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png";
+=======
+>>>>>>> feat/redesign
     private static final Duration DELIVERY_LEASE = Duration.ofMinutes(5);
     private static final String PARAMETERS = "parameters";
     private static final String IMAGE = "image";
@@ -115,7 +118,11 @@ public class ReportSendService {
                     PARAMETERS, List.of(
                         Map.of(
                             "type", IMAGE,
+<<<<<<< HEAD
                             IMAGE, Map.of("link", DEFAULT_IMAGE_URL)
+=======
+                            IMAGE, Map.of("link", props.defaultImageUrl())
+>>>>>>> feat/redesign
                         )
                     )
                 ));

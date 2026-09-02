@@ -1,0 +1,34 @@
+name: Setup Backend Test Environment
+description: Sets up Java, Testcontainers config, and DB env vars for backend tests. Postgres service must be declared in the caller workflow.
+
+inputs:
+  java-version:
+    description: Java version to set up
+    default: "25"
+  db-url:
+    description: JDBC URL for the test database
+    default: "jdbc:postgresql://localhost:5432/predicador_test"
+
+runs:
+  using: composite
+  steps:
+    - name: Add Docker socket to Testcontainers
+      shell: bash
+      run: |
+        echo "unix:///var/run/docker.sock" > $HOME/.testcontainers.properties 2>/dev/null || true
+        mkdir -p $HOME/.testcontainers && echo "ryuk.container.image=ghcr.io/testcontainers/ryuk:0.11.0" >> $HOME/.testcontainers.properties
+
+    - uses: actions/setup-java@v4
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: temurin
+        cache: maven
+
+    - name: Export DB env vars
+      shell: bash
+      run: |
+        echo "DB_URL=${{ inputs.db-url }}" >> $GITHUB_ENV
+        echo "DB_USERNAME=${DB_USERNAME:-predicador}" >> $GITHUB_ENV
+        echo "DB_PASSWORD=${DB_PASSWORD:-test}" >> $GITHUB_ENV
+        echo "TESTCONTAINERS_RYUK_DISABLED=true" >> $GITHUB_ENV
+        echo "DOCKER_HOST=unix:///var/run/docker.sock" >> $GITHUB_ENV

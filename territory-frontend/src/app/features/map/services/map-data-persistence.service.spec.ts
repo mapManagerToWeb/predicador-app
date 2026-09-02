@@ -1,4 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+<<<<<<< HEAD
+=======
+import { HttpErrorResponse } from '@angular/common/http';
+>>>>>>> feat/redesign
 import { MapDataPersistenceService } from './map-data-persistence.service';
 import { MapStateService } from './map-state.service';
 import { MapReportService } from './map-report.service';
@@ -141,10 +145,68 @@ describe('MapDataPersistenceService', () => {
     expect(state.enviando()).toBe(false);
   });
 
+<<<<<<< HEAD
   it('ACID: rolls back the saved reports when the WhatsApp send fails (compensation)', async () => {
     state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
     report.buildTerritoriosParaEnvio.mockReturnValue({
       territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+=======
+  it('503 de reporting-service muestra el mensaje específico con marcas conservadas (guardarYEnviar)', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: false,
+    });
+    report.saveToDatabase.mockRejectedValue(
+      new HttpErrorResponse({ status: 503, error: { service: 'reporting-service' } })
+    );
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+
+    await service.guardarYEnviar();
+
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.reportingUnavailable);
+    expect(show).not.toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
+    // Datos a salvo: sin rollback y marcas intactas.
+    expect(report.eliminarReportes).not.toHaveBeenCalled();
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+  });
+
+  it('503 de reporting-service muestra el mensaje específico también en guardarEnBaseDeDatos', async () => {
+    report.saveToDatabase.mockRejectedValue(
+      new HttpErrorResponse({ status: 503, error: { service: 'reporting-service' } })
+    );
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+
+    await service.guardarEnBaseDeDatos();
+
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.reportingUnavailable);
+    expect(show).not.toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
+  });
+
+  it('un 500 mantiene el mensaje genérico de error de guardado', async () => {
+    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: false,
+    });
+    report.saveToDatabase.mockRejectedValue(
+      new HttpErrorResponse({ status: 500, error: { detail: 'internal' } })
+    );
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+
+    await service.guardarYEnviar();
+
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
+    expect(show).not.toHaveBeenCalledWith(TOAST_MESSAGES.reportingUnavailable);
+  });
+
+  it('ACID: rolls back the saved reports when the WhatsApp send fails (compensation)', async () => {    state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]));
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+>>>>>>> feat/redesign
       requiereScreenshot: true,
     });
     report.buildWhatsAppRequest.mockReturnValue({

@@ -100,6 +100,7 @@ class GatewayFilterIntegrationTest {
 
     @Test
     void fallback_reporting_returnsProblemDetail() {
+<<<<<<< HEAD
         webTestClient.get()
                 .uri("/fallback/reporting")
                 .exchange()
@@ -108,6 +109,20 @@ class GatewayFilterIntegrationTest {
                 .expectBody()
                 .jsonPath("$.title").isEqualTo("Servicio no disponible")
                 .jsonPath("$.detail").isEqualTo("El servicio de reportes no está disponible.");
+=======
+        // Contrato congelado por spec: 503 RFC 7807 con service, sin exponer
+        // detalles internos de la excepción aunque el circuit breaker la haya
+        // registrado en el exchange.
+        webTestClient.get()
+                .uri("/fallback/reporting")
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.title").isEqualTo("Servicio no disponible")
+                .jsonPath("$.detail").isEqualTo("El servicio de reportes no está disponible.")
+                .jsonPath("$.service").isEqualTo("reporting-service");
+>>>>>>> feat/redesign
     }
 
     @Test

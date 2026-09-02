@@ -5,6 +5,10 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+<<<<<<< HEAD
+=======
+import compression from 'compression';
+>>>>>>> feat/redesign
 import { Readable } from 'node:stream';
 import { join } from 'node:path';
 import type { IncomingHttpHeaders } from 'node:http';
@@ -14,6 +18,15 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 
 /**
+<<<<<<< HEAD
+=======
+ * Gzip compression for all text-based responses (HTML, JS, CSS, JSON).
+ * Skips responses already compressed (images, woff2) and responses < 1 KB.
+ */
+app.use(compression());
+
+/**
+>>>>>>> feat/redesign
  * The API URL the frontend uses is relative (`/api/v1`), so every API call
  * from the browser lands here on the SSR origin. Requests must be proxied to
  * the API gateway. Point `GATEWAY_URL` at the gateway from the app host
@@ -40,7 +53,13 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+<<<<<<< HEAD
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+=======
+  // geolocation=(self): el botón "Mi ubicación" del mapa usa la Geolocation
+  // API del propio origen; () la bloquearía a nivel navegador.
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+>>>>>>> feat/redesign
   next();
 });
 
@@ -149,6 +168,7 @@ export function writeResponseHeaders(upstreamResponse: Response, res: express.Re
 }
 
 /**
+<<<<<<< HEAD
  * Serve static files from /browser
  */
 app.use(
@@ -156,6 +176,23 @@ app.use(
     maxAge: '1y',
     index: false,
     redirect: false,
+=======
+ * Serve static files from /browser.
+ * Hashed assets (Angular's outputHashing) get immutable long-term caching.
+ * Non-hashed assets (index.html, favicon) get standard no-cache behavior.
+ */
+app.use(
+  express.static(browserDistFolder, {
+    index: false,
+    redirect: false,
+    setHeaders(res, filePath) {
+      // Angular production builds hash filenames (e.g. chunk-ABC123.js).
+      // These are safe to cache indefinitely since the hash changes on update.
+      if (/[.-][A-Za-z0-9]{8,}\.\w+$/.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
+>>>>>>> feat/redesign
   }),
 );
 

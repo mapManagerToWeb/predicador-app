@@ -1,5 +1,10 @@
 /* ═══════════════════════════════════════════════════
+<<<<<<< HEAD
    Shared Auth Styles — Login, Profile (Paper Card)
+=======
+   Shared Auth Styles — Login, Profile
+   Modern Minimal — Clean, linear-inspired
+>>>>>>> feat/redesign
    ═══════════════════════════════════════════════════ */
 
 :host {
@@ -7,11 +12,19 @@
   height: 100%;
 }
 
+<<<<<<< HEAD
 /* ── Shell (paper background) ── */
 .auth-shell {
   position: fixed;
   inset: 0;
   background: var(--paper);
+=======
+/* ── Shell ── */
+.auth-shell {
+  position: fixed;
+  inset: 0;
+  background: var(--surface-0);
+>>>>>>> feat/redesign
   overflow: hidden;
 }
 
@@ -19,12 +32,18 @@
   content: '';
   position: absolute;
   inset: 0;
+<<<<<<< HEAD
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
   background-size: 128px 128px;
+=======
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, var(--color-primary-glow) 0%, transparent 60%);
+>>>>>>> feat/redesign
   pointer-events: none;
   z-index: 0;
 }
 
+<<<<<<< HEAD
 .auth-shell::after {
   content: '';
   position: absolute;
@@ -46,6 +65,8 @@
   75% { transform: translate(-20px, 40px) scale(1.05); }
 }
 
+=======
+>>>>>>> feat/redesign
 /* ── Scroll Container ── */
 .auth-scroll {
   height: 100%;
@@ -57,32 +78,53 @@
   z-index: 1;
 }
 
+<<<<<<< HEAD
 /* ── Card (clipboard sheet) ── */
+=======
+/* ── Card ── */
+>>>>>>> feat/redesign
 .auth-card {
   flex: 1;
   display: flex;
   flex-direction: column;
+<<<<<<< HEAD
   max-width: 440px;
   width: 100%;
   margin: 0 auto;
   padding: 2rem 1.5rem;
   animation: card-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+=======
+  max-width: 380px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  animation: card-in 0.4s var(--ease-out);
+>>>>>>> feat/redesign
 }
 
 @keyframes card-in {
   from {
     opacity: 0;
+<<<<<<< HEAD
     transform: translateY(24px) scale(0.97);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+=======
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+>>>>>>> feat/redesign
   }
 }
 
 /* ── Brand ── */
 .auth-brand {
   text-align: center;
+<<<<<<< HEAD
   padding: 2.5rem 0 2rem;
 }
 
@@ -99,6 +141,24 @@
     0 4px 16px rgba(46, 92, 138, 0.3),
     0 0 0 6px color-mix(in srgb, var(--territory-blue) 10%, transparent);
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+=======
+  padding: var(--space-16) 0 var(--space-10);
+}
+
+.brand-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elev-2);
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease;
+>>>>>>> feat/redesign
 }
 
 .brand-icon img {
@@ -108,26 +168,47 @@
 }
 
 .brand-icon:hover {
+<<<<<<< HEAD
   transform: scale(1.06) rotate(-2deg);
   box-shadow:
     0 6px 24px rgba(46, 92, 138, 0.4),
     0 0 0 8px color-mix(in srgb, var(--territory-blue) 12%, transparent);
+=======
+  transform: scale(1.03);
+  box-shadow: var(--elev-3);
+>>>>>>> feat/redesign
 }
 
 .auth-brand h1 {
   font-family: var(--font-display);
+<<<<<<< HEAD
   font-size: 1.75rem;
   font-weight: 400;
   color: var(--ink);
   letter-spacing: -0.01em;
   margin: 0;
+=======
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  letter-spacing: -0.035em;
+  margin: 0;
+  line-height: 1.1;
+>>>>>>> feat/redesign
 }
 
 .tagline {
   font-family: var(--font-body);
+<<<<<<< HEAD
   font-size: var(--text-base);
   color: var(--ink-muted);
   margin-top: 0.5rem;
+=======
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin-top: var(--space-2);
+  line-height: var(--leading-relaxed);
+>>>>>>> feat/redesign
 }
 
 /* ── Body ── */
@@ -136,23 +217,38 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+<<<<<<< HEAD
   gap: 1.25rem;
+=======
+  gap: var(--space-5);
+>>>>>>> feat/redesign
 }
 
 .section-label {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+<<<<<<< HEAD
   font-weight: 500;
   color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+=======
+  font-weight: var(--weight-medium);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+>>>>>>> feat/redesign
 }
 
 /* ── Field ── */
 .field {
   display: flex;
   flex-direction: column;
+<<<<<<< HEAD
   gap: 0.5rem;
+=======
+  gap: var(--space-2);
+>>>>>>> feat/redesign
 }
 
 .field fieldset {
@@ -165,13 +261,22 @@
 .field label {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+<<<<<<< HEAD
   font-weight: 500;
   color: var(--ink);
   padding-left: 2px;
+=======
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  padding-left: 2px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+>>>>>>> feat/redesign
 }
 
 .field input {
   width: 100%;
+<<<<<<< HEAD
   height: 48px;
   padding: 0 1rem;
   background: color-mix(in srgb, var(--paper) 90%, var(--clip-metal));
@@ -188,10 +293,27 @@
 .field input:hover {
   border-color: #A8A39C;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+=======
+  height: 44px;
+  padding: 0 var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.field input:hover {
+  border-color: var(--ink-faint);
+>>>>>>> feat/redesign
 }
 
 .field input:focus {
   outline: none;
+<<<<<<< HEAD
   border-color: var(--territory-blue);
   background: #FFFFFF;
   box-shadow:
@@ -202,12 +324,22 @@
 .field input::placeholder {
   color: var(--ink-muted);
   opacity: 0.5;
+=======
+  border-color: var(--color-primary);
+  background: var(--surface-1);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.field input::placeholder {
+  color: var(--ink-faint);
+>>>>>>> feat/redesign
 }
 
 /* ── Phone input ── */
 .input-phone {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
   background: color-mix(in srgb, var(--paper) 90%, var(--clip-metal));
   border: 1.5px solid var(--clip-metal);
   border-radius: var(--radius-md);
@@ -236,29 +368,73 @@
   color: var(--ink-muted);
   background: color-mix(in srgb, var(--clip-metal) 20%, transparent);
   height: 48px;
+=======
+  background: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  transition: all 0.15s ease;
+  overflow: hidden;
+}
+
+.input-phone:hover {
+  border-color: var(--ink-faint);
+}
+
+.input-phone:focus-within {
+  border-color: var(--color-primary);
+  background: var(--surface-1);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.input-phone .prefix {
+  padding: 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  background: var(--surface-3);
+  height: 44px;
+>>>>>>> feat/redesign
   display: flex;
   align-items: center;
   user-select: none;
   flex-shrink: 0;
+<<<<<<< HEAD
   border-right: 1px solid var(--clip-metal);
+=======
+  border-right: 1px solid var(--glass-border);
+>>>>>>> feat/redesign
 }
 
 .input-phone input {
   flex: 1;
   min-width: 0;
+<<<<<<< HEAD
   height: 48px;
   padding: 0 1rem;
   border: none;
   background: transparent;
   font-family: var(--font-body);
   font-size: var(--text-base);
+=======
+  height: 44px;
+  padding: 0 var(--space-4);
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+>>>>>>> feat/redesign
   color: var(--ink);
   outline: none;
 }
 
 .input-phone input::placeholder {
+<<<<<<< HEAD
   color: var(--ink-muted);
   opacity: 0.5;
+=======
+  color: var(--ink-faint);
+>>>>>>> feat/redesign
 }
 
 /* ── Button ── */
@@ -266,15 +442,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
+<<<<<<< HEAD
   gap: 0.5rem;
   height: 52px;
   width: 100%;
   padding: 0 1.5rem;
   background: var(--territory-blue);
+=======
+  gap: var(--space-2);
+  height: 44px;
+  width: 100%;
+  padding: 0 var(--space-6);
+  background: var(--color-primary);
+>>>>>>> feat/redesign
   color: #FFFFFF;
   border: none;
   border-radius: var(--radius-md);
   font-family: var(--font-body);
+<<<<<<< HEAD
   font-size: var(--text-base);
   font-weight: 600;
   cursor: pointer;
@@ -283,6 +468,15 @@
   transition: all 0.2s ease;
   margin-top: 0.5rem;
   box-shadow: 0 2px 8px rgba(46, 92, 138, 0.25);
+=======
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.15s var(--ease-out);
+  margin-top: var(--space-2);
+>>>>>>> feat/redesign
 }
 
 .btn-primary::before {
@@ -292,11 +486,19 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
+<<<<<<< HEAD
     rgba(255, 255, 255, 0.15) 50%,
     transparent 100%
   );
   transform: translateX(-100%);
   transition: transform 0.5s ease;
+=======
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.4s ease;
+>>>>>>> feat/redesign
 }
 
 .btn-primary:hover:not(:disabled)::before {
@@ -304,6 +506,7 @@
 }
 
 .btn-primary:hover:not(:disabled) {
+<<<<<<< HEAD
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(46, 92, 138, 0.35);
 }
@@ -315,16 +518,37 @@
 
 .btn-primary:disabled {
   opacity: 0.4;
+=======
+  background: var(--color-primary-strong);
+  box-shadow: 0 0 20px var(--color-primary-glow);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.3;
+>>>>>>> feat/redesign
   cursor: not-allowed;
 }
 
 .spinner {
+<<<<<<< HEAD
   width: 18px;
   height: 18px;
   border: 2.5px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+=======
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+>>>>>>> feat/redesign
 }
 
 @keyframes spin {
@@ -334,20 +558,36 @@
 /* ── Footer ── */
 .auth-footer {
   text-align: center;
+<<<<<<< HEAD
   padding: 1.5rem 0 calc(1.5rem + var(--safe-bottom));
   font-family: var(--font-body);
   font-size: var(--text-sm);
   color: var(--ink-muted);
+=======
+  padding: var(--space-6) 0 calc(var(--space-6) + var(--safe-bottom));
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+>>>>>>> feat/redesign
   flex-shrink: 0;
 }
 
 .auth-footer a {
+<<<<<<< HEAD
   color: var(--territory-blue);
   font-weight: 600;
   margin-left: 0.25rem;
   text-decoration: none;
   position: relative;
   transition: color 0.2s ease;
+=======
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+  margin-left: var(--space-1);
+  text-decoration: none;
+  position: relative;
+  transition: color 0.15s ease;
+>>>>>>> feat/redesign
 }
 
 .auth-footer a::after {
@@ -356,10 +596,16 @@
   bottom: -2px;
   left: 0;
   width: 0;
+<<<<<<< HEAD
   height: 2px;
   background: var(--territory-blue);
   transition: width 0.3s ease;
   border-radius: 1px;
+=======
+  height: 1px;
+  background: var(--color-primary);
+  transition: width 0.2s var(--ease-out);
+>>>>>>> feat/redesign
 }
 
 .auth-footer a:hover::after {
@@ -367,33 +613,54 @@
 }
 
 .auth-footer a:hover {
+<<<<<<< HEAD
   color: var(--color-primary-dark);
+=======
+  color: var(--color-primary-strong);
+>>>>>>> feat/redesign
 }
 
 /* ── Avatar grid ── */
 .avatar-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+<<<<<<< HEAD
   gap: 0.875rem;
   padding: 0.25rem;
+=======
+  gap: var(--space-3);
+  padding: var(--space-1);
+>>>>>>> feat/redesign
 }
 
 .avatar-btn {
   aspect-ratio: 1;
+<<<<<<< HEAD
   border: 2.5px solid var(--clip-metal);
   border-radius: 50%;
   background: color-mix(in srgb, var(--paper) 80%, var(--clip-metal));
   font-size: 1.5rem;
+=======
+  border: 1.5px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 1.35rem;
+>>>>>>> feat/redesign
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+<<<<<<< HEAD
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+=======
+  transition: all 0.2s var(--ease-out);
+>>>>>>> feat/redesign
   position: relative;
   box-shadow: var(--elev-1);
 }
 
 .avatar-btn:hover {
+<<<<<<< HEAD
   transform: scale(1.12);
   border-color: var(--territory-blue);
   box-shadow: 0 4px 12px rgba(46, 92, 138, 0.2);
@@ -407,20 +674,44 @@
     0 4px 16px color-mix(in srgb, var(--avatar-color, var(--territory-blue)) 35%, transparent),
     0 0 0 3px color-mix(in srgb, var(--avatar-color, var(--territory-blue)) 12%, transparent);
   animation: avatar-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+=======
+  transform: scale(1.08);
+  border-color: var(--ink-faint);
+  box-shadow: var(--elev-2);
+}
+
+.avatar-btn.selected {
+  border-color: var(--avatar-color, var(--color-primary));
+  background: var(--avatar-color, var(--color-primary));
+  transform: scale(1.08);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--avatar-color, var(--color-primary)) 20%, transparent);
+  animation: avatar-pop 0.25s var(--ease-out);
+>>>>>>> feat/redesign
 }
 
 @keyframes avatar-pop {
   0% { transform: scale(1); }
+<<<<<<< HEAD
   50% { transform: scale(1.2); }
   100% { transform: scale(1.12); }
+=======
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1.08); }
+>>>>>>> feat/redesign
 }
 
 /* ── Responsive ── */
 @media (min-width: 640px) {
   .auth-card {
     justify-content: center;
+<<<<<<< HEAD
     padding-top: 2rem;
     padding-bottom: 2rem;
+=======
+    padding-top: var(--space-8);
+    padding-bottom: var(--space-8);
+>>>>>>> feat/redesign
   }
 
   .auth-brand {
@@ -434,6 +725,7 @@
 
 @media (max-width: 360px) {
   .auth-card {
+<<<<<<< HEAD
     padding: 0 1.25rem;
   }
 
@@ -494,4 +786,74 @@
 :root[data-theme="dark"] .avatar-btn {
   background: rgba(26, 24, 21, 0.6);
   border-color: rgba(139, 134, 128, 0.25);
+=======
+    padding: 0 var(--space-5);
+  }
+
+  .brand-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+  }
+
+  .auth-brand h1 {
+    font-size: var(--text-2xl);
+  }
+
+  .avatar-grid {
+    gap: var(--space-2);
+  }
+
+  .avatar-btn {
+    font-size: 1.15rem;
+  }
+}
+
+/* ── Light mode ── */
+:root[data-theme="light"] .auth-shell {
+  background: var(--surface-0);
+}
+
+:root[data-theme="light"] .auth-shell::before {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(37, 99, 235, 0.04) 0%, transparent 60%);
+}
+
+:root[data-theme="light"] .brand-icon {
+  background: var(--surface-2);
+  border-color: var(--color-border);
+  box-shadow: var(--elev-1);
+}
+
+:root[data-theme="light"] .field input,
+:root[data-theme="light"] .input-phone {
+  background: var(--surface-2);
+  border-color: var(--color-border);
+  color: var(--ink);
+}
+
+:root[data-theme="light"] .field input:focus,
+:root[data-theme="light"] .input-phone:focus-within {
+  background: var(--surface-1);
+  border-color: var(--color-primary);
+}
+
+:root[data-theme="light"] .input-phone .prefix {
+  background: var(--surface-3);
+  color: var(--ink-muted);
+  border-right-color: var(--color-border);
+}
+
+:root[data-theme="light"] .avatar-btn {
+  background: var(--surface-2);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="light"] .btn-primary {
+  box-shadow: none;
+}
+
+:root[data-theme="light"] .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 16px var(--color-primary-glow);
+>>>>>>> feat/redesign
 }

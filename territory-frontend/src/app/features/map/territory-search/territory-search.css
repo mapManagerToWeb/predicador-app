@@ -1,7 +1,17 @@
 /* ═══════════════════════════════════════════════════
+<<<<<<< HEAD
    Territory Search — Paper Input
    ═══════════════════════════════════════════════════ */
 
+=======
+   Territory Search — Minimalist Command
+   ═══════════════════════════════════════════════════ */
+
+:host {
+  display: block;
+}
+
+>>>>>>> feat/redesign
 .search-container {
   position: relative;
   z-index: 1000;
@@ -9,10 +19,25 @@
 
 .search-row {
   display: flex;
+<<<<<<< HEAD
   gap: 8px;
   align-items: center;
 }
 
+=======
+  gap: var(--space-1);
+  align-items: center;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-2);
+  padding: var(--space-1);
+}
+
+/* ── Search input ── */
+>>>>>>> feat/redesign
 .search-input-wrapper {
   position: relative;
   display: flex;
@@ -22,15 +47,25 @@
 
 .search-icon {
   position: absolute;
+<<<<<<< HEAD
   left: 12px;
   width: 18px;
   height: 18px;
   color: var(--ink-muted);
   transition: color 0.2s ease;
+=======
+  left: var(--space-3);
+  width: 14px;
+  height: 14px;
+  color: var(--ink-faint);
+  transition: color 0.25s ease;
+  pointer-events: none;
+>>>>>>> feat/redesign
 }
 
 .search-input {
   width: 100%;
+<<<<<<< HEAD
   padding: 14px 14px 14px 40px;
   border: 1.5px solid var(--clip-metal);
   border-radius: var(--radius-md);
@@ -43,19 +78,44 @@
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   box-shadow: var(--elev-1);
+=======
+  height: 40px;
+  padding: 0 var(--space-3) 0 30px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-sizing: border-box;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: var(--ink-faint);
+  font-weight: var(--weight-normal);
+  letter-spacing: var(--tracking-wide);
+>>>>>>> feat/redesign
 }
 
 .search-input:focus {
   outline: none;
+<<<<<<< HEAD
   border-color: var(--territory-blue);
   background: color-mix(in srgb, var(--paper) 95%, transparent);
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--territory-blue) 12%, transparent),
     var(--elev-1);
+=======
+  background: var(--surface-3);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+>>>>>>> feat/redesign
 }
 
 .search-input:focus + .search-icon,
 .search-input-wrapper:has(.search-input:focus) .search-icon {
+<<<<<<< HEAD
   color: var(--territory-blue);
 }
 
@@ -68,12 +128,27 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: var(--ink-muted);
+=======
+  color: var(--color-primary);
+}
+
+/* ── Icon buttons (theme + logout) ── */
+.theme-toggle,
+.logout-toggle {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-faint);
+>>>>>>> feat/redesign
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.2s ease;
+<<<<<<< HEAD
   box-shadow: var(--elev-1);
 }
 
@@ -132,11 +207,52 @@
 
 .logout-toggle:active {
   transform: scale(0.95);
+=======
+}
+
+.theme-toggle svg,
+.logout-toggle svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.3s var(--ease-spring);
+}
+
+/* Theme */
+.theme-toggle:hover {
+  color: var(--ink);
+  background: var(--color-hover);
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(20deg);
+}
+
+.theme-toggle:active {
+  transform: scale(0.9);
+}
+
+/* Logout */
+.logout-toggle:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.logout-toggle:active {
+  transform: scale(0.9);
+}
+
+/* Focus visible */
+.theme-toggle:focus-visible,
+.logout-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+>>>>>>> feat/redesign
 }
 
 /* ── Dropdown ── */
 .dropdown {
   position: absolute;
+<<<<<<< HEAD
   top: 100%;
   left: 0;
   right: 0;
@@ -144,6 +260,16 @@
   border: 1px solid var(--clip-metal);
   border-radius: var(--radius-md);
   margin-top: 4px;
+=======
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+>>>>>>> feat/redesign
   max-height: 240px;
   overflow-y: auto;
   box-shadow: var(--elev-3);
@@ -152,12 +278,17 @@
 .dropdown-item {
   display: block;
   width: 100%;
+<<<<<<< HEAD
   padding: 12px 16px;
+=======
+  padding: var(--space-3) var(--space-4);
+>>>>>>> feat/redesign
   text-align: left;
   border: none;
   background: none;
   cursor: pointer;
   font-family: var(--font-body);
+<<<<<<< HEAD
   font-size: var(--text-base);
   color: var(--ink);
   border-bottom: 1px solid color-mix(in srgb, var(--clip-metal) 40%, transparent);
@@ -166,12 +297,25 @@
 
 .dropdown-item:last-child {
   border-bottom: none;
+=======
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  color: var(--ink);
+  border-radius: var(--radius-md);
+  margin: 0 var(--space-1);
+  transition: background 0.12s ease;
+}
+
+.dropdown-item:last-child {
+  margin-bottom: var(--space-1);
+>>>>>>> feat/redesign
 }
 
 .dropdown-item:hover {
   background: var(--color-hover);
 }
 
+<<<<<<< HEAD
 .dropdown-item-all {
   font-weight: 600;
   color: var(--territory-blue);
@@ -181,11 +325,31 @@
 
 .dropdown-item-all:hover {
   background: color-mix(in srgb, var(--territory-blue) 12%, transparent);
+=======
+.dropdown-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.dropdown-item-all {
+  font-weight: var(--weight-medium);
+  color: var(--color-primary);
+  background: transparent;
+  border-bottom: 1px solid var(--glass-border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin: 0 var(--space-1);
+  padding-bottom: var(--space-4);
+}
+
+.dropdown-item-all:hover {
+  background: var(--color-primary-soft);
+>>>>>>> feat/redesign
 }
 
 /* ── Skeleton ── */
 .skeleton-container {
   position: absolute;
+<<<<<<< HEAD
   top: 100%;
   left: 0;
   right: 0;
@@ -206,6 +370,29 @@
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
+=======
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.skeleton-line {
+  height: 12px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-raised) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+>>>>>>> feat/redesign
 }
 
 .skeleton-short {
@@ -216,6 +403,7 @@
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+<<<<<<< HEAD
 
 /* ── Dark mode ── */
 :root[data-theme="dark"] .search-input {
@@ -255,3 +443,5 @@
   color: #F5F2EB;
   border-bottom-color: rgba(139, 134, 128, 0.15);
 }
+=======
+>>>>>>> feat/redesign

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!-- Paper grain SVG filter (referenced by CSS) -->
 <svg class="paper-grain-filter" aria-hidden="true" focusable="false">
   <filter id="paperGrain">
@@ -10,6 +11,8 @@
   </filter>
 </svg>
 
+=======
+>>>>>>> feat/redesign
 <div class="map-page">
   <div class="map-container" id="map"></div>
 
@@ -26,6 +29,7 @@
 
   <button
     type="button"
+<<<<<<< HEAD
     class="map-toggle-satellite"
     [class.active]="isSatellite()"
     (click)="toggleSatellite()"
@@ -39,11 +43,28 @@
     } @else {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+=======
+    class="map-toggle-location"
+    [class.active]="locationStatus() === 'following'"
+    [disabled]="locationStatus() === 'locating'"
+    (click)="toggleUbicacion()"
+    [attr.aria-label]="
+      locationStatus() === 'following' ? 'Dejar de seguir mi ubicación' : 'Mi ubicación'
+    "
+    [attr.aria-pressed]="locationStatus() === 'following'"
+  >
+    @if (locationStatus() === 'locating') {
+      <span class="btn-spinner" aria-hidden="true"></span>
+    } @else {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+>>>>>>> feat/redesign
       </svg>
     }
   </button>
 
   @if (tieneTerritorio()) {
+<<<<<<< HEAD
     <div class="clipboard-sheet">
       <!-- Metal clip -->
       <div class="clip" aria-hidden="true">
@@ -55,6 +76,10 @@
         </svg>
       </div>
 
+=======
+    @defer (on viewport) {
+      <div class="clipboard-sheet">
+>>>>>>> feat/redesign
       <!-- Territory header -->
       <div class="sheet-header" aria-live="polite">
         @if (territoriosSeleccionados().length > 1) {
@@ -167,5 +192,31 @@
         </div>
       }
     </div>
+<<<<<<< HEAD
   }
+=======
+    } @placeholder {
+      <div class="clipboard-sheet-placeholder">Cargando controles...</div>
+    }
+  }
+
+  <button
+    type="button"
+    class="map-toggle-satellite"
+    [class.active]="isSatellite()"
+    (click)="toggleSatellite()"
+    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'"
+    [attr.aria-pressed]="isSatellite()"
+  >
+    @if (isSatellite()) {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/>
+      </svg>
+    } @else {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    }
+  </button>
+>>>>>>> feat/redesign
 </div>

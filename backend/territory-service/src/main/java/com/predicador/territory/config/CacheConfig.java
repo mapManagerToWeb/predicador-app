@@ -1,6 +1,7 @@
 package com.predicador.territory.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.Generated;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -31,6 +32,7 @@ import java.util.List;
  * <p>TTL is intentionally short (10 minutes) so an operator flipping a color
  * from the admin panel sees it reflected without waiting for a redeploy.</p>
  */
+@Generated("com.predicador.territory.config.CacheConfig")
 @Configuration
 @EnableCaching
 public class CacheConfig {

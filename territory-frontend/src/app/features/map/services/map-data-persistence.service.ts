@@ -1,4 +1,8 @@
 import { Injectable, inject } from '@angular/core';
+<<<<<<< HEAD
+=======
+import { HttpErrorResponse } from '@angular/common/http';
+>>>>>>> feat/redesign
 import { Toast } from '../../../core/services/toast';
 import { MapReportService } from './map-report.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -74,7 +78,15 @@ export class MapDataPersistenceService {
         this.state.manzanasById.set(previousMarcadas);
         this.state.datosParcialesGuardados = previousDatosParciales;
       }
+<<<<<<< HEAD
       this.toastService.show(TOAST_MESSAGES.saveError);
+=======
+      this.toastService.show(
+        this.esReportingNoDisponible(error)
+          ? TOAST_MESSAGES.reportingUnavailable
+          : TOAST_MESSAGES.saveError
+      );
+>>>>>>> feat/redesign
     } finally {
       this.state.enviando.set(false);
     }
@@ -191,7 +203,15 @@ export class MapDataPersistenceService {
         this.state.manzanasById.set(new Map());
       } else {
         // El guardado en BD nunca se completó: no se envió nada.
+<<<<<<< HEAD
         this.toastService.show(TOAST_MESSAGES.saveError);
+=======
+        this.toastService.show(
+          this.esReportingNoDisponible(error)
+            ? TOAST_MESSAGES.reportingUnavailable
+            : TOAST_MESSAGES.saveError
+        );
+>>>>>>> feat/redesign
       }
     } finally {
       this.state.enviando.set(false);
@@ -199,6 +219,20 @@ export class MapDataPersistenceService {
     }
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * El fallback del gateway responde 503 RFC 7807 con `service` cuando el
+   * circuit breaker de reporting no puede llegar al servicio; en ese caso el
+   * usuario debe saber que sus marcas están a salvo y que puede reintentar.
+   */
+  private esReportingNoDisponible(error: unknown): boolean {
+    return error instanceof HttpErrorResponse &&
+      error.status === 503 &&
+      (error.error as { service?: string } | null)?.service === 'reporting-service';
+  }
+
+>>>>>>> feat/redesign
   private async revertirGuardado(guardados: Reporte[]): Promise<void> {
     await this.reportService.eliminarReportes(guardados);
   }

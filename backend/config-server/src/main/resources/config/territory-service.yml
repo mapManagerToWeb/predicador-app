@@ -6,6 +6,11 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
+    hikari:
+      minimum-idle: 1
+      idle-timeout: 30000
+      maximum-pool-size: 3
+      max-lifetime: 300000
   jpa:
     hibernate:
       # Flyway gestiona el esquema; `none` evita que Hibernate valide antes de
@@ -15,6 +20,10 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -24,6 +33,11 @@ spring:
     # Historial propio: territory y reporting comparten la BD pero versionan
     # sus migraciones por separado para no colisionar en la misma tabla.
     table: flyway_schema_history_territory
+    # Conexión directa (sin -pooler): Flyway necesita operaciones de sesión que
+    # PgBouncer en modo transacción no soporta (prepared statements, SET, DDL).
+    url: ${DB_URL_UNPOOLED:${DB_URL:jdbc:postgresql://localhost:5432/predicador}}
+    user: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
 
 server:
   port: 8081
@@ -34,7 +48,10 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
-    health-check-url-path: /actuator/health
+    # Usar /actuator/info en vez de /actuator/health para evitar que Eureka
+    # abra conexiones a la DB en cada heartbeat (cada 30s), lo que impide
+    # que Neon suspenda compute.
+    health-check-url-path: /actuator/info
 
 app:
   session:
@@ -43,6 +60,12 @@ app:
     strict: ${SESSION_STRICT:true}
 
 management:
+  health:
+    # Desactivar DataSourceHealthIndicator para que los health checks no
+    # ejecuten SELECT 1 contra la DB, lo que abriría conexiones y mantendría
+    # Neon despierto.
+    db:
+      enabled: false
   endpoints:
     web:
       exposure:

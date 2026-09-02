@@ -2,9 +2,11 @@ package com.predicador.territory.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import jakarta.annotation.Generated;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+@Generated("com.predicador.territory.config.OpenApiConfig")
 @Configuration
 public class OpenApiConfig {
 
