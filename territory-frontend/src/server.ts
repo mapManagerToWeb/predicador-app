@@ -5,6 +5,7 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import compression from 'compression';
 import { Readable } from 'node:stream';
 import { join } from 'node:path';
 import type { IncomingHttpHeaders } from 'node:http';
@@ -12,6 +13,12 @@ import type { IncomingHttpHeaders } from 'node:http';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
+
+/**
+ * Gzip compression for all text-based responses (HTML, JS, CSS, JSON).
+ * Skips responses already compressed (images, woff2) and responses < 1 KB.
+ */
+app.use(compression());
 
 /**
  * The API URL the frontend uses is relative (`/api/v1`), so every API call
@@ -151,13 +158,21 @@ export function writeResponseHeaders(upstreamResponse: Response, res: express.Re
 }
 
 /**
- * Serve static files from /browser
+ * Serve static files from /browser.
+ * Hashed assets (Angular's outputHashing) get immutable long-term caching.
+ * Non-hashed assets (index.html, favicon) get standard no-cache behavior.
  */
 app.use(
   express.static(browserDistFolder, {
-    maxAge: '1y',
     index: false,
     redirect: false,
+    setHeaders(res, filePath) {
+      // Angular production builds hash filenames (e.g. chunk-ABC123.js).
+      // These are safe to cache indefinitely since the hash changes on update.
+      if (/[.-][A-Za-z0-9]{8,}\.\w+$/.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
   }),
 );
 

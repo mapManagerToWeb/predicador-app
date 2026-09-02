@@ -1,5 +1,5 @@
-import * as L from 'leaflet';
-import * as GeoJSON from 'geojson';
+import type * as L from 'leaflet';
+import type * as GeoJSON from 'geojson';
 import { SnappedPoint, Edge } from '../map-geometry';
 export type { SnappedPoint, Edge };
 
