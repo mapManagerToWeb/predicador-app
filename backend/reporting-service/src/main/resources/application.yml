@@ -164,4 +164,4 @@ whatsapp:
   template-name: ${WHATSAPP_TEMPLATE:-asignacion_territorio}
   language-code: ${WHATSAPP_LANG:es_CL}
   destination-number: ${WHATSAPP_DESTINATION:}
-  default-image-url: ${WHATSAPP_DEFAULT_IMAGE_URL:https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png}
+  default-image-url: ${WHATSAPP_DEFAULT_IMAGE_URL:}
