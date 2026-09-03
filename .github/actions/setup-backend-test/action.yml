@@ -26,8 +26,10 @@ runs:
 
     - name: Export DB env vars
       shell: bash
+      env:
+        INPUT_DB_URL: ${{ inputs.db-url }}
       run: |
-        echo "DB_URL=${{ inputs.db-url }}" >> $GITHUB_ENV
+        echo "DB_URL=$INPUT_DB_URL" >> $GITHUB_ENV
         echo "DB_USERNAME=${DB_USERNAME:-predicador}" >> $GITHUB_ENV
         echo "DB_PASSWORD=${DB_PASSWORD:-test}" >> $GITHUB_ENV
         echo "TESTCONTAINERS_RYUK_DISABLED=true" >> $GITHUB_ENV
