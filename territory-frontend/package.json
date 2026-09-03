@@ -52,7 +52,7 @@
     "@types/node": "^20.17.19",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "angular-eslint": "^22.1.0",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
@@ -62,7 +62,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "zone.js": "^0.16.2"
   }
 }
