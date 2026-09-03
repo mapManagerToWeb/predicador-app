@@ -38,14 +38,16 @@ export class WhatsAppService {
 
   private async pollUntilDone(idempotencyKey: string): Promise<WhatsAppSendResponse> {
     const deadline = Date.now() + this.pollTimeoutMs;
+    let currentInterval = this.pollIntervalMs;
     while (Date.now() < deadline) {
-      await this.sleep(this.pollIntervalMs);
+      await this.sleep(currentInterval);
       const dto = await firstValueFrom(
         this.http.get<WhatsAppDeliveryDto>(`${this.sendUrl}/${idempotencyKey}`),
       );
       if (dto.status !== 'IN_PROGRESS') {
         return this.toResponse(dto);
       }
+      currentInterval = Math.min(currentInterval * 2, 30000);
     }
     return { success: false, messageId: null, error: 'Tiempo de espera agotado' };
   }

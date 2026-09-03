@@ -26,7 +26,7 @@ interface LoginResponse {
 
 @Injectable({ providedIn: 'root' })
 export class EncargadoService {
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
   private authToken = inject(AuthTokenService);
   private apiUrl = `${environment.apiUrl}/encargados`;
 

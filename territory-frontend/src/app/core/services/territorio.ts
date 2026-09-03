@@ -18,12 +18,12 @@ interface ReportDto {
   encargadoNombre: string;
   encargadoApellido?: string | null;
   sessionTime?: string | null;
-  estado?: string;
+  estado?: EstadoReporte | null;
   territorioNumero?: number;
   encargadoId?: number | null;
   totalManzanas?: number;
   manzanasMarcadas?: number;
-  tipoSesion?: string;
+  tipoSesion?: TipoSesion | null;
   geometriaParcial?: string | null;
   puntosParciales?: string | null;
   manzanasIds?: string | null;
@@ -278,11 +278,11 @@ export class TerritorioService {
       encargadoNombre: d.encargadoNombre,
       encargadoApellido: d.encargadoApellido ?? '',
       sessionTime: d.sessionTime ?? '',
-      estado: (d.estado as EstadoReporte) ?? 'completed',
+      estado: d.estado ?? 'completed',
       territorioNumero: d.territorioNumero ?? fallbackNumero,
       totalManzanas: d.totalManzanas ?? 0,
       manzanasMarcadas: d.manzanasMarcadas ?? 0,
-      tipoSesion: (d.tipoSesion as TipoSesion) ?? 'completa',
+      tipoSesion: d.tipoSesion ?? 'completa',
       geometriaParcial: d.geometriaParcial ?? null,
       puntosParciales: d.puntosParciales ?? null,
       manzanasIds: d.manzanasIds ?? null

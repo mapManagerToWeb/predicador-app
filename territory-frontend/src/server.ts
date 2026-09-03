@@ -79,8 +79,7 @@ app.use('/api/v1', async (req, res) => {
     } else {
       res.end();
     }
-  } catch (error) {
-    console.error('Proxy error to API gateway', error);
+  } catch {
     res.status(502).json({ detail: 'El servicio de datos no está disponible.', status: 502, title: 'Servicio no disponible' });
   }
 });
@@ -217,7 +216,7 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
       throw error;
     }
 
-    console.warn(`Node Express server listening on http://localhost:${port}`);
+    // Server started
   });
 }
 
