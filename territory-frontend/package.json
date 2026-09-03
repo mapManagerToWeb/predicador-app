@@ -33,7 +33,7 @@
     "polygon-clipping": "^0.15.7",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
-    "web-vitals": "^4.2.4"
+    "web-vitals": "^6.2.1"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.6.3",
