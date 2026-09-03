@@ -67,8 +67,8 @@ importers:
         specifier: ^2.6.3
         version: 2.6.4(@angular/build@22.1.3(5an6d2u4flsowrznrz67ual2gi))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0))
       '@analogjs/vitest-angular':
-        specifier: ^2.6.3
-        version: 2.6.4(@analogjs/vite-plugin-angular@2.6.4(@angular/build@22.1.3(5an6d2u4flsowrznrz67ual2gi))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)))(@angular-devkit/architect@0.2201.3(chokidar@5.0.0))(@angular-devkit/schematics@22.1.3(chokidar@5.0.0))(vitest@4.1.10)(zone.js@0.16.2)
+        specifier: ^2.7.1
+        version: 2.7.1(@analogjs/vite-plugin-angular@2.6.4(@angular/build@22.1.3(5an6d2u4flsowrznrz67ual2gi))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)))(@angular-devkit/architect@0.2201.3(chokidar@5.0.0))(@angular-devkit/schematics@22.1.3(chokidar@5.0.0))(vitest@4.1.10)(zone.js@0.16.2)
       '@angular-eslint/eslint-plugin':
         specifier: ^22.1.0
         version: 22.1.0(@typescript-eslint/utils@8.66.0(eslint@10.8.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.1(jiti@2.7.0))(typescript@6.0.3)
@@ -172,8 +172,8 @@ packages:
       vite:
         optional: true
 
-  '@analogjs/vitest-angular@2.6.4':
-    resolution: {integrity: sha512-Q58VipnfncenMBKM0EZIUBrcjvG2f6cVde+8eebF5gjwoYd6Eb/c7ffDZsjT6mq0GvDEoI7F1M2YHh2jamoSEQ==}
+  '@analogjs/vitest-angular@2.7.1':
+    resolution: {integrity: sha512-Ra+XrsjlA5NvG0u94dxOE5ZE1gRVA/HMauYXiWEFTddeltJoI8bJ4Tc0du62iZo2AdJxUADaei8Liu0nm0GRBQ==}
     peerDependencies:
       '@analogjs/vite-plugin-angular': '*'
       '@angular-devkit/architect': '>=0.1700.0 < 0.2300.0 || >=0.2200.0 < 0.2300.0'
@@ -3585,7 +3585,7 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  '@analogjs/vitest-angular@2.6.4(@analogjs/vite-plugin-angular@2.6.4(@angular/build@22.1.3(5an6d2u4flsowrznrz67ual2gi))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)))(@angular-devkit/architect@0.2201.3(chokidar@5.0.0))(@angular-devkit/schematics@22.1.3(chokidar@5.0.0))(vitest@4.1.10)(zone.js@0.16.2)':
+  '@analogjs/vitest-angular@2.7.1(@analogjs/vite-plugin-angular@2.6.4(@angular/build@22.1.3(5an6d2u4flsowrznrz67ual2gi))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)))(@angular-devkit/architect@0.2201.3(chokidar@5.0.0))(@angular-devkit/schematics@22.1.3(chokidar@5.0.0))(vitest@4.1.10)(zone.js@0.16.2)':
     dependencies:
       '@analogjs/vite-plugin-angular': 2.6.4(@angular/build@22.1.3(5an6d2u4flsowrznrz67ual2gi))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0))
       '@angular-devkit/architect': 0.2201.3(chokidar@5.0.0)
