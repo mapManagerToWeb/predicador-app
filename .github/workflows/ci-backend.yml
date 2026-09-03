@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload JaCoCo reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-reports
           path: backend/**/target/site/jacoco/
@@ -83,7 +83,7 @@ jobs:
           pg_dump "$PGDATABASE_URL" | gzip > predicador-backup-$(date +%Y%m%d-%H%M%S).sql.gz
 
       - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: neon-backup-${{ github.run_id }}
           path: predicador-backup-*.sql.gz
