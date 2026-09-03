@@ -70,6 +70,16 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Valores numéricos inválidos");
     }
 
+    @ExceptionHandler(ForbiddenOperationException.class)
+    public ProblemDetail handleForbidden(ForbiddenOperationException ex) {
+        log.debug("ForbiddenOperationException: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setTitle("Acceso denegado");
+        problem.setType(URI.create("https://api.predicador.com/errors/forbidden"));
+        return problem;
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ProblemDetail handleResponseStatus(ResponseStatusException ex) {
         log.debug("ResponseStatusException: {} {}", ex.getStatusCode(), ex.getReason());

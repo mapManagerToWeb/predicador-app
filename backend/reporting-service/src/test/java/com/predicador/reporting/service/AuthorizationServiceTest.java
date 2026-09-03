@@ -1,11 +1,10 @@
 package com.predicador.reporting.service;
 
+import com.predicador.shared.exception.ForbiddenOperationException;
 import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AuthorizationServiceTest {
@@ -24,10 +23,8 @@ class AuthorizationServiceTest {
 
     @Test
     void authorizeOwner_rejectsDifferentEncargadoWithForbidden() {
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+        ForbiddenOperationException exception = assertThrows(ForbiddenOperationException.class,
                 () -> authorizationService.authorizeOwner(encargado("7"), 8L));
-
-        assertEquals(403, exception.getStatusCode().value());
     }
 
     @Test

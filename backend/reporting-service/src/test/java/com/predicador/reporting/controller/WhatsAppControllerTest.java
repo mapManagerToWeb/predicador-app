@@ -5,6 +5,7 @@ import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.service.WhatsAppSendService;
 import com.predicador.reporting.publisher.WhatsAppSendPublisher;
 import com.predicador.reporting.service.AuthorizationService;
+import com.predicador.reporting.exception.GlobalExceptionHandler;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -37,7 +39,12 @@ class WhatsAppControllerTest {
     @BeforeEach
     void setUp() {
         controller = new WhatsAppController(whatsAppSendService, whatsAppSendPublisher, new AuthorizationService());
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setValidator(validator)
+                .setControllerAdvice(new GlobalExceptionHandler(), new com.predicador.shared.exception.GlobalExceptionHandler())
+                .build();
     }
 
     private static final String PAYLOAD = """
@@ -102,12 +109,54 @@ class WhatsAppControllerTest {
 
     @Test
     void sendWhatsAppAsync_returns202Accepted() throws Exception {
+        String validPayload = """
+            {
+              "templateName": "asignacion_territorio",
+              "destinationNumber": "+5491100000000"
+            }
+            """;
         mockMvc.perform(post("/api/v1/reports/whatsapp/async")
                 .contentType(MediaType.APPLICATION_JSON)
                 .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
                 .header("Idempotency-Key", "async-key-1")
-                .content("{}"))
+                .content(validPayload))
             .andExpect(status().isAccepted())
             .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void sendWhatsAppAsync_emptyTemplateName_returns400ProblemDetail() throws Exception {
+        String body = """
+            {
+              "templateName": "",
+              "destinationNumber": "+5491100000000"
+            }
+            """;
+        mockMvc.perform(post("/api/v1/reports/whatsapp/async")
+                .contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
+                .header("Idempotency-Key", "async-key-2")
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[?(@.field=='templateName')].message")
+                    .value(org.hamcrest.Matchers.hasItem("templateName es obligatorio")));
+    }
+
+    @Test
+    void sendWhatsAppAsync_invalidE164_returns400ProblemDetail() throws Exception {
+        String body = """
+            {
+              "templateName": "asignacion_territorio",
+              "destinationNumber": "1234"
+            }
+            """;
+        mockMvc.perform(post("/api/v1/reports/whatsapp/async")
+                .contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
+                .header("Idempotency-Key", "async-key-3")
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[?(@.field=='destinationNumber')].message")
+                    .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("E.164"))));
     }
 }

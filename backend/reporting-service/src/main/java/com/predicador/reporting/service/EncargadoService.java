@@ -58,7 +58,24 @@ public class EncargadoService {
         }
     }
 
-    @Transactional
+    /**
+     * Crea un encargado.
+     *
+     * <p>Esta operación se invoca desde {@link #buscarOCrear} cuando no
+     * existe el registro. Si dos requests concurrentes llegan con el mismo
+     * {@code (nombre, apellido)}, la base de datos rechaza la segunda
+     * inserción con {@link DataIntegrityViolationException}. Esa excepción
+     * <em>debe</em> propagarse hacia afuera para que el caller pueda leer
+     * el ganador, pero no queremos que marque la transacción externa como
+     * rollback-only (lo que provocaría
+     * {@code UnexpectedRollbackException} al intentar el commit).
+     *
+     * <p>{@code noRollbackFor} permite que la constraint exception
+     * se propague sin contaminar la transacción padre. El catch en
+     * {@code buscarOCrear} se hace cargo de la colisión y consulta el
+     * ganador persistido.
+     */
+    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
     public EncargadoDto crear(EncargadoDto dto) {
         Encargado encargado = new Encargado();
         encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : "");

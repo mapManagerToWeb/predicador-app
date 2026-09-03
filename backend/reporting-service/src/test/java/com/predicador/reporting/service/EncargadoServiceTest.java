@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
+import com.predicador.shared.exception.ForbiddenOperationException;
 import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -147,7 +148,7 @@ class EncargadoServiceTest {
     void actualizar_shouldRejectAnotherOwnersRecord() {
         EncargadoDto dto = new EncargadoDto(null, "Daniel", "Uribe", 1, null, true);
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> encargadoService.actualizar(8L, dto, encargado("7")));
         verify(repository, never()).findById(8L);
     }
@@ -209,14 +210,14 @@ class EncargadoServiceTest {
 
     @Test
     void listarActivos_shouldRejectOwner() {
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> encargadoService.listarActivos(pageable, encargado("7")));
         verify(repository, never()).findByActivoTrueOrderByNombreAsc(pageable);
     }
 
     @Test
     void buscarPorNombre_shouldRejectOwner() {
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> encargadoService.buscarPorNombre("Daniel", pageable, encargado("7")));
         verify(repository, never())
                 .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrderByNombreAsc("Daniel", "Daniel", pageable);

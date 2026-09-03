@@ -6,18 +6,13 @@ import com.predicador.reporting.dto.WhatsAppMessageRequest;
 import com.predicador.reporting.model.WhatsAppDeliveryStatus;
 import com.predicador.reporting.service.WhatsAppSendService;
 import com.predicador.reporting.service.AuthorizationService;
-import com.predicador.reporting.client.WhatsAppIntegrationException;
 import com.predicador.reporting.publisher.WhatsAppSendPublisher;
 import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/reports")
@@ -72,15 +67,5 @@ public class WhatsAppController {
 
     private SessionToken token(HttpServletRequest request) {
         return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
-    }
-
-    @ExceptionHandler(WhatsAppIntegrationException.class)
-    ResponseEntity<ProblemDetail> handleWhatsAppFailure(WhatsAppIntegrationException exception) {
-        HttpStatus status = HttpStatus.resolve(exception.status());
-        if (status == null || status.is2xxSuccessful()) status = HttpStatus.BAD_GATEWAY;
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, exception.getMessage());
-        problem.setTitle("Fallo en la integración WhatsApp");
-        problem.setType(URI.create("https://api.predicador.com/errors/whatsapp-integration"));
-        return ResponseEntity.status(status).body(problem);
     }
 }

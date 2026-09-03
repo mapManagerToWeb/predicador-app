@@ -27,6 +27,7 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -171,10 +172,7 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56999999999");
-<<<<<<< HEAD
-=======
         when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
->>>>>>> feat/redesign
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
             .thenReturn(new WhatsAppMessageResponse(null, "msg_custom"));
 
@@ -182,6 +180,48 @@ class ReportSendServiceTest {
 
         assertTrue(response.success());
         verify(messageClient).sendTemplateMessage(eq("56999999999"), anyString(), anyString(), anyList());
+    }
+
+    @Test
+    void sendReport_unexpectedRuntimeException_marksFailedAndRethrowsAsWhatsApp() {
+        var request = new WhatsAppSendRequest(
+            "Daniel", "Uribe", "21-07-2026", "tarde",
+            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
+            "base64image", null
+        );
+
+        when(messageService.generarParametrosTemplate(request)).thenReturn(Map.of(
+            "fecha", "21-07-2026",
+            "encargado", "Daniel Uribe",
+            "territorio", "1",
+            "estado", "tarde"
+        ));
+        when(messageService.requiereScreenshot(request)).thenReturn(false);
+        when(props.templateName()).thenReturn("asignacion_territorio");
+        when(props.languageCode()).thenReturn("es_CL");
+        when(props.destinationNumber()).thenReturn("+54911111111");
+        when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
+        // Reserve must succeed so we have a delivery to mark FAILED.
+        WhatsAppDelivery delivery = new WhatsAppDelivery("idempotent-key-fallback");
+        when(deliveryRepository.saveAndFlush(any(WhatsAppDelivery.class))).thenReturn(delivery);
+        when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
+            .thenThrow(new org.springframework.web.client.HttpClientErrorException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "bad template"));
+
+        com.predicador.reporting.client.WhatsAppIntegrationException thrown =
+            assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
+                () -> sendService.sendReport(request, "idempotent-key-fallback"));
+
+        assertEquals(502, thrown.status());
+        assertNotNull(thrown.getCause());
+
+        // Verify the delivery was marked as FAILED.
+        ArgumentCaptor<WhatsAppDelivery> captor = ArgumentCaptor.forClass(WhatsAppDelivery.class);
+        verify(deliveryRepository).save(captor.capture());
+        WhatsAppDelivery saved = captor.getValue();
+        assertEquals(com.predicador.reporting.model.WhatsAppDeliveryStatus.FAILED, saved.getStatus());
+        assertEquals(502, saved.getStatusCode());
+        assertNotNull(saved.getError());
     }
 
     @SuppressWarnings("unchecked")

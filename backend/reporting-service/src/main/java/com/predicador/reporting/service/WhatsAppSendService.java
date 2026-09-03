@@ -128,10 +128,14 @@ public class WhatsAppSendService {
         try {
             sendService.sendReport(request, idempotencyKey);
         } catch (WhatsAppIntegrationException exception) {
-            log.debug("Envío WhatsApp finalizado con error key={} status={}",
-                    idempotencyKey, exception.status());
+            log.debug("Envío WhatsApp finalizado con error key={} status={} cause={}",
+                    idempotencyKey, exception.status(),
+                    exception.getCause() != null ? exception.getCause().getClass().getSimpleName() : "none");
         } catch (RuntimeException exception) {
-            log.error("Error inesperado durante el envío WhatsApp key={}", idempotencyKey, exception);
+            log.error("Error inesperado durante el envío WhatsApp key={} type={} cause={}",
+                    idempotencyKey, exception.getClass().getSimpleName(),
+                    exception.getCause() != null ? exception.getCause().getClass().getSimpleName() : "none",
+                    exception);
             terminalizeUnexpectedFailure(idempotencyKey, exception);
         }
     }
@@ -170,10 +174,17 @@ public class WhatsAppSendService {
             delivery.markSucceeded(response.stableMessageId());
             deliveryRepository.save(delivery);
         } catch (WhatsAppIntegrationException exception) {
+            log.debug("sendRaw error key={} type={} status={} cause={}",
+                    idempotencyKey, exception.getClass().getSimpleName(), exception.status(),
+                    exception.getCause() != null ? exception.getCause().getClass().getSimpleName() : "none");
             delivery.markFailed(exception.getMessage(), exception.status());
             deliveryRepository.save(delivery);
             throw exception;
         } catch (RuntimeException exception) {
+            log.error("sendRaw inesperado key={} type={} cause={}",
+                    idempotencyKey, exception.getClass().getSimpleName(),
+                    exception.getCause() != null ? exception.getCause().getClass().getSimpleName() : "none",
+                    exception);
             delivery.markFailed(exception.getMessage() != null ? exception.getMessage() : "Error inesperado", 502);
             deliveryRepository.save(delivery);
             throw new WhatsAppIntegrationException("Fallo inesperado durante el envío WhatsApp", 502, exception);

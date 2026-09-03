@@ -89,6 +89,7 @@ class Task3HardeningTest {
         when(properties.templateName()).thenReturn("template");
         when(properties.languageCode()).thenReturn("es_CL");
         when(properties.destinationNumber()).thenReturn("56912345678");
+        when(properties.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
                 .thenReturn(new com.predicador.reporting.client.WhatsAppMessageResponse(null, "message-1"));
         var delivery = new com.predicador.reporting.model.WhatsAppDelivery("delivery-1");
@@ -123,6 +124,7 @@ class Task3HardeningTest {
         when(properties.templateName()).thenReturn("template");
         when(properties.languageCode()).thenReturn("es_CL");
         when(properties.destinationNumber()).thenReturn("56912345678");
+        when(properties.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
                 .thenReturn(new com.predicador.reporting.client.WhatsAppMessageResponse(null, "message-1"));
 

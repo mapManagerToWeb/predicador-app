@@ -1,6 +1,7 @@
 package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.EncargadoDto;
+import com.predicador.reporting.dto.EncargadoLoginRequest;
 import com.predicador.reporting.dto.LoginResponse;
 import com.predicador.reporting.service.EncargadoService;
 import com.predicador.shared.security.SecurityConstants;
@@ -95,8 +96,8 @@ public class EncargadoController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
-        String telefono = body.get("telefono");
+    public ResponseEntity<?> login(@Valid @RequestBody EncargadoLoginRequest body) {
+        String telefono = body.telefono();
         var result = encargadoService.buscarPorTelefono(telefono);
         if (result.isPresent()) {
             return withSessionCookie(withToken(result.get()));

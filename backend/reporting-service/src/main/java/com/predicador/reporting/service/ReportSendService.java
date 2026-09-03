@@ -30,11 +30,6 @@ import java.util.concurrent.TimeUnit;
 public class ReportSendService {
 
     private static final Logger log = LoggerFactory.getLogger(ReportSendService.class);
-<<<<<<< HEAD
-    private static final String DEFAULT_IMAGE_URL =
-        "https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png";
-=======
->>>>>>> feat/redesign
     private static final Duration DELIVERY_LEASE = Duration.ofMinutes(5);
     private static final String PARAMETERS = "parameters";
     private static final String IMAGE = "image";
@@ -118,11 +113,7 @@ public class ReportSendService {
                     PARAMETERS, List.of(
                         Map.of(
                             "type", IMAGE,
-<<<<<<< HEAD
-                            IMAGE, Map.of("link", DEFAULT_IMAGE_URL)
-=======
                             IMAGE, Map.of("link", props.defaultImageUrl())
->>>>>>> feat/redesign
                         )
                     )
                 ));
@@ -165,9 +156,28 @@ public class ReportSendService {
         } catch (com.predicador.reporting.client.WhatsAppIntegrationException e) {
             sendTotal.increment();
             sendFailure.increment();
+            log.debug("sendReport error delivery-status={} type={} status={} cause={}",
+                    delivery != null ? delivery.getIdempotencyKey() : "none",
+                    e.getClass().getSimpleName(), e.status(),
+                    e.getCause() != null ? e.getCause().getClass().getSimpleName() : "none");
             WhatsAppSendResponse result = new WhatsAppSendResponse(false, null, e.getMessage());
             persistFailure(delivery, result, e.status());
             throw e;
+        } catch (RuntimeException e) {
+            // Cualquier RuntimeException no-WhatsApp (p.ej. HttpClientErrorException
+            // 4xx de Meta, NetworkException, etc.) que no sea WhatsAppIntegrationException
+            // debe marcarse como FAILED y propagar como 502 para que el caller sepa que
+            // el envío no succeeded y la cola de retry pueda reintentarlo.
+            sendTotal.increment();
+            sendFailure.increment();
+            log.error("sendReport error inesperado type={} cause={}",
+                    e.getClass().getSimpleName(),
+                    e.getCause() != null ? e.getCause().getClass().getSimpleName() : "none", e);
+            WhatsAppSendResponse result = new WhatsAppSendResponse(false, null,
+                    "Error en el envío: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            persistFailure(delivery, result, 502);
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    "Error en el envío WhatsApp", 502, e);
         } finally {
             long elapsed = System.nanoTime() - start;
             sendTimer.record(elapsed, TimeUnit.NANOSECONDS);

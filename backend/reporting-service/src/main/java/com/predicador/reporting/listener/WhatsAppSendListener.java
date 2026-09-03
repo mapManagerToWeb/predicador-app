@@ -24,14 +24,14 @@ public class WhatsAppSendListener {
 
     @RabbitListener(queues = RabbitMQConfig.WHATSAPP_SEND_QUEUE)
     public void onMessage(WhatsAppMessageRequest request) {
-        log.info("Procesando mensaje WhatsApp desde cola key={}", request.getIdempotencyKey());
-        
+        log.info("Procesando mensaje WhatsApp desde cola key={}", request.idempotencyKey());
+
         whatsAppSendService.sendTemplateMessage(
-                request.getIdempotencyKey(),
-                request.getDestinationNumber(),
-                request.getTemplateName(),
-                request.getLanguageCode(),
-                request.getComponents()
+                request.idempotencyKey(),
+                request.destinationNumber(),
+                request.templateName(),
+                request.languageCode(),
+                request.components()
         );
     }
 }

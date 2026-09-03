@@ -19,7 +19,7 @@ public class WhatsAppSendPublisher {
     }
 
     public void publish(WhatsAppMessageRequest request) {
-        log.info("Publicando envío WhatsApp a cola key={}", request.getIdempotencyKey());
+        log.info("Publicando envío WhatsApp a cola key={}", request.idempotencyKey());
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.WHATSAPP_SEND_EXCHANGE,
                 RabbitMQConfig.WHATSAPP_SEND_ROUTING_KEY,

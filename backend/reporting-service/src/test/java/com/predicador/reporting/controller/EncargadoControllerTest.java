@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -46,8 +47,11 @@ class EncargadoControllerTest {
     @BeforeEach
     void setUp() {
         encargadoController = new EncargadoController(encargadoService, tokens, true);
+        var validator = new org.springframework.validation.beanvalidation.LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(encargadoController)
-                .setControllerAdvice(new com.predicador.shared.exception.GlobalExceptionHandler())
+                .setValidator(validator)
+                .setControllerAdvice(new com.predicador.shared.exception.GlobalExceptionHandler(), new com.predicador.reporting.exception.GlobalExceptionHandler())
                 .build();
     }
 
@@ -144,7 +148,7 @@ class EncargadoControllerTest {
 
         var result = mockMvc.perform(post("/api/v1/encargados/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"telefono\":\"56911111111\"}"))
+                .content("{\"telefono\":\"+54911111111\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.encargado.id").value(7))
             .andExpect(jsonPath("$.encargado.nombre").value("Ana"))
@@ -167,7 +171,7 @@ class EncargadoControllerTest {
 
         var result = mockMvc.perform(post("/api/v1/encargados/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"telefono\":\"56911111111\"}"))
+                .content("{\"telefono\":\"+54911111111\"}"))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -187,7 +191,7 @@ class EncargadoControllerTest {
 
         mockMvc.perform(post("/api/v1/encargados/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"telefono\":\"56900000000\"}"))
+                .content("{\"telefono\":\"+54900000000\"}"))
             .andExpect(status().isNotFound());
     }
 
@@ -208,6 +212,14 @@ class EncargadoControllerTest {
     }
 
     @Test
+    void login_emptyBody_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void localHttpOverride_omitsSecureAttribute() throws Exception {
         EncargadoController localController = new EncargadoController(encargadoService, tokens, false);
         EncargadoDto dto = createDto(7L, "Ana", "Perez");
@@ -218,7 +230,7 @@ class EncargadoControllerTest {
         MockMvcBuilders.standaloneSetup(localController).build()
                 .perform(post("/api/v1/encargados/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"telefono\":\"56911111111\"}"))
+                        .content("{\"telefono\":\"+54911111111\"}"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("Secure"))));

@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import com.predicador.shared.exception.ForbiddenOperationException;
 import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,7 +182,7 @@ class ReportServiceTest {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
                 8L, null, null, null, null, null, null);
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.createReports(List.of(dto), encargado("7")));
         verify(repository, never()).saveAll(anyList());
     }
@@ -197,7 +198,7 @@ class ReportServiceTest {
     @Test
     void getReportsByEncargado_shouldRejectAnotherOwner() {
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportsByEncargado(8L, pageable, encargado("7")));
         verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L, pageable);
     }
@@ -212,7 +213,7 @@ class ReportServiceTest {
 
     @Test
     void getReportsForToday_shouldRejectOwnerAndAllowAdmin() {
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportsForToday(pageable, encargado("7")));
 
         when(repository.findByFechaRange(any(Instant.class), any(Instant.class), any())).thenReturn(Page.empty());
@@ -225,7 +226,7 @@ class ReportServiceTest {
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, encargado("7")).getContent().isEmpty());
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, admin).getContent().isEmpty());
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportsByTerritorio(12L, pageable, null));
     }
 
@@ -236,7 +237,7 @@ class ReportServiceTest {
         assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), encargado("7")).isEmpty());
         assertTrue(reportService.getReportsByMultipleTerritorios(List.of(12L), admin).isEmpty());
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportsByMultipleTerritorios(List.of(12L), null));
     }
 
@@ -265,7 +266,7 @@ class ReportServiceTest {
 
     @Test
     void getReportVersions_requiresAuthenticatedUser() {
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportVersions(List.of(1L), null));
     }
 
@@ -306,7 +307,7 @@ class ReportServiceTest {
         foreign.setEncargadoId(8L);
         when(repository.findAllById(List.of(2))).thenReturn(List.of(foreign));
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ForbiddenOperationException.class,
                 () -> reportService.deleteReports(List.of(2), encargado("7")));
         verify(repository, never()).deleteAll(anyList());
     }
