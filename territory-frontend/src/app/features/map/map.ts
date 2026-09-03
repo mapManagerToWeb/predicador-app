@@ -34,10 +34,7 @@ export class MapPage implements OnDestroy {
   private readonly initialization = inject(MapInitializationService);
   private readonly partialMark = inject(MapPartialMarkService);
   private readonly dataPersistence = inject(MapDataPersistenceService);
-<<<<<<< HEAD
-=======
   private readonly location = inject(MapLocationService);
->>>>>>> feat/redesign
   private readonly toastService = inject(Toast);
 
   manzanasCount = this.state.manzanasCount;
@@ -160,13 +157,10 @@ export class MapPage implements OnDestroy {
     this.state.isSatellite.set(this.rendering.isSatellite());
   }
 
-<<<<<<< HEAD
-=======
   toggleUbicacion(): void {
     this.location.toggle();
   }
 
->>>>>>> feat/redesign
   onPredicacionChange(event: Event): void {
     this.state.predicacion.set((event.target as HTMLSelectElement).value);
   }

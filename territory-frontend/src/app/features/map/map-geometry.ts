@@ -1,7 +1,5 @@
 import type * as L from 'leaflet';
 
-<<<<<<< HEAD
-=======
 /**
  * Map Geometry Utilities
  *
@@ -17,7 +15,6 @@ import type * as L from 'leaflet';
  * moved to Web Workers with postMessage communication.
  */
 
->>>>>>> feat/redesign
 export interface SnappedPoint {
   latlng: L.LatLng;
   edgeIdx: number;
@@ -35,14 +32,11 @@ export function makeLatLng(lat: number, lng: number): L.LatLng {
 
 export const SNAP_THRESHOLD_PX = 100;
 
-<<<<<<< HEAD
-=======
 /**
  * Pure ray-casting algorithm for point-in-polygon detection.
  * WEB WORKER CANDIDATE: This function performs repetitive geometric calculations
  * that can block the UI during extensive manzana selection operations.
  */
->>>>>>> feat/redesign
 export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
   const x = point.lat;
   const y = point.lng;
@@ -61,13 +55,10 @@ export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
   return inside;
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Computes parameter t for projection of point onto segment AB.
  * WEB WORKER CANDIDATE: Pure mathematical calculation used in projection logic.
  */
->>>>>>> feat/redesign
 export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map): number {
   const p = map.latLngToContainerPoint(point);
   const pa = map.latLngToContainerPoint(a);
@@ -85,13 +76,10 @@ export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map):
   return Math.max(0, Math.min(1, t));
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Projects a point onto a line segment using parameter t.
  * WEB WORKER CANDIDATE: Geometric projection calculation used in snapping logic.
  */
->>>>>>> feat/redesign
 export function projectOnSegment(
   point: L.LatLng,
   a: L.LatLng,
@@ -102,21 +90,16 @@ export function projectOnSegment(
   return makeLatLng(a.lat + t * (b.lat - a.lat), a.lng + t * (b.lng - a.lng));
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Calculates pixel distance between two LatLng points.
  * WEB WORKER CANDIDATE: Distance calculation used in path building logic.
  */
->>>>>>> feat/redesign
 export function latLngDist(a: L.LatLng, b: L.LatLng, map: L.Map): number {
   const pa = map.latLngToContainerPoint(a);
   const pb = map.latLngToContainerPoint(b);
   return pa.distanceTo(pb);
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Snaps a point to the nearest edge of a polygon within threshold.
  * WEB WORKER CANDIDATE: This is the most computationally intensive function in the
@@ -128,7 +111,6 @@ export function latLngDist(a: L.LatLng, b: L.LatLng, map: L.Map): number {
  * - Iterates through all edges to find minimum distance
  * - Called frequently during drag operations and point selection
  */
->>>>>>> feat/redesign
 export function snapToContour(
   latlng: L.LatLng,
   edges: Edge[],
@@ -192,14 +174,11 @@ export function snapToContour(
   return { latlng, edgeIdx: -1, t: 0 };
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Traces the polygon contour between two snapped points.
  * WEB WORKER CANDIDATE: Path calculation that determines the optimal route between
  * two points on polygon edges, considering both forward and backward directions.
  */
->>>>>>> feat/redesign
 export function traceContourBetween(
   a: SnappedPoint,
   b: SnappedPoint,
@@ -227,13 +206,10 @@ export function traceContourBetween(
   return buildBackwardPath(a, edges, map, stepsBackward, startLatLng, endLatLng);
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Helper function to get a point on an edge using parameter t.
  * WEB WORKER CANDIDATE: Simple interpolation calculation.
  */
->>>>>>> feat/redesign
 function pointOnEdge(edge: Edge, t: number): L.LatLng {
   return makeLatLng(
     edge.from.lat + t * (edge.to.lat - edge.from.lat),
@@ -241,13 +217,10 @@ function pointOnEdge(edge: Edge, t: number): L.LatLng {
   );
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Builds path forward from snapped point a to b.
  * WEB WORKER CANDIDATE: Path construction with distance checks.
  */
->>>>>>> feat/redesign
 function buildForwardPath(
   a: SnappedPoint,
   edges: Edge[],
@@ -273,13 +246,10 @@ function buildForwardPath(
   return result;
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Builds path backward from snapped point a to b.
  * WEB WORKER CANDIDATE: Path construction with distance checks.
  */
->>>>>>> feat/redesign
 function buildBackwardPath(
   a: SnappedPoint,
   edges: Edge[],

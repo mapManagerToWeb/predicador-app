@@ -9,19 +9,6 @@
   bottom: max(80px, calc(60px + var(--safe-bottom)));
   left: 50%;
   transform: translateX(-50%);
-<<<<<<< HEAD
-  background: var(--paper);
-  color: var(--ink);
-  padding: 12px 20px;
-  border-radius: var(--radius-lg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  z-index: 3000;
-  box-shadow: var(--elev-3);
-  border: 1px solid var(--clip-metal);
-  animation: toast-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-=======
   background: var(--surface-1);
   color: var(--ink);
   padding: var(--space-3) var(--space-5);
@@ -33,16 +20,11 @@
   box-shadow: var(--elev-3);
   border: 1px solid var(--color-border-solid);
   animation: toast-in 0.3s var(--ease-spring);
->>>>>>> feat/redesign
   max-width: 90vw;
   text-align: center;
   display: flex;
   align-items: center;
-<<<<<<< HEAD
-  gap: 8px;
-=======
   gap: var(--space-2);
->>>>>>> feat/redesign
 }
 
 .toast--success {
@@ -64,15 +46,9 @@
 }
 
 .toast--info {
-<<<<<<< HEAD
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--clip-metal);
-=======
   background: var(--surface-1);
   color: var(--ink);
   border-color: var(--color-border-solid);
->>>>>>> feat/redesign
 }
 
 /* ── Toast confirmación de envío por WhatsApp ── */
@@ -80,11 +56,7 @@
   background: #ffffff;
   color: #075E54;
   border: 1.5px solid #A8E6C3;
-<<<<<<< HEAD
-  padding: 10px 20px 10px 12px;
-=======
   padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
->>>>>>> feat/redesign
   box-shadow: 0 8px 28px rgba(18, 140, 126, 0.28);
 }
 
@@ -126,22 +98,14 @@
 .toast--sent .toast-title {
   font-family: var(--font-display);
   font-size: 1.05rem;
-<<<<<<< HEAD
-  font-weight: 400;
-=======
   font-weight: var(--weight-normal);
->>>>>>> feat/redesign
   line-height: 1.15;
   white-space: normal;
 }
 
 .toast--sent .toast-subtitle {
   font-size: var(--text-xs);
-<<<<<<< HEAD
-  font-weight: 500;
-=======
   font-weight: var(--weight-medium);
->>>>>>> feat/redesign
   color: #2E7D5B;
   white-space: normal;
 }
@@ -180,15 +144,9 @@
 
 /* ── Dark mode toast ── */
 :root[data-theme="dark"] .toast {
-<<<<<<< HEAD
-  background: #2E2C28;
-  color: #F5F2EB;
-  border-color: #8B8680;
-=======
   background: var(--surface-2);
   color: var(--ink);
   border-color: var(--color-border-solid);
->>>>>>> feat/redesign
 }
 
 :root[data-theme="dark"] .toast--success {

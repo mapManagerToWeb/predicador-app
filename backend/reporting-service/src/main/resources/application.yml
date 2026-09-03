@@ -40,24 +40,15 @@ spring:
         order_inserts: true
         order_updates: true
   flyway:
-<<<<<<< HEAD
-    enabled: false
-=======
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: true
-    # Tabla de historial propia: territory-service y reporting-service comparten
-    # base de datos (Neon) pero versionan sus migraciones por separado. Sin esta
-    # tabla dedicada, las migraciones de reporting colisionarían con las de territory.
     table: flyway_schema_history_reporting
-    # Conexión directa (sin -pooler): Flyway necesita operaciones de sesión que
-    # PgBouncer en modo transacción no soporta (prepared statements, SET, DDL).
     url: ${DB_URL_UNPOOLED:${DB_URL:jdbc:postgresql://localhost:5432/predicador}}
     user: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
->>>>>>> feat/redesign
 
 server:
   port: 8082
@@ -168,7 +159,4 @@ whatsapp:
   template-name: ${WHATSAPP_TEMPLATE:-asignacion_territorio}
   language-code: ${WHATSAPP_LANG:es_CL}
   destination-number: ${WHATSAPP_DESTINATION:}
-<<<<<<< HEAD
-=======
   default-image-url: ${WHATSAPP_DEFAULT_IMAGE_URL:}
->>>>>>> feat/redesign

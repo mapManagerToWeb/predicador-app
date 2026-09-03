@@ -1,18 +1,3 @@
-<<<<<<< HEAD
-<!-- Paper grain SVG filter (referenced by CSS) -->
-<svg class="paper-grain-filter" aria-hidden="true" focusable="false">
-  <filter id="paperGrain">
-    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch" result="noise"/>
-    <feColorMatrix type="saturate" values="0" in="noise" result="gray"/>
-    <feBlend in="SourceGraphic" in2="gray" mode="multiply" result="blended"/>
-    <feComponentTransfer in="blended">
-      <feFuncA type="linear" slope="0.04"/>
-    </feComponentTransfer>
-  </filter>
-</svg>
-
-=======
->>>>>>> feat/redesign
 <div class="map-page">
   <div class="map-container" id="map"></div>
 
@@ -29,21 +14,6 @@
 
   <button
     type="button"
-<<<<<<< HEAD
-    class="map-toggle-satellite"
-    [class.active]="isSatellite()"
-    (click)="toggleSatellite()"
-    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'"
-    [attr.aria-pressed]="isSatellite()"
-  >
-    @if (isSatellite()) {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/>
-      </svg>
-    } @else {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
-=======
     class="map-toggle-location"
     [class.active]="locationStatus() === 'following'"
     [disabled]="locationStatus() === 'locating'"
@@ -58,28 +28,13 @@
     } @else {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
->>>>>>> feat/redesign
       </svg>
     }
   </button>
 
   @if (tieneTerritorio()) {
-<<<<<<< HEAD
-    <div class="clipboard-sheet">
-      <!-- Metal clip -->
-      <div class="clip" aria-hidden="true">
-        <svg viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="56" height="20" rx="4" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="10" y="6" width="40" height="12" rx="3" fill="currentColor" opacity="0.15"/>
-          <line x1="20" y1="10" x2="40" y2="10" stroke="currentColor" stroke-width="1" opacity="0.3"/>
-          <line x1="20" y1="14" x2="40" y2="14" stroke="currentColor" stroke-width="1" opacity="0.3"/>
-        </svg>
-      </div>
-
-=======
     @defer (on viewport) {
       <div class="clipboard-sheet">
->>>>>>> feat/redesign
       <!-- Territory header -->
       <div class="sheet-header" aria-live="polite">
         @if (territoriosSeleccionados().length > 1) {
@@ -192,9 +147,6 @@
         </div>
       }
     </div>
-<<<<<<< HEAD
-  }
-=======
     } @placeholder {
       <div class="clipboard-sheet-placeholder">Cargando controles...</div>
     }
@@ -218,5 +170,4 @@
       </svg>
     }
   </button>
->>>>>>> feat/redesign
 </div>

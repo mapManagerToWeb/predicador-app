@@ -1,83 +1,4 @@
 /* ═══════════════════════════════════════════════════
-<<<<<<< HEAD
-   Field Clipboard — Design Tokens & Global Resets
-   ═══════════════════════════════════════════════════ */
-
-/* ── Paper grain SVG filter (inline) ── */
-svg.paper-grain-filter {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-}
-
-/* ── Light Theme ── */
-:root {
-  /* Paper & Ink */
-  --paper: #FDFBF7;
-  --ink: #1D1B18;
-  --ink-muted: #6B6660;
-  --clip-metal: #C9C3BB;
-  --shadow-ink: rgba(29, 27, 24, 0.12);
-
-  /* Semantic */
-  --territory-blue: #2E5C8A;
-  --territory-blue-light: #4A8BC2;
-  --field-amber: #B8860B;
-  --report-green: #2D7D3A;
-  --clear-red: #B83B3B;
-
-  /* Functional aliases (backward compat) */
-  --color-primary: var(--territory-blue);
-  --color-primary-dark: #1E3D5C;
-  --color-success: var(--report-green);
-  --color-danger: var(--clear-red);
-  --color-warning: var(--field-amber);
-  --color-bg: var(--paper);
-  --color-surface: #FFFFFF;
-  --color-text: var(--ink);
-  --color-text-secondary: var(--ink-muted);
-  --color-border: var(--clip-metal);
-  --color-hover: #F5F3EF;
-  --color-tag-bg: #D4EDDA;
-  --color-tag-text: #1B5E20;
-  --color-input-bg: #FFFFFF;
-  --color-shadow: var(--shadow-ink);
-
-  /* Map */
-  --map-bg: var(--paper);
-  --map-tile-filter: none;
-  --map-border-color: rgba(29, 27, 24, 0.7);
-  --map-fill-opacity: 0.08;
-  --map-active-opacity: 0.6;
-
-  /* Elevation */
-  --elev-1: 0 1px 3px var(--shadow-ink);
-  --elev-2: 0 4px 12px var(--shadow-ink);
-  --elev-3: 0 8px 24px var(--shadow-ink);
-  --shadow-sm: var(--elev-1);
-  --shadow-md: var(--elev-2);
-  --shadow-lg: var(--elev-3);
-
-  /* Spacing */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-
-  /* Radius — Cuaderno: small, precise, cartographic */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 6px;
-
-  /* Type */
-  --font-display: 'DM Serif Display', Georgia, 'Times New Roman', serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-=======
    Modern Minimal — Design Tokens & Global Resets
    Clean, linear-inspired dark theme
    ═══════════════════════════════════════════════════ */
@@ -139,16 +60,12 @@ svg.paper-grain-filter {
 
   /* Font sizes */
   --text-2xs: 0.625rem;
->>>>>>> feat/redesign
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
-<<<<<<< HEAD
-  --text-3xl: 2rem;
-=======
   --text-3xl: 1.875rem;
   --text-4xl: 2.25rem;
 
@@ -247,57 +164,12 @@ svg.paper-grain-filter {
 
   /* Contour — decorative topographic lines */
   --contour-color: rgba(59, 130, 246, 0.03);
->>>>>>> feat/redesign
 
   /* Safe areas */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
 
-<<<<<<< HEAD
-/* ── Dark Theme ── */
-:root[data-theme="dark"] {
-  --paper: #1A1815;
-  --ink: #F5F2EB;
-  --ink-muted: #A8A39C;
-  --clip-metal: #8B8680;
-  --shadow-ink: rgba(0, 0, 0, 0.35);
-
-  --territory-blue: #5A9BD8;
-  --territory-blue-light: #7DB8E8;
-  --field-amber: #D4A843;
-  --report-green: #4ADE80;
-  --clear-red: #F87171;
-
-  --color-primary: var(--territory-blue);
-  --color-primary-dark: #3D7AB8;
-  --color-success: var(--report-green);
-  --color-danger: var(--clear-red);
-  --color-warning: var(--field-amber);
-  --color-bg: var(--paper);
-  --color-surface: #242220;
-  --color-text: var(--ink);
-  --color-text-secondary: var(--ink-muted);
-  --color-border: var(--clip-metal);
-  --color-hover: #2E2C28;
-  --color-tag-bg: #1B3A20;
-  --color-tag-text: #81C784;
-  --color-input-bg: #242220;
-  --color-shadow: var(--shadow-ink);
-
-  --map-bg: #0E0D0B;
-  --map-border-color: rgba(245, 242, 235, 0.7);
-  --map-fill-opacity: 0.06;
-  --map-active-opacity: 0.7;
-
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-/* ── Global Reset ── */
-* {
-=======
 /* ── Light Theme ── */
 :root[data-theme="light"] {
   /* Surfaces — clean white scale */
@@ -386,21 +258,11 @@ svg.paper-grain-filter {
 *,
 *::before,
 *::after {
->>>>>>> feat/redesign
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-<<<<<<< HEAD
-html, body {
-  height: 100%;
-  width: 100%;
-  font-family: var(--font-body);
-  font-size: 16px;
-  color: var(--ink);
-  background: var(--paper);
-=======
 html {
   height: 100%;
   -webkit-text-size-adjust: 100%;
@@ -416,7 +278,6 @@ body {
   line-height: var(--leading-normal);
   color: var(--ink);
   background: var(--surface-0);
->>>>>>> feat/redesign
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
@@ -425,17 +286,6 @@ body {
   overscroll-behavior: none;
 }
 
-<<<<<<< HEAD
-button {
-  font-family: inherit;
-  cursor: pointer;
-  min-height: 44px; /* WCAG minimum touch target */
-}
-
-input {
-  font-family: inherit;
-  min-height: 44px; /* WCAG minimum touch target */
-=======
 /* ── Typography Hierarchy ── */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -514,7 +364,6 @@ input, select, textarea {
   font-family: inherit;
   font-size: inherit;
   min-height: 44px;
->>>>>>> feat/redesign
 }
 
 a {
@@ -527,12 +376,6 @@ img {
   display: block;
 }
 
-<<<<<<< HEAD
-/* ── Focus visible for keyboard navigation ── */
-:focus-visible {
-  outline: 2px solid var(--territory-blue);
-  outline-offset: 2px;
-=======
 /* ── Selection ── */
 ::selection {
   background: var(--color-primary);
@@ -563,7 +406,6 @@ img {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
->>>>>>> feat/redesign
 }
 
 /* ── Reduced motion ── */
@@ -601,15 +443,6 @@ img {
 
 .leaflet-popup-content-wrapper {
   border-radius: var(--radius-md);
-<<<<<<< HEAD
-  box-shadow: var(--elev-2);
-  background: var(--color-surface);
-  color: var(--ink);
-}
-
-.leaflet-popup-content {
-  margin: 8px 12px;
-=======
   box-shadow: var(--elev-3);
   background: var(--surface-2);
   color: var(--ink);
@@ -618,7 +451,6 @@ img {
 
 .leaflet-popup-content {
   margin: 10px 14px;
->>>>>>> feat/redesign
   font-size: var(--text-sm);
 }
 
@@ -631,17 +463,10 @@ img {
 }
 
 :root[data-theme="light"] .leaflet-tile-pane {
-<<<<<<< HEAD
-  filter: brightness(0.92);
-}
-
-/* ── Territory Labels (map markers) ── */
-=======
   filter: brightness(0.95) saturate(0.95);
 }
 
 /* ── Territory Labels ── */
->>>>>>> feat/redesign
 .centroid-label {
   background: none !important;
   border: none !important;
@@ -651,28 +476,16 @@ img {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-<<<<<<< HEAD
-  background: var(--territory-blue);
-  color: white;
-  font-family: var(--font-mono);
-  font-weight: 700;
-=======
   background: var(--color-primary);
   color: white;
   font-family: var(--font-mono);
   font-weight: var(--weight-bold);
->>>>>>> feat/redesign
   font-size: var(--text-xs);
   display: flex;
   align-items: center;
   justify-content: center;
-<<<<<<< HEAD
-  box-shadow: var(--elev-1);
-  border: 2px solid var(--paper);
-=======
   box-shadow: 0 0 16px var(--color-primary-glow), var(--elev-1);
   border: 2px solid var(--surface-0);
->>>>>>> feat/redesign
 }
 
 .territory-label {
@@ -687,27 +500,6 @@ img {
   min-width: 24px;
   height: 24px;
   padding: 0 6px;
-<<<<<<< HEAD
-  border-radius: 12px;
-  /* Sin backdrop-filter: los labels se mueven con el mapa y el blur fuerza
-     re-rasterización en cada pan. Fondo casi opaco consigue el mismo look. */
-  background: rgba(253, 251, 247, 0.96);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1;
-  white-space: nowrap;
-  pointer-events: none;
-  user-select: none;
-}
-
-:root[data-theme="dark"] .territory-label__text {
-  background: rgba(36, 34, 32, 0.96);
-  color: #F5F2EB;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-=======
   border-radius: var(--radius-pill);
   background: rgba(24, 24, 27, 0.88);
   backdrop-filter: blur(8px);
@@ -727,41 +519,20 @@ img {
 :root[data-theme="light"] .territory-label__text {
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(24, 24, 27, 0.06);
->>>>>>> feat/redesign
 }
 
 /* ── Partial marker dot ── */
 .partial-dot {
   width: 16px;
   height: 16px;
-<<<<<<< HEAD
-  background: var(--report-green);
-  border: 3px solid var(--paper);
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-=======
   background: var(--color-success);
   border: 3px solid var(--surface-0);
   border-radius: 50%;
   box-shadow: 0 0 8px var(--color-success-glow), 0 2px 6px rgba(0, 0, 0, 0.3);
->>>>>>> feat/redesign
 }
 
 /* ── Leaflet dark mode overrides ── */
 :root[data-theme="dark"] .leaflet-popup-content-wrapper {
-<<<<<<< HEAD
-  background: #2E2C28;
-  color: #F5F2EB;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-:root[data-theme="dark"] .leaflet-popup-tip {
-  background: #2E2C28;
-}
-
-:root[data-theme="dark"] .leaflet-container {
-  background: #0E0D0B;
-=======
   background: var(--surface-2);
   color: var(--ink);
   border-color: var(--glass-border);
@@ -775,24 +546,12 @@ img {
 
 :root[data-theme="dark"] .leaflet-container {
   background: var(--surface-0);
->>>>>>> feat/redesign
 }
 
 :root[data-theme="dark"] .leaflet-bar,
 :root[data-theme="dark"] .leaflet-control-zoom a,
 :root[data-theme="dark"] .leaflet-control-attribution,
 :root[data-theme="dark"] .leaflet-control-layers {
-<<<<<<< HEAD
-  background: rgba(26, 24, 21, 0.92);
-  color: #F5F2EB;
-  border-color: rgba(139, 134, 128, 0.25);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-}
-
-:root[data-theme="dark"] .leaflet-control-zoom a {
-  color: #F5F2EB;
-  border-bottom-color: rgba(139, 134, 128, 0.25);
-=======
   background: var(--glass-bg);
   color: var(--ink);
   border-color: var(--glass-border);
@@ -805,31 +564,15 @@ img {
 :root[data-theme="dark"] .leaflet-control-zoom a {
   color: var(--ink);
   border-bottom-color: var(--glass-border);
->>>>>>> feat/redesign
 }
 
 :root[data-theme="dark"] .leaflet-control-zoom a:hover,
 :root[data-theme="dark"] .leaflet-control-layers:hover {
-<<<<<<< HEAD
-  background: rgba(46, 44, 40, 0.95);
-=======
   background: var(--surface-3);
->>>>>>> feat/redesign
 }
 
 :root[data-theme="dark"] .leaflet-control-attribution,
 :root[data-theme="dark"] .leaflet-control-attribution a {
-<<<<<<< HEAD
-  color: #A8A39C;
-}
-
-:root[data-theme="dark"] .leaflet-control-attribution a {
-  color: #5A9BD8;
-}
-
-:root[data-theme="dark"] .leaflet-interactive {
-  stroke: rgba(245, 242, 235, 0.55);
-=======
   color: var(--ink-muted);
 }
 
@@ -861,5 +604,4 @@ img {
 
 :root[data-theme="light"] .leaflet-control-attribution a {
   color: var(--color-primary);
->>>>>>> feat/redesign
 }
