@@ -12,6 +12,14 @@ import { DraftMarksService } from '../../../core/services/map-draft';
 import type { ManzanaMarcada } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 
+/**
+ * Checks if an error is an AbortError (DOMException with name "AbortError").
+ * This happens when Angular SSR aborts long-running requests.
+ */
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
 @Injectable({ providedIn: 'root' })
 export class MapDataPersistenceService {
   private readonly state = inject(MapStateService);
@@ -70,6 +78,12 @@ export class MapDataPersistenceService {
       this.state.modoMarcado.set('none');
       this.state.manzanasById.set(new Map());
     } catch (error) {
+      // Si es un AbortError del SSR, no revertimos el estado del usuario ya que la
+      // operación pudo haber succeedido en el backend.
+      if (isAbortError(error)) {
+        return;
+      }
+
       if (previousMarcadas && previousDatosParciales) {
         this.state.manzanasById.set(previousMarcadas);
         this.state.datosParcialesGuardados = previousDatosParciales;
@@ -178,6 +192,12 @@ export class MapDataPersistenceService {
       this.state.modoMarcado.set('none');
       this.state.manzanasById.set(new Map());
     } catch (error) {
+      // Si es un AbortError del SSR, no es un error real: el backend pudo haber
+      // procesado el envío correctamente. No mostramos error ni revertimos.
+      if (isAbortError(error)) {
+        return;
+      }
+
       if (guardados.length > 0 && !envioConfirmado) {
         // Quedó guardado sin envío confirmado: revertir para cumplir ACID.
         await this.revertirGuardado(guardados);
