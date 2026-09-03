@@ -36,7 +36,7 @@
     "web-vitals": "^6.2.1"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "^2.6.3",
+    "@analogjs/vite-plugin-angular": "^2.7.1",
     "@analogjs/vitest-angular": "^2.6.3",
     "@angular-eslint/eslint-plugin": "^22.1.0",
     "@angular-eslint/eslint-plugin-template": "^22.1.0",
