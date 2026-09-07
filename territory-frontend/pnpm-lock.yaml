@@ -74,8 +74,8 @@ importers:
         specifier: ^2.7.1
         version: 2.7.1(@analogjs/vite-plugin-angular@2.6.4(@angular/build@22.1.7(fmsu46ezyi6dlvp4xbr6xnvjr4))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@8.1.5(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)))(@angular-devkit/architect@0.2201.7(chokidar@5.0.0))(@angular-devkit/schematics@22.1.7(chokidar@5.0.0))(vitest@4.1.11)(zone.js@0.16.2)
       '@angular-eslint/eslint-plugin':
-        specifier: ^22.1.0
-        version: 22.1.0(@typescript-eslint/utils@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)
+        specifier: ^22.2.0
+        version: 22.2.0(@typescript-eslint/utils@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)
       '@angular-eslint/eslint-plugin-template':
         specifier: ^22.1.0
         version: 22.1.0(@angular-eslint/template-parser@22.1.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(@typescript-eslint/types@8.68.0)(@typescript-eslint/utils@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)
@@ -250,13 +250,6 @@ packages:
     peerDependencies:
       '@angular-eslint/template-parser': 22.2.0
       '@typescript-eslint/types': ^8.0.0
-      '@typescript-eslint/utils': ^8.0.0
-      eslint: ^9.0.0 || ^10.0.0
-      typescript: '*'
-
-  '@angular-eslint/eslint-plugin@22.1.0':
-    resolution: {integrity: sha512-nRwdbUiW7vF0gbwtxw2hRGPZYZCNWOTLZKw4HM+I37o5YFIA0CFLtbyRKgZWs6JZCIqzTYSwCyKNsW41Qw0FwQ==}
-    peerDependencies:
       '@typescript-eslint/utils': ^8.0.0
       eslint: ^9.0.0 || ^10.0.0
       typescript: '*'
@@ -3777,15 +3770,6 @@ snapshots:
       aria-query: 5.3.2
       axobject-query: 4.1.0
       eslint: 10.9.1(jiti@2.7.0)
-      typescript: 6.0.3
-
-  '@angular-eslint/eslint-plugin@22.1.0(@typescript-eslint/utils@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)':
-    dependencies:
-      '@angular-eslint/bundled-angular-compiler': 22.1.0
-      '@angular-eslint/utils': 22.1.0(@typescript-eslint/utils@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)
-      eslint: 10.9.1(jiti@2.7.0)
-      ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
 
   '@angular-eslint/eslint-plugin@22.2.0(@typescript-eslint/utils@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)':
