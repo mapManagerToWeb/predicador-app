@@ -1,0 +1,163 @@
+import { Component, signal, computed, output, inject, OnInit, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
+import { Router } from '@angular/router';
+import { TerritorioService } from '../../../core/services/territorio';
+import { Profile } from '../../../core/services/profile';
+import { AuthTokenService } from '../../../core/services/auth-token';
+
+const THEME_KEY = 'territory_theme';
+
+@Component({
+  selector: 'app-territory-search',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './territory-search.html',
+  styleUrl: './territory-search.css'
+})
+export class TerritorySearch implements OnInit {
+  private territorioService = inject(TerritorioService);
+  private profileService = inject(Profile);
+  private authToken = inject(AuthTokenService);
+  private router = inject(Router);
+
+  private readonly destroyRef = inject(DestroyRef);
+  private blurTimer: ReturnType<typeof setTimeout> | null = null;
+
+  consultaBusqueda = signal('');
+  todosLosNumeros = signal<number[]>([]);
+  mostrarDropdown = signal(false);
+  cargando = signal(true);
+  isDark = signal(this.loadTheme());
+
+  numerosFiltrados = computed(() => {
+    const consulta = this.consultaBusqueda().trim();
+    const numeros = this.todosLosNumeros();
+    if (!consulta) return numeros;
+
+    const tokens = consulta
+      .split(/[,\s]+/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+
+    if (tokens.length === 0) return numeros;
+
+    const matches = new Set<number>();
+    for (const token of tokens) {
+      for (const n of numeros) {
+        if (n.toString().includes(token)) {
+          matches.add(n);
+        }
+      }
+    }
+    return Array.from(matches).sort((a, b) => a - b);
+  });
+
+  territoriosSeleccionados = computed(() => {
+    const consulta = this.consultaBusqueda().trim();
+    if (!consulta) return [];
+    const tokens = consulta
+      .split(/[,\s]+/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    if (tokens.length === 0) return [];
+
+    const matches = new Set<number>();
+    for (const token of tokens) {
+      for (const n of this.todosLosNumeros()) {
+        if (n.toString() === token) {
+          matches.add(n);
+        }
+      }
+    }
+    return Array.from(matches).sort((a, b) => a - b);
+  });
+
+  seleccionMultiple = computed(() => {
+    const consulta = this.consultaBusqueda().trim();
+    if (!consulta) return false;
+    const tokens = consulta.split(/[,\s]+/).map(t => t.trim()).filter(t => t.length > 0);
+    return tokens.length > 1;
+  });
+
+  territorySelected = output<number[]>();
+
+  ngOnInit(): void {
+    this.applyTheme();
+    void this.loadTerritorios();
+    this.destroyRef.onDestroy(() => {
+      if (this.blurTimer !== null) clearTimeout(this.blurTimer);
+    });
+  }
+
+  async loadTerritorios(): Promise<void> {
+    try {
+      const numeros = await this.territorioService.getNumerosTerritorios();
+      this.todosLosNumeros.set(numeros);
+    } catch {
+      // Error handled silently — territory list stays empty
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  private loadTheme(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(THEME_KEY) === 'dark';
+  }
+
+  private applyTheme(): void {
+    if (typeof document === 'undefined') return;
+    document.documentElement.setAttribute('data-theme', this.isDark() ? 'dark' : 'light');
+  }
+
+  toggleTheme(): void {
+    this.isDark.set(!this.isDark());
+    try {
+      localStorage.setItem(THEME_KEY, this.isDark() ? 'dark' : 'light');
+    } catch {
+      // Storage can be unavailable (private mode); the theme still applies for
+      // the current session.
+    }
+    this.applyTheme();
+  }
+
+  logout(): void {
+    this.profileService.clear();
+    this.authToken.logout();
+    void this.router.navigate(['/login']);
+  }
+
+  onInput(event: Event): void {
+    const valor = (event.target as HTMLInputElement).value;
+    this.consultaBusqueda.set(valor);
+    this.mostrarDropdown.set(valor.length > 0);
+    
+    // Emitir array vacío cuando se limpia la búsqueda para deseleccionar territorios
+    if (valor.trim() === '') {
+      this.territorySelected.emit([]);
+    }
+  }
+
+  onSeleccion(numero: number): void {
+    this.consultaBusqueda.set(numero.toString());
+    this.mostrarDropdown.set(false);
+    this.territorySelected.emit([numero]);
+  }
+
+  onSeleccionMultiple(): void {
+    const seleccionados = this.territoriosSeleccionados();
+    if (seleccionados.length === 0) return;
+    this.mostrarDropdown.set(false);
+    this.territorySelected.emit(seleccionados);
+  }
+
+  onFocus(): void {
+    if (this.consultaBusqueda()) this.mostrarDropdown.set(true);
+  }
+
+  onBlur(): void {
+    if (this.blurTimer !== null) clearTimeout(this.blurTimer);
+    this.blurTimer = setTimeout(() => {
+      this.mostrarDropdown.set(false);
+      this.blurTimer = null;
+    }, 200);
+  }
+}

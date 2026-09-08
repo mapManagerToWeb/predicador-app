@@ -1,0 +1,179 @@
+spring:
+  application:
+    name: api-gateway
+  codec:
+    max-in-memory-size: 10MB
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+    loadbalancer:
+      cache:
+        # No servir listas de instancias vacías/obsoletas durante ~30s+ tras un
+        # re-arranque; el gateway recupera el routing apenas el servicio existe.
+        ttl: 10s
+
+server:
+  port: 8080
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  admin:
+    username: ${ADMIN_USERNAME}
+    password: ${ADMIN_PASSWORD:}
+    password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
+  session:
+    secret: ${SESSION_SECRET}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+    strict: ${SESSION_STRICT:true}
+    cookie-secure: ${SESSION_COOKIE_SECURE:false}
+  csrf:
+    cookie-secure: ${CSRF_COOKIE_SECURE:false}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+    # Detecta re-registros de territorios/reporting antes (default 30s): reduce
+    # la ventana de arranque en frío en la que el LB no encuentra instancia.
+    registry-fetch-interval-seconds: 10
+  instance:
+    prefer-ip-address: true
+
+management:
+  server:
+    port: 8090
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,circuitbreakers,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      access: unrestricted
+  metrics:
+    tags:
+      application: api-gateway
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        spring.cloud.gateway.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        spring.cloud.gateway.requests: 0.5, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+
+otel:
+  service:
+    name: api-gateway
+  logs:
+    exporter: none
+  metrics:
+    exporter: none
+  traces:
+    exporter: none
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      territoryCB-colors:
+        base-config: default
+      territoryCB-geojson:
+        base-config: default
+      territoryCB-default:
+        base-config: default
+      reportingCB:
+        base-config: default
+      encargadosCB:
+        base-config: default
+      rumCB:
+        base-config: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 5s
+        cancel-running-future: true
+    instances:
+      territoryCB-colors:
+        base-config: default
+      territoryCB-geojson:
+        base-config: default
+      territoryCB-default:
+        base-config: default
+      reportingCB:
+        timeout-duration: 20s
+        cancel-running-future: true
+      encargadosCB:
+        timeout-duration: 10s
+        cancel-running-future: true
+      rumCB:
+        base-config: default
+
+---
+# Profile: observability — enables OTLP trace export to collector.
+spring:
+  config:
+    activate:
+      on-profile: observability
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+otel:
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}
+      protocol: http/protobuf
+  traces:
+    exporter: otlp
+
+---
+# Profile: prod — conservative sampling, stricter health details, secure cookies.
+spring:
+  config:
+    activate:
+      on-profile: prod
+app:
+  session:
+    cookie-secure: ${SESSION_COOKIE_SECURE:true}
+  csrf:
+    cookie-secure: ${CSRF_COOKIE_SECURE:true}
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  endpoint:
+    health:
+      show-details: never
+
+---
+# Profile: local — explicitly permits an unset session secret for local-only use.
+spring:
+  config:
+    activate:
+      on-profile: local
+app:
+  admin:
+    username: ${ADMIN_USERNAME:}
+    password: ${ADMIN_PASSWORD:}
+    password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
+  session:
+    secret: ${SESSION_SECRET:}
+    strict: false

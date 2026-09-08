@@ -1,0 +1,84 @@
+# Local development defaults. When config-server is running it overrides
+# most of these values via the remote api-gateway.yml.
+spring:
+  application:
+    name: api-gateway
+
+app:
+  admin:
+    username: ${ADMIN_USERNAME:}
+    # Preferir ADMIN_PASSWORD_BCRYPT en produccion. ADMIN_PASSWORD queda como
+    # fallback plano solo para desarrollo local.
+    password: ${ADMIN_PASSWORD:}
+    password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,https://shus3z-ip-191-116-92-175.tunnelmole.net}
+  session:
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+    strict: ${SESSION_STRICT:true}
+    cookie-secure: ${SESSION_COOKIE_SECURE:false}
+  csrf:
+    cookie-secure: ${CSRF_COOKIE_SECURE:false}
+
+server:
+  port: 8080
+
+management:
+  server:
+    port: 8090
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+otel:
+  traces:
+    exporter: none
+  metrics:
+    exporter: none
+  logs:
+    exporter: none
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+---
+# Profile: observability — enables OTLP trace export to collector.
+spring:
+  config:
+    activate:
+      on-profile: observability
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+otel:
+  traces:
+    exporter: otlp
+
+---
+# Profile: prod — conservative sampling, stricter health details, secure cookies.
+spring:
+  config:
+    activate:
+      on-profile: prod
+app:
+  session:
+    cookie-secure: ${SESSION_COOKIE_SECURE:true}
+  csrf:
+    cookie-secure: ${CSRF_COOKIE_SECURE:true}
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  endpoint:
+    health:
+      show-details: never

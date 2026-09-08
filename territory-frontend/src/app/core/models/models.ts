@@ -1,0 +1,82 @@
+export interface UserProfile {
+  name: string;
+  lastName: string;
+  avatar: number;
+  telefono?: string;
+  encargadoId?: number;
+}
+
+export type EstadoReporte = 'completed' | 'incomplete';
+export type TipoSesion = 'completa' | 'parcial';
+
+export interface Reporte {
+  id: number;
+  manzanaId: string | null;
+  fecha: string;
+  encargadoId: number;
+  encargadoNombre: string;
+  encargadoApellido: string;
+  sessionTime: string;
+  estado: EstadoReporte;
+  territorioNumero: number;
+  totalManzanas: number;
+  manzanasMarcadas: number;
+  tipoSesion: TipoSesion;
+  geometriaParcial: string | null;
+  puntosParciales: string | null;
+  manzanasIds: string | null;
+}
+
+export interface RegistroReporte {
+  territorioNumero: number;
+  manzanaId: string | null;
+  encargadoId: number | null;
+  encargadoNombre: string;
+  encargadoApellido: string;
+  sessionTime: string;
+  estado: EstadoReporte;
+  totalManzanas: number;
+  manzanasMarcadas: number;
+  tipoSesion: TipoSesion;
+  geometriaParcial?: string | null;
+  puntosParciales?: string | null;
+  manzanasIds?: string | null;
+}
+
+export interface TerritorioReporteEnvio {
+  numero: number;
+  finalizado: boolean;
+  totalManzanas: number;
+  manzanasMarcadas: number;
+}
+
+export interface TerritoriosEnvio {
+  territorios: TerritorioReporteEnvio[];
+  /** false cuando es un único territorio completado: se usa la imagen oficial. */
+  requiereScreenshot: boolean;
+}
+
+export interface WhatsAppSendRequest {
+  encargadoNombre: string;
+  encargadoApellido: string;
+  fechaRegistro: string;
+  predicacion: string;
+  territorios: TerritorioReporteEnvio[];
+  screenshotBase64: string | null;
+  destinationNumber: string | null;
+}
+
+export interface WhatsAppSendResponse {
+  success: boolean;
+  messageId: string | null;
+  error: string | null;
+}
+
+export type WhatsAppDeliveryStatus = 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED';
+
+export interface WhatsAppDeliveryDto {
+  idempotencyKey: string;
+  status: WhatsAppDeliveryStatus;
+  messageId: string | null;
+  error: string | null;
+}

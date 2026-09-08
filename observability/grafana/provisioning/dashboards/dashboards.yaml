@@ -1,0 +1,13 @@
+# Auto-provisioned dashboard folders.
+apiVersion: 1
+
+providers:
+  - name: Predicador
+    orgId: 1
+    folder: Predicador
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

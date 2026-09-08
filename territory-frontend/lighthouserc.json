@@ -1,0 +1,33 @@
+# Lighthouse CI configuration.
+#
+# Run: npx lhci autorun --config=lighthouserc.json
+# Or:  npx lhci collect --config=lighthouserc.json && npx lhci assert
+
+{
+  "ci": {
+    "collect": {
+      "url": ["http://localhost:4200"],
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--no-sandbox --headless"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.7 }],
+        "categories:accessibility": ["warn", { "minScore": 0.8 }],
+        "categories:best-practices": ["warn", { "minScore": 0.8 }],
+        "categories:seo": ["warn", { "minScore": 0.7 }],
+        "first-contentful-paint": ["error", { "maxNumericValue": 3000 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 4000 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.25 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 5000 }]
+      }
+    },
+    "upload": {
+      "target": " lhci",
+      "serverBaseUrl": "http://localhost:9001"
+    }
+  }
+}

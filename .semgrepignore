@@ -1,0 +1,22 @@
+# Semgrepignore v2 (sintaxis similar a .gitignore).
+# Reutiliza los patrones del .gitignore del repo para no duplicarlos.
+:include .gitignore
+
+# Artefactos y dependencias del backend (Maven)
+backend/**/target/
+
+# Artefactos y dependencias del frontend (Angular/pnpm)
+territory-frontend/**/node_modules/
+territory-frontend/**/dist/
+territory-frontend/**/.angular/
+territory-frontend/**/coverage/
+
+# Datos de prueba y archivos geoestáticos (no son código)
+**/*.geojson
+territory-frontend/src/environments/
+
+# Otros artefactos ignorados por tooling
+.semgrep/
+.venv/
+venv/
+.sage/

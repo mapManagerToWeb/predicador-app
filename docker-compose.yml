@@ -1,0 +1,265 @@
+services:
+  config-server:
+    build:
+      context: ./backend
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    expose:
+      - "8888"
+    environment:
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      # El config-server materializa placeholders como ${SESSION_SECRET} en
+      # los YAML servidos. Pasar el valor aquí es lo que hace que los servicios
+      # downstream (gateway, reporting, territory) reciban el secret propagado.
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_STRICT=${SESSION_STRICT:-true}
+      - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      # El config-server sirve config desde classpath (perfil `native`).
+      # Un SPRING_PROFILES_ACTIVE vacío (default de ${VAR:-}) sobreescribiría
+      # ese perfil y haría que intente usar un repo git sin uri. Default nativo.
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-native}
+      # Igual con las credenciales admin, que hoy se resuelven al arrancar el
+      # gateway pero el config-server también las sirve como overlay opcional.
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
+      # Protege los documentos de configuración. Si se definen, el config-server
+      # exige HTTP Basic auth y los servicios downstream deben enviarlos.
+      - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  discovery-server:
+    build:
+      context: ./backend
+      dockerfile: discovery-server/Dockerfile
+    container_name: discovery-server
+    expose:
+      - "8761"
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8761/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    expose:
+      - "8090"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      # BCrypt es obligatorio fuera de local; plaintext sólo se usa con perfil local.
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD_BCRYPT=${ADMIN_PASSWORD_BCRYPT:-}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200,https://shus3z-ip-191-116-92-175.tunnelmole.net}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
+      # HMAC secret compartido con reporting-service para emitir/verificar tokens.
+      # El secret es obligatorio para evitar iniciar servicios sin enforcement.
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
+      # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
+      # Para activar tracing con el colector, levantar con el perfil observability
+      # y exportar en el shell del host:
+      #   export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      #   export OTEL_TRACES_EXPORTER=otlp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8090/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  territory-service:
+    build:
+      context: ./backend
+      dockerfile: territory-service/Dockerfile
+    container_name: territory-service
+    expose:
+      - "8081"
+      - "8091"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      # Debe coincidir con el api-gateway y reporting-service: mismo HMAC
+      # secret para poder verificar los tokens que emiten los otros servicios.
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
+      # RabbitMQ configuration
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      # Si el config-server exige auth, enviar las mismas credenciales.
+      - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  reporting-service:
+    build:
+      context: ./backend
+      dockerfile: reporting-service/Dockerfile
+    container_name: reporting-service
+    expose:
+      - "8082"
+      - "8092"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-asignacion_territorio}
+      - WHATSAPP_DESTINATION=${WHATSAPP_DESTINATION:-}
+      # Debe coincidir con el api-gateway para que los tokens que éste emite
+      # sean verificables aquí cuando activemos enforcement server-side.
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      # RabbitMQ configuration
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      # Si el config-server exige auth, enviar las mismas credenciales.
+      - CONFIG_SERVER_USERNAME=${CONFIG_SERVER_USERNAME:-}
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:4.3.4-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # --------------------------------------------------------------------------
+  # Observability stack. Activado con:
+  #   docker-compose --profile observability up -d
+  #
+  # No arranca por defecto para no gastar RAM en desarrollo cotidiano.
+  # Puertos expuestos:
+  #   - Prometheus  :9090
+  #   - Grafana     :3000  (admin / admin)
+  #   - Jaeger UI   :16686
+  #   - OTel Collector debug metrics :8888 (colisiona con config-server; usa red interna)
+  # --------------------------------------------------------------------------
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.109.0
+    container_name: otel-collector
+    profiles: [observability]
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC — localhost only
+      - "127.0.0.1:4318:4318"   # OTLP HTTP — localhost only
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    container_name: jaeger
+    profiles: [observability]
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "127.0.0.1:16686:16686"  # UI — localhost only
+      - "127.0.0.1:14268:14268"  # legacy thrift receiver — localhost only
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    profiles: [observability]
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  rabbitmq_data:

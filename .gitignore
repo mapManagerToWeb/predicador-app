@@ -1,0 +1,67 @@
+# Backend
+**/target/
+*.class
+*.jar
+*.war
+
+# Frontend
+**/node_modules/
+**/dist/
+**/.angular/
+**/coverage/
+# pnpm es el único package manager (package.json pinnea pnpm@9.15.0); el
+# lockfile de npm no debe volver a commitearse.
+**/package-lock.json
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+.factorypath
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+*.env
+application-local.yml
+
+# SonarQube
+.scannerwork/
+
+# Qodo
+.qodo/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test outputs
+**/surefire-reports/
+**/failsafe-reports/
+
+# Build artifacts
+**/build/
+
+# AI tooling (local only, not part of the shared repo)
+.agents/
+.claude/
+.opencode/
+.superpowers/
+docs/
+
+# AI-generated scaffolding (unwired placeholders, not part of the app)
+predicador-frontend/src/app/whatsapp-simulation/
+predicador-frontend/src/app/core/services/pending-reports-queue.ts
+backend/reporting-service/src/main/java/com/predicador/reporting/dto/EncargadoBuscarCrearRequest.java
+
+# Local linked worktrees
+.worktrees/

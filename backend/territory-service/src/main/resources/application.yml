@@ -1,0 +1,166 @@
+spring:
+  application:
+    name: territory-service
+  config:
+    import: "optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}"
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USERNAME:}
+      password: ${CONFIG_SERVER_PASSWORD:}
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/predicador}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
+    hikari:
+      minimum-idle: 1
+      idle-timeout: 30000
+      maximum-pool-size: 3
+      max-lifetime: 300000
+  cache:
+    type: caffeine
+    cache-names:
+      - territory-numbers
+      - geojson-all
+      - geojson-one
+      - territory-colors
+    metrics:
+      enabled: true
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    hibernate:
+      # Flyway gestiona el esquema; `none` evita que Hibernate valide antes de
+      # que Flyway migre (en Spring Boot 4 el EntityManagerFactory se crea
+      # antes que el initializer de Flyway).
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    # Tabla de historial propia: territory-service y reporting-service comparten
+    # base de datos (Neon) pero versionan sus migraciones por separado. Sin esta
+    # tabla dedicada, la migración V1 (índices de manzanas) colisionaría con la
+    # V1 de reporting (índices de reportes) en el mismo historial.
+    table: flyway_schema_history_territory
+    # Conexión directa (sin -pooler): Flyway necesita operaciones de sesión que
+    # PgBouncer en modo transacción no soporta (prepared statements, SET, DDL).
+    url: ${DB_URL_UNPOOLED:${DB_URL:jdbc:postgresql://localhost:5432/predicador}}
+    user: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
+
+server:
+  port: 8081
+  compression:
+    enabled: true
+    mime-types: text/plain,application/json
+    min-response-size: 1024
+
+management:
+  server:
+    port: 8091
+  health:
+    # Desactivar DataSourceHealthIndicator para que los health checks no
+    # ejecuten SELECT 1 contra la DB, lo que abriría conexiones y mantendría
+    # Neon despierto.
+    db:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    prometheus:
+      access: unrestricted
+  metrics:
+    tags:
+      application: territory-service
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    # Usar /actuator/info en vez de /actuator/health para evitar que Eureka
+    # abra conexiones a la DB en cada heartbeat (cada 30s), lo que impide
+    # que Neon suspenda compute.
+    health-check-url-path: /actuator/info
+
+app:
+  session:
+    secret: ${SESSION_SECRET:}
+    ttl-hours: ${SESSION_TTL_HOURS:12}
+    strict: ${SESSION_STRICT:true}
+
+otel:
+  service:
+    name: territory-service
+  traces:
+    exporter: none
+  logs:
+    exporter: none
+  metrics:
+    exporter: none
+
+---
+# Profile: observability — enables OTLP trace export to collector.
+spring:
+  config:
+    activate:
+      on-profile: observability
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+otel:
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}
+      protocol: http/protobuf
+  traces:
+    exporter: otlp
+
+---
+# Profile: prod — conservative sampling, stricter health details.
+spring:
+  config:
+    activate:
+      on-profile: prod
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  endpoint:
+    health:
+      show-details: never

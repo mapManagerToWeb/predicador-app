@@ -1,0 +1,70 @@
+<div class="auth-shell">
+  <div class="auth-scroll">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-icon">
+          <img src="logo.jpeg" alt="Territory Logo" width="48" height="48" loading="lazy" />
+        </div>
+        <h1>Territory</h1>
+        <p class="tagline">Gestion de territorios</p>
+      </div>
+
+      <div class="auth-body">
+        <p class="section-label">Inicia sesion con tu telefono</p>
+
+        <div class="field">
+          <label for="telefono">Telefono</label>
+          <div class="input-phone">
+            <span class="prefix">+56</span>
+            <input
+              id="telefono"
+              type="tel"
+              inputmode="numeric"
+              [value]="telefono()"
+              (input)="onTelefonoInput($event)"
+              (keyup.enter)="login()"
+              placeholder="9 1234 5678"
+              [disabled]="loading()"
+              autocomplete="tel"
+            />
+          </div>
+        </div>
+
+        <button
+          class="btn-primary"
+          (click)="login()"
+          [disabled]="!telefono() || loading()"
+        >
+          @if (loading()) {
+            <span class="spinner"></span>
+            <span>Conectando...</span>
+          } @else {
+            <span>Conectar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="m12 5 7 7-7 7"/>
+            </svg>
+          }
+        </button>
+      </div>
+
+      <div class="auth-divider">
+        <span>o</span>
+      </div>
+
+      <a routerLink="/map/view" class="btn-view-territories">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/>
+          <line x1="8" y1="2" x2="8" y2="18"/>
+          <line x1="16" y1="6" x2="16" y2="22"/>
+        </svg>
+        <span>Ver Territorios</span>
+      </a>
+
+      <div class="auth-footer">
+        <span>No tienes cuenta?</span>
+        <a routerLink="/profile">Crear perfil</a>
+      </div>
+    </div>
+  </div>
+</div>

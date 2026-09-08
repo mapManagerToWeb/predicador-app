@@ -1,0 +1,96 @@
+<div class="auth-shell">
+  <div class="auth-scroll">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-icon">
+          <img src="logo.jpeg" alt="Territory Logo" width="48" height="48" loading="lazy" />
+        </div>
+        <h1>Bienvenido</h1>
+        <p class="tagline">Crea tu perfil para comenzar</p>
+      </div>
+
+      <div class="auth-body">
+        <div class="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1 max-[360px]:gap-4">
+          <div class="min-w-0 field">
+            <label for="name">Nombre</label>
+            <input
+              id="name"
+              type="text"
+              [value]="name()"
+              (input)="onNameInput($event)"
+              placeholder="Tu nombre"
+              autocomplete="given-name"
+            />
+          </div>
+          <div class="min-w-0 field">
+            <label for="lastName">Apellido</label>
+            <input
+              id="lastName"
+              type="text"
+              [value]="lastName()"
+              (input)="onLastNameInput($event)"
+              placeholder="Tu apellido"
+              autocomplete="family-name"
+            />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="telefono">Telefono</label>
+          <div class="input-phone">
+            <span class="prefix">+56</span>
+            <input
+              id="telefono"
+              type="tel"
+              inputmode="numeric"
+              [value]="telefono()"
+              (input)="onTelefonoInput($event)"
+              placeholder="9 1234 5678"
+              autocomplete="tel"
+            />
+          </div>
+        </div>
+
+        <fieldset class="field">
+          <legend>Avatar</legend>
+          <div class="avatar-grid">
+            @for (avatar of avatars; track avatar.id) {
+              <button
+                class="avatar-btn"
+                [class.selected]="selectedAvatar() === avatar.id"
+                [style.--avatar-color]="avatar.color"
+                (click)="selectAvatar(avatar.id)"
+                type="button"
+                [attr.aria-label]="'Avatar ' + (avatar.id + 1)"
+              >
+                {{ avatar.emoji }}
+              </button>
+            }
+          </div>
+        </fieldset>
+
+        <button
+          class="btn-primary"
+          (click)="save()"
+          [disabled]="!name() || !lastName() || !telefono() || loading()"
+        >
+          @if (loading()) {
+            <span class="spinner"></span>
+            <span>Guardando...</span>
+          } @else {
+            <span>Comenzar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="m12 5 7 7-7 7"/>
+            </svg>
+          }
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        <span>Ya tienes cuenta?</span>
+        <a routerLink="/login">Iniciar sesion</a>
+      </div>
+    </div>
+  </div>
+</div>

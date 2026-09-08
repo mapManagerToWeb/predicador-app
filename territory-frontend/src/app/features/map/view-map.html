@@ -1,0 +1,96 @@
+<div class="view-map-page">
+  <div class="map-container" id="view-map"></div>
+
+  @if (isLoading()) {
+    <div class="loading-overlay" role="status" aria-live="polite">
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <span class="loading-text">Cargando territorios...</span>
+    </div>
+  }
+
+  <div class="top-bar">
+    <div class="search-container">
+      <div class="search-row">
+        <button class="back-btn" (click)="goToLogin()" aria-label="Volver al inicio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
+          </svg>
+        </button>
+        <div class="search-input-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            id="view-territory-search"
+            type="text"
+            class="search-input"
+            placeholder="Buscar territorio..."
+            aria-label="Buscar territorio"
+            [value]="consultaBusqueda()"
+            (input)="onInput($event)"
+            (focus)="onFocus()"
+            (blur)="onBlur()"
+          />
+        </div>
+        <button class="icon-btn" (click)="toggleTheme()" [attr.aria-label]="isDark() ? 'Modo claro' : 'Modo oscuro'">
+          @if (isDark()) {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          }
+        </button>
+      </div>
+
+      @if (mostrarDropdown() && numerosFiltrados().length > 0) {
+        <div class="dropdown">
+          @for (numero of numerosFiltrados(); track numero) {
+            <button class="dropdown-item" (mousedown)="onSeleccion(numero)">
+              Territorio {{ numero }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="map-toggle-satellite"
+    [class.active]="isSatellite()"
+    (click)="toggleSatellite()"
+    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'"
+    [attr.aria-pressed]="isSatellite()"
+  >
+    @if (isSatellite()) {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/>
+      </svg>
+    } @else {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    }
+  </button>
+
+  <div class="view-badge" aria-label="Modo solo lectura">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span>Solo lectura</span>
+  </div>
+</div>
+

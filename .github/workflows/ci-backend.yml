@@ -1,0 +1,90 @@
+name: CI Backend
+
+on:
+  push:
+    branches: [main, chore/production-quality-hardening]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci-backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: predicador
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: predicador_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Docker socket to Testcontainers
+        run: |
+          echo "unix:///var/run/docker.sock" > $HOME/.testcontainers.properties 2>/dev/null || true
+          mkdir -p $HOME/.testcontainers && echo "ryuk.container.image=ghcr.io/testcontainers/ryuk:0.11.0" >> $HOME/.testcontainers.properties
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "25"
+          distribution: temurin
+          cache: maven
+
+      - name: Build and test all modules
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/predicador_test
+          DB_USERNAME: predicador
+          DB_PASSWORD: test
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+          DOCKER_HOST: unix:///var/run/docker.sock
+        run: mvn verify -B
+
+      - name: Upload JaCoCo reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-reports
+          path: backend/**/target/site/jacoco/
+          retention-days: 7
+
+  backup:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump Neon database
+        env:
+          PGDATABASE_URL: ${{ secrets.NEON_DATABASE_URL_DIRECT }}
+        run: |
+          pg_dump "$PGDATABASE_URL" | gzip > predicador-backup-$(date +%Y%m%d-%H%M%S).sql.gz
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: neon-backup-${{ github.run_id }}
+          path: predicador-backup-*.sql.gz
+          retention-days: 30

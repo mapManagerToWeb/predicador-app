@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.predicador</groupId>
+        <artifactId>predicador-backend</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>shared</artifactId>
+    <name>Shared</name>
+    <description>Shared code for Predicador backend services</description>
+
+    <dependencies>
+        <!--
+            spring-boot-starter-web es necesario SÓLO para GlobalExceptionHandler
+            (@RestControllerAdvice de Spring MVC). Se marca <optional> para que
+            no se filtre transitivamente al api-gateway, que corre en WebFlux/
+            Netty y explota si ve Tomcat en el classpath.
+
+            Los servicios MVC (territory-service, reporting-service) ya
+            declaran spring-boot-starter-web por su cuenta, así que no
+            pierden nada con esta marca. El gateway obtiene SessionTokenService
+            (una utilidad pura de dominio) sin arrastrar el módulo web.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Jakarta Annotations for @Nullable (replaces javax.annotation in Java 11+) -->
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+    </dependencies>
+
+</project>

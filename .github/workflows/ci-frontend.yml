@@ -1,0 +1,64 @@
+name: CI Frontend
+
+on:
+  push:
+    branches: [main, chore/production-quality-hardening, feat/redesign]
+    paths:
+      - "territory-frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+  pull_request:
+    branches: [main, feat/redesign]
+    paths:
+      - "territory-frontend/**"
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: territory-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm/action-setup instala la versión declarada en `packageManager`
+      # (pnpm@9.15.0) sin depender de npm.
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: territory-frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        # pnpm 9 no tiene `pnpm ci` (llegó en pnpm 11); el equivalente CI
+        # es `install --frozen-lockfile`, que falla si el lockfile no está
+        # sincronizado con package.json. `--ignore-scripts` evita que se
+        # ejecuten lifecycle scripts de terceros durante la instalación (S6505).
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Type check
+        run: pnpm exec ng build --configuration=production 2>&1 | tee /tmp/build.log
+
+      - name: Test
+        run: pnpm test -- --run --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: territory-frontend/coverage/
+          retention-days: 7
+
+      - name: Build production
+        run: pnpm run build

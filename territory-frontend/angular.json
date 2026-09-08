@@ -1,0 +1,116 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "pnpm",
+    "analytics": false
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "territory-frontend": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:class": {
+          "skipTests": false
+        },
+        "@schematics/angular:component": {
+          "skipTests": false
+        },
+        "@schematics/angular:directive": {
+          "skipTests": false
+        },
+        "@schematics/angular:guard": {
+          "skipTests": false
+        },
+        "@schematics/angular:pipe": {
+          "skipTests": false
+        },
+        "@schematics/angular:resolver": {
+          "skipTests": false
+        },
+        "@schematics/angular:service": {
+          "skipTests": false
+        }
+      },
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "polyfills": [],
+                "styles": ["src/styles.css", "node_modules/leaflet/dist/leaflet.css"],
+            "server": "src/main.server.ts",
+            "outputMode": "server",
+            "security": {
+              "allowedHosts": [
+                "localhost",
+                "127.0.0.1",
+                "shus3z-ip-191-116-92-175.tunnelmole.net"
+              ]
+            },
+            "ssr": {
+              "entry": "src/server.ts"
+            }
+          },
+            "configurations": {
+             "production": {
+               "optimization": true,
+               "sourceMap": false,
+               "allowedCommonJsDependencies": ["leaflet"],
+                "budgets": [
+                  {
+                    "type": "initial",
+                    "maximumWarning": "320kB",
+                    "maximumError": "600kB"
+                  },
+                  {
+                    "type": "anyComponentStyle",
+                    "maximumWarning": "12kB",
+                    "maximumError": "16kB"
+                  }
+                ],
+               "outputHashing": "all",
+               "serviceWorker": "ngsw-config.json"
+             },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json",
+            "allowedHosts": [
+              "localhost",
+              "127.0.0.1",
+              "shus3z-ip-191-116-92-175.tunnelmole.net"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "territory-frontend:build:production"
+            },
+            "development": {
+              "buildTarget": "territory-frontend:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    }
+  }
+}

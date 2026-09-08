@@ -1,0 +1,261 @@
+package com.predicador.reporting.service;
+
+import com.predicador.reporting.client.WhatsAppMediaClient;
+import com.predicador.reporting.client.WhatsAppMessageClient;
+import com.predicador.reporting.client.WhatsAppMessageResponse;
+import com.predicador.reporting.config.WhatsAppProperties;
+import com.predicador.reporting.dto.WhatsAppSendRequest;
+import com.predicador.reporting.dto.WhatsAppSendResponse;
+import com.predicador.reporting.model.WhatsAppDelivery;
+import com.predicador.reporting.repository.WhatsAppDeliveryRepository;
+import com.predicador.shared.util.PhoneUtil;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.time.Duration;
+import java.time.Instant;
+import org.springframework.dao.DataAccessException;
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class ReportSendService {
+
+    private static final Logger log = LoggerFactory.getLogger(ReportSendService.class);
+    private static final Duration DELIVERY_LEASE = Duration.ofMinutes(5);
+    private static final String PARAMETERS = "parameters";
+    private static final String IMAGE = "image";
+    private static final String PARAMETER_NAME = "parameter_name";
+
+    private final ReportMessageService messageService;
+    private final WhatsAppMediaClient mediaClient;
+    private final WhatsAppMessageClient messageClient;
+    private final WhatsAppProperties props;
+    private final WhatsAppDeliveryRepository deliveryRepository;
+    private final TransactionTemplate txTemplate;
+    private final Counter sendTotal;
+    private final Counter sendSuccess;
+    private final Counter sendFailure;
+    private final Timer sendTimer;
+
+    public ReportSendService(
+            ReportMessageService messageService,
+            WhatsAppMediaClient mediaClient,
+            WhatsAppMessageClient messageClient,
+            WhatsAppProperties props,
+            MeterRegistry registry,
+            WhatsAppDeliveryRepository deliveryRepository,
+            TransactionTemplate txTemplate) {
+        this.messageService = messageService;
+        this.mediaClient = mediaClient;
+        this.messageClient = messageClient;
+        this.props = props;
+        this.deliveryRepository = deliveryRepository;
+        this.txTemplate = txTemplate;
+        this.sendTotal = Counter.builder("whatsapp.send.total")
+                .description("Total de mensajes WhatsApp enviados")
+                .register(registry);
+        this.sendSuccess = Counter.builder("whatsapp.send.success")
+                .description("Mensajes WhatsApp enviados exitosamente")
+                .register(registry);
+        this.sendFailure = Counter.builder("whatsapp.send.failure")
+                .description("Mensajes WhatsApp con error")
+                .register(registry);
+        this.sendTimer = Timer.builder("whatsapp.send.duration")
+                .description("Tiempo total de envío WhatsApp")
+                .register(registry);
+    }
+
+    public WhatsAppSendResponse sendReport(WhatsAppSendRequest request) {
+        return sendReport(request, null);
+    }
+
+    public WhatsAppSendResponse sendReport(WhatsAppSendRequest request, String idempotencyKey) {
+        Reservation reservation = reserve(idempotencyKey);
+        if (reservation.replay() != null) return reservation.replay();
+        WhatsAppDelivery delivery = reservation.delivery();
+        long start = System.nanoTime();
+        try {
+            Map<String, String> templateParams = messageService.generarParametrosTemplate(request);
+
+            List<Map<String, Object>> components = new ArrayList<>();
+
+            // Un único territorio completado se anuncia con la imagen por
+            // defecto (link) en lugar de subir la captura: el mensaje es
+            // liviano y no depende de la subida de media a WhatsApp.
+            boolean requiereScreenshot = messageService.requiereScreenshot(request)
+                    && request.screenshotBase64() != null;
+
+            if (requiereScreenshot) {
+                String mediaId = mediaClient.uploadImage(
+                    request.screenshotBase64(), "image/jpeg");
+
+                components.add(Map.of(
+                    "type", "header",
+                    PARAMETERS, List.of(
+                        Map.of(
+                            "type", IMAGE,
+                            IMAGE, Map.of("id", mediaId)
+                        )
+                    )
+                ));
+            } else {
+                components.add(Map.of(
+                    "type", "header",
+                    PARAMETERS, List.of(
+                        Map.of(
+                            "type", IMAGE,
+                            IMAGE, Map.of("link", props.defaultImageUrl())
+                        )
+                    )
+                ));
+            }
+
+            List<Map<String, Object>> bodyParams = List.of(
+                Map.of("type", "text", PARAMETER_NAME, "fecha_registro",
+                       "text", templateParams.get("fecha")),
+                Map.of("type", "text", PARAMETER_NAME, "nombre_encargado",
+                       "text", templateParams.get("encargado")),
+                Map.of("type", "text", PARAMETER_NAME, "numero_territorio",
+                       "text", templateParams.get("territorio")),
+                Map.of("type", "text", PARAMETER_NAME, "detalle_estado",
+                       "text", templateParams.get("estado"))
+            );
+
+            components.add(Map.of("type", "body", PARAMETERS, bodyParams));
+
+            String destination = request.destinationNumber() != null
+                ? PhoneUtil.normalize(request.destinationNumber())
+                : props.destinationNumber();
+
+            WhatsAppMessageResponse response = messageClient.sendTemplateMessage(
+                    destination, props.templateName(), props.languageCode(), components);
+
+            if (response == null || response.stableMessageId() == null || response.stableMessageId().isBlank()) {
+                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                        "WhatsApp devolvió una respuesta sin message id", 502, null);
+            }
+            String messageId = response.stableMessageId();
+            log.info("WhatsApp delivery outcome=success");
+
+            sendTotal.increment();
+            sendSuccess.increment();
+
+            WhatsAppSendResponse result = new WhatsAppSendResponse(true, messageId, null);
+            persistSuccess(delivery, result);
+            return result;
+
+        } catch (com.predicador.reporting.client.WhatsAppIntegrationException e) {
+            sendTotal.increment();
+            sendFailure.increment();
+            log.debug("sendReport error delivery-status={} type={} status={} cause={}",
+                    delivery != null ? delivery.getIdempotencyKey() : "none",
+                    e.getClass().getSimpleName(), e.status(),
+                    e.getCause() != null ? e.getCause().getClass().getSimpleName() : "none");
+            WhatsAppSendResponse result = new WhatsAppSendResponse(false, null, e.getMessage());
+            persistFailure(delivery, result, e.status());
+            throw e;
+        } catch (RuntimeException e) {
+            // Cualquier RuntimeException no-WhatsApp (p.ej. HttpClientErrorException
+            // 4xx de Meta, NetworkException, etc.) que no sea WhatsAppIntegrationException
+            // debe marcarse como FAILED y propagar como 502 para que el caller sepa que
+            // el envío no succeeded y la cola de retry pueda reintentarlo.
+            sendTotal.increment();
+            sendFailure.increment();
+            log.error("sendReport error inesperado type={} cause={}",
+                    e.getClass().getSimpleName(),
+                    e.getCause() != null ? e.getCause().getClass().getSimpleName() : "none", e);
+            WhatsAppSendResponse result = new WhatsAppSendResponse(false, null,
+                    "Error en el envío: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            persistFailure(delivery, result, 502);
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    "Error en el envío WhatsApp", 502, e);
+        } finally {
+            long elapsed = System.nanoTime() - start;
+            sendTimer.record(elapsed, TimeUnit.NANOSECONDS);
+        }
+    }
+
+    Reservation reserve(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) return new Reservation(null, null);
+        Instant now = Instant.now();
+        Optional<WhatsAppDelivery> previous;
+        try {
+            previous = deliveryRepository.findById(idempotencyKey);
+        } catch (DataAccessException exception) {
+            throw databaseFailure(exception);
+        }
+        if (previous.isPresent()) {
+            return resolveExisting(idempotencyKey, previous.get(), now);
+        }
+        try {
+            return new Reservation(deliveryRepository.saveAndFlush(new WhatsAppDelivery(idempotencyKey)), null);
+        } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
+            Optional<WhatsAppDelivery> raced;
+            try {
+                raced = txTemplate.execute(status -> deliveryRepository.findById(idempotencyKey));
+            } catch (DataAccessException exception) {
+                throw databaseFailure(exception);
+            }
+            if (raced.isEmpty()) throw databaseFailure(duplicate);
+            return resolveExisting(idempotencyKey, raced.get(), now);
+        } catch (DataAccessException exception) {
+            throw databaseFailure(exception);
+        }
+    }
+
+    private Reservation resolveExisting(String idempotencyKey, WhatsAppDelivery delivery, Instant now) {
+        if (delivery.isCompleted()) return new Reservation(delivery, replay(delivery));
+        if (delivery.isLeaseActive(now)) {
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    "El envío con esta clave está en progreso", 409, null);
+        }
+        try {
+            if (deliveryRepository.claimStale(idempotencyKey,
+                    com.predicador.reporting.model.WhatsAppDeliveryStatus.IN_PROGRESS,
+                    now, now.plus(DELIVERY_LEASE)) != 1) {
+                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                        "No se pudo reservar el envío", 409, null);
+            }
+        } catch (DataAccessException exception) {
+            throw databaseFailure(exception);
+        }
+        delivery.renewLease(now.plus(DELIVERY_LEASE));
+        return new Reservation(delivery, null);
+    }
+
+    private com.predicador.reporting.client.WhatsAppIntegrationException databaseFailure(Exception exception) {
+        return new com.predicador.reporting.client.WhatsAppIntegrationException(
+                "No se pudo reservar el envío por un error de persistencia", 503, exception);
+    }
+
+    private void persistSuccess(WhatsAppDelivery delivery, WhatsAppSendResponse result) {
+        if (delivery == null) return;
+        delivery.markSucceeded(result.messageId());
+        deliveryRepository.save(delivery);
+    }
+
+    private void persistFailure(WhatsAppDelivery delivery, WhatsAppSendResponse result, int status) {
+        if (delivery == null) return;
+        delivery.markFailed(result.error(), status);
+        deliveryRepository.save(delivery);
+    }
+
+    private WhatsAppSendResponse replay(WhatsAppDelivery delivery) {
+        if (delivery.getStatus() == com.predicador.reporting.model.WhatsAppDeliveryStatus.FAILED) {
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    delivery.getError(), delivery.getStatusCode() == null ? 502 : delivery.getStatusCode(), null);
+        }
+        return new WhatsAppSendResponse(true, delivery.getMessageId(), null);
+    }
+
+    private record Reservation(WhatsAppDelivery delivery, WhatsAppSendResponse replay) {}
+}

@@ -1,0 +1,127 @@
+# Prometheus alert rules for Predicador microservices.
+#
+# These fire when Prometheus evaluates the condition for the specified
+# duration, then routes the alert to Alertmanager (if deployed) or simply
+# makes it visible in the Prometheus UI / Grafana.
+
+groups:
+  - name: predicador_service_health
+    rules:
+      # ── Availability ──────────────────────────────────────────────
+      - alert: ServiceDown
+        expr: up{job=~".*service|.*gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "{{ $labels.instance }} has been unreachable for >1 min."
+
+      - alert: HighErrorRate
+        expr: |
+          sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+          /
+          sum by (application) (rate(http_server_requests_seconds_count[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.application }}"
+          description: ">{{ $value | humanizePercentage }} of requests are failing (threshold 5%)."
+
+      # ── Latency ──────────────────────────────────────────────────
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, application) (rate(http_server_requests_seconds_bucket[5m]))
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency > 2s on {{ $labels.application }}"
+          description: "Current P95 is {{ $value | humanizeDuration }}."
+
+      # ── Circuit Breaker ──────────────────────────────────────────
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is OPEN"
+          description: "Requests to this backend are being short-circuited."
+
+      # ── JVM / GC ────────────────────────────────────────────────
+      - alert: HighHeapUsage
+        expr: |
+          sum by (application) (jvm_memory_used_bytes{area="heap"})
+          /
+          sum by (application) (jvm_memory_max_bytes{area="heap"})
+          > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Heap usage > 85% on {{ $labels.application }}"
+          description: "Current usage: {{ $value | humanizePercentage }}."
+
+      - alert: FrequentFullGC
+        expr: rate(jvm_gc_pause_seconds_sum{action="end of minor GC"}[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frequent GC pauses on {{ $labels.application }}"
+          description: "GC pause rate: {{ $value }}s/s."
+
+  - name: predicador_business
+    rules:
+      # ── WhatsApp ─────────────────────────────────────────────────
+      - alert: WhatsAppSendFailureRateHigh
+        expr: |
+          rate(whatsapp_send_failure_total[5m])
+          /
+          rate(whatsapp_send_total[5m])
+          > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WhatsApp send failure rate > 10%"
+          description: "Current failure rate: {{ $value | humanizePercentage }}."
+
+      # ── RUM ingestion ───────────────────────────────────────────
+      - alert: RUMIngestionStalled
+        expr: rate(web_vitals_seconds_count[5m]) == 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "No RUM metrics received for 15 minutes"
+          description: "Either no users are active or the RUM pipeline is broken."
+
+  - name: predicador_infrastructure
+    rules:
+      # ── Database ─────────────────────────────────────────────────
+      - alert: DataSourceConnectionPoolExhausted
+        expr: |
+          hikaricp_connections_active
+          / hikaricp_connections_max > 0.9
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HikariCP pool > 90% utilized on {{ $labels.application }}"
+          description: "Connection pool exhaustion risk."
+
+      # ── Prometheus self-monitoring ────────────────────────────────
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scrape target {{ $labels.job }} is down"
+          description: "{{ $labels.instance }} unreachable."
