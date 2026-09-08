@@ -1,7 +1,10 @@
 export const DEDUP_THRESHOLD_PX = 2;
 export const MAX_PUNTOS_PARCIAL = 6;
 export const LABEL_MIN_ZOOM = 14;
+<<<<<<< HEAD
 export const MOVEEND_THROTTLE_MS = 150;
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
 export const MAX_TILE_WAIT_MS = typeof navigator !== 'undefined' &&
   /AppleWebKit/.test(navigator.userAgent) &&
   !/(Chrome|CriOS)/.test(navigator.userAgent)

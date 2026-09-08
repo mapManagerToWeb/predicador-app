@@ -10,10 +10,13 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client,
   },
   {
+<<<<<<< HEAD
     path: 'map/view',
     renderMode: RenderMode.Client,
   },
   {
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
     path: 'map',
     renderMode: RenderMode.Client,
   },

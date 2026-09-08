@@ -6,7 +6,11 @@ import { DraftMarksService } from '../../../core/services/map-draft';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+<<<<<<< HEAD
 import { TOAST_MESSAGES, MOVEEND_THROTTLE_MS } from '../utils/map-constants';
+=======
+import { TOAST_MESSAGES } from '../utils/map-constants';
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
 import type { MapDraft } from '../../../core/services/map-draft';
 import type { Reporte } from '../../../core/models/models';
 import type { FeatureLayer } from '../types/map.types';
@@ -20,8 +24,11 @@ export class MapInitializationService {
   private readonly toastService = inject(Toast);
   private readonly draftService = inject(DraftMarksService);
 
+<<<<<<< HEAD
   private moveEndTimer: ReturnType<typeof setTimeout> | null = null;
 
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
   async initialize(el: HTMLElement, onMapClick: (e: L.LeafletMouseEvent) => void): Promise<void> {
     this.rendering.initializeMap(el);
     const map = this.rendering.getMap();
@@ -42,11 +49,16 @@ export class MapInitializationService {
 
     map.on('click', onMapClick);
     map.on('zoomend', () => this.rendering.updateLabelsVisibility());
+<<<<<<< HEAD
     map.on('moveend', () => this.throttledMoveEnd());
+=======
+    map.on('moveend', () => this.onMoveEnd());
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
 
     await this.loadAllTerritories();
   }
 
+<<<<<<< HEAD
   /** Throttle moveend to avoid excessive recalculations during continuous pan. */
   private throttledMoveEnd(): void {
     if (this.moveEndTimer !== null) return;
@@ -56,6 +68,8 @@ export class MapInitializationService {
     }, MOVEEND_THROTTLE_MS);
   }
 
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
   private async loadAllTerritories(): Promise<void> {
     if (this.state.isLoading()) return;
     this.state.isLoading.set(true);
@@ -64,7 +78,11 @@ export class MapInitializationService {
       await this.reconciliarCaches();
       await this.loadTerritoriesWithRetry();
       this.onMoveEnd();
+<<<<<<< HEAD
       this.deferRestoreMarks();
+=======
+      await this.restoreAllMarks();
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
     } catch {
       this.toastService.show(TOAST_MESSAGES.loadError);
     } finally {
@@ -73,6 +91,7 @@ export class MapInitializationService {
   }
 
   /**
+<<<<<<< HEAD
    * Defers the heavy mark restoration to an idle callback so it does not block
    * the first interactive render of the map.
    */
@@ -86,6 +105,8 @@ export class MapInitializationService {
   }
 
   /**
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
    * Detecta territorios borrados en el backend y poda los caches del navegador
    * (reportes en localStorage + snapshot de GeoJSON en sessionStorage) para que
    * el mapa vuelva a la normalidad sin recargar a mano. Best-effort: si no hay

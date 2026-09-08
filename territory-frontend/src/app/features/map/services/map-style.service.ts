@@ -116,7 +116,11 @@ export class MapStyleService implements OnDestroy {
     marcadasCount: number,
     options: { total?: number; isComplete?: boolean } = {}
   ): void {
+<<<<<<< HEAD
     const total = options.total ?? this.countByTerritorio(manzanaIndex, territorioNumero);
+=======
+    const total = options.total ?? manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
     const isComplete = options.isComplete ?? (total > 0 && marcadasCount >= total);
     const style = getBaseTerritoryStyle(color, isComplete);
 
@@ -132,6 +136,7 @@ export class MapStyleService implements OnDestroy {
     manzanasMarcadas: ManzanaMarcada[],
     territorioNumeros: number[]
   ): void {
+<<<<<<< HEAD
     // Pre-build a by-territory index for marked blocks so the inner loop is O(1)
     const marcadasByTerritorio = new Map<number, ManzanaMarcada[]>();
     for (const m of manzanasMarcadas) {
@@ -143,10 +148,13 @@ export class MapStyleService implements OnDestroy {
       list.push(m);
     }
 
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
     for (const num of territorioNumeros) {
       const featureLayer = allTerritoriesLayer.find(f => f.territorioPadre === num);
       if (!featureLayer) continue;
 
+<<<<<<< HEAD
       const total = this.countByTerritorio(manzanaIndex, num);
       const marcadasList = marcadasByTerritorio.get(num) ?? [];
       const isComplete = total > 0 && marcadasList.length >= total;
@@ -154,12 +162,23 @@ export class MapStyleService implements OnDestroy {
       this.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
 
       for (const m of marcadasList) {
+=======
+      const total = manzanaIndex.filter(m => m.territorioNumero === num).length;
+      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num).length;
+      const isComplete = total > 0 && marcadas >= total;
+
+      this.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
+
+      const marcadasLayers = manzanasMarcadas.filter(m => m.territorioNumero === num);
+      for (const m of marcadasLayers) {
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
         const layer = this.registry.get(m.id);
         if (layer) layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
       }
     }
   }
 
+<<<<<<< HEAD
   /** Cached per-territory counts to avoid repeated O(n) .filter() scans. */
   private countByTerritorio(manzanaIndex: Array<{ territorioNumero: number }>, num: number): number {
     let count = 0;
@@ -169,6 +188,8 @@ export class MapStyleService implements OnDestroy {
     return count;
   }
 
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
   limpiarMarcasVisuales(allTerritoriesLayer: FeatureLayer[]): void {
     for (const fl of allTerritoriesLayer) {
       this.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(fl.color, false));

@@ -12,10 +12,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/profile/profile').then(m => m.ProfilePage)
   },
   {
+<<<<<<< HEAD
     path: 'map/view',
     loadComponent: () => import('./features/map/view-map').then(m => m.ViewMapPage)
   },
   {
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
     path: 'map',
     loadComponent: () => import('./features/map/map').then(m => m.MapPage),
     canActivate: [profileGuard]

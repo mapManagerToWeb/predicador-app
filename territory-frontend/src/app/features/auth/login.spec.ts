@@ -120,6 +120,7 @@ describe('LoginPage', () => {
     expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('iniciar sesión'), 3000, 'error');
     expect(component.loading()).toBe(false);
   });
+<<<<<<< HEAD
 
   it('renders link to /map/view in template', () => {
     fixture.detectChanges();
@@ -128,4 +129,6 @@ describe('LoginPage', () => {
     expect(viewTerritoriesLink).toBeTruthy();
     expect(viewTerritoriesLink?.getAttribute('routerLink') || viewTerritoriesLink?.getAttribute('href')).toMatch(/(\/map\/view|map\/view)/);
   });
+=======
+>>>>>>> f993952e61d8c718f69929c1211e5322269167d3
 });
