@@ -101,7 +101,7 @@ describe('ProfilePage', () => {
       name: 'Daniel',
       lastName: 'Uribe',
       avatar: 3,
-      telefono: '56912345678',
+      telefono: '+56912345678',
       encargadoId: 7,
     });
     expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('exitosamente'), 2000, 'success');
@@ -121,7 +121,7 @@ describe('ProfilePage', () => {
       name: 'Daniel',
       lastName: 'Uribe',
       avatar: 0,
-      telefono: '56912345678',
+      telefono: '+56912345678',
     });
     expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('guardado localmente'), 3000, 'warning');
     expect(router.navigate).toHaveBeenCalledWith(['/map']);
