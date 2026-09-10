@@ -35,7 +35,10 @@ const gatewayUrl = process.env['GATEWAY_URL'] || 'http://localhost:8080';
  * touching code.
  */
 const allowedHosts =
-  process.env['NG_ALLOWED_HOSTS']?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+  process.env['NG_ALLOWED_HOSTS']?.split(',').map((s) => s.trim()).filter(Boolean) ?? [
+    'localhost',
+    '127.0.0.1',
+  ];
 const angularApp = new AngularNodeAppEngine({ allowedHosts });
 
 /**

@@ -54,8 +54,7 @@
             "security": {
               "allowedHosts": [
                 "localhost",
-                "127.0.0.1",
-                "shus3z-ip-191-116-92-175.tunnelmole.net"
+                "127.0.0.1"
               ]
             },
             "ssr": {
@@ -96,8 +95,7 @@
             "proxyConfig": "proxy.conf.json",
             "allowedHosts": [
               "localhost",
-              "127.0.0.1",
-              "shus3z-ip-191-116-92-175.tunnelmole.net"
+              "127.0.0.1"
             ]
           },
           "configurations": {
