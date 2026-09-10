@@ -64,7 +64,7 @@ describe('elegirUltimoReporte', () => {
 
 describe('getTerritoryFillOpacity', () => {
   it('should return slightly reduced opacity for complete territories', () => {
-    expect(getTerritoryFillOpacity(true)).toBe(0.85);
+    expect(getTerritoryFillOpacity(true)).toBe(0.6);
   });
 
   it('should return low opacity for incomplete territories', () => {

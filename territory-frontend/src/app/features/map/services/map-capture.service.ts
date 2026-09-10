@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { Map as LeafletMap, Path, Polygon, Marker, LatLngBounds } from 'leaflet';
 import { MAP_DEFAULTS } from '../utils/map-constants';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
@@ -31,7 +31,7 @@ export class MapCaptureService {
    * Returns when every <img> in the tile pane has complete=true,
    * or after MAX_TILE_WAIT_MS (whichever comes first).
    */
-  waitForTiles(map: L.Map): Promise<void> {
+  waitForTiles(map: LeafletMap): Promise<void> {
     const container = map.getContainer();
     const tiles = Array.from(
       container.querySelectorAll('.leaflet-tile-pane img')
@@ -88,7 +88,7 @@ export class MapCaptureService {
     if (!map) return Promise.resolve();
 
     const seleccionados = new Set(territoriosSeleccionados);
-    const _markedLayers = new Set<L.Path>(
+    const _markedLayers = new Set<Path>(
       manzanasMarcadas.map(m => this.registry.get(m.id)!).filter(Boolean)
     );
     const allTerritoriesLayer = this.territories.getAllTerritoriesLayer();
@@ -148,14 +148,14 @@ export class MapCaptureService {
     incompletos: Set<number>,
     manzanasMarcadas: ManzanaMarcada[]
   ): void {
-    const markedLayers = new Set<L.Path>(
-      manzanasMarcadas.map(m => this.registry.get(m.id)).filter((l): l is L.Path => Boolean(l))
+    const markedLayers = new Set<Path>(
+      manzanasMarcadas.map(m => this.registry.get(m.id)).filter((l): l is Path => Boolean(l))
     );
 
     for (const fl of allTerritoriesLayer) {
       if (incompletos.has(fl.territorioPadre)) {
         fl.layer.eachLayer(l => {
-          if (!(l instanceof L.Path)) return;
+          if (!(l instanceof Path)) return;
           l.setStyle(markedLayers.has(l) ? getMarkedManzanaStyle(fl.color) : getCaptureIncompleteStyle(fl.color));
         });
       } else {
@@ -185,7 +185,7 @@ export class MapCaptureService {
   private styleTerritoryLayers(
     allTerritoriesLayer: FeatureLayer[],
     seleccionados: Set<number>,
-    markedLayers: Set<L.Path>
+    markedLayers: Set<Path>
   ): void {
     for (const fl of allTerritoriesLayer) {
       if (!seleccionados.has(fl.territorioPadre)) {
@@ -198,13 +198,13 @@ export class MapCaptureService {
 
   private applyHiddenStyle(fl: FeatureLayer): void {
     fl.layer.eachLayer(l => {
-      if (l instanceof L.Path) l.setStyle(getHiddenStyle());
+      if (l instanceof Path) l.setStyle(getHiddenStyle());
     });
   }
 
-  private applySelectionStyle(fl: FeatureLayer, markedLayers: Set<L.Path>): void {
+  private applySelectionStyle(fl: FeatureLayer, markedLayers: Set<Path>): void {
     fl.layer.eachLayer(l => {
-      if (!(l instanceof L.Path)) return;
+      if (!(l instanceof Path)) return;
       const isMarked = markedLayers.has(l);
       l.setStyle(isMarked ? getMarkedManzanaStyle(fl.color) : getCaptureUnmarkedStyle(fl.color));
     });
@@ -221,7 +221,7 @@ export class MapCaptureService {
     }
   }
 
-  private updateLabelVisibility(territoryLabels: L.Marker[], seleccionados: Set<number>): void {
+  private updateLabelVisibility(territoryLabels: Marker[], seleccionados: Set<number>): void {
     for (const lbl of territoryLabels) {
       const el = lbl.getElement();
       if (!el) continue;
@@ -232,7 +232,7 @@ export class MapCaptureService {
   }
 
   private fitBoundsToSelection(
-    map: L.Map,
+    map: LeafletMap,
     seleccionados: Set<number>,
     manzanasMarcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[]
@@ -251,7 +251,7 @@ export class MapCaptureService {
     seleccionados: Set<number>,
     manzanasMarcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[]
-  ): L.LatLngBounds | null {
+  ): LatLngBounds | null {
     let combined = this.getBoundsFromSelectedTerritories(seleccionados, allTerritoriesLayer);
     if (!combined) {
       combined = this.getBoundsFromMarkedManzanas(manzanasMarcadas);
@@ -259,8 +259,8 @@ export class MapCaptureService {
     return combined;
   }
 
-  private getBoundsFromSelectedTerritories(seleccionados: Set<number>, _allTerritoriesLayer: FeatureLayer[]): L.LatLngBounds | null {
-    let combined: L.LatLngBounds | null = null;
+  private getBoundsFromSelectedTerritories(seleccionados: Set<number>, _allTerritoriesLayer: FeatureLayer[]): LatLngBounds | null {
+    let combined: LatLngBounds | null = null;
     for (const num of seleccionados) {
       const fl = this.territories.getFeatureLayerByTerritorio(num);
       if (!fl) continue;
@@ -272,11 +272,11 @@ export class MapCaptureService {
     return combined;
   }
 
-  private getBoundsFromMarkedManzanas(manzanasMarcadas: ManzanaMarcada[]): L.LatLngBounds | null {
-    let combined: L.LatLngBounds | null = null;
+  private getBoundsFromMarkedManzanas(manzanasMarcadas: ManzanaMarcada[]): LatLngBounds | null {
+    let combined: LatLngBounds | null = null;
     for (const m of manzanasMarcadas) {
       const layer = this.registry.get(m.id);
-      if (!(layer instanceof L.Polygon)) continue;
+      if (!(layer instanceof Polygon)) continue;
       const b = layer.getBounds();
       if (b.isValid()) {
         combined = combined ? combined.extend(b) : b;
@@ -303,7 +303,7 @@ export class MapCaptureService {
   private applyVisibilityStyle(fl: FeatureLayer, modoMarcado: string): void {
     const isVisible = modoMarcado === 'none';
     fl.layer.eachLayer(l => {
-      if (l instanceof L.Path) {
+      if (l instanceof Path) {
         l.setStyle(isVisible ? getBaseTerritoryStyle(fl.color, false) : getHiddenStyle());
       }
     });
@@ -311,7 +311,7 @@ export class MapCaptureService {
 
   private applyRestoredSelectionStyle(fl: FeatureLayer, _manzanasMarcadas: ManzanaMarcada[]): void {
     fl.layer.eachLayer(l => {
-      if (!(l instanceof L.Path)) return;
+      if (!(l instanceof Path)) return;
       const isMarked = this.registry.hasLayer(l);
       if (!isMarked) {
         l.setStyle(getBaseTerritoryStyle(fl.color, false));
@@ -319,14 +319,14 @@ export class MapCaptureService {
     });
   }
 
-  private fitBoundsToSelected(map: L.Map, seleccionados: Set<number>, allTerritoriesLayer: FeatureLayer[]): void {
+  private fitBoundsToSelected(map: LeafletMap, seleccionados: Set<number>, allTerritoriesLayer: FeatureLayer[]): void {
     const combined = this.getBoundsFromSelectedTerritories(seleccionados, allTerritoriesLayer);
     if (combined?.isValid()) {
       map.fitBounds(combined, { padding: MAP_DEFAULTS.boundsPadding });
     }
   }
 
-  private restoreLabelVisibility(map: L.Map, territoryLabels: L.Marker[], seleccionados: Set<number>): void {
+  private restoreLabelVisibility(map: LeafletMap, territoryLabels: Marker[], seleccionados: Set<number>): void {
     const zoomVisible = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
     if (seleccionados.size > 0 && zoomVisible) {
       this.showSelectedLabels(territoryLabels, seleccionados);
@@ -335,7 +335,7 @@ export class MapCaptureService {
     }
   }
 
-  private showSelectedLabels(territoryLabels: L.Marker[], seleccionados: Set<number>): void {
+  private showSelectedLabels(territoryLabels: Marker[], seleccionados: Set<number>): void {
     for (const lbl of territoryLabels) {
       const el = lbl.getElement();
       if (!el) continue;
@@ -344,7 +344,7 @@ export class MapCaptureService {
     }
   }
 
-  private showAllLabels(territoryLabels: L.Marker[], zoomVisible: boolean): void {
+  private showAllLabels(territoryLabels: Marker[], zoomVisible: boolean): void {
     for (const lbl of territoryLabels) {
       lbl.setOpacity(zoomVisible ? 1 : 0);
     }

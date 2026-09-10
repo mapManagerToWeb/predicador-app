@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { DomEvent, type LeafletMouseEvent } from 'leaflet';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { DraftMarksService } from '../../../core/services/map-draft';
@@ -20,7 +20,7 @@ export class MapInitializationService {
   private readonly toastService = inject(Toast);
   private readonly draftService = inject(DraftMarksService);
 
-  async initialize(el: HTMLElement, onMapClick: (e: L.LeafletMouseEvent) => void): Promise<void> {
+  async initialize(el: HTMLElement, onMapClick: (e: LeafletMouseEvent) => void): Promise<void> {
     this.rendering.initializeMap(el);
     const map = this.rendering.getMap();
     if (!map) return;
@@ -28,7 +28,7 @@ export class MapInitializationService {
     this.rendering.setManzanaClickHandler((id, nombreBloque, polygon, color, territorioNumero, e) => {
       if (this.state.modoMarcado() !== 'completa') return;
 
-      L.DomEvent.stop(e);
+      DomEvent.stop(e);
       // En modo marcar-completo solo se marcan manzanas de territorios YA
       // seleccionados y nunca se desmarcan: un manzana ya marcada es un no-op,
       // y un click sobre un territorio ajeno lo agregaría a la selección

@@ -1,5 +1,5 @@
 import { Injectable, inject, signal, OnDestroy } from '@angular/core';
-import * as L from 'leaflet';
+import { TileLayer, Control } from 'leaflet';
 import { MAP_DEFAULTS, TILE_LAYERS, ATTRIBUTIONS } from '../utils/map-constants';
 import { MapEngineService } from './map-engine.service';
 
@@ -13,8 +13,8 @@ const SATELLITE_KEY = 'territory_satellite';
  */
 @Injectable({ providedIn: 'root' })
 export class MapTileLayerService implements OnDestroy {
-  private tileLayer = signal<L.TileLayer | null>(null);
-  private satelliteLayer = signal<L.TileLayer | null>(null);
+  private tileLayer = signal<TileLayer | null>(null);
+  private satelliteLayer = signal<TileLayer | null>(null);
   private themeObserver: MutationObserver | null = null;
   private isSatelliteView = false;
 
@@ -25,7 +25,7 @@ export class MapTileLayerService implements OnDestroy {
     if (!map) return;
 
     const theme = this.getCurrentTheme();
-    const tileLayer = L.tileLayer(this.getTileLayerUrl(theme), {
+    const tileLayer = new TileLayer(this.getTileLayerUrl(theme), {
       maxZoom: MAP_DEFAULTS.maxZoom,
       attribution: this.getMapAttribution(theme),
       // CORS limpio para poder dibujar los tiles en el canvas de captura
@@ -33,13 +33,13 @@ export class MapTileLayerService implements OnDestroy {
       crossOrigin: true,
     }).addTo(map);
 
-    const satelliteLayer = L.tileLayer(TILE_LAYERS.satellite, {
+    const satelliteLayer = new TileLayer(TILE_LAYERS.satellite, {
       maxZoom: MAP_DEFAULTS.maxZoom,
       attribution: ATTRIBUTIONS.satellite,
       crossOrigin: true,
     });
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    new Control.Zoom({ position: 'bottomright' }).addTo(map);
 
     this.tileLayer.set(tileLayer);
     this.satelliteLayer.set(satelliteLayer);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Layer, LayerGroup, Polygon } from 'leaflet';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapEngineService } from './map-engine.service';
 import { MapTileLayerService } from './map-tile-layer.service';
@@ -63,14 +63,14 @@ describe('MapRenderingFacade', () => {
 
   describe('extraLayers', () => {
     it('should delegate addExtraLayer to territories', () => {
-      const mockLayer = { addTo: vi.fn() } as unknown as L.Layer;
+      const mockLayer = { addTo: vi.fn() } as unknown as Layer;
       const spy = vi.spyOn(territories, 'addExtraLayer');
       facade.addExtraLayer(mockLayer);
       expect(spy).toHaveBeenCalledWith(mockLayer);
     });
 
     it('should delegate removeExtraLayer to territories', () => {
-      const mockLayer = {} as L.Layer;
+      const mockLayer = {} as Layer;
       const spy = vi.spyOn(territories, 'removeExtraLayer');
       facade.removeExtraLayer(mockLayer);
       expect(spy).toHaveBeenCalledWith(mockLayer);
@@ -112,7 +112,7 @@ describe('MapRenderingFacade', () => {
           eachLayer: vi.fn((cb: (layer: unknown) => void) => {
             cb({ setStyle: vi.fn() });
           }),
-        } as unknown as L.LayerGroup,
+        } as unknown as LayerGroup,
       };
       vi.spyOn(territories, 'getAllTerritoriesLayer').mockReturnValue([fl]);
       vi.spyOn(territories, 'updateLabelsForSelection').mockImplementation(() => {});
@@ -127,7 +127,7 @@ describe('MapRenderingFacade', () => {
     it('re-applies marked styles for all territories and keeps layers visible', () => {
       const registry = TestBed.inject(MapLayerRegistry);
       const styles = TestBed.inject(MapStyleService);
-      const markedPath = new L.Polygon([
+      const markedPath = new Polygon([
         [
           { lat: -1, lng: -1 },
           { lat: 2, lng: -1 },
@@ -144,7 +144,7 @@ describe('MapRenderingFacade', () => {
           eachLayer: vi.fn((cb: (layer: unknown) => void) => {
             cb({ setStyle: vi.fn() });
           }),
-        } as unknown as L.LayerGroup,
+        } as unknown as LayerGroup,
       };
       vi.spyOn(territories, 'getAllTerritoriesLayer').mockReturnValue([fl]);
       vi.spyOn(territories, 'getFeatureLayerByTerritorio').mockReturnValue(fl);

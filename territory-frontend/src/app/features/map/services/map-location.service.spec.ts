@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { CircleMarker, Circle, LayerGroup } from 'leaflet';
 import { MapLocationService } from './map-location.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { Toast } from '../../../core/services/toast';
@@ -24,18 +24,23 @@ const { fakeMap } = vi.hoisted(() => {
 
 vi.mock('leaflet', async importOriginal => {
   const actual = await importOriginal<typeof import('leaflet')>();
-  return {
-    ...actual,
-    circleMarker: vi.fn(() => ({ setLatLng: vi.fn() })),
-    circle: vi.fn(() => ({
+  function FakeCircleMarker() { return { setLatLng: vi.fn() }; }
+  function FakeCircle() {
+    return {
       setLatLng: vi.fn(),
       setRadius: vi.fn(),
-    })),
-    layerGroup: vi.fn(() => {
-      const group = { addTo: vi.fn(), remove: vi.fn() };
-      (group.addTo as ReturnType<typeof vi.fn>).mockReturnValue(group);
-      return group;
-    }),
+    };
+  }
+  function FakeLayerGroup() {
+    const group = { addTo: vi.fn(), remove: vi.fn() };
+    (group.addTo as ReturnType<typeof vi.fn>).mockReturnValue(group);
+    return group;
+  }
+  return {
+    ...actual,
+    CircleMarker: vi.fn().mockImplementation(FakeCircleMarker),
+    Circle: vi.fn().mockImplementation(FakeCircle),
+    LayerGroup: vi.fn().mockImplementation(FakeLayerGroup),
   };
 });
 
@@ -111,7 +116,7 @@ describe('MapLocationService', () => {
     watchCb(positionAt(-37.47, -73.35));
 
     expect(fakeMap.setView).toHaveBeenCalled();
-    expect(L.layerGroup).toHaveBeenCalled();
+    expect(LayerGroup).toHaveBeenCalled();
     expect(service.status()).toBe('following');
   });
 
@@ -137,8 +142,8 @@ describe('MapLocationService', () => {
     service.toggle();
     watchCb(positionAt(-37.47, -73.35));
 
-    const marker = (L.circleMarker as ReturnType<typeof vi.fn>).mock.results[0].value;
-    const accuracyCircle = (L.circle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const marker = (CircleMarker as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const accuracyCircle = (Circle as ReturnType<typeof vi.fn>).mock.results[0].value;
     watchCb(positionAt(-37.48, -73.36, 120));
 
     expect(marker.setLatLng).toHaveBeenCalledTimes(2);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Layer } from 'leaflet';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
 import { MapEngineService } from './map-engine.service';
 
@@ -60,8 +60,8 @@ describe('MapTerritoryLayerService', () => {
 
   describe('extra layers', () => {
     it('should add and remove extra layers', () => {
-      const layer1 = { remove: () => {} } as unknown as L.Layer;
-      const layer2 = { remove: () => {} } as unknown as L.Layer;
+      const layer1 = { remove: () => {} } as unknown as Layer;
+      const layer2 = { remove: () => {} } as unknown as Layer;
 
       service.addExtraLayer(layer1);
       service.addExtraLayer(layer2);

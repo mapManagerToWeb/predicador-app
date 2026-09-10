@@ -1,19 +1,71 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import {
+  GeoJSON as LeafletGeoJSON,
+  Marker,
+  DivIcon,
+  LatLng,
+  LatLngBounds,
+  Polygon,
+  type Map as LeafletMap,
+  type Layer,
+  type PathOptions,
+  type LeafletMouseEvent,
+} from 'leaflet';
 import * as GeoJSON from 'geojson';
+import { simplify } from '@turf/simplify';
+import { union } from '@turf/union';
+import { featureCollection } from '@turf/helpers';
 import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
 import { getColorForTerritorio } from '../utils/territory-colors';
 import { MapEngineService } from './map-engine.service';
 import { getBaseTerritoryStyle } from './map-style.service';
 import type { ManzanaIndex, FeatureLayer, TerritorioCacheData } from '../types/map.types';
 
+const SIMPLIFY_TOLERANCE = 0.0001;
+
+function simplifyFeatureCollection(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection {
+  const features = fc.features.map(f => {
+    if (!f.geometry) return f;
+    try {
+      const simplified = simplify(f as Parameters<typeof simplify>[0], { tolerance: SIMPLIFY_TOLERANCE, highQuality: true }) as GeoJSON.Feature;
+      return { ...f, geometry: simplified.geometry };
+    } catch {
+      return f;
+    }
+  });
+  return { type: 'FeatureCollection', features };
+}
+
+function dissolveTerritory(fc: GeoJSON.FeatureCollection): GeoJSON.Feature | null {
+  const validFeatures = fc.features.filter(f => f.geometry);
+  if (validFeatures.length === 0) return null;
+  if (validFeatures.length === 1) return validFeatures[0];
+
+  try {
+    const turfFeatures = validFeatures.map(f => ({
+      type: 'Feature' as const,
+      geometry: f.geometry! as GeoJSON.Polygon | GeoJSON.MultiPolygon,
+      properties: f.properties ?? {},
+    }));
+    const merged = union(featureCollection(turfFeatures));
+    if (!merged) return validFeatures[0];
+    return {
+      type: 'Feature',
+      geometry: merged.geometry as GeoJSON.Geometry,
+      properties: validFeatures[0].properties ?? {},
+    };
+  } catch {
+    return validFeatures[0];
+  }
+}
+
 export type ManzanaClickHandler = (
   id: string,
   nombreBloque: string,
-  polygon: L.Polygon,
+  polygon: Polygon,
   color: string,
   territorioNumero: number,
-  event: L.LeafletMouseEvent
+  event: LeafletMouseEvent
 ) => void;
 
 /**
@@ -36,14 +88,14 @@ export class MapTerritoryLayerService {
   private manzanaList: ManzanaIndex[] = [];
   private manzanasByTerritory = new Map<number, ManzanaIndex[]>();
 
-  // O(1) territory → label lookup; replaces signal<L.Marker[]> + querySelector
-  private labelByTerritory = new Map<number, L.Marker>();
+  // O(1) territory → label lookup; replaces signal<Marker[]> + querySelector
+  private labelByTerritory = new Map<number, Marker>();
 
   // Plain map; was signal<Map<...>> — no reactivity needed (set once at load)
   private dataCache = new Map<number, TerritorioCacheData>();
 
   private manzanaClickHandler: ManzanaClickHandler | null = null;
-  private extraLayers: L.Layer[] = [];
+  private extraLayers: Layer[] = [];
 
   private engine = inject(MapEngineService);
 
@@ -162,8 +214,10 @@ export class MapTerritoryLayerService {
       const rawColor = features[0]?.properties?.['color'] ?? null;
       const color = getColorForTerritorio(territorioNum, rawColor);
       const fc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features };
+      const dissolvedFeature = dissolveTerritory(fc);
+      const simplifiedFc = simplifyFeatureCollection(fc);
       const bounds = this.computeBoundsFromFeatures(features);
-      cache.set(territorioNum, { fc, color, bounds });
+      cache.set(territorioNum, { fc, simplifiedFc, dissolvedFeature, color, bounds });
     }
     return cache;
   }
@@ -235,15 +289,15 @@ export class MapTerritoryLayerService {
     return this.manzanasByTerritory.get(territorioNum)?.length ?? 0;
   }
 
-  getTerritoryLabels(): L.Marker[] {
+  getTerritoryLabels(): Marker[] {
     return Array.from(this.labelByTerritory.values());
   }
 
-  addExtraLayer(layer: L.Layer): void {
+  addExtraLayer(layer: Layer): void {
     this.extraLayers.push(layer);
   }
 
-  removeExtraLayer(layer: L.Layer): void {
+  removeExtraLayer(layer: Layer): void {
     this.extraLayers = this.extraLayers.filter(l => l !== layer);
     this.engine.getMap()?.removeLayer(layer);
   }
@@ -257,16 +311,24 @@ export class MapTerritoryLayerService {
   }
 
   private addTerritoryLayer(territorioNum: number, data: TerritorioCacheData): void {
-    const { fc, color, bounds } = data;
+    const { simplifiedFc, dissolvedFeature, color, bounds } = data;
     const map = this.engine.getMap();
     if (!map) return;
 
+    const useDissolved = map.getZoom() < MAP_DEFAULTS.labelMinZoom && dissolvedFeature;
     const newEntries: ManzanaIndex[] = [];
 
-    const layer = L.geoJSON(fc, {
-      style: () => this.getTerritoryStyle(color),
-      onEachFeature: (feature, l) => this.onEachFeature(feature, l, territorioNum, color, newEntries),
-    });
+    let layer: LeafletGeoJSON;
+    if (useDissolved) {
+      layer = new LeafletGeoJSON(dissolvedFeature, {
+        style: () => this.getTerritoryStyle(color),
+      });
+    } else {
+      layer = new LeafletGeoJSON(simplifiedFc, {
+        style: () => this.getTerritoryStyle(color),
+        onEachFeature: (feature, l) => this.onEachFeature(feature, l, territorioNum, color, newEntries),
+      });
+    }
 
     if (newEntries.length > 0) {
       // Push directly — no array spread/copy
@@ -290,18 +352,18 @@ export class MapTerritoryLayerService {
     this.layerByTerritory.set(territorioNum, { territorioPadre: territorioNum, color, layer });
   }
 
-  private getTerritoryStyle(color: string): L.PathOptions {
+  private getTerritoryStyle(color: string): PathOptions {
     return getBaseTerritoryStyle(color, false);
   }
 
   private onEachFeature(
     feature: GeoJSON.Feature,
-    l: L.Layer,
+    l: Layer,
     territorioNum: number,
     color: string,
     newEntries: ManzanaIndex[]
   ): void {
-    if (!(l instanceof L.Polygon)) return;
+    if (!(l instanceof Polygon)) return;
 
     const id = String(feature.properties?.['id'] ?? '');
     const nombreBloque = String(feature.properties?.['nombre_bloque'] ?? '');
@@ -316,14 +378,14 @@ export class MapTerritoryLayerService {
       bbox,
     });
 
-    l.on('click', (e: L.LeafletMouseEvent) => {
+    l.on('click', (e: LeafletMouseEvent) => {
       this.manzanaClickHandler?.(id, nombreBloque, l, color, territorioNum, e);
     });
   }
 
-  private computePolygonBBox(polygon: L.Polygon): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+  private computePolygonBBox(polygon: Polygon): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
     const rings = polygon.getLatLngs();
-    const outer = rings[0] as L.LatLng[];
+    const outer = rings[0] as LatLng[];
     let minLat = Infinity;
     let maxLat = -Infinity;
     let minLng = Infinity;
@@ -341,10 +403,10 @@ export class MapTerritoryLayerService {
     return { minLat, maxLat, minLng, maxLng };
   }
 
-  private addTerritoryLabel(map: L.Map, territorioNum: number, bounds: L.LatLngBounds): void {
+  private addTerritoryLabel(map: LeafletMap, territorioNum: number, bounds: LatLngBounds): void {
     const center = bounds.getCenter();
-    const label = L.marker(center, {
-      icon: L.divIcon({
+    const label = new Marker(center, {
+      icon: new DivIcon({
         className: STYLE_DEFAULTS.label.className,
         html: `<span class="territory-label__text">${territorioNum}</span>`,
         iconSize: [...STYLE_DEFAULTS.label.iconSize],
@@ -384,7 +446,7 @@ export class MapTerritoryLayerService {
     }
   }
 
-  private computeBoundsFromFeatures(features: GeoJSON.Feature[]): L.LatLngBounds {
+  private computeBoundsFromFeatures(features: GeoJSON.Feature[]): LatLngBounds {
     let minLat = Infinity;
     let maxLat = -Infinity;
     let minLng = Infinity;
@@ -398,7 +460,7 @@ export class MapTerritoryLayerService {
       maxLng = extended.maxLng;
     }
 
-    return L.latLngBounds(L.latLng(minLat, minLng), L.latLng(maxLat, maxLng));
+    return new LatLngBounds(new LatLng(minLat, minLng), new LatLng(maxLat, maxLng));
   }
 
   private extendBoundsFromGeometry(

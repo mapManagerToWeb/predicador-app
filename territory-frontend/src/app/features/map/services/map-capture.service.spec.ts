@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Polygon, Path, Layer } from 'leaflet';
 import { MapCaptureService } from './map-capture.service';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
@@ -14,8 +14,8 @@ import {
   getPartialPolygonCompleteStyle,
 } from './map-style.service';
 
-function makePath(): L.Path {
-  const p = new L.Polygon([
+function makePath(): Path {
+  const p = new Polygon([
     [
       { lat: 0, lng: 0 },
       { lat: 1, lng: 0 },
@@ -24,15 +24,15 @@ function makePath(): L.Path {
     ],
   ]);
   vi.spyOn(p, 'setStyle');
-  return p as unknown as L.Path;
+  return p as unknown as Path;
 }
 
-function fakeFeatureLayer(territorioNumero: number, color: string, paths: L.Path[]) {
+function fakeFeatureLayer(territorioNumero: number, color: string, paths: Path[]) {
   return {
     territorioPadre: territorioNumero,
     color,
     layer: {
-      eachLayer: (cb: (l: L.Layer) => void) => paths.forEach(cb),
+      eachLayer: (cb: (l: Layer) => void) => paths.forEach(cb),
       getBounds: () => ({ isValid: () => true, extend: vi.fn() }),
     },
   };

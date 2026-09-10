@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { Map as LeafletMap, Layer, Marker, Polygon, type PathOptions, type LatLngExpression } from 'leaflet';
 import { MapEngineService } from './map-engine.service';
 import {
   getBaseTerritoryStyle,
@@ -43,7 +43,7 @@ export class MapRenderingFacade {
 
   // ─── Engine delegation ───────────────────────────────────────────
 
-  getMap(): L.Map | null {
+  getMap(): LeafletMap | null {
     return this.engine.getMap();
   }
 
@@ -135,7 +135,7 @@ export class MapRenderingFacade {
     );
   }
 
-  applyStyleToFeatureLayer(fl: FeatureLayer, style: L.PathOptions | ((fl: FeatureLayer) => L.PathOptions)): void {
+  applyStyleToFeatureLayer(fl: FeatureLayer, style: PathOptions | ((fl: FeatureLayer) => PathOptions)): void {
     this.styles.applyStyleToFeatureLayer(fl, style);
   }
 
@@ -174,7 +174,7 @@ export class MapRenderingFacade {
     this.territories.updateLabelsForSelection(seleccionados);
   }
 
-  getTerritoryLabels(): L.Marker[] {
+  getTerritoryLabels(): Marker[] {
     return this.territories.getTerritoryLabels();
   }
 
@@ -278,12 +278,12 @@ export class MapRenderingFacade {
     puntos: SnappedPoint[],
     currentTerritoryColor: string,
     manzanaEdges: Edge[],
-    onMarkerDrag: (index: number, marker: L.Marker) => void
+    onMarkerDrag: (index: number, marker: Marker) => void
   ): void {
     this.partialDraw.redibujarParcial(puntos, currentTerritoryColor, manzanaEdges, onMarkerDrag);
   }
 
-  updatePartialPolygonLatLngs(latlngs: L.LatLngExpression[], currentTerritoryColor: string): void {
+  updatePartialPolygonLatLngs(latlngs: LatLngExpression[], currentTerritoryColor: string): void {
     this.partialDraw.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
   }
 
@@ -292,7 +292,7 @@ export class MapRenderingFacade {
     currentTerritoryColor: string,
     manzanaEdges: Edge[],
     index: number,
-    marker: L.Marker
+    marker: Marker
   ): void {
     this.partialDraw.actualizarParcialEnDrag(puntos, currentTerritoryColor, manzanaEdges, index, marker);
   }
@@ -301,7 +301,7 @@ export class MapRenderingFacade {
     this.partialDraw.limpiarCapasParciales();
   }
 
-  getPoligonoParcial(): L.Polygon | null {
+  getPoligonoParcial(): Polygon | null {
     return this.partialDraw.getPoligonoParcial();
   }
 
@@ -311,11 +311,11 @@ export class MapRenderingFacade {
 
   // ─── Extra layers (delegated to territory-layer) ─────────────────
 
-  addExtraLayer(layer: L.Layer): void {
+  addExtraLayer(layer: Layer): void {
     this.territories.addExtraLayer(layer);
   }
 
-  removeExtraLayer(layer: L.Layer): void {
+  removeExtraLayer(layer: Layer): void {
     this.territories.removeExtraLayer(layer);
   }
 
@@ -333,7 +333,7 @@ export class MapRenderingFacade {
     return this.state.currentTerritoryColor();
   }
 
-  private computeBaseStyle(territorioNumero: number, manzanasMarcadaList: ManzanaMarcada[]): L.PathOptions {
+  private computeBaseStyle(territorioNumero: number, manzanasMarcadaList: ManzanaMarcada[]): PathOptions {
     const total = this.territories.getManzanaCountByTerritorio(territorioNumero);
     const marcadas = manzanasMarcadaList.filter(m => m.territorioNumero === territorioNumero).length;
     const isComplete = total > 0 && marcadas >= total;

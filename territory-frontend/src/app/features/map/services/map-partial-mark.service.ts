@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { DomEvent, type LeafletMouseEvent } from 'leaflet';
 import { Toast } from '../../../core/services/toast';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapInteractionService } from './map-interaction.service';
@@ -122,8 +122,8 @@ export class MapPartialMarkService {
       this.state.manzanasById.set(newMap);
       this.rendering.addExtraLayer(poligonoParcial);
 
-      poligonoParcial.on('click', (e: L.LeafletMouseEvent) => {
-        L.DomEvent.stop(e);
+      poligonoParcial.on('click', (e: LeafletMouseEvent) => {
+        DomEvent.stop(e);
         this.eliminarParcial(id);
       });
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MapPartialDrawService } from './map-partial-draw.service';
 import { MapEngineService } from './map-engine.service';
-import { polygon as polygonMock, marker as markerMock, divIcon as divIconMock } from 'leaflet';
+import { Polygon as polygonMock, Marker as markerMock, DivIcon as divIconMock } from 'leaflet';
 
 const { poly } = vi.hoisted(() => {
   const p = { setLatLngs: vi.fn(), addTo: vi.fn(), on: vi.fn() };
@@ -11,13 +11,14 @@ const { poly } = vi.hoisted(() => {
 });
 
 vi.mock('leaflet', () => ({
-  polygon: vi.fn(() => poly),
-  marker: vi.fn(() => {
+  Polygon: vi.fn().mockImplementation(function () { return poly; }),
+  Marker: vi.fn().mockImplementation(function () {
     const m = { on: vi.fn(), addTo: vi.fn(), setLatLng: vi.fn() };
     m.addTo.mockReturnValue(m);
     return m;
   }),
-  divIcon: vi.fn(() => ({})),
+  DivIcon: vi.fn().mockImplementation(function () { return {}; }),
+  Canvas: vi.fn().mockImplementation(function () { return {}; }),
 }));
 
 let rafCallbacks: Array<() => void>;

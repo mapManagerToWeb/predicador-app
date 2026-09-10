@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { Map as LeafletMap, Path, LayerGroup, Layer, Marker, type LatLng, type Point } from 'leaflet';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
 
@@ -54,7 +54,7 @@ export class MapCanvasCaptureService {
    * eagerly, which is why captures worked there but not in Safari. An
    * explicit decode() forces the pixels to be ready before drawing.</p>
    */
-  private async drawTiles(map: L.Map, ctx: CanvasRenderingContext2D): Promise<void> {
+  private async drawTiles(map: LeafletMap, ctx: CanvasRenderingContext2D): Promise<void> {
     const container = map.getContainer();
     const origin = container.getBoundingClientRect();
     const tiles = Array.from(
@@ -83,11 +83,9 @@ export class MapCanvasCaptureService {
     }
   }
 
-  private drawPaths(map: L.Map, ctx: CanvasRenderingContext2D): void {
+  private drawPaths(map: LeafletMap, ctx: CanvasRenderingContext2D): void {
     map.eachLayer(layer => {
-      // Dos niveles alcanzan: GeoJSON groups (manzanas) y capas sueltas
-      // (polígonos parciales). No hay grupos anidados más profundo.
-      if (layer instanceof L.LayerGroup) {
+      if (layer instanceof LayerGroup) {
         layer.eachLayer(child => this.drawPath(map, child, ctx));
       } else {
         this.drawPath(map, layer, ctx);
@@ -95,8 +93,8 @@ export class MapCanvasCaptureService {
     });
   }
 
-  private drawPath(map: L.Map, layer: L.Layer, ctx: CanvasRenderingContext2D): void {
-    if (!(layer instanceof L.Path)) return;
+  private drawPath(map: LeafletMap, layer: Layer, ctx: CanvasRenderingContext2D): void {
+    if (!(layer instanceof Path)) return;
     const opts = layer.options;
     // Estilo oculto (getHiddenStyle): nada que dibujar.
     if (!opts.opacity && !opts.fillOpacity) return;
@@ -133,13 +131,12 @@ export class MapCanvasCaptureService {
     ctx.globalAlpha = 1;
   }
 
-  private projectRings(path: L.Path, map: L.Map): L.Point[][] {
+  private projectRings(path: Path, map: LeafletMap): Point[][] {
     const polygon = path as unknown as { getLatLngs?: () => unknown };
     if (typeof polygon.getLatLngs !== 'function') return [];
 
     const raw = polygon.getLatLngs!() as unknown[];
-    // Polygon → LatLng[][]; Polyline → LatLng[]. Normalizamos a anillos.
-    const rings = (Array.isArray(raw[0]) ? raw : [raw]) as L.LatLng[][];
+    const rings = (Array.isArray(raw[0]) ? raw : [raw]) as LatLng[][];
     return rings.map(ring =>
       ring.map(ll => map.latLngToContainerPoint(ll))
     );
@@ -179,7 +176,7 @@ export class MapCanvasCaptureService {
     }
   }
 
-  private labelNumber(lbl: L.Marker): number | string {
+  private labelNumber(lbl: Marker): number | string {
     const el = lbl.getElement();
     const text = el?.querySelector('.territory-label__text')?.textContent;
     return text ?? '';

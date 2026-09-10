@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MapEngineService } from './map-engine.service';
-import { map } from 'leaflet';
+import { Map } from 'leaflet';
 
 const { fakeMap } = vi.hoisted(() => {
   const m = { setView: vi.fn(), remove: vi.fn() };
@@ -9,7 +9,8 @@ const { fakeMap } = vi.hoisted(() => {
 });
 
 vi.mock('leaflet', () => ({
-  map: vi.fn(() => fakeMap),
+  Map: vi.fn().mockImplementation(function () { return fakeMap; }),
+  Canvas: vi.fn().mockImplementation(function () { return {}; }),
 }));
 
 describe('MapEngineService', () => {
@@ -28,7 +29,13 @@ describe('MapEngineService', () => {
     const element = document.createElement('div');
     service.initializeMap(element);
 
-    expect(map).toHaveBeenCalledWith(element, { preferCanvas: true, zoomControl: false });
+    expect(Map).toHaveBeenCalledWith(element, {
+      zoomControl: false,
+      markerZoomAnimation: false,
+      inertia: false,
+      fadeAnimation: true,
+      renderer: expect.anything(),
+    });
     expect(fakeMap.setView).toHaveBeenCalled();
     expect(service.getMap()).toBe(fakeMap);
   });

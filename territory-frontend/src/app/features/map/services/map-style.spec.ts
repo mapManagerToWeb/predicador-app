@@ -25,7 +25,7 @@ describe('MapStyleService — pure style functions', () => {
 
     it('should return high fillOpacity for complete territory', () => {
       const style = getBaseTerritoryStyle('#00ff00', true);
-      expect(style.fillOpacity).toBe(0.85);
+      expect(style.fillOpacity).toBe(0.6);
       expect(style.fillColor).toBe('#00ff00');
       expect(style.color).toBe('#00ff00');
     });

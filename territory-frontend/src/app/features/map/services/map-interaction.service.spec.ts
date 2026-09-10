@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Polygon, Marker, LeafletMouseEvent } from 'leaflet';
 import { MapInteractionService } from './map-interaction.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -25,7 +25,7 @@ function fakeManzana(id: string, territorioNumero = 5): ManzanaIndex {
     color: '#ff0000',
     territorioNumero,
     bbox: { minLat: -1, maxLat: 2, minLng: -1, maxLng: 2 },
-    polygon: new L.Polygon([
+    polygon: new Polygon([
       [
         { lat: -1, lng: -1 },
         { lat: 2, lng: -1 },
@@ -47,7 +47,7 @@ describe('MapInteractionService', () => {
   };
 
   function clickAt(lat: number, lng: number) {
-    return { latlng: { lat, lng } } as L.LeafletMouseEvent;
+    return { latlng: { lat, lng } } as LeafletMouseEvent;
   }
 
   beforeEach(() => {
@@ -169,7 +169,7 @@ describe('MapInteractionService', () => {
   describe('modo parcial', () => {
     it('removes an existing partial polygon when clicking inside it', () => {
       state.modoMarcado.set('parcial');
-      const parcial = new L.Polygon([
+      const parcial = new Polygon([
         [
           { lat: -1, lng: -1 },
           { lat: 2, lng: -1 },
@@ -267,7 +267,7 @@ describe('MapInteractionService', () => {
       state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
       const marker = { getLatLng: () => ({ lat: 0.5, lng: 0 }) };
 
-      const result = service.handleMarkerDrag(marker as L.Marker, 0);
+      const result = service.handleMarkerDrag(marker as Marker, 0);
 
       expect(result[0].edgeIdx).toBe(0);
     });

@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import * as L from 'leaflet';
+import { LatLng, CircleMarker, Circle, LayerGroup, type Map } from 'leaflet';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { Toast } from '../../../core/services/toast';
 import { LOCATION_DEFAULTS, TOAST_MESSAGES } from '../utils/map-constants';
@@ -22,9 +22,9 @@ export class MapLocationService {
   readonly status = signal<LocationStatus>('idle');
 
   private watchId: number | null = null;
-  private layerGroup: L.LayerGroup | null = null;
-  private marker: L.CircleMarker | null = null;
-  private accuracyCircle: L.Circle | null = null;
+  private layerGroup: LayerGroup | null = null;
+  private marker: CircleMarker | null = null;
+  private accuracyCircle: Circle | null = null;
   private warnedLowAccuracy = false;
 
   /** Alterna seguimiento. Ignora taps mientras localiza el primer fix. */
@@ -72,8 +72,8 @@ export class MapLocationService {
     );
   }
 
-  private onPosition(map: L.Map, pos: GeolocationPosition): void {
-    const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+  private onPosition(map: Map, pos: GeolocationPosition): void {
+    const latlng = new LatLng(pos.coords.latitude, pos.coords.longitude);
     this.ensureLayers(map);
 
     this.marker?.setLatLng(latlng);
@@ -111,7 +111,7 @@ export class MapLocationService {
     }
   }
 
-  private ensureLayers(map: L.Map): void {
+  private ensureLayers(map: Map): void {
     if (this.layerGroup) return;
 
     // Pane propio por encima de los polígonos; interactive:false para que los
@@ -122,7 +122,7 @@ export class MapLocationService {
       pane.style.pointerEvents = 'none';
     }
 
-    this.marker = L.circleMarker([0, 0], {
+    this.marker = new CircleMarker([0, 0], {
       radius: 8,
       color: '#ffffff',
       weight: 3,
@@ -131,7 +131,7 @@ export class MapLocationService {
       interactive: false,
       pane: LOCATION_PANE,
     });
-    this.accuracyCircle = L.circle([0, 0], {
+    this.accuracyCircle = new Circle([0, 0], {
       radius: 0,
       color: '#1a73e8',
       weight: 1,
@@ -140,7 +140,7 @@ export class MapLocationService {
       interactive: false,
       pane: LOCATION_PANE,
     });
-    this.layerGroup = L.layerGroup([this.accuracyCircle, this.marker]).addTo(map);
+    this.layerGroup = new LayerGroup([this.accuracyCircle, this.marker]).addTo(map);
   }
 
   private removeLayers(): void {

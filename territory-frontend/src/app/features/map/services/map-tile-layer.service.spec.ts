@@ -11,13 +11,14 @@ const { tileLayerMock, controlZoomMock } = vi.hoisted(() => {
     return t;
   };
   const tileLayerMock = vi.fn(makeTile);
-  const controlZoomMock = { zoom: vi.fn(() => ({ addTo: vi.fn() })) };
+  const controlZoomMock = { Zoom: vi.fn().mockImplementation(function () { return { addTo: vi.fn() }; }) };
   return { tileLayerMock, controlZoomMock };
 });
 
 vi.mock('leaflet', () => ({
-  tileLayer: (url: string, options: object) => tileLayerMock(url, options),
-  control: controlZoomMock,
+  TileLayer: vi.fn().mockImplementation(function (url: string, options: object) { return tileLayerMock(url, options); }),
+  Control: controlZoomMock,
+  Canvas: vi.fn().mockImplementation(function () { return {}; }),
 }));
 
 describe('MapTileLayerService', () => {
@@ -62,7 +63,7 @@ describe('MapTileLayerService', () => {
       attribution: ATTRIBUTIONS.satellite,
       crossOrigin: true,
     });
-    expect(controlZoomMock.zoom).toHaveBeenCalledWith({ position: 'bottomright' });
+    expect(controlZoomMock.Zoom).toHaveBeenCalledWith({ position: 'bottomright' });
     expect(service.isSatellite()).toBe(false);
   });
 

@@ -5,7 +5,7 @@ import {
   afterNextRender,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import * as L from 'leaflet';
+import { type LeafletMouseEvent } from 'leaflet';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
 import { MapStateService } from './services/map-state.service';
@@ -61,7 +61,7 @@ export class MapPage implements OnDestroy {
     const el = document.getElementById('map');
     if (!el) return;
 
-    void this.initialization.initialize(el, (e: L.LeafletMouseEvent) => this.onMapClick(e));
+    void this.initialization.initialize(el, (e: LeafletMouseEvent) => this.onMapClick(e));
   }
 
 
@@ -94,7 +94,7 @@ export class MapPage implements OnDestroy {
     this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
   }
 
-  private onMapClick(e: L.LeafletMouseEvent): void {
+  private onMapClick(e: LeafletMouseEvent): void {
     const result = this.interaction.handleMapClick(e);
 
     switch (result.action) {

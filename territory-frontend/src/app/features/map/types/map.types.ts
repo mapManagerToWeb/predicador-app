@@ -38,6 +38,8 @@ export interface ManzanaIndex {
 
 export interface TerritorioCacheData {
   fc: GeoJSON.FeatureCollection;
+  simplifiedFc: GeoJSON.FeatureCollection;
+  dissolvedFeature: GeoJSON.Feature | null;
   color: string;
   bounds: L.LatLngBounds;
 }
