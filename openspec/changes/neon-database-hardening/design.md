@@ -41,6 +41,14 @@ El backend es una arquitectura de microservicios Spring Boot 4 sobre Maven, con 
 
 **Elección:** Modificar `.env.example` para documentar `DB_URL_UNPOOLED` con comentario claro. No modificar CI secrets ni `.env` real.
 
+### Decision 6: `minimum-idle: 0` para permitir scale-to-zero de Neon
+
+**Elección:** Fijar `spring.datasource.hikari.minimum-idle: 0` en ambos servicios (config-server y application.yml local), junto con `connection-timeout: 10000`, `keepalive-time: 0` y `spring.jpa.open-in-view: false`.
+
+**Rationale:** Con `minimum-idle: 1`, el HouseKeeper de HikariCP (corre cada 30s) recrea proactivamente la conexión cuando el pool baja del mínimo. Eso despierta el compute suspendido de Neon en un ciclo continuo: suspend → reconnect → wake → suspend. A 0.25 CU activo 24/7, el consumo es ~180 CU-hours/mes, superando las 100 CU-hours del plan free en ~16 días. Con `minimum-idle: 0`, el pool se vacía en reposo y Neon permanece suspendido; las 100 CU-hours alcanzan para ~400 horas activas/mes.
+
+**Trade-off:** La primera query tras suspensión paga un cold start de ~300-500ms. Aceptado: es el costo de permanecer en el plan free.
+
 ## Risks / Trade-offs
 
 **[Risk] PostGIS no disponible en Neon free tier** → Mitigation: verificar que el plan Neon incluye PostGIS. La migración V0 fallará con error claro si no está.

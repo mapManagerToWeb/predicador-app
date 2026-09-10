@@ -13,10 +13,16 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
     hikari:
-      minimum-idle: 1
+      # minimum-idle: 0 permite que el pool se vacíe cuando no hay tráfico.
+      # Con minimum-idle > 0, el HouseKeeper de HikariCP (cada 30s) recrea la
+      # conexión proactivamente, despertando el compute de Neon (scale-to-zero)
+      # en un ciclo continuo que consume CU-hours del plan free.
+      minimum-idle: 0
       idle-timeout: 30000
       maximum-pool-size: 3
       max-lifetime: 300000
+      connection-timeout: 10000
+      keepalive-time: 0
   threads:
     virtual:
       enabled: true
@@ -30,6 +36,9 @@ spring:
       # que Flyway migre (en Spring Boot 4 el EntityManagerFactory se crea
       # antes que el initializer de Flyway).
       ddl-auto: none
+    # Evita mantener el EntityManager abierto durante el renderizado de vistas,
+    # lo que retendría conexiones del pool y mantendría el compute de Neon activo.
+    open-in-view: false
     show-sql: false
     properties:
       hibernate:
