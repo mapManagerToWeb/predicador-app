@@ -1,5 +1,5 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { Path, type PathOptions } from 'leaflet';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { getTerritoryFillOpacity } from '../utils/territory-colors';
 import { MapLayerRegistry } from './map-layer-registry.service';
@@ -10,7 +10,7 @@ import type { FeatureLayer, ManzanaMarcada } from '../types/map.types';
 // deliberately pure (no Leaflet objects) so the interface is the test surface:
 // what the tests assert is exactly what production renders.
 
-export function getBaseTerritoryStyle(color: string, isComplete: boolean): L.PathOptions {
+export function getBaseTerritoryStyle(color: string, isComplete: boolean): PathOptions {
   return {
     fillColor: color,
     fillOpacity: getTerritoryFillOpacity(isComplete),
@@ -21,7 +21,7 @@ export function getBaseTerritoryStyle(color: string, isComplete: boolean): L.Pat
   };
 }
 
-export function getMarkedManzanaStyle(color: string): L.PathOptions {
+export function getMarkedManzanaStyle(color: string): PathOptions {
   return {
     fillColor: color,
     fillOpacity: STYLE_DEFAULTS.markedPolygon.fillOpacity,
@@ -34,16 +34,16 @@ export function getMarkedManzanaStyle(color: string): L.PathOptions {
 
 // Singleton — Leaflet reads but never mutates the passed style object, so
 // returning a frozen constant avoids one allocation per hidden territory per frame.
-const HIDDEN_STYLE: L.PathOptions = Object.freeze({ ...STYLE_DEFAULTS.hiddenPolygon });
-export function getHiddenStyle(): L.PathOptions {
+const HIDDEN_STYLE: PathOptions = Object.freeze({ ...STYLE_DEFAULTS.hiddenPolygon });
+export function getHiddenStyle(): PathOptions {
   return HIDDEN_STYLE;
 }
 
-export function getSelectedManzanaStyle(): L.PathOptions {
+export function getSelectedManzanaStyle(): PathOptions {
   return { ...STYLE_DEFAULTS.selectedManzana };
 }
 
-export function getPartialPolygonStyle(color: string, dashed: boolean): L.PathOptions {
+export function getPartialPolygonStyle(color: string, dashed: boolean): PathOptions {
   return {
     color,
     fillColor: color,
@@ -53,7 +53,7 @@ export function getPartialPolygonStyle(color: string, dashed: boolean): L.PathOp
   };
 }
 
-export function getPartialPolygonCompleteStyle(color: string): L.PathOptions {
+export function getPartialPolygonCompleteStyle(color: string): PathOptions {
   return {
     color,
     fillColor: color,
@@ -63,11 +63,11 @@ export function getPartialPolygonCompleteStyle(color: string): L.PathOptions {
   };
 }
 
-export function getCaptureUnmarkedStyle(color: string): L.PathOptions {
+export function getCaptureUnmarkedStyle(color: string): PathOptions {
   return { opacity: 0.6, fillOpacity: 0.05, color, weight: 1.5 };
 }
 
-export function getCaptureIncompleteStyle(color: string): L.PathOptions {
+export function getCaptureIncompleteStyle(color: string): PathOptions {
   return { opacity: 0.8, fillOpacity: 0.05, color, weight: 4 };
 }
 
@@ -101,10 +101,10 @@ export class MapStyleService implements OnDestroy {
     this.pendingStyleQueue = [];
   }
 
-  applyStyleToFeatureLayer(fl: FeatureLayer, style: L.PathOptions | ((fl: FeatureLayer) => L.PathOptions)): void {
+  applyStyleToFeatureLayer(fl: FeatureLayer, style: PathOptions | ((fl: FeatureLayer) => PathOptions)): void {
     const resolved = typeof style === 'function' ? style(fl) : style;
     fl.layer.eachLayer(l => {
-      if (l instanceof L.Path) l.setStyle(resolved);
+      if (l instanceof Path) l.setStyle(resolved);
     });
   }
 

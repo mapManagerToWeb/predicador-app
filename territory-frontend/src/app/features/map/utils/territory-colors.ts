@@ -17,5 +17,5 @@ export function getColorForTerritorio(territorioNum: number, backendColor: strin
 }
 
 export function getTerritoryFillOpacity(isComplete: boolean): number {
-  return isComplete ? 0.85 : 0.05;
+  return isComplete ? 0.6 : 0.05;
 }

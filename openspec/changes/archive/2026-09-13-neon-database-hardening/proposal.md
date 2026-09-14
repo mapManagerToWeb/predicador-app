@@ -9,6 +9,7 @@ El backend comparte una base de datos PostgreSQL en Neon con dos servicios (`ter
 - **Crear `V0__initial_schema.sql` en `territory-service`**: migrar el DDL existente de `manzanas_territorio`, `territory_settings` y `CREATE EXTENSION postgis` a una migración Flyway versionada, permitiendo reproducir el esquema en un Neon vacío.
 - **Crear `V0__initial_schema.sql` en `reporting-service`**: migrar el DDL de `registro_predicacion`, `encargados`, `whatsapp_delivery_idempotency` a Flyway versionado.
 - **Agregar backup en pipeline CI**: incluir `pg_dump` con la URL directa para proteger los datos de producción.
+- **Fijar `minimum-idle: 0` en HikariCP**: ambos servicios tenían `minimum-idle: 1`, lo que hace que el HouseKeeper de HikariCP (cada 30s) despierte el compute suspendido de Neon en un ciclo continuo, quemando ~180 CU-hours/mes — superando las 100 CU-hours del plan free. Con `minimum-idle: 0` el pool se vacía en reposo y Neon permanece suspendido (scale-to-zero).
 
 ## Capabilities
 
@@ -24,3 +25,4 @@ El backend comparte una base de datos PostgreSQL en Neon con dos servicios (`ter
 - **Multi-ambiente Neon**: branches de preview Neon necesitan el esquema completo para funcionar. Sin `V0__initial_schema.sql`, cada branch requiere intervención manual.
 - **Restore/DR**: un restore de producción sin schema versionado requiere exportar/importar data dumps. Con Flyway versionado, un nuevo Postgres puede reproducir el esquema automáticamente.
 - **CI/CD**: el pipeline de GitHub Actions actualmente no hace backup de la base de datos Neon.
+- **Costo Neon (plan free)**: con `minimum-idle: 1`, el compute de Neon nunca duerme y consume ~180 CU-hours/mes, agotando las 100 CU-hours del plan free en ~16 días. El fix de `minimum-idle: 0` permite scale-to-zero real y ~400 horas activas/mes dentro del límite.

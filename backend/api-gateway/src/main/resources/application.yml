@@ -1,5 +1,7 @@
-# Local development defaults. When config-server is running it overrides
-# most of these values via the remote api-gateway.yml.
+# Local development defaults. NOTA: el api-gateway no incluye el cliente de
+# config (spring-cloud-starter-config), por lo que NO consume la sección
+# `api-gateway.yml` servida por el config-server. Esta application.yml es la
+# fuente única de config del gateway, incluida la de Resilience4j.
 spring:
   application:
     name: api-gateway
@@ -12,7 +14,7 @@ app:
     password: ${ADMIN_PASSWORD:}
     password-bcrypt: ${ADMIN_PASSWORD_BCRYPT:}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,https://shus3z-ip-191-116-92-175.tunnelmole.net}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
   session:
     secret: ${SESSION_SECRET:}
     ttl-hours: ${SESSION_TTL_HOURS:12}
@@ -46,6 +48,68 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
+
+# ---------------------------------------------------------------------------
+# Resilience4j: circuit breakers + time limiters del gateway (Spring Cloud
+# Gateway los resuelve desde el application.yml LOCAL — el gateway no usa
+# config-server). Nombres alineados con RouteConfig.java:
+# territoryCB-colors / territoryCB-geojson / territoryCB-default /
+# reportingCB / encargadosCB / rumCB.
+#
+# Timeouts generosos para arranque en frío: la primera consulta PostGIS tras
+# un restart puede tardar >5s (cache de Hibernate frío). Un TimeLimiter
+# agresivo (default 1000ms) produce 503 intermitentes sin patrón aparente.
+# ---------------------------------------------------------------------------
+resilience4j:
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 5s
+        cancel-running-future: true
+    instances:
+      territoryCB-colors:
+        timeout-duration: 5s
+        cancel-running-future: true
+      territoryCB-geojson:
+        timeout-duration: 30s
+        cancel-running-future: true
+      territoryCB-default:
+        timeout-duration: 15s
+        cancel-running-future: true
+      reportingCB:
+        timeout-duration: 20s
+        cancel-running-future: true
+      encargadosCB:
+        timeout-duration: 10s
+        cancel-running-future: true
+      rumCB:
+        timeout-duration: 5s
+        cancel-running-future: true
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 30
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 60
+        slow-call-duration-threshold: 3s
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      territoryCB-colors:
+        base-config: default
+      territoryCB-geojson:
+        base-config: default
+      territoryCB-default:
+        base-config: default
+      reportingCB:
+        base-config: default
+      encargadosCB:
+        base-config: default
+      rumCB:
+        base-config: default
 
 ---
 # Profile: observability — enables OTLP trace export to collector.

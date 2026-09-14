@@ -263,12 +263,12 @@ historial **propia**, aunque compartan la misma base:
 
 | Servicio | Tabla de historial | Migraciones |
 |---|---|---|
-| `territory-service` | `flyway_schema_history_territory` | `V1__add_indexes.sql` (índices de `manzanas_territorio` y `territory_settings`) |
-| `reporting-service` | Flyway deshabilitado | `V1_1`, `V2`, `V3` (dedupe de encargados, índices, `whatsapp_delivery_idempotency`) |
+| `territory-service` | `flyway_schema_history_territory` | `V0__initial_schema.sql`, `V1__add_indexes.sql`, `V2__add_geometry_gist_index.sql` |
+| `reporting-service` | `flyway_schema_history_reporting` | `V0__initial_schema.sql`, `V1__add_indexes.sql`, `V1_1`, `V2`, `V3`, `V4`, `V5` |
 
-Nota: si se vuelve a habilitar Flyway en `reporting-service`, debe apuntar a una
-tabla de historial propia (`flyway_schema_history_reporting`) para no colisionar
-con las versiones de `territory-service`.
+Ambos servicios usan `DB_URL_UNPOOLED` (conexión directa, sin `-pooler`) para
+las migraciones Flyway, ya que PgBouncer en modo transacción no soporta DDL ni
+prepared statements.
 
 ## Variables de Entorno
 
@@ -276,7 +276,8 @@ Ver `.env.example` para la lista completa.
 
 | Variable | Descripción | Default |
 |---|---|---|
-| `DB_URL` | JDBC URL de PostgreSQL | `jdbc:postgresql://localhost:5432/predicador` |
+| `DB_URL` | JDBC URL de PostgreSQL (pooled, con `-pooler` para Neon) | `jdbc:postgresql://localhost:5432/predicador` |
+| `DB_URL_UNPOOLED` | JDBC URL directa (sin `-pooler`) para Flyway/backups | `jdbc:postgresql://localhost:5432/predicador` |
 | `DB_USERNAME` | Usuario de BD | `postgres` |
 | `DB_PASSWORD` | Contraseña de BD | — |
 | `ADMIN_USERNAME` | Usuario admin | `admin` |

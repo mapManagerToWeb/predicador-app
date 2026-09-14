@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { Polygon, Path, LatLng, LatLngBounds } from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
@@ -13,6 +13,7 @@ import {
   getSelectedManzanaStyle,
 } from './map-style.service';
 import { getTerritoryProgress } from '../utils/territory-progress';
+import { collectLatLngRings } from './map-rings';
 import type { ModoMarcado } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 
@@ -26,9 +27,9 @@ export class MapSelectionService {
   private readonly draftService = inject(DraftMarksService);
 
   /** The currently selected manzana polygon (transient UI state, not in state). */
-  private selectedPolygon: L.Polygon | null = null;
+  private selectedPolygon: Polygon | null = null;
 
-  seleccionarManzana(polygon: L.Polygon, color: string, nombreBloque: string, territorioNumero: number): void {
+  seleccionarManzana(polygon: Polygon, color: string, nombreBloque: string, territorioNumero: number): void {
     this.restaurarManzanaAnterior();
 
     this.selectedPolygon = polygon;
@@ -36,14 +37,17 @@ export class MapSelectionService {
     this.state.manzanaSeleccionadaNombre.set(nombreBloque);
     this.state.manzanaSeleccionadaTerritorio.set(territorioNumero);
 
-    const rings = polygon.getLatLngs();
-    const outer = rings[0] as L.LatLng[];
-    const edges: { from: L.LatLng; to: L.LatLng }[] = [];
-    if (outer && outer.length >= 3) {
-      for (let i = 0; i < outer.length - 1; i++) {
-        edges.push({ from: outer[i], to: outer[i + 1] });
+    // Leaflet 2.0 comparte Polygon/MultiPolygon: collectLatLngRings aplana la
+    // forma [[ring],[ring]] de un MultiPolygon para que el snapping del
+    // marcado parcial disponga de los edges de todas las partes (antes una
+    // manzana multiparte generaba 0 edges).
+    const edges: { from: LatLng; to: LatLng }[] = [];
+    for (const ring of collectLatLngRings(polygon.getLatLngs())) {
+      if (ring.length < 3) continue;
+      for (let i = 0; i < ring.length - 1; i++) {
+        edges.push({ from: ring[i], to: ring[i + 1] });
       }
-      edges.push({ from: outer[outer.length - 1], to: outer[0] });
+      edges.push({ from: ring[ring.length - 1], to: ring[0] });
     }
     this.state.manzanaEdges.set(edges);
 
@@ -96,7 +100,7 @@ export class MapSelectionService {
     this.state.manzanaEdges.set([]);
   }
 
-  toggleManzana(id: string, nombreBloque: string, layer: L.Path, color: string, territorioNumero: number): void {
+  toggleManzana(id: string, nombreBloque: string, layer: Path, color: string, territorioNumero: number): void {
     if (this.state.manzanasById().has(id)) {
       this.desmarcarManzana(id, territorioNumero, color, layer);
     } else {
@@ -108,7 +112,7 @@ export class MapSelectionService {
     id: string,
     territorioNumero: number,
     color: string,
-    layer: L.Path
+    layer: Path
   ): void {
     const newMap = new Map(this.state.manzanasById());
     newMap.delete(id);
@@ -131,7 +135,7 @@ export class MapSelectionService {
   marcarManzana(
     id: string,
     nombreBloque: string,
-    layer: L.Path,
+    layer: Path,
     color: string,
     territorioNumero: number
   ): void {
@@ -207,8 +211,8 @@ export class MapSelectionService {
     this.state.territoriosSeleccionados.set(numeros);
   }
 
-  private aplicarMarcasYCrearBounds(nums: number[]): L.LatLngBounds | null {
-    let combinedBounds: L.LatLngBounds | null = null;
+  private aplicarMarcasYCrearBounds(nums: number[]): LatLngBounds | null {
+    let combinedBounds: LatLngBounds | null = null;
     for (const numero of nums) {
       const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero);
       if (!featureLayer) continue;

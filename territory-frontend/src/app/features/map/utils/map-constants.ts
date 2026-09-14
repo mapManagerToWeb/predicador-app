@@ -21,7 +21,7 @@ export const MAP_DEFAULTS = {
 
 export const STYLE_DEFAULTS = {
   polygon: {
-    weight: 4,
+    weight: 2,
     smoothFactor: 1,
     opacity: 1,
     fillOpacity: 0.05,

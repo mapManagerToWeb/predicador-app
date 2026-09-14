@@ -60,8 +60,11 @@ export class MapDataPersistenceService {
       previousMarcadas = new Map(this.state.manzanasById());
       previousDatosParciales = new Map(this.state.datosParcialesGuardados);
       this.toastService.show(TOAST_MESSAGES.saving);
-      this.state.clearDatosParciales();
       const saved = await this.reportService.saveToDatabase(registros);
+      // Clear partial data AFTER the HTTP request completes so the debounced
+      // draft-save effect does not capture an intermediate state where marks
+      // are still present but partial geometry/points have been cleared.
+      this.state.clearDatosParciales();
 
       const territoriosGuardados = this.state.territoriosSeleccionados();
       this.persistirEnCacheYLimpiarDraft(saved, territoriosGuardados);

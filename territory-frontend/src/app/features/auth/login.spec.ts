@@ -80,7 +80,7 @@ describe('LoginPage', () => {
 
     await component.login();
 
-    expect(encargadoService.loginByPhone).toHaveBeenCalledWith('56912345678');
+    expect(encargadoService.loginByPhone).toHaveBeenCalledWith('+56912345678');
     expect(profile.save).toHaveBeenCalledWith({
       name: 'Daniel',
       lastName: 'Uribe',

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Polygon, LeafletMouseEvent } from 'leaflet';
 import { MapInitializationService } from './map-initialization.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -128,24 +128,24 @@ describe('MapInitializationService', () => {
     state.modoMarcado.set('completa');
     // Territorio NO seleccionado: el click debe ignorarse (bloquea seleccionar
     // territorios ajenos desde el modo marcar-completo).
-    handler('m0', 'Otro', {} as L.Polygon, '#0000ff', 99, event as L.LeafletMouseEvent);
+    handler('m0', 'Otro', {} as Polygon, '#0000ff', 99, event as LeafletMouseEvent);
     expect(selection.marcarManzana).not.toHaveBeenCalled();
 
     // Territorio seleccionado, manzana NO marcada: se marca.
     state.territoriosSeleccionados.set([5]);
-    handler('m1', 'A', {} as L.Polygon, '#ff0000', 5, event as L.LeafletMouseEvent);
+    handler('m1', 'A', {} as Polygon, '#ff0000', 5, event as LeafletMouseEvent);
     expect(selection.marcarManzana).toHaveBeenCalledWith('m1', 'A', {}, '#ff0000', 5);
 
     // Manzana YA marcada del territorio seleccionado: no-op (nunca desmarcar).
     selection.marcarManzana.mockClear();
     state.manzanasById.set(new Map([['m2', { id: 'm2', nombreBloque: 'B', color: '#ff0000', territorioNumero: 5 }]]));
-    handler('m2', 'B', {} as L.Polygon, '#ff0000', 5, event as L.LeafletMouseEvent);
+    handler('m2', 'B', {} as Polygon, '#ff0000', 5, event as LeafletMouseEvent);
     expect(selection.marcarManzana).not.toHaveBeenCalled();
 
     // Fuera del modo completa: el handler no debe intervenir.
     selection.marcarManzana.mockClear();
     state.modoMarcado.set('none');
-    handler('m3', 'C', {} as L.Polygon, '#00ff00', 6, event as L.LeafletMouseEvent);
+    handler('m3', 'C', {} as Polygon, '#00ff00', 6, event as LeafletMouseEvent);
     expect(selection.marcarManzana).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { LatLng, Polygon, type LatLngExpression } from 'leaflet';
 import * as GeoJSON from 'geojson';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -125,18 +125,18 @@ export class MapMarkRestorationService {
 
     try {
       const geometry = JSON.parse(geometriaParcial) as GeoJSON.Geometry;
-      let latlngs: L.LatLngExpression[] = [];
+      let latlngs: LatLngExpression[] = [];
 
       if (geometry.type === 'Polygon') {
-        latlngs = (geometry as GeoJSON.Polygon).coordinates[0].map(c => L.latLng(c[1], c[0]));
+        latlngs = (geometry as GeoJSON.Polygon).coordinates[0].map(c => new LatLng(c[1], c[0]));
       } else if (geometry.type === 'MultiPolygon') {
-        latlngs = (geometry as GeoJSON.MultiPolygon).coordinates[0][0].map(c => L.latLng(c[1], c[0]));
+        latlngs = (geometry as GeoJSON.MultiPolygon).coordinates[0][0].map(c => new LatLng(c[1], c[0]));
       }
 
       if (latlngs.length === 0) return;
 
       const parcialId = nextParcialId();
-      const polygon = L.polygon(latlngs, getPartialPolygonCompleteStyle(color)).addTo(map);
+      const polygon = new Polygon(latlngs, getPartialPolygonCompleteStyle(color)).addTo(map);
 
       this.rendering.addExtraLayer(polygon);
 

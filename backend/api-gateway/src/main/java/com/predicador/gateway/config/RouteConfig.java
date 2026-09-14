@@ -61,7 +61,7 @@ public class RouteConfig {
                                 .circuitBreaker(c -> c.setName("territoryCB-colors")
                                         .setFallbackUri(TERRITORY_FALLBACK))
                                 .retry(config -> config
-                                        .setRetries(2)
+                                        .setRetries(1)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
                         .uri(TERRITORY_SERVICE_URI))
@@ -71,7 +71,7 @@ public class RouteConfig {
                                 .circuitBreaker(c -> c.setName("territoryCB-geojson")
                                         .setFallbackUri(TERRITORY_FALLBACK))
                                 .retry(config -> config
-                                        .setRetries(2)
+                                        .setRetries(1)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
                         .uri(TERRITORY_SERVICE_URI))
@@ -81,7 +81,7 @@ public class RouteConfig {
                                 .circuitBreaker(c -> c.setName("territoryCB-default")
                                         .setFallbackUri(TERRITORY_FALLBACK))
                                 .retry(config -> config
-                                        .setRetries(2)
+                                        .setRetries(1)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
                         .uri(TERRITORY_SERVICE_URI))

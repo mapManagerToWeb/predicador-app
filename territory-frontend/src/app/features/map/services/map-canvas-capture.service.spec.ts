@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Map as LeafletMap, Polygon, Marker, GeoJSON as LeafletGeoJSON } from 'leaflet';
 import { MapCanvasCaptureService } from './map-canvas-capture.service';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
@@ -35,13 +35,14 @@ function createMapContainer(): HTMLElement {
 describe('MapCanvasCaptureService', () => {
   let ctx: Ctx2D;
   let canvasEl: HTMLCanvasElement;
-  let map: L.Map;
+  let map: LeafletMap;
   let container: HTMLElement;
   let engine: MapEngineService;
   let territories: MapTerritoryLayerService;
   let service: MapCanvasCaptureService;
 
   beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
     ctx = createCtx();
 
     canvasEl = document.createElement('canvas');
@@ -55,7 +56,7 @@ describe('MapCanvasCaptureService', () => {
     vi.spyOn(canvasEl, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
     vi.spyOn(canvasEl, 'toDataURL').mockReturnValue('data:image/jpeg;base64,QUJD');
 
-    map = L.map(container, { center: [0, 0], zoom: 15 });
+    map = new LeafletMap(container, { center: [0, 0], zoom: 15 });
     Object.defineProperty(container, 'getBoundingClientRect', {
       value: () => new DOMRect(10, 10, 800, 600),
       configurable: true,
@@ -76,6 +77,7 @@ describe('MapCanvasCaptureService', () => {
   afterEach(() => {
     map.remove();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('returns null without a map', async () => {
@@ -124,7 +126,7 @@ describe('MapCanvasCaptureService', () => {
   });
 
   it('draws visible paths with their live style options', async () => {
-    const polygon = L.polygon([[0, 0], [0, 1], [1, 1]], {
+    const polygon = new Polygon([[0, 0], [0, 1], [1, 1]], {
       color: '#ff0000',
       fillColor: '#ff0000',
       fillOpacity: 0.95,
@@ -142,7 +144,7 @@ describe('MapCanvasCaptureService', () => {
   });
 
   it('skips hidden paths (opacity 0 and fillOpacity 0)', async () => {
-    const hidden = L.polygon([[0, 0], [0, 1], [1, 1]], { opacity: 0, fillOpacity: 0 });
+    const hidden = new Polygon([[0, 0], [0, 1], [1, 1]], { opacity: 0, fillOpacity: 0 });
     hidden.addTo(map);
 
     await service.capture();
@@ -151,7 +153,7 @@ describe('MapCanvasCaptureService', () => {
   });
 
   it('applies dashArray for partial polygons', async () => {
-    const partial = L.polygon([[0, 0], [0, 1], [1, 1]], {
+    const partial = new Polygon([[0, 0], [0, 1], [1, 1]], {
       color: '#123456',
       weight: 4,
       opacity: 1,
@@ -165,9 +167,56 @@ describe('MapCanvasCaptureService', () => {
     expect(ctx.setLineDash).toHaveBeenCalledWith([8, 8]);
   });
 
+  it('captures a MultiPolygon GeoJSON territory without crashing (partial-mark regression)', async () => {
+    // Regresión del "marcado parcial": en Leaflet 2.0 (alpha) Polygon y
+    // MultiPolygon comparten clase, y un MultiPolygon deja getLatLngs() =
+    // [[ring],[ring]]. projectRings trataba cada parte como un ring y pasaba
+    // un ARRAY a latLngToContainerPoint -> toLatLng() -> null -> TypeError
+    // ("Cannot read properties of null (reading 'lat')") al guardar el
+    // reporte — los territorios disueltos con turf union y las manzanas
+    // multiparte son MultiPolygon. Esto es lo que produce dissolvedFeature
+    // en map-territory-layer.service.ts a zoom bajo.
+    const layer = new LeafletGeoJSON({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [
+          [[[0, 0], [0, 1], [1, 1], [0, 0]]],
+          [[[2, 2], [2, 3], [3, 3], [2, 2]]],
+        ],
+      },
+    });
+    layer.addTo(map);
+
+    await expect(service.capture()).resolves.toBe('QUJD');
+    expect(ctx.fill).toHaveBeenCalled();
+    expect(ctx.moveTo).toHaveBeenCalled();
+  });
+
+  it('skips degenerate MultiPolygon parts (empty rings) without crashing', async () => {
+    // Las partes vacías pueden aparecer tras simplify/union de turf; deben
+    // descartarse sin romper la captura.
+    const layer = new LeafletGeoJSON({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [
+          [[]],
+          [[[2, 2], [2, 3], [3, 3], [2, 2]]],
+        ],
+      },
+    });
+    layer.addTo(map);
+
+    await expect(service.capture()).resolves.toBe('QUJD');
+    expect(ctx.fill).toHaveBeenCalled();
+  });
+
   it('draws only labels with opacity 1', async () => {
-    const visible = L.marker([0, 0], { opacity: 1 });
-    const hidden = L.marker([1, 1], { opacity: 0 });
+    const visible = new Marker([0, 0], { opacity: 1 });
+    const hidden = new Marker([1, 1], { opacity: 0 });
     visible.addTo(map);
     hidden.addTo(map);
     const span = document.createElement('span');
@@ -176,7 +225,7 @@ describe('MapCanvasCaptureService', () => {
     const icon = document.createElement('div');
     icon.appendChild(span);
     vi.spyOn(visible, 'getElement').mockReturnValue(icon);
-    (territories as { getTerritoryLabels: () => L.Marker[] }).getTerritoryLabels =
+    (territories as { getTerritoryLabels: () => Marker[] }).getTerritoryLabels =
       () => [visible, hidden];
 
     await service.capture();

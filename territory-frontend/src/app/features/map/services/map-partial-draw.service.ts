@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import * as L from 'leaflet';
+import { Polygon, Marker, DivIcon, LatLng, type Map as LeafletMap, type LatLngExpression } from 'leaflet';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { latLngDist, traceContourBetween } from '../map-geometry';
 import polygonClipping from 'polygon-clipping';
@@ -14,12 +14,12 @@ import type { SnappedPoint, Edge } from '../map-geometry';
 @Injectable({ providedIn: 'root' })
 export class MapPartialDrawService {
   private engine = inject(MapEngineService);
-  private poligonoParcial: L.Polygon | null = null;
-  private markersParciales: L.Marker[] = [];
+  private poligonoParcial: Polygon | null = null;
+  private markersParciales: Marker[] = [];
   private dragRaf = 0;
-  private pendingDrag: { index: number; marker: L.Marker } | null = null;
+  private pendingDrag: { index: number; marker: Marker } | null = null;
 
-  getPoligonoParcial(): L.Polygon | null {
+  getPoligonoParcial(): Polygon | null {
     return this.poligonoParcial;
   }
 
@@ -34,14 +34,14 @@ export class MapPartialDrawService {
     this.removePartialMarkers(map);
   }
 
-  private removePartialPolygon(map: L.Map | null): void {
+  private removePartialPolygon(map: LeafletMap | null): void {
     if (this.poligonoParcial && map) {
       map.removeLayer(this.poligonoParcial);
       this.poligonoParcial = null;
     }
   }
 
-  private removePartialMarkers(map: L.Map | null): void {
+  private removePartialMarkers(map: LeafletMap | null): void {
     for (const m of this.markersParciales) {
       map?.removeLayer(m);
     }
@@ -52,7 +52,7 @@ export class MapPartialDrawService {
     puntos: SnappedPoint[],
     currentTerritoryColor: string,
     manzanaEdges: Edge[],
-    onMarkerDrag: (index: number, marker: L.Marker) => void
+    onMarkerDrag: (index: number, marker: Marker) => void
   ): void {
     this.limpiarCapasParciales();
 
@@ -75,7 +75,7 @@ export class MapPartialDrawService {
     currentTerritoryColor: string,
     manzanaEdges: Edge[],
     index: number,
-    marker: L.Marker
+    marker: Marker
   ): void {
     const map = this.engine.getMap();
     if (!map) return;
@@ -89,8 +89,8 @@ export class MapPartialDrawService {
 
   private scheduleMarkerDrag(
     index: number,
-    marker: L.Marker,
-    onMarkerDrag: (index: number, marker: L.Marker) => void
+    marker: Marker,
+    onMarkerDrag: (index: number, marker: Marker) => void
   ): void {
     this.pendingDrag = { index, marker };
     if (this.dragRaf === 0) {
@@ -111,13 +111,13 @@ export class MapPartialDrawService {
     this.pendingDrag = null;
   }
 
-  private createPartialPolygonIfValid(latlngs: L.LatLng[], color: string): void {
+  private createPartialPolygonIfValid(latlngs: LatLng[], color: string): void {
     const map = this.engine.getMap();
     if (!map) return;
     this.createPolygonFromLatLngs(latlngs, color, map);
   }
 
-  updatePartialPolygonLatLngs(latlngs: L.LatLngExpression[], currentTerritoryColor: string): void {
+  updatePartialPolygonLatLngs(latlngs: LatLngExpression[], currentTerritoryColor: string): void {
     const map = this.engine.getMap();
     if (!map) return;
 
@@ -128,7 +128,7 @@ export class MapPartialDrawService {
     }
   }
 
-  private updateExistingPolygon(latlngs: L.LatLngExpression[], map: L.Map): void {
+  private updateExistingPolygon(latlngs: LatLngExpression[], map: LeafletMap): void {
     if (latlngs.length >= 2) {
       this.poligonoParcial!.setLatLngs(latlngs);
     } else {
@@ -137,14 +137,14 @@ export class MapPartialDrawService {
     }
   }
 
-  private createNewPolygonIfValid(latlngs: L.LatLngExpression[], color: string, map: L.Map): void {
+  private createNewPolygonIfValid(latlngs: LatLngExpression[], color: string, map: LeafletMap): void {
     this.createPolygonFromLatLngs(latlngs, color, map);
   }
 
-  private createPolygonFromLatLngs(latlngs: L.LatLngExpression[], color: string, map: L.Map): void {
+  private createPolygonFromLatLngs(latlngs: LatLngExpression[], color: string, map: LeafletMap): void {
     if (latlngs.length < 2) return;
     const fillColor = color || '#22c55e';
-    const polygon = L.polygon(latlngs, getPartialPolygonStyle(fillColor, latlngs.length < 3)).addTo(map);
+    const polygon = new Polygon(latlngs, getPartialPolygonStyle(fillColor, latlngs.length < 3)).addTo(map);
     this.poligonoParcial = polygon;
   }
 
@@ -152,12 +152,12 @@ export class MapPartialDrawService {
     this.limpiarCapasParciales();
   }
 
-  private buildContourPolygon(puntos: SnappedPoint[], manzanaEdges: Edge[]): L.LatLng[] {
+  private buildContourPolygon(puntos: SnappedPoint[], manzanaEdges: Edge[]): LatLng[] {
     const map = this.engine.getMap();
     if (!map || puntos.length === 0) return [];
     if (puntos.length === 1) return [puntos[0].latlng];
 
-    const result: L.LatLng[] = [];
+    const result: LatLng[] = [];
     this.traceAllSegments(puntos, manzanaEdges, map, result);
 
     if (result.length >= 3 && manzanaEdges.length >= 3) {
@@ -171,8 +171,8 @@ export class MapPartialDrawService {
   private traceAllSegments(
     puntos: SnappedPoint[],
     manzanaEdges: Edge[],
-    map: L.Map,
-    result: L.LatLng[]
+    map: LeafletMap,
+    result: LatLng[]
   ): void {
     for (let i = 0; i < puntos.length - 1; i++) {
       const segment = traceContourBetween(puntos[i], puntos[i + 1], manzanaEdges, map);
@@ -180,7 +180,7 @@ export class MapPartialDrawService {
     }
   }
 
-  private addUniquePoints(segment: L.LatLng[], map: L.Map, result: L.LatLng[]): void {
+  private addUniquePoints(segment: LatLng[], map: LeafletMap, result: LatLng[]): void {
     for (const point of segment) {
       if (result.length === 0 || latLngDist(result.at(-1)!, point, map) > 1) {
         result.push(point);
@@ -188,7 +188,7 @@ export class MapPartialDrawService {
     }
   }
 
-  private clipPolygonToManzana(polygon: L.LatLng[], manzanaEdges: Edge[]): L.LatLng[] {
+  private clipPolygonToManzana(polygon: LatLng[], manzanaEdges: Edge[]): LatLng[] {
     try {
       const subject = this.buildSubjectRing(polygon);
       const manzanaRing = this.buildManzanaRing(manzanaEdges);
@@ -202,7 +202,7 @@ export class MapPartialDrawService {
     }
   }
 
-  private buildSubjectRing(polygon: L.LatLng[]): [number, number][] {
+  private buildSubjectRing(polygon: LatLng[]): [number, number][] {
     const subject: [number, number][] = polygon.map(p => [p.lng, p.lat]);
     if (subject.length > 0 && !this.isRingClosed(subject)) {
       subject.push([subject[0][0], subject[0][1]]);
@@ -225,21 +225,21 @@ export class MapPartialDrawService {
     return first[0] === last[0] && first[1] === last[1];
   }
 
-  private extractClippedResult(intersection: polygonClipping.Polygon[], fallback: L.LatLng[]): L.LatLng[] {
+  private extractClippedResult(intersection: polygonClipping.Polygon[], fallback: LatLng[]): LatLng[] {
     if (!intersection || intersection.length === 0) return fallback;
 
     const outerRing = intersection[0][0];
     if (!outerRing || outerRing.length < 3) return fallback;
 
-    return outerRing.map(([lng, lat]) => ({ lat, lng } as L.LatLng));
+    return outerRing.map(([lng, lat]) => new LatLng(lat, lng));
   }
 
-  private agregarMarkersParciales(puntos: SnappedPoint[], onMarkerDrag: (index: number, marker: L.Marker) => void): void {
+  private agregarMarkersParciales(puntos: SnappedPoint[], onMarkerDrag: (index: number, marker: Marker) => void): void {
     const map = this.engine.getMap();
     if (!map) return;
 
     const icon = this.createMarkerIcon();
-    const markers: L.Marker[] = [];
+    const markers: Marker[] = [];
 
     for (let i = 0; i < puntos.length; i++) {
       const marker = this.createDraggableMarker(puntos[i].latlng, icon, map, i, onMarkerDrag);
@@ -249,8 +249,8 @@ export class MapPartialDrawService {
     this.markersParciales = markers;
   }
 
-  private createMarkerIcon(): L.DivIcon {
-    return L.divIcon({
+  private createMarkerIcon(): DivIcon {
+    return new DivIcon({
       className: STYLE_DEFAULTS.partialPoint.className,
       html: '<div class="partial-dot"></div>',
       iconSize: [...STYLE_DEFAULTS.partialPoint.iconSize],
@@ -259,13 +259,13 @@ export class MapPartialDrawService {
   }
 
   private createDraggableMarker(
-    latlng: L.LatLng,
-    icon: L.DivIcon,
-    map: L.Map,
+    latlng: LatLng,
+    icon: DivIcon,
+    map: LeafletMap,
     idx: number,
-    onMarkerDrag: (index: number, marker: L.Marker) => void
-  ): L.Marker {
-    const m = L.marker(latlng, { icon, draggable: true }).addTo(map);
+    onMarkerDrag: (index: number, marker: Marker) => void
+  ): Marker {
+    const m = new Marker(latlng, { icon, draggable: true }).addTo(map);
     m.on('drag', () => this.scheduleMarkerDrag(idx, m, onMarkerDrag));
     return m;
   }

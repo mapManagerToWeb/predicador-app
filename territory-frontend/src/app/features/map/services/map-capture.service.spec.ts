@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Polygon, Path, Layer } from 'leaflet';
 import { MapCaptureService } from './map-capture.service';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
@@ -14,8 +14,8 @@ import {
   getPartialPolygonCompleteStyle,
 } from './map-style.service';
 
-function makePath(): L.Path {
-  const p = new L.Polygon([
+function makePath(): Path {
+  const p = new Polygon([
     [
       { lat: 0, lng: 0 },
       { lat: 1, lng: 0 },
@@ -24,15 +24,15 @@ function makePath(): L.Path {
     ],
   ]);
   vi.spyOn(p, 'setStyle');
-  return p as unknown as L.Path;
+  return p as unknown as Path;
 }
 
-function fakeFeatureLayer(territorioNumero: number, color: string, paths: L.Path[]) {
+function fakeFeatureLayer(territorioNumero: number, color: string, paths: Path[]) {
   return {
     territorioPadre: territorioNumero,
     color,
     layer: {
-      eachLayer: (cb: (l: L.Layer) => void) => paths.forEach(cb),
+      eachLayer: (cb: (l: Layer) => void) => paths.forEach(cb),
       getBounds: () => ({ isValid: () => true, extend: vi.fn() }),
     },
   };
@@ -52,13 +52,28 @@ describe('MapCaptureService', () => {
   let territories: {
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getTerritoryLabels: ReturnType<typeof vi.fn>;
+    getExtraLayers: ReturnType<typeof vi.fn>;
   };
-  let fakeMap: { fitBounds: ReturnType<typeof vi.fn>; getZoom: ReturnType<typeof vi.fn>; getContainer: ReturnType<typeof vi.fn> };
+  let fakeMap: {
+    fitBounds: ReturnType<typeof vi.fn>;
+    getZoom: ReturnType<typeof vi.fn>;
+    getContainer: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
-    fakeMap = { fitBounds: vi.fn(), getZoom: vi.fn().mockReturnValue(15), getContainer: vi.fn().mockReturnValue(document.createElement('div')) };
+    fakeMap = {
+      fitBounds: vi.fn(),
+      getZoom: vi.fn().mockReturnValue(15),
+      getContainer: vi.fn().mockReturnValue(document.createElement('div')),
+    };
     engine = { getMap: vi.fn() };
-    territories = { getAllTerritoriesLayer: vi.fn(), getTerritoryLabels: vi.fn(), getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined), getManzanaCountByTerritorio: vi.fn().mockReturnValue(0) };
+    territories = {
+      getAllTerritoriesLayer: vi.fn(),
+      getTerritoryLabels: vi.fn(),
+      getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
+      getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
+      getExtraLayers: vi.fn().mockReturnValue([]),
+    };
     TestBed.configureTestingModule({
       providers: [
         MapCaptureService,
@@ -88,9 +103,7 @@ describe('MapCaptureService', () => {
       engine.getMap.mockReturnValue(fakeMap);
       territories.getAllTerritoriesLayer.mockReturnValue([fakeFeatureLayer(1, '#ff0000', [])]);
       territories.getTerritoryLabels.mockReturnValue([]);
-      territories.getFeatureLayerByTerritorio.mockReturnValue(
-        fakeFeatureLayer(1, '#ff0000', [])
-      );
+      territories.getFeatureLayerByTerritorio.mockReturnValue(fakeFeatureLayer(1, '#ff0000', []));
 
       await service.prepararCaptura([], [1]);
 
@@ -115,8 +128,18 @@ describe('MapCaptureService', () => {
       ]);
       territories.getTerritoryLabels.mockReturnValue([fakeLabel('1'), fakeLabel('2')]);
       territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
-        if (num === 1) return { territorioPadre: 1, color: '#ff0000', layer: { getBounds: () => ({ isValid: () => true }) } };
-        if (num === 2) return { territorioPadre: 2, color: '#00ff00', layer: { getBounds: () => ({ isValid: () => true }) } };
+        if (num === 1)
+          return {
+            territorioPadre: 1,
+            color: '#ff0000',
+            layer: { getBounds: () => ({ isValid: () => true }) },
+          };
+        if (num === 2)
+          return {
+            territorioPadre: 2,
+            color: '#00ff00',
+            layer: { getBounds: () => ({ isValid: () => true }) },
+          };
         return undefined;
       });
 
@@ -132,7 +155,10 @@ describe('MapCaptureService', () => {
       expect(markedPath.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
       expect(unmarkedPath.setStyle).toHaveBeenCalledWith(getCaptureUnmarkedStyle('#ff0000'));
       expect(partialPath.setStyle).toHaveBeenCalledWith(getPartialPolygonCompleteStyle('#ff0000'));
-      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50], animate: false });
+      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), {
+        padding: [50, 50],
+        animate: false,
+      });
     });
 
     it('updates label opacity to reflect the selection', async () => {
@@ -147,6 +173,59 @@ describe('MapCaptureService', () => {
 
       expect(label1.setOpacity).toHaveBeenCalledWith(1);
       expect(label2.setOpacity).toHaveBeenCalledWith(0);
+    });
+
+    it('hides leftover partial layers and partials of non-selected territories during capture', async () => {
+      engine.getMap.mockReturnValue(fakeMap);
+      const leftoverPath = makePath();
+      const partialVisiblePath = makePath();
+      const partialOcultoPath = makePath();
+      registry.register('m1', makePath());
+      registry.register('parcial-1-x', partialVisiblePath);
+      registry.register('parcial-2-y', partialOcultoPath);
+
+      territories.getAllTerritoriesLayer.mockReturnValue([
+        fakeFeatureLayer(1, '#ff0000', [makePath()]),
+        fakeFeatureLayer(2, '#00ff00', [makePath()]),
+      ]);
+      territories.getTerritoryLabels.mockReturnValue([fakeLabel('1'), fakeLabel('2')]);
+      territories.getExtraLayers.mockReturnValue([
+        leftoverPath,
+        partialVisiblePath,
+        partialOcultoPath,
+      ]);
+      territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
+        if (num === 1) return fakeFeatureLayer(1, '#ff0000', []);
+        if (num === 2) return fakeFeatureLayer(2, '#00ff00', []);
+        return undefined;
+      });
+
+      const marcadas = [
+        { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 },
+        { id: 'parcial-1-x', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
+        {
+          id: 'parcial-2-y',
+          nombreBloque: 'Zona parcial 2',
+          color: '#00ff00',
+          territorioNumero: 2,
+        },
+      ];
+
+      const promise = service.prepararCaptura(marcadas, [1]);
+      await promise;
+
+      // Leftover partial from a previous session (no mark anymore) is hidden.
+      expect(leftoverPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+      // Partial assigned to a territory NOT photographed in this report is hidden.
+      expect(partialOcultoPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+      expect(partialOcultoPath.setStyle).not.toHaveBeenCalledWith(
+        getPartialPolygonCompleteStyle('#00ff00'),
+      );
+      // Partial of a selected territory stays visible with its complete style.
+      expect(partialVisiblePath.setStyle).toHaveBeenCalledWith(
+        getPartialPolygonCompleteStyle('#ff0000'),
+      );
+      expect(partialVisiblePath.setStyle).not.toHaveBeenCalledWith(getHiddenStyle());
     });
   });
 
@@ -177,14 +256,22 @@ describe('MapCaptureService', () => {
         { id: 'parcial-9', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
       ];
 
-      const promise = service.prepararCapturaSoloIncompletos(marcadas, [1, 2], territories.getAllTerritoriesLayer(), getCount);
+      const promise = service.prepararCapturaSoloIncompletos(
+        marcadas,
+        [1, 2],
+        territories.getAllTerritoriesLayer(),
+        getCount,
+      );
       await promise;
 
       expect(markedPath.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
       expect(unmarkedPath.setStyle).toHaveBeenCalledWith(getCaptureIncompleteStyle('#ff0000'));
       expect(hiddenPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
       expect(partialPath.setStyle).toHaveBeenCalledWith(getPartialPolygonCompleteStyle('#ff0000'));
-      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), { padding: [50, 50], animate: false });
+      expect(fakeMap.fitBounds).toHaveBeenCalledWith(expect.anything(), {
+        padding: [50, 50],
+        animate: false,
+      });
     });
 
     it('resolves immediately when no incomplete territory is selected', async () => {
@@ -197,11 +284,72 @@ describe('MapCaptureService', () => {
         [{ id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 }],
         [1],
         territories.getAllTerritoriesLayer(),
-        getCount
+        getCount,
       );
 
       await promise;
       expect(getCount).toHaveBeenCalled();
+    });
+
+    it('hides leftover partial layers and partials of completed territories; keeps shown incomplete partials visible', async () => {
+      engine.getMap.mockReturnValue(fakeMap);
+      const leftoverPath = makePath();
+      const partialCompletadoPath = makePath();
+      const partialIncompletoPath = makePath();
+      registry.register('m1', makePath());
+      registry.register('m2', makePath());
+      registry.register('parcial-2-x', partialCompletadoPath);
+      registry.register('parcial-1-y', partialIncompletoPath);
+
+      territories.getAllTerritoriesLayer.mockReturnValue([
+        fakeFeatureLayer(1, '#ff0000', [makePath()]),
+        fakeFeatureLayer(2, '#00ff00', [makePath()]),
+      ]);
+      territories.getTerritoryLabels.mockReturnValue([fakeLabel('1'), fakeLabel('2')]);
+      territories.getExtraLayers.mockReturnValue([
+        leftoverPath,
+        partialCompletadoPath,
+        partialIncompletoPath,
+      ]);
+      territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
+        if (num === 1) return fakeFeatureLayer(1, '#ff0000', []);
+        if (num === 2) return fakeFeatureLayer(2, '#00ff00', []);
+        return undefined;
+      });
+      const getCount = vi.fn().mockImplementation((num: number) => (num === 1 ? 3 : 1));
+
+      const marcadas = [
+        { id: 'm2', nombreBloque: 'B', color: '#00ff00', territorioNumero: 2 },
+        {
+          id: 'parcial-2-x',
+          nombreBloque: 'Zona parcial completada',
+          color: '#00ff00',
+          territorioNumero: 2,
+        },
+        { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 },
+        { id: 'parcial-1-y', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 },
+      ];
+
+      const promise = service.prepararCapturaSoloIncompletos(
+        marcadas,
+        [1, 2],
+        territories.getAllTerritoriesLayer(),
+        getCount,
+      );
+      await promise;
+
+      // Leftover partial from a previous session (no mark anymore) is hidden.
+      expect(leftoverPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+      // Partial belonging to a COMPLETED territory (in marks but not shown) is hidden too.
+      expect(partialCompletadoPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+      expect(partialCompletadoPath.setStyle).not.toHaveBeenCalledWith(
+        getPartialPolygonCompleteStyle('#00ff00'),
+      );
+      // Partial of the incomplete shown territory keeps its complete style.
+      expect(partialIncompletoPath.setStyle).toHaveBeenCalledWith(
+        getPartialPolygonCompleteStyle('#ff0000'),
+      );
+      expect(partialIncompletoPath.setStyle).not.toHaveBeenCalledWith(getHiddenStyle());
     });
   });
 
@@ -295,8 +443,18 @@ describe('MapCaptureService', () => {
       ]);
       territories.getTerritoryLabels.mockReturnValue([]);
       territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
-        if (num === 1) return { territorioPadre: 1, color: '#ff0000', layer: { getBounds: () => ({ isValid: () => true }) } };
-        if (num === 2) return { territorioPadre: 2, color: '#00ff00', layer: { getBounds: () => ({ isValid: () => true }) } };
+        if (num === 1)
+          return {
+            territorioPadre: 1,
+            color: '#ff0000',
+            layer: { getBounds: () => ({ isValid: () => true }) },
+          };
+        if (num === 2)
+          return {
+            territorioPadre: 2,
+            color: '#00ff00',
+            layer: { getBounds: () => ({ isValid: () => true }) },
+          };
         return undefined;
       });
 
@@ -319,6 +477,57 @@ describe('MapCaptureService', () => {
       service.restaurarMapaPostCaptura([], [1], 'completa');
 
       expect(unselectedPath.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+    });
+
+    it('restores partial-zone layers hidden during capture with their captured color, once', async () => {
+      engine.getMap.mockReturnValue(fakeMap);
+      const hiddenPartial = new Polygon(
+        [
+          [
+            { lat: 0, lng: 0 },
+            { lat: 1, lng: 0 },
+            { lat: 1, lng: 1 },
+            { lat: 0, lng: 1 },
+          ],
+        ],
+        { color: '#00ff00' },
+      );
+      vi.spyOn(hiddenPartial, 'setStyle');
+      registry.register('m1', makePath());
+      territories.getAllTerritoriesLayer.mockReturnValue([
+        fakeFeatureLayer(1, '#ff0000', []),
+        fakeFeatureLayer(2, '#00ff00', []),
+      ]);
+      territories.getTerritoryLabels.mockReturnValue([]);
+      territories.getExtraLayers.mockReturnValue([hiddenPartial]);
+      territories.getFeatureLayerByTerritorio.mockImplementation((num: number) => {
+        if (num === 1) return fakeFeatureLayer(1, '#ff0000', []);
+        if (num === 2) return fakeFeatureLayer(2, '#00ff00', []);
+        return undefined;
+      });
+      const getCount = vi.fn().mockReturnValue(3);
+      const marcadas = [{ id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 }];
+
+      // Prepare hides the leftover partial (not part of this report's marks).
+      await service.prepararCapturaSoloIncompletos(
+        marcadas,
+        [1],
+        territories.getAllTerritoriesLayer(),
+        getCount,
+      );
+      expect(hiddenPartial.setStyle).toHaveBeenCalledWith(getHiddenStyle());
+
+      service.restaurarMapaPostCaptura(marcadas, [1], 'none');
+
+      // Restored with the color captured BEFORE the hide, not the hidden style.
+      expect(hiddenPartial.setStyle).toHaveBeenNthCalledWith(
+        2,
+        getPartialPolygonCompleteStyle('#00ff00'),
+      );
+
+      // A second restore does not re-apply styles: the hidden list was cleared.
+      service.restaurarMapaPostCaptura(marcadas, [1], 'none');
+      expect(hiddenPartial.setStyle).toHaveBeenCalledTimes(2);
     });
   });
 });

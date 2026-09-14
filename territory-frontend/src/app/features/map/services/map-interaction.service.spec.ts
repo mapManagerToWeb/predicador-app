@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import * as L from 'leaflet';
+import { Polygon, Marker, LeafletMouseEvent, GeoJSON as LeafletGeoJSON } from 'leaflet';
 import { MapInteractionService } from './map-interaction.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -25,7 +25,7 @@ function fakeManzana(id: string, territorioNumero = 5): ManzanaIndex {
     color: '#ff0000',
     territorioNumero,
     bbox: { minLat: -1, maxLat: 2, minLng: -1, maxLng: 2 },
-    polygon: new L.Polygon([
+    polygon: new Polygon([
       [
         { lat: -1, lng: -1 },
         { lat: 2, lng: -1 },
@@ -36,24 +36,75 @@ function fakeManzana(id: string, territorioNumero = 5): ManzanaIndex {
   } as ManzanaIndex;
 }
 
+// Manzana MultiPolygon real (Leaflet 2.0 comparte Polygon/MultiPolygon:
+// getLatLngs() devuelve [[ring],[ring]]). Regresión del marcado parcial:
+// antes, rings[0] era [ringA] y pointInPolygon recibía un ARRAY como ring
+// -> nunca detectaba la segunda parte (marcado fallaba en silencio).
+function fakeManzanaMultiPolygon(id: string, territorioNumero = 5): ManzanaIndex {
+  // Un MultiPolygon GeoJSON real produce getLatLngs() [[ring],[ring]] en las
+  // versiones de Leaflet (1.9 y 2.0-alpha); new Polygon([[r1],[r2]]) NO lo
+  // produce (deja [r1,r2]), por eso se construye vía L.geoJSON.
+  const gj = new LeafletGeoJSON({
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'MultiPolygon',
+      coordinates: [
+        [
+          [
+            [-1, -1],
+            [2, -1],
+            [2, 2],
+            [-1, 2],
+            [-1, -1],
+          ],
+        ],
+        [
+          [
+            [10, 10],
+            [12, 10],
+            [12, 12],
+            [10, 12],
+            [10, 10],
+          ],
+        ],
+      ],
+    },
+  });
+  let child: Polygon | null = null;
+  gj.eachLayer(l => {
+    child = l as Polygon;
+  });
+  return {
+    id,
+    nombreBloque: `Bloque-${id}`,
+    color: '#ff0000',
+    territorioNumero,
+    bbox: { minLat: -1, maxLat: 12, minLng: -1, maxLng: 12 },
+    polygon: child as Polygon,
+  } as ManzanaIndex;
+}
+
 describe('MapInteractionService', () => {
   let service: MapInteractionService;
   let state: MapStateService;
   let registry: MapLayerRegistry;
   let toast: { show: ReturnType<typeof vi.fn> };
   let rendering: {
-    getManzanaIndex: ReturnType<typeof vi.fn>;
+    queryManzanasAt: ReturnType<typeof vi.fn>;
+    queryManzanasNear: ReturnType<typeof vi.fn>;
     getMap: ReturnType<typeof vi.fn>;
   };
 
   function clickAt(lat: number, lng: number) {
-    return { latlng: { lat, lng } } as L.LeafletMouseEvent;
+    return { latlng: { lat, lng } } as LeafletMouseEvent;
   }
 
   beforeEach(() => {
     toast = { show: vi.fn() };
     rendering = {
-      getManzanaIndex: vi.fn(),
+      queryManzanasAt: vi.fn().mockReturnValue([]),
+      queryManzanasNear: vi.fn().mockReturnValue([]),
       getMap: vi.fn().mockReturnValue({
         latLngToContainerPoint: (ll: { lat: number; lng: number }) => containerPoint(ll.lat, ll.lng),
       }),
@@ -75,7 +126,7 @@ describe('MapInteractionService', () => {
   describe('modo none', () => {
     it('toggles a manzana that is already marked', () => {
       state.modoMarcado.set('none');
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
@@ -86,7 +137,7 @@ describe('MapInteractionService', () => {
 
     it('selects the territory when clicking an unmarked manzana', () => {
       state.modoMarcado.set('none');
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m2')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m2')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -97,13 +148,31 @@ describe('MapInteractionService', () => {
 
     it('returns none when clicking empty space', () => {
       state.modoMarcado.set('none');
-      rendering.getManzanaIndex.mockReturnValue([]);
+      rendering.queryManzanasAt.mockReturnValue([]);
 
       expect(service.handleMapClick(clickAt(50, 50)).action).toBe('none');
     });
+    it('detects a MultiPolygon manzana when the click lands on a non-first part (regression)', () => {
+      state.modoMarcado.set('none');
+      const manzana = fakeManzanaMultiPolygon('m-multi');
+      // Guard del fixture: debe producir el shape real [[ring],[ring]] de
+      // Leaflet (ring envuelto), no el shape [ring,ring] de un Polygon simple.
+      const raw = manzana.polygon.getLatLngs() as unknown[][][];
+      expect(raw.length).toBe(2);
+      expect(Array.isArray(raw[0])).toBe(true);
+      expect(Array.isArray(raw[0][0])).toBe(true);
+      // El click cae en la SEGUNDA parte (10..12). Antes del fix, rings[0] era
+      // [ringA] (un ARRAY) y pointInPolygon devolvía false -> 'none'.
+      rendering.queryManzanasAt.mockReturnValue([manzana]);
+
+      const result = service.handleMapClick(clickAt(11, 11));
+
+      expect(result.action).toBe('select_territory');
+      expect(result.manzana?.id).toBe('m-multi');
+    });
   it('still selects a foreign territory in mode none', () => {
       state.modoMarcado.set('none');
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m9', 9)]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m9', 9)]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -116,7 +185,7 @@ describe('MapInteractionService', () => {
     it('marks an unmarked manzana of the already selected territory', () => {
       state.modoMarcado.set('completa');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -127,7 +196,7 @@ describe('MapInteractionService', () => {
     it('never unmarks an already-marked manzana (only marks while marking)', () => {
       state.modoMarcado.set('completa');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
@@ -140,7 +209,7 @@ describe('MapInteractionService', () => {
     it('ignores click on unselected territory (no select_territory)', () => {
       state.modoMarcado.set('completa');
       state.territoriosSeleccionados.set([]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -150,7 +219,7 @@ describe('MapInteractionService', () => {
     it('locks and toasts on a foreign-territory manzana click', () => {
       state.modoMarcado.set('completa');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 9)]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1', 9)]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -160,7 +229,7 @@ describe('MapInteractionService', () => {
 
     it('returns none when clicking empty space', () => {
       state.modoMarcado.set('completa');
-      rendering.getManzanaIndex.mockReturnValue([]);
+      rendering.queryManzanasAt.mockReturnValue([]);
 
       expect(service.handleMapClick(clickAt(50, 50)).action).toBe('none');
     });
@@ -169,7 +238,7 @@ describe('MapInteractionService', () => {
   describe('modo parcial', () => {
     it('removes an existing partial polygon when clicking inside it', () => {
       state.modoMarcado.set('parcial');
-      const parcial = new L.Polygon([
+      const parcial = new Polygon([
         [
           { lat: -1, lng: -1 },
           { lat: 2, lng: -1 },
@@ -179,7 +248,7 @@ describe('MapInteractionService', () => {
       ]);
       registry.register('parcial-123', parcial);
       state.manzanasById.set(new Map([['parcial-123', { id: 'parcial-123', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 5 }]]));
-      rendering.getManzanaIndex.mockReturnValue([]);
+      rendering.queryManzanasAt.mockReturnValue([]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -190,7 +259,7 @@ describe('MapInteractionService', () => {
     it('never unmarks an already-marked manzana while marking parcial', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 5 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
@@ -203,7 +272,7 @@ describe('MapInteractionService', () => {
     it('does NOT toggle an already-marked manzana of a foreign territory (lock + toast)', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m9', 9)]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m9', 9)]);
       state.manzanasById.set(new Map([['m9', { id: 'm9', nombreBloque: 'Bloque-m9', color: '#ff0000', territorioNumero: 9 }]]));
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
@@ -216,7 +285,7 @@ describe('MapInteractionService', () => {
     it('locks and toasts on an unmarked foreign-territory manzana click', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m9', 9)]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m9', 9)]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -226,7 +295,7 @@ describe('MapInteractionService', () => {
 
     it('ignores click on unselected territory (no select_manzana)', () => {
       state.modoMarcado.set('parcial');
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -235,7 +304,7 @@ describe('MapInteractionService', () => {
 
     it('returns none when no manzana is selected and none is near', () => {
       state.modoMarcado.set('parcial');
-      rendering.getManzanaIndex.mockReturnValue([]);
+      rendering.queryManzanasAt.mockReturnValue([]);
 
       expect(service.handleMapClick(clickAt(50, 50)).action).toBe('none');
     });
@@ -243,7 +312,7 @@ describe('MapInteractionService', () => {
     it('selects the manzana to partially mark when clicking it in parcial mode', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -254,7 +323,10 @@ describe('MapInteractionService', () => {
     it('selects the nearest manzana when clicking near but outside it', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      // El punto (2.5, 0) cae fuera del bbox de m1: la celda exacta no lo ve,
+      // pero la ventana de celdas vecinas sí lo encuentra.
+      rendering.queryManzanasAt.mockReturnValue([]);
+      rendering.queryManzanasNear.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(2.5, 0));
 
@@ -267,7 +339,7 @@ describe('MapInteractionService', () => {
       state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
       const marker = { getLatLng: () => ({ lat: 0.5, lng: 0 }) };
 
-      const result = service.handleMarkerDrag(marker as L.Marker, 0);
+      const result = service.handleMarkerDrag(marker as Marker, 0);
 
       expect(result[0].edgeIdx).toBe(0);
     });
@@ -277,7 +349,7 @@ describe('MapInteractionService', () => {
       state.territoriosSeleccionados.set([5]);
       state.manzanaSeleccionadaTerritorio.set(5);
       state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0));
 
@@ -290,7 +362,7 @@ describe('MapInteractionService', () => {
       state.territoriosSeleccionados.set([5]);
       state.manzanaSeleccionadaTerritorio.set(5);
       state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
@@ -310,7 +382,7 @@ describe('MapInteractionService', () => {
         { latlng: { lat: 0.8, lng: 0 }, edgeIdx: 0, t: 0.8 },
         { latlng: { lat: 1, lng: 0 }, edgeIdx: 0, t: 1 },
       ]);
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1')]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.3, 0));
 

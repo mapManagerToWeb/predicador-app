@@ -92,6 +92,14 @@ class RumControllerTest {
     }
 
     @Test
+    void ingest_rechazaValueNulo() throws Exception {
+        mockMvc.perform(post(RUM_ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"LCP\",\"value\":null,\"route\":\"/map\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void ingest_ignoraNombresDesconocidosSinFallar() throws Exception {
         mockMvc.perform(post(RUM_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import * as L from 'leaflet';
+import { Path } from 'leaflet';
 
 /**
  * Seam that resolves a marked manzana's id to its live Leaflet layer.
@@ -10,13 +10,13 @@ import * as L from 'leaflet';
  */
 @Injectable({ providedIn: 'root' })
 export class MapLayerRegistry {
-  private readonly layers = new Map<string, L.Path>();
+  private readonly layers = new Map<string, Path>();
 
-  get(id: string): L.Path | null {
+  get(id: string): Path | null {
     return this.layers.get(id) ?? null;
   }
 
-  register(id: string, layer: L.Path): void {
+  register(id: string, layer: Path): void {
     this.layers.set(id, layer);
   }
 
@@ -29,13 +29,13 @@ export class MapLayerRegistry {
   }
 
   /** Checks if a given live layer is currently tracked as marked. */
-  hasLayer(layer: L.Path): boolean {
+  hasLayer(layer: Path): boolean {
     for (const l of this.layers.values()) if (l === layer) return true;
     return false;
   }
 
   /** All currently tracked layers (for capture's markedLayers set). */
-  values(): Iterable<L.Path> {
+  values(): Iterable<Path> {
     return this.layers.values();
   }
 }

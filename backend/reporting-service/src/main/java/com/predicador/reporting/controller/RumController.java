@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -85,18 +86,19 @@ public class RumController {
             return ResponseEntity.noContent().build();
         }
 
-        // 2. Validate value is finite (not NaN, not Infinity)
-        if (!Double.isFinite(metric.value())) {
+        // 2. Validate value is present and finite (not NaN, not Infinity)
+        double value = metric.value();
+        if (!Double.isFinite(value)) {
             return ResponseEntity.badRequest().build();
         }
 
         // 3. Validate value is positive
-        if (metric.value() < 0) {
+        if (value < 0) {
             return ResponseEntity.badRequest().build();
         }
 
         // 4. Cap values to prevent percentile skewing
-        double cappedValue = capMetricValue(name, metric.value());
+        double cappedValue = capMetricValue(name, value);
 
         // 5. Sanitize and allowlist route
         String route = sanitizeRoute(metric.route());
@@ -163,8 +165,9 @@ public class RumController {
     public record RumMetric(
             @NotBlank(message = "name es obligatorio")
             String name,
+            @NotNull(message = "value es obligatorio")
             @PositiveOrZero(message = "value debe ser >= 0")
-            double value,
+            Double value,
             String route
     ) {}
 }

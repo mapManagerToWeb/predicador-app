@@ -6,7 +6,7 @@
 ## 2. Document DB_URL_UNPOOLED in .env.example
 
 - [x] 2.1 Add `DB_URL_UNPOOLED=jdbc:postgresql://<host>/predicador` to `.env.example` under the PostgreSQL section, with a comment explaining the role: "Direct connection (sin -pooler) — required by Flyway for migrations because PgBouncer in transaction mode doesn't support DDL/prepared statements". Verify by reading the file and confirming the variable appears with comment.
-- [ ] 2.2 (Operator action, not code) Update the deployment `.env` and CI/CD secrets to set `DB_URL_UNPOOLED` to the Neon endpoint without `-pooler`. Verify by checking `application.yml` resolves `${DB_URL_UNPOOLED}` to the unpooled string at boot (logs will show the URL).
+- [x] 2.2 (Operator action, not code) Update the deployment `.env` and CI/CD secrets to set `DB_URL_UNPOOLED` to the Neon endpoint without `-pooler`. Verify by checking `application.yml` resolves `${DB_URL_UNPOOLED}` to the unpooled string at boot (logs will show the URL). **Done**: `docker-compose.yml` now passes `DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}` to config-server, territory, and reporting services. Flyway logs confirm `jdbc:postgresql://ep-small-feather-acwivdj1.sa-east-1.aws.neon.tech/neondb` (unpooled).
 
 ## 3. Create V0__initial_schema.sql for territory-service
 
@@ -25,6 +25,12 @@
 
 ## 6. End-to-end verification
 
-- [ ] 6.1 Spin up local stack with `docker-compose up --build`. Verify all five backend services start without errors. Verify the log lines for `territory-service` and `reporting-service` show `Flyway Community Edition X.Y.Z by Redgate` and successful migration execution.
-- [ ] 6.2 Smoke-test the API: hit `GET /api/v1/territories` and `GET /api/v1/reports` through the gateway. Verify both return 200 with data (or empty list, not 500).
+- [x] 6.1 Spin up local stack with `docker-compose up --build`. Verify all five backend services start without errors. Verify the log lines for `territory-service` and `reporting-service` show `Flyway Community Edition X.Y.Z by Redgate` and successful migration execution.
+- [x] 6.2 Smoke-test the API: hit `GET /api/v1/territories` and `GET /api/v1/reports` through the gateway. Verify both return 200 with data (or empty list, not 500). **Note:** first request after Neon suspension may return 503 (gateway circuit-breaker 1s timeout vs ~300-500ms cold start). Retry after warm-up returns 200.
 - [ ] 6.3 (Documentation) Update `README.md` (or `.env.example` comment) to note that the Neon plan must include PostGIS, or document the manual step `CREATE EXTENSION postgis` before first deploy if not in the plan. Verify by reading the updated docs.
+
+## 7. Fix HikariCP minimum-idle to allow Neon scale-to-zero
+
+- [x] 7.1 Set `spring.datasource.hikari.minimum-idle: 0` in `territory-service` and `reporting-service` (both `config-server/src/main/resources/config/*.yml` and each service's local `application.yml`). Rationale: with `minimum-idle: 1`, HikariCP's HouseKeeper (every 30s) proactively recreates the connection when the pool drops below minimum, waking the suspended Neon compute in a continuous cycle that burns CU-hours 24/7 — exceeding the free plan's 100 CU-hours/month (~180 CU-hours/month at 0.25 CU). With `minimum-idle: 0` the pool empties when idle and Neon stays suspended. Also set `connection-timeout: 10000`, `keepalive-time: 0`, and `spring.jpa.open-in-view: false` (prevents retaining pool connections during view rendering). Verify by running `mvn -pl territory-service,reporting-service test -B` from `backend/` — all tests pass.
+- [ ] 7.2 (Operator action) In Neon Console, verify the autoscaling max is set to 0.25 CU (not 2 CU) so a traffic spike doesn't consume CU-hours 4× faster. Verify by checking Neon Console → Compute → autoscaling settings.
+- [ ] 7.3 (Monitoring) After deploy, check Neon Console → Monitoring → Compute usage weekly. Expected: compute at 0 CU during idle hours. If CU usage still approaches the 100 CU-hour limit, investigate other wake sources (scheduled tasks, health checks, external polling).
