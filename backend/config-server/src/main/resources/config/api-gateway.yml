@@ -83,25 +83,33 @@ resilience4j:
     configs:
       default:
         sliding-window-type: COUNT_BASED
-        sliding-window-size: 20
-        minimum-number-of-calls: 10
+        sliding-window-size: 30
+        minimum-number-of-calls: 20
         failure-rate-threshold: 50
+        slow-call-rate-threshold: 60
+        slow-call-duration-threshold: 3s
         wait-duration-in-open-state: 15s
-        permitted-number-of-calls-in-half-open-state: 3
+        permitted-number-of-calls-in-half-open-state: 5
         automatic-transition-from-open-to-half-open-enabled: true
     instances:
       territoryCB-colors:
-        base-config: default
+        timeout-duration: 5s
+        cancel-running-future: true
       territoryCB-geojson:
-        base-config: default
+        timeout-duration: 30s
+        cancel-running-future: true
       territoryCB-default:
-        base-config: default
+        timeout-duration: 15s
+        cancel-running-future: true
       reportingCB:
-        base-config: default
+        timeout-duration: 20s
+        cancel-running-future: true
       encargadosCB:
-        base-config: default
+        timeout-duration: 10s
+        cancel-running-future: true
       rumCB:
-        base-config: default
+        timeout-duration: 5s
+        cancel-running-future: true
   timelimiter:
     configs:
       default:
@@ -109,11 +117,14 @@ resilience4j:
         cancel-running-future: true
     instances:
       territoryCB-colors:
-        base-config: default
+        timeout-duration: 5s
+        cancel-running-future: true
       territoryCB-geojson:
-        base-config: default
+        timeout-duration: 30s
+        cancel-running-future: true
       territoryCB-default:
-        base-config: default
+        timeout-duration: 15s
+        cancel-running-future: true
       reportingCB:
         timeout-duration: 20s
         cancel-running-future: true
