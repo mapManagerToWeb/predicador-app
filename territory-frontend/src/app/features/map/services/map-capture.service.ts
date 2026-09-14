@@ -26,6 +26,9 @@ export class MapCaptureService {
   private territories = inject(MapTerritoryLayerService);
   private registry = inject(MapLayerRegistry);
 
+  /** Partial-zone extra layers hidden for the current capture, to restore after. */
+  private ocultosEnCaptura: { layer: Path; color: string }[] = [];
+
   /**
    * Waits for all visible tile images to finish loading.
    * Returns when every <img> in the tile pane has complete=true,
@@ -34,12 +37,12 @@ export class MapCaptureService {
   waitForTiles(map: LeafletMap): Promise<void> {
     const container = map.getContainer();
     const tiles = Array.from(
-      container.querySelectorAll('.leaflet-tile-pane img')
+      container.querySelectorAll('.leaflet-tile-pane img'),
     ) as HTMLImageElement[];
 
     if (tiles.length === 0) return Promise.resolve();
 
-    const allLoaded = () => tiles.every(t => t.complete);
+    const allLoaded = () => tiles.every((t) => t.complete);
     if (allLoaded()) return Promise.resolve();
 
     return new Promise<void>((resolve) => {
@@ -83,19 +86,23 @@ export class MapCaptureService {
     return this.territories.getAllTerritoriesLayer();
   }
 
-  async prepararCaptura(manzanasMarcadas: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
+  async prepararCaptura(
+    manzanasMarcadas: ManzanaMarcada[],
+    territoriosSeleccionados: number[],
+  ): Promise<void> {
     const map = this.engine.getMap();
     if (!map) return Promise.resolve();
 
     const seleccionados = new Set(territoriosSeleccionados);
     const _markedLayers = new Set<Path>(
-      manzanasMarcadas.map(m => this.registry.get(m.id)!).filter(Boolean)
+      manzanasMarcadas.map((m) => this.registry.get(m.id)!).filter(Boolean),
     );
     const allTerritoriesLayer = this.territories.getAllTerritoriesLayer();
     const territoryLabels = this.territories.getTerritoryLabels();
 
+    this.hideExtraLayersOutsideReport(manzanasMarcadas, seleccionados);
     this.styleTerritoryLayers(allTerritoriesLayer, seleccionados, _markedLayers);
-    this.stylePartialMarks(manzanasMarcadas, allTerritoriesLayer);
+    this.stylePartialMarks(manzanasMarcadas, seleccionados);
     this.updateLabelVisibility(territoryLabels, seleccionados);
     this.fitBoundsToSelection(map, seleccionados, manzanasMarcadas, allTerritoriesLayer);
 
@@ -110,7 +117,7 @@ export class MapCaptureService {
     manzanasMarcadas: ManzanaMarcada[],
     territoriosSeleccionados: number[],
     allTerritoriesLayer: FeatureLayer[],
-    getManzanaCountByTerritorio: (num: number) => number
+    getManzanaCountByTerritorio: (num: number) => number,
   ): Promise<void> {
     const map = this.engine.getMap();
     if (!map) return Promise.resolve();
@@ -119,11 +126,18 @@ export class MapCaptureService {
     const incompletos = new Set<number>();
     for (const num of territoriosSeleccionados) {
       const total = getManzanaCountByTerritorio(num);
-      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num && !m.id.startsWith('parcial-')).length;
+      const marcadas = manzanasMarcadas.filter(
+        (m) => m.territorioNumero === num && !m.id.startsWith('parcial-'),
+      ).length;
       if (total > 0 && marcadas < total) {
         incompletos.add(num);
       }
     }
+
+    // Ocultar zonas parciales que no pertenecen a los territorios de ESTE
+    // reporte (sobras de sesiones anteriores o de territorios completados),
+    // incluso cuando no hay territorios incompletos.
+    this.hideExtraLayersOutsideReport(manzanasMarcadas, incompletos);
 
     if (incompletos.size === 0) return Promise.resolve();
 
@@ -131,7 +145,7 @@ export class MapCaptureService {
 
     // Ocultar territorios completados
     this.styleTerritoryLayersSoloIncompletos(allTerritoriesLayer, incompletos, manzanasMarcadas);
-    this.stylePartialMarks(manzanasMarcadas, allTerritoriesLayer);
+    this.stylePartialMarks(manzanasMarcadas, incompletos);
     this.updateLabelVisibility(territoryLabels, incompletos);
     this.fitBoundsToSelection(map, incompletos, manzanasMarcadas, allTerritoriesLayer);
 
@@ -146,17 +160,21 @@ export class MapCaptureService {
   private styleTerritoryLayersSoloIncompletos(
     allTerritoriesLayer: FeatureLayer[],
     incompletos: Set<number>,
-    manzanasMarcadas: ManzanaMarcada[]
+    manzanasMarcadas: ManzanaMarcada[],
   ): void {
     const markedLayers = new Set<Path>(
-      manzanasMarcadas.map(m => this.registry.get(m.id)).filter((l): l is Path => Boolean(l))
+      manzanasMarcadas.map((m) => this.registry.get(m.id)).filter((l): l is Path => Boolean(l)),
     );
 
     for (const fl of allTerritoriesLayer) {
       if (incompletos.has(fl.territorioPadre)) {
-        fl.layer.eachLayer(l => {
+        fl.layer.eachLayer((l) => {
           if (!(l instanceof Path)) return;
-          l.setStyle(markedLayers.has(l) ? getMarkedManzanaStyle(fl.color) : getCaptureIncompleteStyle(fl.color));
+          l.setStyle(
+            markedLayers.has(l)
+              ? getMarkedManzanaStyle(fl.color)
+              : getCaptureIncompleteStyle(fl.color),
+          );
         });
       } else {
         // Completado: ocultar
@@ -168,7 +186,7 @@ export class MapCaptureService {
   restaurarMapaPostCaptura(
     manzanasMarcadas: ManzanaMarcada[],
     territoriosSeleccionados: number[],
-    modoMarcado: string
+    modoMarcado: string,
   ): void {
     const map = this.engine.getMap();
     if (!map) return;
@@ -180,12 +198,17 @@ export class MapCaptureService {
     this.restoreTerritoryLayers(allTerritoriesLayer, seleccionados, manzanasMarcadas, modoMarcado);
     this.fitBoundsToSelected(map, seleccionados, allTerritoriesLayer);
     this.restoreLabelVisibility(map, territoryLabels, seleccionados);
+
+    for (const { layer, color } of this.ocultosEnCaptura) {
+      layer.setStyle(getPartialPolygonCompleteStyle(color));
+    }
+    this.ocultosEnCaptura = [];
   }
 
   private styleTerritoryLayers(
     allTerritoriesLayer: FeatureLayer[],
     seleccionados: Set<number>,
-    markedLayers: Set<Path>
+    markedLayers: Set<Path>,
   ): void {
     for (const fl of allTerritoriesLayer) {
       if (!seleccionados.has(fl.territorioPadre)) {
@@ -197,27 +220,51 @@ export class MapCaptureService {
   }
 
   private applyHiddenStyle(fl: FeatureLayer): void {
-    fl.layer.eachLayer(l => {
+    fl.layer.eachLayer((l) => {
       if (l instanceof Path) l.setStyle(getHiddenStyle());
     });
   }
 
   private applySelectionStyle(fl: FeatureLayer, markedLayers: Set<Path>): void {
-    fl.layer.eachLayer(l => {
+    fl.layer.eachLayer((l) => {
       if (!(l instanceof Path)) return;
       const isMarked = markedLayers.has(l);
       l.setStyle(isMarked ? getMarkedManzanaStyle(fl.color) : getCaptureUnmarkedStyle(fl.color));
     });
   }
 
-  private stylePartialMarks(manzanasMarcadas: ManzanaMarcada[], _allTerritoriesLayer: FeatureLayer[]): void {
+  private stylePartialMarks(manzanasMarcadas: ManzanaMarcada[], visibles: Set<number>): void {
     for (const m of manzanasMarcadas) {
       if (!m.id.startsWith('parcial-')) continue;
+      if (!visibles.has(m.territorioNumero)) continue;
       const layer = this.registry.get(m.id);
       if (!layer) continue;
       const fl = this.territories.getFeatureLayerByTerritorio(m.territorioNumero);
       if (!fl) continue;
       layer.setStyle(getPartialPolygonCompleteStyle(fl.color));
+    }
+  }
+
+  /**
+   * Oculta las zonas parciales (extra layers) que NO pertenecen a los
+   * territorios visibles del reporte actual: sobras de sesiones anteriores o
+   * parciales de territorios completados. Guarda capa y color original para
+   * restaurarlas en restaurarMapaPostCaptura.
+   */
+  private hideExtraLayersOutsideReport(marcadas: ManzanaMarcada[], visibles: Set<number>): void {
+    this.ocultosEnCaptura = [];
+    const visiblesSet = new Set<Path>();
+    for (const m of marcadas) {
+      if (!m.id.startsWith('parcial-')) continue;
+      if (!visibles.has(m.territorioNumero)) continue;
+      const layer = this.registry.get(m.id);
+      if (layer) visiblesSet.add(layer);
+    }
+    for (const layer of this.territories.getExtraLayers()) {
+      if (!(layer instanceof Path)) continue;
+      if (visiblesSet.has(layer)) continue;
+      this.ocultosEnCaptura.push({ layer, color: layer.options.color ?? '' });
+      layer.setStyle(getHiddenStyle());
     }
   }
 
@@ -235,9 +282,13 @@ export class MapCaptureService {
     map: LeafletMap,
     seleccionados: Set<number>,
     manzanasMarcadas: ManzanaMarcada[],
-    allTerritoriesLayer: FeatureLayer[]
+    allTerritoriesLayer: FeatureLayer[],
   ): void {
-    const combined = this.calculateCombinedBounds(seleccionados, manzanasMarcadas, allTerritoriesLayer);
+    const combined = this.calculateCombinedBounds(
+      seleccionados,
+      manzanasMarcadas,
+      allTerritoriesLayer,
+    );
     if (combined) {
       // animate: false — the map must settle instantly before the tile waiter
       // snapshot; an animated fitBounds keeps the OLD tiles in the pane while
@@ -250,7 +301,7 @@ export class MapCaptureService {
   private calculateCombinedBounds(
     seleccionados: Set<number>,
     manzanasMarcadas: ManzanaMarcada[],
-    allTerritoriesLayer: FeatureLayer[]
+    allTerritoriesLayer: FeatureLayer[],
   ): LatLngBounds | null {
     let combined = this.getBoundsFromSelectedTerritories(seleccionados, allTerritoriesLayer);
     if (!combined) {
@@ -259,7 +310,10 @@ export class MapCaptureService {
     return combined;
   }
 
-  private getBoundsFromSelectedTerritories(seleccionados: Set<number>, _allTerritoriesLayer: FeatureLayer[]): LatLngBounds | null {
+  private getBoundsFromSelectedTerritories(
+    seleccionados: Set<number>,
+    _allTerritoriesLayer: FeatureLayer[],
+  ): LatLngBounds | null {
     let combined: LatLngBounds | null = null;
     for (const num of seleccionados) {
       const fl = this.territories.getFeatureLayerByTerritorio(num);
@@ -289,7 +343,7 @@ export class MapCaptureService {
     allTerritoriesLayer: FeatureLayer[],
     seleccionados: Set<number>,
     manzanasMarcadas: ManzanaMarcada[],
-    modoMarcado: string
+    modoMarcado: string,
   ): void {
     for (const fl of allTerritoriesLayer) {
       if (!seleccionados.has(fl.territorioPadre)) {
@@ -302,7 +356,7 @@ export class MapCaptureService {
 
   private applyVisibilityStyle(fl: FeatureLayer, modoMarcado: string): void {
     const isVisible = modoMarcado === 'none';
-    fl.layer.eachLayer(l => {
+    fl.layer.eachLayer((l) => {
       if (l instanceof Path) {
         l.setStyle(isVisible ? getBaseTerritoryStyle(fl.color, false) : getHiddenStyle());
       }
@@ -310,7 +364,7 @@ export class MapCaptureService {
   }
 
   private applyRestoredSelectionStyle(fl: FeatureLayer, _manzanasMarcadas: ManzanaMarcada[]): void {
-    fl.layer.eachLayer(l => {
+    fl.layer.eachLayer((l) => {
       if (!(l instanceof Path)) return;
       const isMarked = this.registry.hasLayer(l);
       if (!isMarked) {
@@ -319,14 +373,22 @@ export class MapCaptureService {
     });
   }
 
-  private fitBoundsToSelected(map: LeafletMap, seleccionados: Set<number>, allTerritoriesLayer: FeatureLayer[]): void {
+  private fitBoundsToSelected(
+    map: LeafletMap,
+    seleccionados: Set<number>,
+    allTerritoriesLayer: FeatureLayer[],
+  ): void {
     const combined = this.getBoundsFromSelectedTerritories(seleccionados, allTerritoriesLayer);
     if (combined?.isValid()) {
       map.fitBounds(combined, { padding: MAP_DEFAULTS.boundsPadding });
     }
   }
 
-  private restoreLabelVisibility(map: LeafletMap, territoryLabels: Marker[], seleccionados: Set<number>): void {
+  private restoreLabelVisibility(
+    map: LeafletMap,
+    territoryLabels: Marker[],
+    seleccionados: Set<number>,
+  ): void {
     const zoomVisible = map.getZoom() >= MAP_DEFAULTS.labelMinZoom;
     if (seleccionados.size > 0 && zoomVisible) {
       this.showSelectedLabels(territoryLabels, seleccionados);
@@ -349,5 +411,4 @@ export class MapCaptureService {
       lbl.setOpacity(zoomVisible ? 1 : 0);
     }
   }
-
 }

@@ -391,8 +391,12 @@ export class MapTerritoryLayerService {
   }
 
   removeExtraLayer(layer: Layer): void {
-    this.extraLayers = this.extraLayers.filter(l => l !== layer);
+    this.extraLayers = this.extraLayers.filter((l) => l !== layer);
     this.engine.getMap()?.removeLayer(layer);
+  }
+
+  getExtraLayers(): Layer[] {
+    return this.extraLayers;
   }
 
   clearExtraLayers(): void {
