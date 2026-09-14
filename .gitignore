@@ -58,6 +58,14 @@ yarn-error.log*
 .superpowers/
 docs/
 
+# AI planning artifacts (map pipeline specs, perf capability map, task lists)
+tasks/
+CAPABILITY-MAP.md
+SPEC-map-*.md
+
+# Browser-testing debug output (playwright-mcp logs/screenshots)
+.playwright-mcp/
+
 # AI-generated scaffolding (unwired placeholders, not part of the app)
 predicador-frontend/src/app/whatsapp-simulation/
 predicador-frontend/src/app/core/services/pending-reports-queue.ts
