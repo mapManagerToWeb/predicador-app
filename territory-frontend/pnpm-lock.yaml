@@ -58,8 +58,8 @@ importers:
         specifier: ^5.1.0
         version: 5.2.1
       leaflet:
-        specifier: 2.0.0-alpha.1
-        version: 2.0.0-alpha.1
+        specifier: 1.9.4
+        version: 1.9.4
       polygon-clipping:
         specifier: ^0.15.7
         version: 0.15.7
@@ -2778,8 +2778,8 @@ packages:
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
-  leaflet@2.0.0-alpha.1:
-    resolution: {integrity: sha512-2EJU27z/wljOgQCyybRkfrm5Xc3uy6huKehh0UAPsrAdwnSMxaplsqCl9cXPAuDm6D7uL6PCznYMDVIsaAdSdA==}
+  leaflet@1.9.4:
+    resolution: {integrity: sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -6161,7 +6161,7 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  leaflet@2.0.0-alpha.1: {}
+  leaflet@1.9.4: {}
 
   levn@0.4.1:
     dependencies:

@@ -7,6 +7,7 @@ import { Toast } from '../../../core/services/toast';
 import { MAX_PUNTOS_PARCIAL, TOAST_MESSAGES } from '../utils/map-constants';
 import type { SnappedPoint, ManzanaIndex } from '../types/map.types';
 import { snapToContour, pointInPolygon, projectOnSegment } from '../map-geometry';
+import { collectLatLngRings } from './map-rings';
 
 export interface MapClickResult {
   action: 'none' | 'select_manzana' | 'toggle_manzana' | 'add_partial_point' | 'remove_partial' | 'select_territory';
@@ -116,10 +117,14 @@ export class MapInteractionService {
       if (!m.id.startsWith('parcial-')) continue;
       const layer = this.registry.get(m.id);
       if (!(layer instanceof Polygon)) continue;
-      const rings = layer.getLatLngs();
-      const outer = rings[0] as LatLng[];
-      if (outer && pointInPolygon(latlng, outer)) {
-        return { id: m.id };
+      // Leaflet 2.0 comparte Polygon/MultiPolygon: un MultiPolygon deja
+      // getLatLngs() con forma [[ring],[ring]]. collectLatLngRings aplana la
+      // forma; probamos el punto contra todas las partes.
+      const rings = collectLatLngRings(layer.getLatLngs());
+      for (const ring of rings) {
+        if (pointInPolygon(latlng, ring)) {
+          return { id: m.id };
+        }
       }
     }
     return null;
@@ -127,14 +132,17 @@ export class MapInteractionService {
 
   private findManzanaInside(latlng: LatLng): ManzanaIndex | null {
     const { lat, lng } = latlng;
-    for (const mc of this.rendering.getManzanaIndex()) {
+    // El grid espacial acota la búsqueda a la celda del punto (O(1) promedio)
+    // en lugar de escanear todas las manzanas.
+    for (const mc of this.rendering.queryManzanasAt(latlng)) {
       if (lat < mc.bbox.minLat || lat > mc.bbox.maxLat || lng < mc.bbox.minLng || lng > mc.bbox.maxLng) {
         continue;
       }
-      const rings = mc.polygon.getLatLngs();
-      const outer = rings[0] as LatLng[];
-      if (outer && pointInPolygon(latlng, outer)) {
-        return mc;
+      const rings = collectLatLngRings(mc.polygon.getLatLngs());
+      for (const ring of rings) {
+        if (pointInPolygon(latlng, ring)) {
+          return mc;
+        }
       }
     }
     return null;
@@ -151,7 +159,9 @@ export class MapInteractionService {
     let best: ManzanaIndex | null = null;
     let bestDist = Infinity;
 
-    for (const mc of this.rendering.getManzanaIndex()) {
+    // El grid espacial acota la búsqueda a las celdas vecinas del punto
+    // (ventana 3x3 por defecto) en lugar de escanear todas las manzanas.
+    for (const mc of this.rendering.queryManzanasNear(latlng)) {
       const { minLat, maxLat, minLng, maxLng } = mc.bbox;
       const clampLat = Math.max(minLat, Math.min(latlng.lat, maxLat));
       const clampLng = Math.max(minLng, Math.min(latlng.lng, maxLng));
@@ -160,19 +170,20 @@ export class MapInteractionService {
       const bboxDist = Math.sqrt(bboxDx * bboxDx + bboxDy * bboxDy);
       if (bboxDist >= bestDist) continue;
 
-      const rings = mc.polygon.getLatLngs();
-      const outer = rings[0] as LatLng[];
-      if (!outer) continue;
+      const rings = collectLatLngRings(mc.polygon.getLatLngs());
+      if (rings.length === 0) continue;
 
-      for (let i = 0; i < outer.length; i++) {
-        const a = outer[i];
-        const b = outer[(i + 1) % outer.length];
-        const proj = projectOnSegment(latlng, a, b, map);
-        const projPt = map.latLngToContainerPoint(proj);
-        const d = clickPt.distanceTo(projPt);
-        if (d < bestDist) {
-          bestDist = d;
-          best = mc;
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i];
+          const b = ring[(i + 1) % ring.length];
+          const proj = projectOnSegment(latlng, a, b, map);
+          const projPt = map.latLngToContainerPoint(proj);
+          const d = clickPt.distanceTo(projPt);
+          if (d < bestDist) {
+            bestDist = d;
+            best = mc;
+          }
         }
       }
     }

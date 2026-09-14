@@ -93,6 +93,16 @@ export class MapRenderingFacade {
     return this.territories.getManzanaIndex();
   }
 
+  /** Manzanas whose bbox covers the cell containing the point (O(1) lookup). */
+  queryManzanasAt(latlng: { lat: number; lng: number }): ManzanaIndex[] {
+    return this.territories.queryManzanasAt(latlng);
+  }
+
+  /** Manzanas in the cells within `radiusCells` of the point's cell, deduplicated. */
+  queryManzanasNear(latlng: { lat: number; lng: number }, radiusCells = 1): ManzanaIndex[] {
+    return this.territories.queryManzanasNear(latlng, radiusCells);
+  }
+
   getAllTerritoriesLayer(): FeatureLayer[] {
     return this.territories.getAllTerritoriesLayer();
   }

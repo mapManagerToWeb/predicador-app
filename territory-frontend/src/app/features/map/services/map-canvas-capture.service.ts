@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { Map as LeafletMap, Path, LayerGroup, Layer, Marker, type LatLng, type Point } from 'leaflet';
+import { Map as LeafletMap, Path, LayerGroup, Layer, Marker, type Point } from 'leaflet';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
+import { collectLatLngRings } from './map-rings';
 
 const CAPTURE_PIXEL_RATIO = 2;
 const JPEG_QUALITY = 0.85;
@@ -135,9 +136,11 @@ export class MapCanvasCaptureService {
     const polygon = path as unknown as { getLatLngs?: () => unknown };
     if (typeof polygon.getLatLngs !== 'function') return [];
 
-    const raw = polygon.getLatLngs!() as unknown[];
-    const rings = (Array.isArray(raw[0]) ? raw : [raw]) as LatLng[][];
-    return rings.map(ring =>
+    // collectLatLngRings aplana Polygon/MultiPolygon (Leaflet 2.0 comparte
+    // clase: un MultiPolygon devuelve [[ring],[ring]]) y descarta elementos
+    // degenerados; sin esto, latLngToContainerPoint recibía un ARRAY y
+    // Leaflet lo convertía en null -> TypeError al guardar el reporte.
+    return collectLatLngRings(polygon.getLatLngs!()).map(ring =>
       ring.map(ll => map.latLngToContainerPoint(ll))
     );
   }

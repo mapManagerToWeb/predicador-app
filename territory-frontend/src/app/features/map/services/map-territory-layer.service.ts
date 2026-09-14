@@ -19,15 +19,26 @@ import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
 import { getColorForTerritorio } from '../utils/territory-colors';
 import { MapEngineService } from './map-engine.service';
 import { getBaseTerritoryStyle } from './map-style.service';
+import { ManzanaSpatialIndex } from './manzana-spatial-index';
+import { collectLatLngRings } from './map-rings';
 import type { ManzanaIndex, FeatureLayer, TerritorioCacheData } from '../types/map.types';
 
 const SIMPLIFY_TOLERANCE = 0.0001;
 
+/** Resultado procesado (simplify + union) de un territorio, persistible en sessionStorage. */
+interface ProcessedTerritoryData {
+  simplifiedFc: GeoJSON.FeatureCollection;
+  dissolvedFeature: GeoJSON.Feature | null;
+}
+
 function simplifyFeatureCollection(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection {
-  const features = fc.features.map(f => {
+  const features = fc.features.map((f) => {
     if (!f.geometry) return f;
     try {
-      const simplified = simplify(f as Parameters<typeof simplify>[0], { tolerance: SIMPLIFY_TOLERANCE, highQuality: true }) as GeoJSON.Feature;
+      const simplified = simplify(f as Parameters<typeof simplify>[0], {
+        tolerance: SIMPLIFY_TOLERANCE,
+        highQuality: true,
+      }) as GeoJSON.Feature;
       return { ...f, geometry: simplified.geometry };
     } catch {
       return f;
@@ -37,12 +48,12 @@ function simplifyFeatureCollection(fc: GeoJSON.FeatureCollection): GeoJSON.Featu
 }
 
 function dissolveTerritory(fc: GeoJSON.FeatureCollection): GeoJSON.Feature | null {
-  const validFeatures = fc.features.filter(f => f.geometry);
+  const validFeatures = fc.features.filter((f) => f.geometry);
   if (validFeatures.length === 0) return null;
   if (validFeatures.length === 1) return validFeatures[0];
 
   try {
-    const turfFeatures = validFeatures.map(f => ({
+    const turfFeatures = validFeatures.map((f) => ({
       type: 'Feature' as const,
       geometry: f.geometry! as GeoJSON.Polygon | GeoJSON.MultiPolygon,
       properties: f.properties ?? {},
@@ -65,7 +76,7 @@ export type ManzanaClickHandler = (
   polygon: Polygon,
   color: string,
   territorioNumero: number,
-  event: LeafletMouseEvent
+  event: LeafletMouseEvent,
 ) => void;
 
 /**
@@ -81,12 +92,21 @@ export class MapTerritoryLayerService {
   // and re-parse on every navigation/reload. Miss-safes to a plain fetch.
   static readonly GEOJSON_CACHE_KEY = 'territory.territories.geojson.v1';
 
+  // sessionStorage key — processed geometry (simplify + union) per territory.
+  // Same lifecycle as GEOJSON_CACHE_KEY: pruned together in podarGeojsonCache.
+  // Avoids recomputing turf simplify/union on every navigation/reload.
+  static readonly PROCESSED_CACHE_KEY = 'territory.territories.processed.v1';
+
   // O(1) territory → layer lookup; replaces signal<FeatureLayer[]>
   private layerByTerritory = new Map<number, FeatureLayer>();
 
   // Flat manzana list for iteration (MapInteractionService); O(1) by-territory index alongside
   private manzanaList: ManzanaIndex[] = [];
   private manzanasByTerritory = new Map<number, ManzanaIndex[]>();
+
+  // Spatial grid over manzana bboxes — turns tap hit-testing from O(V) into
+  // O(1) cell lookups. Kept in sync with manzanaList at every mutation point.
+  private spatialIndex = new ManzanaSpatialIndex();
 
   // O(1) territory → label lookup; replaces signal<Marker[]> + querySelector
   private labelByTerritory = new Map<number, Marker>();
@@ -109,6 +129,16 @@ export class MapTerritoryLayerService {
 
   getManzanaIndex(): ManzanaIndex[] {
     return this.manzanaList;
+  }
+
+  /** Manzanas whose bbox covers the cell containing the point (O(1) lookup). */
+  queryManzanasAt(latlng: { lat: number; lng: number }): ManzanaIndex[] {
+    return this.spatialIndex.queryAt(latlng);
+  }
+
+  /** Manzanas in the cells within `radiusCells` of the point's cell, deduplicated. */
+  queryManzanasNear(latlng: { lat: number; lng: number }, radiusCells = 1): ManzanaIndex[] {
+    return this.spatialIndex.queryNear(latlng, radiusCells);
   }
 
   /** O(1) lookup — avoids .find() in hot paths. */
@@ -144,10 +174,13 @@ export class MapTerritoryLayerService {
   podarGeojsonCache(vigentes: Set<number>): void {
     if (!this.hasCachedGeojson()) return;
     const features = this.getCachedFeatures() ?? [];
-    const obsoleto = features.some(f => !vigentes.has(Number(f.properties?.['territorio_padre'])));
+    const obsoleto = features.some(
+      (f) => !vigentes.has(Number(f.properties?.['territorio_padre'])),
+    );
     if (!obsoleto) return;
     try {
       sessionStorage.removeItem(MapTerritoryLayerService.GEOJSON_CACHE_KEY);
+      sessionStorage.removeItem(MapTerritoryLayerService.PROCESSED_CACHE_KEY);
     } catch {
       // Storage no disponible — el refetch igualmente ocurrirá en memoria.
     }
@@ -156,11 +189,15 @@ export class MapTerritoryLayerService {
   async loadAllTerritories(territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
     this.clearAllLayers();
 
-    const features = this.getCachedFeatures() ?? (await this.fetchAndCacheFeatures(territorioService));
+    const cachedFeatures = this.getCachedFeatures();
+    const features = cachedFeatures ?? (await this.fetchAndCacheFeatures(territorioService));
     if (!features) return;
 
     const byTerritorio = this.groupFeaturesByTerritorio(features);
-    this.dataCache = this.buildTerritorioCache(byTerritorio);
+    // La procesada solo es válida si la cruda estaba cacheada (mismo ciclo de vida).
+    // Si la cruda se fetcheó ahora, la procesada podría ser huérfana → reprocesar.
+    const cachedProcessed = cachedFeatures ? this.getCachedProcessed() : null;
+    this.dataCache = await this.buildTerritorioCache(byTerritorio, cachedProcessed);
   }
 
   private getCachedFeatures(): GeoJSON.Feature[] | null {
@@ -187,7 +224,7 @@ export class MapTerritoryLayerService {
       try {
         sessionStorage.setItem(
           MapTerritoryLayerService.GEOJSON_CACHE_KEY,
-          JSON.stringify({ features })
+          JSON.stringify({ features }),
         );
       } catch {
         // Quota exceeded / storage disabled — cache is best-effort only.
@@ -208,16 +245,71 @@ export class MapTerritoryLayerService {
     return byTerritorio;
   }
 
-  private buildTerritorioCache(byTerritorio: Map<number, GeoJSON.Feature[]>): Map<number, TerritorioCacheData> {
+  private getCachedProcessed(): Record<string, ProcessedTerritoryData> | null {
+    if (typeof sessionStorage === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(MapTerritoryLayerService.PROCESSED_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Record<string, ProcessedTerritoryData>;
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private saveProcessedToCache(processed: Record<string, ProcessedTerritoryData>): void {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      sessionStorage.setItem(
+        MapTerritoryLayerService.PROCESSED_CACHE_KEY,
+        JSON.stringify(processed),
+      );
+    } catch {
+      // Quota exceeded / storage disabled — cache is best-effort only.
+    }
+  }
+
+  private async buildTerritorioCache(
+    byTerritorio: Map<number, GeoJSON.Feature[]>,
+    cachedProcessed?: Record<string, ProcessedTerritoryData> | null,
+  ): Promise<Map<number, TerritorioCacheData>> {
     const cache = new Map<number, TerritorioCacheData>();
+    const processedToSave: Record<string, ProcessedTerritoryData> = {};
+
     for (const [territorioNum, features] of byTerritorio) {
+      const key = String(territorioNum);
+      const cached = cachedProcessed?.[key];
+
+      let simplifiedFc: GeoJSON.FeatureCollection;
+      let dissolvedFeature: GeoJSON.Feature | null;
+
+      if (cached) {
+        simplifiedFc = cached.simplifiedFc;
+        dissolvedFeature = cached.dissolvedFeature;
+      } else {
+        const fc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features };
+        dissolvedFeature = dissolveTerritory(fc);
+        simplifiedFc = simplifyFeatureCollection(fc);
+        processedToSave[key] = { simplifiedFc, dissolvedFeature };
+        // Cede al event loop entre territorios: el browser puede pintar/responder
+        // durante el primer cálculo en lugar de bloquear todo el frame.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
       const rawColor = features[0]?.properties?.['color'] ?? null;
       const color = getColorForTerritorio(territorioNum, rawColor);
-      const fc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features };
-      const dissolvedFeature = dissolveTerritory(fc);
-      const simplifiedFc = simplifyFeatureCollection(fc);
       const bounds = this.computeBoundsFromFeatures(features);
-      cache.set(territorioNum, { fc, simplifiedFc, dissolvedFeature, color, bounds });
+      cache.set(territorioNum, {
+        fc: { type: 'FeatureCollection', features },
+        simplifiedFc,
+        dissolvedFeature,
+        color,
+        bounds,
+      });
+    }
+
+    if (Object.keys(processedToSave).length > 0) {
+      this.saveProcessedToCache(processedToSave);
     }
     return cache;
   }
@@ -258,6 +350,7 @@ export class MapTerritoryLayerService {
     this.labelByTerritory.clear();
     this.manzanaList = [];
     this.manzanasByTerritory.clear();
+    this.spatialIndex.clear();
     this.dataCache.clear();
   }
 
@@ -326,7 +419,8 @@ export class MapTerritoryLayerService {
     } else {
       layer = new LeafletGeoJSON(simplifiedFc, {
         style: () => this.getTerritoryStyle(color),
-        onEachFeature: (feature, l) => this.onEachFeature(feature, l, territorioNum, color, newEntries),
+        onEachFeature: (feature, l) =>
+          this.onEachFeature(feature, l, territorioNum, color, newEntries),
       });
     }
 
@@ -334,6 +428,7 @@ export class MapTerritoryLayerService {
       // Push directly — no array spread/copy
       for (const entry of newEntries) {
         this.manzanaList.push(entry);
+        this.spatialIndex.insert(entry);
         let list = this.manzanasByTerritory.get(territorioNum);
         if (!list) {
           list = [];
@@ -361,7 +456,7 @@ export class MapTerritoryLayerService {
     l: Layer,
     territorioNum: number,
     color: string,
-    newEntries: ManzanaIndex[]
+    newEntries: ManzanaIndex[],
   ): void {
     if (!(l instanceof Polygon)) return;
 
@@ -383,16 +478,23 @@ export class MapTerritoryLayerService {
     });
   }
 
-  private computePolygonBBox(polygon: Polygon): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
-    const rings = polygon.getLatLngs();
-    const outer = rings[0] as LatLng[];
+  private computePolygonBBox(polygon: Polygon): {
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+  } {
+    // collectLatLngRings aplana Polygon/MultiPolygon (Leaflet 2.0 comparte
+    // clase sin distinguir); sin esto, una manzana MultiPolygon daba bbox
+    // Infinity/-Infinity y fallaba el hit-testing del índice espacial.
+    const rings = collectLatLngRings(polygon.getLatLngs());
     let minLat = Infinity;
     let maxLat = -Infinity;
     let minLng = Infinity;
     let maxLng = -Infinity;
 
-    if (outer) {
-      for (const pt of outer) {
+    for (const ring of rings) {
+      for (const pt of ring) {
         if (pt.lat < minLat) minLat = pt.lat;
         if (pt.lat > maxLat) maxLat = pt.lat;
         if (pt.lng < minLng) minLng = pt.lng;
@@ -434,7 +536,10 @@ export class MapTerritoryLayerService {
     this.manzanasByTerritory.delete(territorioNum);
     if (manzanas && manzanas.length > 0) {
       const toRemove = new Set(manzanas);
-      this.manzanaList = this.manzanaList.filter(m => !toRemove.has(m));
+      this.manzanaList = this.manzanaList.filter((m) => !toRemove.has(m));
+      for (const m of manzanas) {
+        this.spatialIndex.remove(m);
+      }
     }
   }
 
@@ -468,16 +573,28 @@ export class MapTerritoryLayerService {
     minLat: number,
     maxLat: number,
     minLng: number,
-    maxLng: number
+    maxLng: number,
   ): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
     if (!geom) return { minLat, maxLat, minLng, maxLng };
 
     if (geom.type === 'Polygon') {
-      return this.extendBoundsFromPolygon((geom as GeoJSON.Polygon).coordinates, minLat, maxLat, minLng, maxLng);
+      return this.extendBoundsFromPolygon(
+        (geom as GeoJSON.Polygon).coordinates,
+        minLat,
+        maxLat,
+        minLng,
+        maxLng,
+      );
     }
 
     if (geom.type === 'MultiPolygon') {
-      return this.extendBoundsFromMultiPolygon((geom as GeoJSON.MultiPolygon).coordinates, minLat, maxLat, minLng, maxLng);
+      return this.extendBoundsFromMultiPolygon(
+        (geom as GeoJSON.MultiPolygon).coordinates,
+        minLat,
+        maxLat,
+        minLng,
+        maxLng,
+      );
     }
 
     return { minLat, maxLat, minLng, maxLng };
@@ -488,7 +605,7 @@ export class MapTerritoryLayerService {
     minLat: number,
     maxLat: number,
     minLng: number,
-    maxLng: number
+    maxLng: number,
   ): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
     for (const ring of coordinates) {
       for (const [lng, lat] of ring) {
@@ -506,7 +623,7 @@ export class MapTerritoryLayerService {
     minLat: number,
     maxLat: number,
     minLng: number,
-    maxLng: number
+    maxLng: number,
   ): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
     for (const poly of coordinates) {
       const result = this.extendBoundsFromPolygon(poly, minLat, maxLat, minLng, maxLng);

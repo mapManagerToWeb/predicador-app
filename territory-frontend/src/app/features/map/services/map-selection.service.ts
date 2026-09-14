@@ -13,6 +13,7 @@ import {
   getSelectedManzanaStyle,
 } from './map-style.service';
 import { getTerritoryProgress } from '../utils/territory-progress';
+import { collectLatLngRings } from './map-rings';
 import type { ModoMarcado } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 
@@ -36,14 +37,17 @@ export class MapSelectionService {
     this.state.manzanaSeleccionadaNombre.set(nombreBloque);
     this.state.manzanaSeleccionadaTerritorio.set(territorioNumero);
 
-    const rings = polygon.getLatLngs();
-    const outer = rings[0] as LatLng[];
+    // Leaflet 2.0 comparte Polygon/MultiPolygon: collectLatLngRings aplana la
+    // forma [[ring],[ring]] de un MultiPolygon para que el snapping del
+    // marcado parcial disponga de los edges de todas las partes (antes una
+    // manzana multiparte generaba 0 edges).
     const edges: { from: LatLng; to: LatLng }[] = [];
-    if (outer && outer.length >= 3) {
-      for (let i = 0; i < outer.length - 1; i++) {
-        edges.push({ from: outer[i], to: outer[i + 1] });
+    for (const ring of collectLatLngRings(polygon.getLatLngs())) {
+      if (ring.length < 3) continue;
+      for (let i = 0; i < ring.length - 1; i++) {
+        edges.push({ from: ring[i], to: ring[i + 1] });
       }
-      edges.push({ from: outer[outer.length - 1], to: outer[0] });
+      edges.push({ from: ring[ring.length - 1], to: ring[0] });
     }
     this.state.manzanaEdges.set(edges);
 

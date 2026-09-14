@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Map as LeafletMap, Polygon, Marker } from 'leaflet';
+import { Map as LeafletMap, Polygon, Marker, GeoJSON as LeafletGeoJSON } from 'leaflet';
 import { MapCanvasCaptureService } from './map-canvas-capture.service';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
@@ -165,6 +165,53 @@ describe('MapCanvasCaptureService', () => {
     await service.capture();
 
     expect(ctx.setLineDash).toHaveBeenCalledWith([8, 8]);
+  });
+
+  it('captures a MultiPolygon GeoJSON territory without crashing (partial-mark regression)', async () => {
+    // Regresión del "marcado parcial": en Leaflet 2.0 (alpha) Polygon y
+    // MultiPolygon comparten clase, y un MultiPolygon deja getLatLngs() =
+    // [[ring],[ring]]. projectRings trataba cada parte como un ring y pasaba
+    // un ARRAY a latLngToContainerPoint -> toLatLng() -> null -> TypeError
+    // ("Cannot read properties of null (reading 'lat')") al guardar el
+    // reporte — los territorios disueltos con turf union y las manzanas
+    // multiparte son MultiPolygon. Esto es lo que produce dissolvedFeature
+    // en map-territory-layer.service.ts a zoom bajo.
+    const layer = new LeafletGeoJSON({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [
+          [[[0, 0], [0, 1], [1, 1], [0, 0]]],
+          [[[2, 2], [2, 3], [3, 3], [2, 2]]],
+        ],
+      },
+    });
+    layer.addTo(map);
+
+    await expect(service.capture()).resolves.toBe('QUJD');
+    expect(ctx.fill).toHaveBeenCalled();
+    expect(ctx.moveTo).toHaveBeenCalled();
+  });
+
+  it('skips degenerate MultiPolygon parts (empty rings) without crashing', async () => {
+    // Las partes vacías pueden aparecer tras simplify/union de turf; deben
+    // descartarse sin romper la captura.
+    const layer = new LeafletGeoJSON({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [
+          [[]],
+          [[[2, 2], [2, 3], [3, 3], [2, 2]]],
+        ],
+      },
+    });
+    layer.addTo(map);
+
+    await expect(service.capture()).resolves.toBe('QUJD');
+    expect(ctx.fill).toHaveBeenCalled();
   });
 
   it('draws only labels with opacity 1', async () => {
