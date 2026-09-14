@@ -29,7 +29,7 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 ## Verification
 
 - Frontend setup: run `corepack enable` (once) then `pnpm install` in `territory-frontend/` (Node 22 is used by CI). The pnpm version is pinned in `package.json` (`packageManager: pnpm@9.15.0`).
-- Frontend checks, in CI order: `pnpm run lint`, `npx ng build --configuration=production`, `pnpm test -- --run --coverage`, then `pnpm run build`.
+- Frontend checks, in CI order: `pnpm run lint`, then one production build (`pnpm run build`, which also type-checks), then `pnpm test -- --run --coverage`.
 - Run one frontend spec with `pnpm test -- src/path/to/file.spec.ts` from `territory-frontend/`; tests use Vitest, jsdom, and `src/test-setup.ts`. Coverage thresholds are low (30/30/30/20 in `vitest.config.ts`) — passing coverage does not mean good coverage.
 - **Leaflet is pinned to `1.9.4`** in `package.json` (`leaflet: "1.9.4"`). The Leaflet `2.0.0-alpha.1` upgrade (commit `a534fba`) was reverted in the working tree; do not assume 2.0-only APIs exist. Before perf work always reinstall with `pnpm install --frozen-lockfile` — a stale `node_modules` is the most common cause of local vs CI divergence.
 - Backend full verification: from `backend/`, run `mvn verify -B`; local tests needing the database require PostgreSQL/PostGIS and `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
@@ -38,12 +38,12 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 
 ## CI / Automation (`.github/workflows/`)
 
-- `ci-backend.yml` — backend build/test (`mvn verify -B`) with PostGIS service; uploads JaCoCo reports. On `main` pushes it additionally dumps the Neon production DB (`NEON_DATABASE_URL_DIRECT` secret) as a backup artifact (30-day retention).
-- `ci-frontend.yml` — pnpm 9.15.0 + Node 22; `pnpm install --frozen-lockfile --ignore-scripts`; lint → production build (type check) → tests with coverage → production build again. Branches: `main`, `chore/production-quality-hardening`, `feat/redesign`.
-- `docker.yml` — builds/pushes the 5 backend images to GHCR (`ghcr.io/<owner>/predicador-<service>`) on `main` and `v*` tags; PRs build without pushing.
-- `security.yml` — gitleaks (secrets), OWASP dependency-check (fails on CVSS ≥ 7, non-blocking), Trivy image scan on all 5 images (HIGH/CRITICAL, `ignore-unfixed`), Semgrep SAST (security-audit + owasp-top-ten + github-actions, SARIF upload, gates on ERROR). Weekly cron Sun 03:00. Local config: `.gitleaks.toml`, `.semgrepignore`, `.trivyignore`.
-- `sonarcloud.yml` — CI-based analysis (project key `mapManagerToWeb_predicador-app`): frontend coverage (lcov) + backend `mvn verify -Pcoverage`, then scanner. Settings in `sonar-project.properties` (Java 25, JaCoCo + lcov report paths).
-- `opencode.yml` — triggers the opencode GitHub action when a comment starts with `/oc` or `/opencode` (model `opencode/mimo-v2.5-free`).
+- `ci-backend.yml` — backend build/test with PostGIS service; runs `mvn verify -Pcoverage` (which also enforces the jacoco 40% LINE/INSTRUCTION gate) and uploads JaCoCo reports. On `main` pushes it additionally dumps the Neon production DB (`NEON_DATABASE_URL_DIRECT` secret) as an AGE-encrypted backup artifact (30-day retention; public key `.github/backup/age.pub`, decryptor key held by the owner, not in the repo). Backend dependency management overrides Tomcat `11.0.25` / Netty `4.2.17.Final` for the Trivy gate.
+- `ci-frontend.yml` — pnpm 9.15.0 + Node 22; `pnpm install --frozen-lockfile --ignore-scripts`; lint → one production build (which also type-checks) → tests with coverage. Branches: `main`, `chore/production-quality-hardening`, `feat/redesign`.
+- `docker.yml` — builds/pushes the 5 backend images to GHCR (`ghcr.io/<owner>/predicador-<service>`) on `main` and `v*` tags; PRs build without pushing. Branch pushes and PRs are path-filtered to `backend/**` (+ the workflow file); `v*` tags always build (path filters are not evaluated for tag pushes).
+- `security.yml` — gitleaks (secrets), OWASP dependency-check (fails on CVSS ≥ 7, non-blocking), Trivy image scan on all 5 images (HIGH/CRITICAL, `ignore-unfixed`), Semgrep SAST (security-audit + owasp-top-ten + github-actions, uploads an ERROR-severity SARIF and gates on ERROR in one pass). gitleaks and semgrep skip dependabot-triggered runs (GitHub withholds repo secrets from them). Weekly cron Sun 03:00. Local config: `.gitleaks.toml`, `.semgrepignore`, `.trivyignore`.
+- `sonarcloud.yml` — CI-based analysis (project key `mapManagerToWeb_predicador-app`): frontend coverage (lcov) + backend `mvn verify -Pcoverage`, then scanner (skips dependabot-triggered runs: no `SONAR_TOKEN` there). Settings in `sonar-project.properties` (Java 25, JaCoCo + lcov report paths).
+- `opencode.yml` — triggers the opencode GitHub action when a comment starts with `/oc` or `/opencode` (model `opencode/mimo-v2.5-free`); only `OWNER`/`MEMBER`/`COLLABORATOR` author associations can trigger it (public repo).
 
 ## Runtime
 
