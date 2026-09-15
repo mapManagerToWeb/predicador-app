@@ -47,8 +47,8 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 | Componente | Tecnología |
 |---|---|
 | Runtime | Java 25 (virtual threads) |
-| Framework | Spring Boot 4.0 |
-| Microservicios | Spring Cloud 2025.1 |
+| Framework | Spring Boot 4.1.1 |
+| Microservicios | Spring Cloud 2025.1.3 |
 | Gateway | Spring Cloud Gateway (WebFlux) |
 | Service Discovery | Netflix Eureka |
 | Config Server | Spring Cloud Config (native) |
@@ -79,7 +79,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 | Coverage | V8 |
 | Linting | ESLint + Prettier |
 | Build | Angular CLI (Vite) |
-| Geometria | polygon-clipping |
+| Geometria | polygon-clipping, @turf/simplify, @turf/union, @turf/helpers |
 | Screenshots | html2canvas |
 | RUM | web-vitals |
 
@@ -104,7 +104,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **Selección de territorios**: Búsqueda con autocompletado, selección múltiple
 - **Gestión de colores**: Colores asignados por territorio para diferenciación visual
 - **Captura de pantalla**: Screenshot automático del mapa para envío por WhatsApp
-- **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada; el reporte se envía **siempre con la captura** (aunque todos los territorios estén completos) y cada territorio se lista como `*terminado*` o `*incompleto*`, dirigido al teléfono del encargado logueado
+- **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada, dirigido al teléfono del encargado logueado. Un territorio único marcado como **completo** se envía **sin captura** (imagen predeterminada), anunciando su cierre; los territorios incompletos/parciales se envían **con captura**. En un reporte multi-territorio, los territorios ya completados se excluyen del mensaje y de la imagen. Cada territorio se lista como `*terminado*` o `*incompleto*`
 - **Guardado local**: Marcado persistido en base de datos, restauración al recargar
 - **Notificaciones responsivas**: Toast notifications adaptables con soporte para multilínea en pantallas móviles y modo claro/oscuro
 - **Modo oscuro**: Soporte completo de temas claro/oscuro
@@ -115,6 +115,8 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **Admin Panel**: Gestión de colores de territorios con login admin
 - **Session selector**: Selección de horario (Mañana/Tarde)
 - **Satellite view**: Toggle entre vista normal y satelital
+
+**Rendimiento del mapa (2026-09-14):** el renderer es el `Canvas` estándar de Leaflet 1.9.4 — durante el pan el canvas se mueve con transform GPU y los vectores se repintan solo en `moveend` (sin repintado por frame). El hit-testing de manzanas usa un grid espacial uniforme (celda 0.002° ≈ 200 m): un tap consulta solo la celda del punto (O(1) promedio) y el "nearest" mira una ventana 3×3 de celdas. La geometría procesada de los territorios (simplify + union) se calcula una vez por sesión y se cachea en `sessionStorage`.
 
 ### Backend
 
@@ -355,12 +357,12 @@ pnpm run test:coverage        # Con cobertura V8
 # Lines: 30% | Statements: 30% | Functions: 30% | Branches: 20%
 ```
 
-**Archivos de test (26 spec files):**
-- Core: `profile.ts`, `auth-token.ts`, `territorio.ts`, `toast.ts`, `whatsapp.ts`, `rum.ts`, `phone.ts`, `encargado.ts`
+**Archivos de test (44 spec files):**
+- Core: `profile.ts`, `auth-token.ts`, `auth.service.ts`, `territorio.ts`, `toast.ts`, `csrf-token.ts`, `encargado.ts`, `rum.ts`, `map-draft.service.ts`, `report-cache.service.ts`, `phone.ts`
 - Interceptors: `auth.interceptor.ts`, `error.interceptor.ts`, `csrf.interceptor.ts`
 - Guards: `admin.guard.ts`, `profile.guard.ts`
-- Map: `map.ts`, `map-report.service.ts`, `map-geometry.ts`, `map-rendering.facade.ts`, `map-state.service.ts`, `map-style.ts`, `map-selection.service.ts`, `map-data-persistence.service.ts`, `map-territory-layer.ts`, `territory-search.ts`
-- Auth/Admin/Profile: `login.ts`, `admin.ts`, `profile.ts`
+- Map: `map.ts`, `map-geometry.ts`, `manzana-spatial-index.ts`, `map-rings.ts`, `map-engine.service.ts`, `map-tile-layer.service.ts`, `map-location.service.ts`, `map-partial-mark.service.ts`, `map-initialization.service.ts`, `map-mark-restoration.service.ts`, `map-layer-registry.service.ts`, `map-canvas-capture.service.ts`, `map-capture.service.ts`, `map-partial-draw.service.ts`, `map-rendering.facade.ts`, `map-report.service.ts`, `map-data-persistence.service.ts`, `map-interaction.service.ts`, `map-territory-layer.service.ts`, `map-state.service.ts`, `map-selection.service.ts`, `map-style.ts`, `whatsapp.ts`, `territory-search.ts`
+- Auth/Admin/Profile/SSR: `login.ts`, `admin.ts`, `profile.ts`, `server.spec.ts`
 
 ### Backend
 
@@ -468,9 +470,8 @@ predicador-app/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── core/              # Servicios, guards, interceptors, utils
-│   │   │   ├── features/          # Auth, Profile, Map, Admin
-│   │   │   │   └── map/           # Feature principal (10+ servicios)
-│   │   │   └── shared/            # Componentes compartidos
+│   │   │   └── features/          # Auth, Profile, Map, Admin
+│   │   │       └── map/           # Feature principal (10+ servicios)
 │   │   ├── server.ts              # SSR entry
 │   │   └── styles.css             # Estilos globales + design tokens
 │   ├── public/                    # Assets estáticos, manifest, icons

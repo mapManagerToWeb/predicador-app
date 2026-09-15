@@ -56,7 +56,10 @@ yarn-error.log*
 .claude/
 .opencode/
 .superpowers/
-docs/
+
+# Local docs artifacts (audit/, superpowers/); ADRs are versioned
+docs/*
+!docs/adr/
 
 # AI planning artifacts (map pipeline specs, perf capability map, task lists)
 tasks/

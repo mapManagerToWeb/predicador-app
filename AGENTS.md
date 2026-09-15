@@ -1,6 +1,6 @@
 # Repository Instructions
 
-> Last verified: 2026-09-13. Whenever a fact here disagrees with the code, the code wins — fix this file.
+> Last verified: 2026-09-14. Whenever a fact here disagrees with the code, the code wins — fix this file.
 
 ## Codebase Memory (Knowledge Graph)
 
@@ -10,13 +10,13 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 - **Interactive graph UI**: `http://127.0.0.1:9749/` — the codebase-memory-mcp server exposes a persisted graph visualization on port 9749. Start it with `codebase-memory-mcp` (the MCP server auto-starts the UI when running). Use `lsof -nP -iTCP:9749` to check if it is up.
 - After significant refactors or new features, refresh the index with `index_repository` (project name `predicador-app`, root is the repo root).
 
-### Key graph facts (from `get_architecture`, 2026-08-09 index)
+### Key graph facts (from `get_architecture`, 2026-08-09 index; counts from that index — refresh with `index_repository` after significant refactors)
 
 - **Security hot path** lives in `backend/shared`: `SessionTokenService.verify` (41 callers), `TokenValidator.validate` (22), `SessionTokenService.issue` (19), `SessionAuthFilter` + its `Rule.any` (18). Shared is the architectural core (`reporting-service → shared` 89 calls, `api-gateway → reporting-service` 24) — treat changes here as high-risk.
 - **Reporting owns WhatsApp**: `WhatsAppMessageClient.sendTemplateMessage` (15 callers), `WhatsAppSendService.getStatus` (19), `WhatsAppDelivery.getStatusCode` (23).
 - **Frontend** is highly cohesive (~0.98–0.99) around `map-geometry.ts` (`snapToContour`, `pointInPolygon`, `projectOnSegment`) and `map-style.service.ts`, plus `profile.ProfilePage.save`.
 - **Routes** (52 total): `/api/v1/territories*`, `/api/v1/encargados*`, `/api/v1/reports*`, `/api/v1/rum`; gateway has `/fallback/territory` and `/fallback/reporting` fallbacks.
-- **ADRs**: none exist yet. `docs/` only contains `audit/` and `superpowers/`. Record new decisions under `docs/adr/` when they are made.
+- **ADRs**: `docs/adr/` holds versioned architecture decision records (0001–0005). The rest of `docs/` (`audit/`, `superpowers/`) is local-only and gitignored — along with `tasks/`, `CAPABILITY-MAP.md`, and `SPEC-map-*.md` — so only `docs/adr/` is tracked. Record new decisions under `docs/adr/` when they are made.
 
 ## Layout
 
@@ -31,7 +31,7 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 - Frontend setup: run `corepack enable` (once) then `pnpm install` in `territory-frontend/` (Node 22 is used by CI). The pnpm version is pinned in `package.json` (`packageManager: pnpm@9.15.0`).
 - Frontend checks, in CI order: `pnpm run lint`, then one production build (`pnpm run build`, which also type-checks), then `pnpm test -- --run --coverage`.
 - Run one frontend spec with `pnpm test -- src/path/to/file.spec.ts` from `territory-frontend/`; tests use Vitest, jsdom, and `src/test-setup.ts`. Coverage thresholds are low (30/30/30/20 in `vitest.config.ts`) — passing coverage does not mean good coverage.
-- **Leaflet is pinned to `1.9.4`** in `package.json` (`leaflet: "1.9.4"`). The Leaflet `2.0.0-alpha.1` upgrade (commit `a534fba`) was reverted in the working tree; do not assume 2.0-only APIs exist. Before perf work always reinstall with `pnpm install --frozen-lockfile` — a stale `node_modules` is the most common cause of local vs CI divergence.
+- **Leaflet is pinned to `1.9.4`** in `package.json` (`leaflet: "1.9.4"`). The Leaflet `2.0.0-alpha.1` upgrade (commit `a534fba`) was reverted by commit `3a0f0ba`; do not assume 2.0-only APIs exist. Before perf work always reinstall with `pnpm install --frozen-lockfile` — a stale `node_modules` is the most common cause of local vs CI divergence.
 - Backend full verification: from `backend/`, run `mvn verify -B`; local tests needing the database require PostgreSQL/PostGIS and `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
 - Backend focused checks can use `mvn -pl <module> test` from `backend/`; JaCoCo reports are generated with `mvn verify -Pcoverage` (40% line/instruction minimum enforced at verify).
 - CI backend uses Java 25 and a `postgis/postgis:16-3.4` service with database `predicador_test` (user `predicador`), plus Testcontainers wired to the job's Docker socket (`TESTCONTAINERS_RYUK_DISABLED=true`).
@@ -66,10 +66,10 @@ All downstream URIs use `lb://<service>` resolved through Eureka; each route has
 | --------------------------------- | ----------------- | ---------------------------------------------------- |
 | `/api/v1/territories/colors`      | territory-service | CB `territoryCB-colors`, 5s timeout                  |
 | `/api/v1/territories/all/geojson` | territory-service | CB `territoryCB-geojson`, 30s timeout                |
-| `/api/v1/territories/**`          | territory-service | CB `territoryCB-default`                             |
-| `/api/v1/reports/**`              | reporting-service | CB `reportingCB`                                     |
-| `/api/v1/encargados/**`           | reporting-service | CB `encargadosCB`                                    |
-| `/api/v1/rum`                     | reporting-service | Public RUM sink, high volume, no retries, CB `rumCB` |
+| `/api/v1/territories/**`          | territory-service | CB `territoryCB-default`, 15s timeout               |
+| `/api/v1/reports/**`              | reporting-service | CB `reportingCB`, 20s timeout                       |
+| `/api/v1/encargados/**`           | reporting-service | CB `encargadosCB`, 10s timeout                      |
+| `/api/v1/rum`                     | reporting-service | Public RUM sink, high volume, no retries, CB `rumCB`, 5s timeout |
 
 Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS allows `X-XSRF-TOKEN` and `Idempotency-Key` headers; exposes `ETag`, `Location`; credentials allowed.
 
@@ -112,7 +112,7 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 
 - **SSR Differences:** `window` / `document` don't exist in server context; wrap DOM access in platform/browser guards or use `afterNextRender()`.
 - **Map UI split:** The map feature is split into multiple single-responsibility services under `features/map/services/` (engine, tile layer, territory layer, selection, partial draw, capture, style, state, interaction, rendering facade, data persistence, initialization, location, mark restoration, report, whatsapp, spatial index, etc.). Put new map behavior in one of these services, not in `MapPage`.
-- **Map perf (status 2026-09-13):** `map-engine.service.ts` uses Leaflet's standard `Canvas` renderer — pan moves the canvas with a GPU transform and paths repaint only on `moveend` (no per-frame redraw; the old `ContinuousCanvas` hot spot is gone). Remaining known debt: `map-territory-layer.service.ts` computes turf `simplify`(highQuality)+`union` on the main thread per session (result cached in `sessionStorage`); `map-interaction.service.ts` hit-tests linearly per tap (`findManzanaInside`) — a `manzana-spatial-index.ts` exists but is only used by the territory layer so far.
+- **Map perf (status 2026-09-14):** `map-engine.service.ts` uses Leaflet 1.9's standard `Canvas` renderer (`padding: 0.3`) — pan moves the canvas with a GPU transform and paths repaint only on `moveend` (no per-frame redraw; the `ContinuousCanvas` hack is gone). Hit-testing is **not** linear: `map-interaction.service.ts` uses `queryManzanasAt` (O(1) on average) and `queryManzanasNear` (3×3 cell window) through `map-rendering.facade.ts` → `map-territory-layer.service.ts`, which instantiates `manzana-spatial-index.ts` (uniform grid, cell 0.002° ≈ 200 m). Remaining known debt: `map-territory-layer.service.ts` computes turf `simplify`(highQuality)+`union` on the main thread per session (result cached in `sessionStorage`).
 
 ## Backend Conventions
 

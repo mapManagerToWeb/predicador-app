@@ -34,7 +34,9 @@
 ## 4) Documentación y limpieza
 
 - Se actualizó el archivo de instrucciones del repositorio (AGENTS.md) para reflejar el estado real del proyecto.
-- Se archivaron 5 propuestas de trabajo (OpenSpec) ya completadas.
+- Se archivaron 5 propuestas de trabajo (OpenSpec) de este ciclo (además de una archivada previamente).
+- Se robustecieron los flujos de CI (GitHub Actions): las acciones quedaron fijadas por SHA y se forzaron versiones de dependencias (Tomcat 11.0.25, Netty 4.2.17.Final, pgjdbc, BouncyCastle) para eliminar vulnerabilidades críticas detectadas por el escáner Trivy.
+- Se dejó de usar la integración LSP de opencode (configuración local; sin efecto en la app).
 - Se dejaron de controlar en git archivos de configuración del editor Eclipse (no deberían estar en el repositorio).
 - Se ignoraron artefactos locales de planificación y depuración (carpetas `tasks/`, `.playwright-mcp/` y documentos `SPEC-map-*`, `CAPABILITY-MAP.md`) que solo sirven en la máquina de trabajo.
 
@@ -53,7 +55,7 @@
 - **No se modificó la base de datos** (no hay migraciones) ni la estructura de datos de los reportes/territorios.
 - **No se agregaron ni expusieron credenciales:** se verificó antes de commitear que no haya secretos en los cambios.
 - **Nada se borró del proyecto:** los archivos siguen en disco; solo se organizó el historial de git.
-- El PR contiene **10 commits**, cada uno con un cambio coherente y su propia descripción.
+- El PR contiene **16 commits**, cada uno con un cambio coherente y su propia descripción.
 
 ---
 
@@ -71,3 +73,4 @@
 | Backend          | Gateway: retries 2→1 y timeouts explícitos por circuit breaker                                   |
 | Backend          | RUM: valor de métrica obligatorio y finito                                                       |
 | Repo             | AGENTS.md actualizado, OpenSpecs archivados, `.settings/` untrackeados, gitignore ampliado       |
+| CI               | Workflows pineados por SHA; overrides de versiones (Tomcat/Netty/pgjdbc/BouncyCastle) para gate Trivy |
