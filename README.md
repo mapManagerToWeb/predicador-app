@@ -80,7 +80,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 | Linting | ESLint + Prettier |
 | Build | Angular CLI (Vite) |
 | Geometria | polygon-clipping, @turf/simplify, @turf/union, @turf/helpers |
-| Screenshots | html2canvas |
+| Screenshots | Captura propia a canvas offscreen (`MapCanvasCaptureService` — dibuja tiles + vectores Leaflet; reemplaza html-to-image, roto en iOS WebKit) |
 | RUM | web-vitals |
 
 ### Infraestructura
