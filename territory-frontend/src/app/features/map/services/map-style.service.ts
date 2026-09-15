@@ -130,15 +130,6 @@ export class MapStyleService implements OnDestroy {
     });
   }
 
-  private static stylesEqual(current: PathOptions, next: PathOptions): boolean {
-    // Leaflet setStyle mergea el estilo entrante sobre las opciones actuales:
-    // solo importan las claves presentes en `next`.
-    for (const key of Object.keys(next) as Array<keyof PathOptions>) {
-      if (current[key] !== next[key]) return false;
-    }
-    return true;
-  }
-
   applyBaseTerritoryStyle(
     allTerritoriesLayer: FeatureLayer[],
     manzanaIndex: Array<{ territorioNumero: number }>,

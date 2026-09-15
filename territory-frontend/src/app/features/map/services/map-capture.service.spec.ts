@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Polygon, Path, Layer } from 'leaflet';
+import { Polygon, Path, Layer, type Map as LeafletMap } from 'leaflet';
 import { MapCaptureService } from './map-capture.service';
 import { MapEngineService } from './map-engine.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
@@ -354,18 +354,18 @@ describe('MapCaptureService', () => {
   });
 
   describe('waitForTiles', () => {
-    function fakeTileMap() {
+    function fakeTileMap(): LeafletMap {
       const container = document.createElement('div');
       return {
         getContainer: () => container,
         fitBounds: vi.fn(),
         getZoom: vi.fn().mockReturnValue(15),
-      };
+      } as unknown as LeafletMap;
     }
 
     it('resolves immediately when there are no tiles', async () => {
       const map = fakeTileMap();
-      await expect((service as any).waitForTiles(map)).resolves.toBeUndefined();
+      await expect(service.waitForTiles(map)).resolves.toBeUndefined();
     });
 
     it('resolves immediately when all tiles are complete', async () => {
@@ -380,7 +380,7 @@ describe('MapCaptureService', () => {
       tilePane.appendChild(img2);
       map.getContainer().appendChild(tilePane);
 
-      await expect((service as any).waitForTiles(map)).resolves.toBeUndefined();
+      await expect(service.waitForTiles(map)).resolves.toBeUndefined();
     });
 
     it('resolves after tiles load within timeout', async () => {
@@ -396,11 +396,11 @@ describe('MapCaptureService', () => {
       tilePane.appendChild(img2);
       map.getContainer().appendChild(tilePane);
 
-      const promise = (service as any).waitForTiles(map);
+      const promise = service.waitForTiles(map);
 
       // Simulate tile loading after 200ms
       vi.advanceTimersByTime(200);
-      (img2 as any).complete = true;
+      Object.defineProperty(img2, 'complete', { value: true });
       img2.dispatchEvent(new Event('load'));
 
       await expect(promise).resolves.toBeUndefined();
@@ -417,7 +417,7 @@ describe('MapCaptureService', () => {
       tilePane.appendChild(img);
       map.getContainer().appendChild(tilePane);
 
-      const promise = (service as any).waitForTiles(map);
+      const promise = service.waitForTiles(map);
 
       vi.advanceTimersByTime(8000);
 
