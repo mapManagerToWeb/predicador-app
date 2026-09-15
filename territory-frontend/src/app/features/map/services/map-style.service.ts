@@ -101,11 +101,42 @@ export class MapStyleService implements OnDestroy {
     this.pendingStyleQueue = [];
   }
 
+  /**
+   * ¿El estilo entrante ya está aplicado? Compara solo las claves presentes en
+   * `next`, replicando la semántica de merge de Leaflet setStyle (Object.assign
+   * sobre options). PRECONDICIÓN: los estilos entrantes deben ser completos
+   * (getBaseTerritoryStyle/getHiddenStyle); un estilo parcial con valores
+   * equivalentes en sus claves se consideraría igual aunque falten claves.
+   */
+  private static stylesEqual(current: PathOptions, next: PathOptions): boolean {
+    const keys = Object.keys(next) as Array<keyof PathOptions>;
+    for (const key of keys) {
+      if (current[key] !== next[key]) return false;
+    }
+    return true;
+  }
+
   applyStyleToFeatureLayer(fl: FeatureLayer, style: PathOptions | ((fl: FeatureLayer) => PathOptions)): void {
     const resolved = typeof style === 'function' ? style(fl) : style;
     fl.layer.eachLayer(l => {
-      if (l instanceof Path) l.setStyle(resolved);
+      if (l instanceof Path) {
+        // No-op si el estilo entrante ya es el efectivo: evita redibujos de
+        // canvas redundantes (ocultar/restaurar visibilidad recorre TODAS las
+        // capas aunque el estilo no haya cambiado).
+        if (!MapStyleService.stylesEqual(l.options, resolved)) {
+          l.setStyle(resolved);
+        }
+      }
     });
+  }
+
+  private static stylesEqual(current: PathOptions, next: PathOptions): boolean {
+    // Leaflet setStyle mergea el estilo entrante sobre las opciones actuales:
+    // solo importan las claves presentes en `next`.
+    for (const key of Object.keys(next) as Array<keyof PathOptions>) {
+      if (current[key] !== next[key]) return false;
+    }
+    return true;
   }
 
   applyBaseTerritoryStyle(

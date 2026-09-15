@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { Path } from 'leaflet';
+import type { PathOptions } from 'leaflet';
+import type * as L from 'leaflet';
 import {
   getBaseTerritoryStyle,
   getMarkedManzanaStyle,
@@ -8,8 +12,22 @@ import {
   getPartialPolygonCompleteStyle,
   getCaptureUnmarkedStyle,
   getCaptureIncompleteStyle,
+  MapStyleService,
 } from './map-style.service';
+import { MapLayerRegistry } from './map-layer-registry.service';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
+import type { FeatureLayer } from '../types/map.types';
+
+// Mock de Leaflet Path para poder ejercitar applyStyleToFeatureLayer (filtra
+// `l instanceof Path`). El factory crea la clase internamente porque vi.mock
+// se hoistea por encima de las declaraciones del archivo.
+vi.mock('leaflet', () => {
+  class FakePath {
+    options: PathOptions = {};
+    readonly setStyle = vi.fn();
+  }
+  return { Path: FakePath };
+});
 
 describe('MapStyleService — pure style functions', () => {
   describe('getBaseTerritoryStyle', () => {
@@ -107,5 +125,83 @@ describe('MapStyleService — pure style functions', () => {
       expect(style.fillOpacity).toBe(0.05);
       expect(style.weight).toBe(4);
     });
+  });
+});
+
+describe('MapStyleService', () => {
+  let service: MapStyleService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [MapStyleService, MapLayerRegistry],
+    });
+    service = TestBed.inject(MapStyleService);
+  });
+
+  /** FeatureLayer cuyo GeoJSON itera sobre los `Path` dados (mocks de Leaflet). */
+  function makeFeatureLayer(paths: Array<{ options: PathOptions; setStyle: ReturnType<typeof vi.fn> }>): FeatureLayer {
+    return {
+      territorioPadre: 1,
+      color: '#ff0000',
+      layer: {
+        eachLayer: vi.fn((cb: (l: unknown) => void) => {
+          for (const p of paths) cb(p);
+        }),
+      } as unknown as L.GeoJSON,
+    };
+  }
+
+  // `Path` real es abstracto; el mock de leaflet lo reemplaza por una clase
+  // instanciable. El cast solo ajusta el tipo para poder construir fakes.
+  const FakePathCtor = Path as unknown as new () => { options: PathOptions; setStyle: ReturnType<typeof vi.fn> };
+
+  it('skips setStyle when the incoming style equals the layer current options', () => {
+    const base = getBaseTerritoryStyle('#ff0000', false);
+    const path = new FakePathCtor();
+    path.options = { ...base };
+    const fl = makeFeatureLayer([path]);
+
+    service.applyStyleToFeatureLayer(fl, base);
+
+    expect(path.setStyle).not.toHaveBeenCalled();
+  });
+
+  it('calls setStyle once per path when the style differs', () => {
+    const base = getBaseTerritoryStyle('#ff0000', false);
+    const hidden = getHiddenStyle();
+    const paths = [new FakePathCtor(), new FakePathCtor()];
+    for (const p of paths) p.options = { ...base };
+    const fl = makeFeatureLayer(paths);
+
+    service.applyStyleToFeatureLayer(fl, hidden);
+
+    for (const p of paths) expect(p.setStyle).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves a style function once per feature layer', () => {
+    const resolver = vi.fn(() => getBaseTerritoryStyle('#00ff00', true));
+    const paths = [new FakePathCtor(), new FakePathCtor()];
+    for (const p of paths) p.options = { ...getBaseTerritoryStyle('#ff0000', false) };
+    const fl = makeFeatureLayer(paths);
+
+    service.applyStyleToFeatureLayer(fl, resolver);
+
+    expect(resolver).toHaveBeenCalledTimes(1);
+    expect(resolver).toHaveBeenCalledWith(fl);
+    for (const p of paths) expect(p.setStyle).toHaveBeenCalledTimes(1);
+  });
+
+  it('compares partial styles with dashArray undefined correctly', () => {
+    const estilo = getPartialPolygonStyle('#123456', false); // incluye dashArray: undefined
+    const igual = new FakePathCtor();
+    igual.options = { ...estilo };
+    const distinto = new FakePathCtor();
+    distinto.options = { ...estilo, dashArray: '8, 8' };
+    const fl = makeFeatureLayer([igual, distinto]);
+
+    service.applyStyleToFeatureLayer(fl, estilo);
+
+    expect(igual.setStyle).not.toHaveBeenCalled();
+    expect(distinto.setStyle).toHaveBeenCalledTimes(1);
   });
 });

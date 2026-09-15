@@ -75,8 +75,18 @@ export class MapRenderingFacade {
     await this.territories.loadAllTerritories(territorioService);
   }
 
-  updateVisibleTerritories(): number[] {
-    return this.territories.updateVisibleTerritories();
+  updateVisibleTerritories(onBatchLoaded?: (newlyLoaded: number[]) => void): void {
+    this.territories.updateVisibleTerritories(onBatchLoaded);
+  }
+
+  /** Resuelve cuando el stream de carga de territorios visibles drena. */
+  whenTerritoryLoadsIdle(): Promise<void> {
+    return this.territories.whenTerritoryLoadsIdle();
+  }
+
+  /** Cancela la carga pendiente de territorios (frames + cola). */
+  cancelPendingLoads(): void {
+    this.territories.cancelPendingLoads();
   }
 
   ensureTerritoryLoaded(territorioNum: number): void {
@@ -355,6 +365,7 @@ export class MapRenderingFacade {
 
   destroy(): void {
     this.styles.cancelPendingStyleUpdates();
+    this.territories.cancelPendingLoads();
     this.clearExtraLayers();
     this.partialDraw.destroy();
     this.tiles.destroy();

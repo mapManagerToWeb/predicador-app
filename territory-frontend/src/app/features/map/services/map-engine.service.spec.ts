@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MapEngineService } from './map-engine.service';
-import { Map } from 'leaflet';
+import { Map, Canvas } from 'leaflet';
 
 const { fakeMap } = vi.hoisted(() => {
   const m = { setView: vi.fn(), remove: vi.fn() };
@@ -38,6 +38,12 @@ describe('MapEngineService', () => {
     });
     expect(fakeMap.setView).toHaveBeenCalled();
     expect(service.getMap()).toBe(fakeMap);
+  });
+
+  it('creates the territory renderer with a small canvas padding', () => {
+    service.getTerritoryRenderer();
+
+    expect(Canvas).toHaveBeenCalledWith({ padding: 0.1 });
   });
 
   it('destroy removes the map and clears the reference', () => {

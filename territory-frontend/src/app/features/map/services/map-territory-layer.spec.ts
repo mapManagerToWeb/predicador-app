@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Layer } from 'leaflet';
+import { type LatLngBounds, type Layer } from 'leaflet';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
 import { MapEngineService } from './map-engine.service';
+import type { TerritorioCacheData } from '../types/map.types';
 
 // Mock de Leaflet para poder ejercitar addTerritoryLayer (requiere un mapa).
 // El bbox devuelto por polygonCtor coincide con el geoJson de los tests de
@@ -87,6 +88,10 @@ describe('MapTerritoryLayerService', () => {
       providers: [MapTerritoryLayerService, MapEngineService],
     });
     service = TestBed.inject(MapTerritoryLayerService);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should be created', () => {
@@ -386,7 +391,17 @@ describe('MapTerritoryLayerService', () => {
 
     it('indexes loaded manzanas so queryManzanasAt finds them by cell', async () => {
       await service.loadAllTerritories({ getAllGeoJson: vi.fn().mockResolvedValue(geoJson) });
-      expect(service.updateVisibleTerritories()).toEqual([1]);
+      vi.useFakeTimers({
+        toFake: [
+          'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+          'requestAnimationFrame', 'cancelAnimationFrame', 'performance',
+        ],
+      });
+      // La carga ahora es un stream por frames: hay que avanzar al menos un
+      // frame para que la capa/mánzanas existan.
+      service.updateVisibleTerritories();
+      await vi.advanceTimersByTimeAsync(20);
+      expect(service.getAllTerritoriesLayer()).toHaveLength(1);
 
       // m1 bbox [-34.5,-34.4] × [-58.5,-58.4]; el punto cae en una celda cubierta
       const found = service.queryManzanasAt({ lat: -34.45, lng: -58.45 });
@@ -396,7 +411,14 @@ describe('MapTerritoryLayerService', () => {
 
     it('queryManzanasNear finds manzanas in neighbor cells that queryAt misses', async () => {
       await service.loadAllTerritories({ getAllGeoJson: vi.fn().mockResolvedValue(geoJson) });
+      vi.useFakeTimers({
+        toFake: [
+          'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+          'requestAnimationFrame', 'cancelAnimationFrame', 'performance',
+        ],
+      });
       service.updateVisibleTerritories();
+      await vi.advanceTimersByTimeAsync(20);
 
       // Celda adyacente al bbox de m1: queryAt no la ve, queryNear (radio 1) sí
       const at = service.queryManzanasAt({ lat: -34.398, lng: -58.398 });
@@ -407,12 +429,154 @@ describe('MapTerritoryLayerService', () => {
 
     it('clearAllLayers empties the spatial index', async () => {
       await service.loadAllTerritories({ getAllGeoJson: vi.fn().mockResolvedValue(geoJson) });
+      vi.useFakeTimers({
+        toFake: [
+          'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+          'requestAnimationFrame', 'cancelAnimationFrame', 'performance',
+        ],
+      });
       service.updateVisibleTerritories();
+      await vi.advanceTimersByTimeAsync(20);
       expect(service.queryManzanasAt({ lat: -34.45, lng: -58.45 })).toHaveLength(1);
 
       service.clearAllLayers();
 
       expect(service.queryManzanasAt({ lat: -34.45, lng: -58.45 })).toEqual([]);
+    });
+  });
+
+  describe('streaming territory loading', () => {
+    const FAKE_TIMERS: Parameters<typeof vi.useFakeTimers>[0] = {
+      toFake: [
+        'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+        'requestAnimationFrame', 'cancelAnimationFrame', 'performance',
+      ],
+    };
+
+    beforeEach(() => {
+      // addTerritoryLayer requiere un mapa; el mock de leaflet devuelve fakeMap.
+      TestBed.inject(MapEngineService).initializeMap(document.createElement('div'));
+    });
+
+    /** Crea un TerritorioCacheData con visibilidad controlable por test. */
+    function makeTerritorio(initiallyVisible: boolean): {
+      data: TerritorioCacheData;
+      setVisible: (visible: boolean) => void;
+    } {
+      const intersects = vi.fn(() => initiallyVisible);
+      return {
+        data: {
+          fc: { type: 'FeatureCollection', features: [] },
+          simplifiedFc: { type: 'FeatureCollection', features: [] },
+          dissolvedFeature: null,
+          color: '#ff0000',
+          bounds: {
+            isValid: () => true,
+            intersects,
+            getCenter: () => ({ lat: 0, lng: 0 }),
+          } as unknown as LatLngBounds,
+        },
+        setVisible: (visible: boolean) => intersects.mockReturnValue(visible),
+      };
+    }
+
+    it('does not add layers synchronously; layers appear after a frame and whenTerritoryLoadsIdle resolves on drain', async () => {
+      vi.useFakeTimers(FAKE_TIMERS);
+      service.getTerritoryDataCache().set(1, makeTerritorio(true).data);
+
+      service.updateVisibleTerritories();
+      expect(service.getAllTerritoriesLayer()).toEqual([]);
+      expect(service.getFeatureLayerByTerritorio(1)).toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(20); // un frame
+
+      expect(service.getAllTerritoriesLayer()).toHaveLength(1);
+      expect(service.getFeatureLayerByTerritorio(1)).toBeDefined();
+      await expect(service.whenTerritoryLoadsIdle()).resolves.toBeUndefined();
+    });
+
+    it('splits adds across frames when there are more territories than VISIBLE_LOAD_MAX_PER_FRAME', async () => {
+      vi.useFakeTimers(FAKE_TIMERS);
+      const cantidad = MapTerritoryLayerService.VISIBLE_LOAD_MAX_PER_FRAME + 2;
+      for (let i = 1; i <= cantidad; i++) {
+        service.getTerritoryDataCache().set(i, makeTerritorio(true).data);
+      }
+      const batches: number[][] = [];
+      service.updateVisibleTerritories((nums) => batches.push(nums));
+
+      expect(service.getAllTerritoriesLayer()).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(20); // frame 1 → primer batch
+      expect(batches).toHaveLength(1);
+      expect(batches[0]).toHaveLength(MapTerritoryLayerService.VISIBLE_LOAD_MAX_PER_FRAME);
+      expect(service.getAllTerritoriesLayer()).toHaveLength(MapTerritoryLayerService.VISIBLE_LOAD_MAX_PER_FRAME);
+
+      await vi.advanceTimersByTimeAsync(20); // frame 2 → el resto
+      expect(batches).toHaveLength(2);
+      expect(batches[1]).toHaveLength(2);
+      expect(batches[1]).toContain(cantidad); // el último territorio llega en el batch final
+      expect(service.getAllTerritoriesLayer()).toHaveLength(cantidad);
+      await expect(service.whenTerritoryLoadsIdle()).resolves.toBeUndefined();
+    });
+
+    it('re-targets the queue mid-stream: drops no-longer-visible, picks up newly visible, resolves after the final generation', async () => {
+      vi.useFakeTimers(FAKE_TIMERS);
+      const t1 = makeTerritorio(true);
+      const t2 = makeTerritorio(false);
+      const cache = service.getTerritoryDataCache();
+      cache.set(1, t1.data);
+      cache.set(2, t2.data);
+
+      service.updateVisibleTerritories(); // solo el 1 entra a la cola
+      expect(service.getAllTerritoriesLayer()).toEqual([]);
+
+      // Simula un pan: el 1 sale de la vista y el 2 entra.
+      t1.setVisible(false);
+      t2.setVisible(true);
+      service.updateVisibleTerritories(); // re-target: la cola pasa a [2]
+
+      const idle = service.whenTerritoryLoadsIdle();
+      await vi.advanceTimersByTimeAsync(20);
+
+      expect(service.getAllTerritoriesLayer().map((fl) => fl.territorioPadre)).toEqual([2]);
+      await expect(idle).resolves.toBeUndefined();
+    });
+
+    it('ensureTerritoryLoaded during a pending stream prevents the double-add', async () => {
+      vi.useFakeTimers(FAKE_TIMERS);
+      const cache = service.getTerritoryDataCache();
+      cache.set(1, makeTerritorio(true).data);
+      cache.set(2, makeTerritorio(true).data);
+
+      service.updateVisibleTerritories();
+      expect(service.getAllTerritoriesLayer()).toEqual([]);
+
+      service.ensureTerritoryLoaded(1); // carga síncrona fuera del stream
+      expect(service.getAllTerritoriesLayer().map((fl) => fl.territorioPadre)).toEqual([1]);
+
+      await vi.advanceTimersByTimeAsync(20);
+
+      const cargados = service.getAllTerritoriesLayer().map((fl) => fl.territorioPadre);
+      expect(cargados.filter((n) => n === 1)).toHaveLength(1);
+      expect(cargados).toContain(2);
+      await expect(service.whenTerritoryLoadsIdle()).resolves.toBeUndefined();
+    });
+
+    it('cancelPendingLoads (via clearAllLayers) cancels the frame, empties the queue and resolves idle waiters', async () => {
+      vi.useFakeTimers(FAKE_TIMERS);
+      service.getTerritoryDataCache().set(1, makeTerritorio(true).data);
+
+      service.updateVisibleTerritories();
+      const idle = service.whenTerritoryLoadsIdle();
+
+      service.clearAllLayers(); // → cancelPendingLoads
+
+      expect(service.getAllTerritoriesLayer()).toEqual([]);
+      await expect(idle).resolves.toBeUndefined();
+
+      // Ningún frame posterior agrega capas: el frame quedó cancelado.
+      await vi.advanceTimersByTimeAsync(40);
+      expect(service.getAllTerritoriesLayer()).toEqual([]);
     });
   });
 });

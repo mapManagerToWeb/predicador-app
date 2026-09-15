@@ -53,6 +53,7 @@ export class MapInitializationService {
       await this.reconciliarCaches();
       await this.loadTerritoriesWithRetry();
       this.onMoveEnd();
+      await this.rendering.whenTerritoryLoadsIdle();
       await this.restoreAllMarks();
     } catch {
       this.toastService.show(TOAST_MESSAGES.loadError);
@@ -99,7 +100,21 @@ export class MapInitializationService {
   }
 
   private onMoveEnd(): void {
-    const newlyLoaded = this.rendering.updateVisibleTerritories();
+    // La carga de territorios visibles es un stream por frames: el callback
+    // corre por cada batch recién agregado (nunca con lista vacía).
+    this.rendering.updateVisibleTerritories((newlyLoaded) => {
+      this.restaurarMarcasDeTerritorios(newlyLoaded);
+
+      // Ocultar los no seleccionados siempre que haya una selección activa
+      // (no solo en modo marcado), para que no reaparezcan al navegar el mapa.
+      if (this.state.territoriosSeleccionados().length > 0) {
+        this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
+      }
+    });
+  }
+
+  /** Restaura marcas/cache para los territorios recién agregados al mapa. */
+  private restaurarMarcasDeTerritorios(newlyLoaded: number[]): void {
     if (newlyLoaded.length === 0) return;
 
     const draft = this.draftService.cargar();
@@ -124,12 +139,6 @@ export class MapInitializationService {
 
       const cached = this.territorioService.getReportesDesdeCache([num]).get(num) ?? [];
       this.selection.restaurarMarcadoConReportes(num, cached, fl.color, { actualizarEstadoMarcado: false });
-    }
-
-    // Ocultar los no seleccionados siempre que haya una selección activa
-    // (no solo en modo marcado), para que no reaparezcan al navegar el mapa.
-    if (this.state.territoriosSeleccionados().length > 0) {
-      this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
     }
   }
 

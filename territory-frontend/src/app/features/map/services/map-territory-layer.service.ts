@@ -92,6 +92,13 @@ export class MapTerritoryLayerService {
   // and re-parse on every navigation/reload. Miss-safes to a plain fetch.
   static readonly GEOJSON_CACHE_KEY = 'territory.territories.geojson.v1';
 
+  // Presupuesto de main-thread por frame para AGREGAR territorios visibles
+  // (la carga es un stream por rAF, no un burst síncrono por moveend).
+  static readonly VISIBLE_LOAD_BUDGET_MS = 8;
+
+  // Tope defensivo de agregados por frame (independiente del presupuesto).
+  static readonly VISIBLE_LOAD_MAX_PER_FRAME = 6;
+
   // sessionStorage key — processed geometry (simplify + union) per territory.
   // Same lifecycle as GEOJSON_CACHE_KEY: pruned together in podarGeojsonCache.
   // Avoids recomputing turf simplify/union on every navigation/reload.
@@ -116,6 +123,14 @@ export class MapTerritoryLayerService {
 
   private manzanaClickHandler: ManzanaClickHandler | null = null;
   private extraLayers: Layer[] = [];
+
+  // Cola de territorios visibles pendientes de agregar. Se procesa por frames
+  // con presupuesto de tiempo (streaming) para no bloquear el hilo principal
+  // en un único burst síncrono por moveend.
+  private pendingLoadQueue: number[] = [];
+  private loadFrameHandle: number | null = null;
+  private pendingBatchCallback: ((newlyLoaded: number[]) => void) | null = null;
+  private loadIdleWaiters: Array<() => void> = [];
 
   private engine = inject(MapEngineService);
 
@@ -314,36 +329,146 @@ export class MapTerritoryLayerService {
     return cache;
   }
 
-  updateVisibleTerritories(): number[] {
+  /**
+   * Actualiza los territorios visibles del viewport de forma incremental.
+   *
+   * <p>Las REMOCIONES se aplican de inmediato (síncrono, como antes), pero los
+   * AGREGADOS se encolan y se procesan por frames con un presupuesto de
+   * tiempo (VISIBLE_LOAD_BUDGET_MS) para no bloquear el main thread en un
+   * único burst síncrono. Cada batch procesado invoca `onBatchLoaded` con los
+   * números recién agregados, DESPUÉS de crear sus capas (para que
+   * getFeatureLayerByTerritorio ya responda).</p>
+   *
+   * <p>Una nueva llamada reemplaza por completo la cola pendiente (re-target):
+   * las entradas obsoletas de una generación anterior se descartan y la carga
+   * se re-apunta al viewport actual; el callback pasado pasa a ser el vigente.</p>
+   */
+  updateVisibleTerritories(onBatchLoaded?: (newlyLoaded: number[]) => void): void {
     const map = this.engine.getMap();
-    if (!map) return [];
+    if (!map) {
+      // Sin mapa (destroy en curso): limpia cualquier stream pendiente y avisa
+      // a los waiters de idle.
+      this.cancelPendingLoads();
+      return;
+    }
 
     const mapBounds = map.getBounds().pad(MAP_DEFAULTS.mapBoundsPadFactor);
-    const newlyLoaded: number[] = [];
+    const toLoad: number[] = [];
 
     for (const [num, data] of this.dataCache) {
       const isVisible = data.bounds.isValid() && data.bounds.intersects(mapBounds);
       const isLoaded = this.layerByTerritory.has(num); // O(1) — no Set creation
 
       if (isVisible && !isLoaded) {
-        this.addTerritoryLayer(num, data);
-        newlyLoaded.push(num);
+        toLoad.push(num);
       } else if (!isVisible && isLoaded) {
         this.removeTerritoryLayer(num);
       }
     }
 
-    this.updateLabelsVisibility();
-    return newlyLoaded;
+    // Reemplazo total de la cola: los territorios ya cargados no pueden estar
+    // en toLoad, así que un re-target a mitad de stream nunca duplica capas.
+    this.pendingLoadQueue = toLoad;
+    this.pendingBatchCallback = onBatchLoaded ?? null;
+
+    if (toLoad.length === 0) {
+      // Paridad con el contrato anterior: refrescar etiquetas en cada moveend
+      // aunque no haya cargas nuevas (rango zoom/label no cambia, es barato).
+      this.updateLabelsVisibility();
+      this.notifyLoadIdle();
+      return;
+    }
+
+    // Un solo frame pendiente a la vez: la iteración de la cola es continua.
+    if (this.loadFrameHandle === null) {
+      this.loadFrameHandle = requestAnimationFrame(() => this.processLoadFrame());
+    }
+  }
+
+  /** Procesa un frame del stream de carga respetando el presupuesto de tiempo. */
+  private processLoadFrame(): void {
+    this.loadFrameHandle = null;
+    if (!this.engine.getMap()) {
+      // El mapa fue destruido mientras el stream estaba pendiente.
+      this.cancelPendingLoads();
+      return;
+    }
+
+    const started = performance.now();
+    const batch: number[] = [];
+
+    while (
+      this.pendingLoadQueue.length > 0 &&
+      batch.length < MapTerritoryLayerService.VISIBLE_LOAD_MAX_PER_FRAME &&
+      performance.now() - started < MapTerritoryLayerService.VISIBLE_LOAD_BUDGET_MS
+    ) {
+      const num = this.pendingLoadQueue.shift()!;
+      // Guard defensivo: si el territorio se cargó por otra vía
+      // (ensureTerritoryLoaded) mientras el frame estaba pendiente, no agregar
+      // dos veces.
+      if (this.layerByTerritory.has(num)) continue;
+      const data = this.dataCache.get(num);
+      if (data) {
+        this.addTerritoryLayer(num, data);
+        batch.push(num);
+      }
+    }
+
+    if (batch.length > 0) {
+      this.updateLabelsVisibility();
+      // El callback corre después de crear las capas del batch.
+      this.pendingBatchCallback?.(batch);
+    }
+
+    if (this.pendingLoadQueue.length > 0) {
+      this.loadFrameHandle = requestAnimationFrame(() => this.processLoadFrame());
+    } else {
+      this.pendingBatchCallback = null;
+      this.notifyLoadIdle();
+    }
+  }
+
+  /**
+   * Resuelve cuando el stream de carga actual drena (o es cancelado). Si no
+   * hay cola ni frame pendiente, resuelve de inmediato.
+   */
+  whenTerritoryLoadsIdle(): Promise<void> {
+    if (this.pendingLoadQueue.length === 0 && this.loadFrameHandle === null) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this.loadIdleWaiters.push(resolve);
+    });
+  }
+
+  /** Cancela el frame pendiente, vacía la cola y notifica a los waiters de idle. */
+  cancelPendingLoads(): void {
+    if (this.loadFrameHandle !== null) {
+      cancelAnimationFrame(this.loadFrameHandle);
+      this.loadFrameHandle = null;
+    }
+    this.pendingLoadQueue = [];
+    this.pendingBatchCallback = null;
+    this.notifyLoadIdle();
+  }
+
+  private notifyLoadIdle(): void {
+    const waiters = this.loadIdleWaiters;
+    this.loadIdleWaiters = [];
+    for (const resolve of waiters) resolve();
   }
 
   ensureTerritoryLoaded(territorioNum: number): void {
     if (this.layerByTerritory.has(territorioNum)) return; // O(1)
     const data = this.dataCache.get(territorioNum);
     if (data) this.addTerritoryLayer(territorioNum, data);
+    // Si el número seguía pendiente en el stream, descartarlo para evitar un
+    // doble add cuando procese el frame (sin cambiar la carga síncrona).
+    this.pendingLoadQueue = this.pendingLoadQueue.filter((n) => n !== territorioNum);
   }
 
   clearAllLayers(): void {
+    this.cancelPendingLoads();
     for (const fl of this.layerByTerritory.values()) fl.layer.remove();
     for (const lbl of this.labelByTerritory.values()) lbl.remove();
     this.layerByTerritory.clear();

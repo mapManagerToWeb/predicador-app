@@ -23,7 +23,7 @@ export class MapEngineService {
 
   getTerritoryRenderer(): Canvas {
     if (!this.territoryRenderer) {
-      this.territoryRenderer = new Canvas({ padding: 0.3 });
+      this.territoryRenderer = new Canvas({ padding: 0.1 });
     }
     return this.territoryRenderer;
   }

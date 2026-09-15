@@ -19,6 +19,7 @@ describe('MapInitializationService', () => {
     setManzanaClickHandler: ReturnType<typeof vi.fn>;
     loadAllTerritories: ReturnType<typeof vi.fn>;
     updateVisibleTerritories: ReturnType<typeof vi.fn>;
+    whenTerritoryLoadsIdle: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getFeatureLayerByTerritorio: ReturnType<typeof vi.fn>;
     getTerritoryDataCache: ReturnType<typeof vi.fn>;
@@ -52,7 +53,8 @@ describe('MapInitializationService', () => {
       getMap: vi.fn().mockReturnValue(fakeMap),
       setManzanaClickHandler: vi.fn(),
       loadAllTerritories: vi.fn().mockResolvedValue(undefined),
-      updateVisibleTerritories: vi.fn().mockReturnValue([]),
+      updateVisibleTerritories: vi.fn(),
+      whenTerritoryLoadsIdle: vi.fn().mockResolvedValue(undefined),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
       getTerritoryDataCache: vi.fn().mockReturnValue(new Map()),
@@ -150,7 +152,7 @@ describe('MapInitializationService', () => {
   });
 
   it('restores marks for newly visible territories from cache without hitting the db', async () => {
-    rendering.updateVisibleTerritories.mockReturnValue([3]);
+    rendering.updateVisibleTerritories.mockImplementation((cb: (nums: number[]) => void) => cb([3]));
     rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#ff0000', layer: {} });
     territorioService.getReportesDesdeCache.mockReturnValue(new Map([[3, [{ id: 7 } as never]]]));
 
@@ -165,7 +167,7 @@ describe('MapInitializationService', () => {
   });
 
   it('hides unselected territories on pan whenever a selection is active (also in mode none)', async () => {
-    rendering.updateVisibleTerritories.mockReturnValue([3]);
+    rendering.updateVisibleTerritories.mockImplementation((cb: (nums: number[]) => void) => cb([3]));
     rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#ff0000', layer: {} });
     state.modoMarcado.set('none');
     state.territoriosSeleccionados.set([3]);
@@ -176,7 +178,7 @@ describe('MapInitializationService', () => {
   });
 
   it('restores draft marks for a newly visible territory during a pan', async () => {
-    rendering.updateVisibleTerritories.mockReturnValue([3]);
+    rendering.updateVisibleTerritories.mockImplementation((cb: (nums: number[]) => void) => cb([3]));
     rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 3, color: '#3b82f6', layer: {} });
     drafts.guardar({
       manzanasById: { A: { id: 'A', nombreBloque: 'Bloque A', color: '#3b82f6', territorioNumero: 3 } },
@@ -227,6 +229,21 @@ describe('MapInitializationService', () => {
     expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(1, [{ id: 1 }], '#00ff00', { actualizarEstadoMarcado: false });
     expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(2, [{ id: 2 }], '#0000ff', { actualizarEstadoMarcado: false });
     expect(selection.restaurarMarcadoConReportes).not.toHaveBeenCalledWith(3, expect.anything(), expect.anything(), expect.anything());
+  });
+
+  it('waits for the visible-territory stream to idle before restoring all marks', async () => {
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    // Contrato del streaming: onMoveEnd agenda la carga (updateVisibleTerritories),
+    // loadAllTerritories espera el drenado (whenTerritoryLoadsIdle) y solo entonces
+    // restoreAllMarks lee las capas cargadas (getAllTerritoriesLayer).
+    const orderUpdate = rendering.updateVisibleTerritories.mock.invocationCallOrder[0];
+    const orderIdle = rendering.whenTerritoryLoadsIdle.mock.invocationCallOrder[0];
+    const orderRestore = rendering.getAllTerritoriesLayer.mock.invocationCallOrder[0];
+
+    expect(orderUpdate).toBeGreaterThan(0);
+    expect(orderIdle).toBeGreaterThan(orderUpdate);
+    expect(orderRestore).toBeGreaterThan(orderIdle);
   });
 
   it('restores the draft when one exists and skips cache paint + revalidation for drafted territories', async () => {
