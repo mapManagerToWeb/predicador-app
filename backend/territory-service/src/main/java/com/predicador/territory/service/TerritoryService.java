@@ -44,7 +44,6 @@ public class TerritoryService {
         this(territoryRepository, colorRepository, geoJsonSerializer, registry, null, null);
     }
 
-    @Autowired
     public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry,
                             ObjectProvider<TerritoryService> self) {
         this(territoryRepository, colorRepository, geoJsonSerializer, registry, self, null);
