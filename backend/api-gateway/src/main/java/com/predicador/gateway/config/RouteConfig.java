@@ -43,6 +43,7 @@ public class RouteConfig {
     private static final String REPORTING_SERVICE_URI = "lb://reporting-service";
     private static final String TERRITORY_FALLBACK = "forward:/fallback/territory";
     private static final String TERRITORY_SERVICE_URI = "lb://territory-service";
+    private static final String TERRITORY_TILES_CB = "territoryCB-tiles";
 
     @Value("${app.cors.allowed-origins:}")
     private String allowedOrigins;
@@ -74,6 +75,21 @@ public class RouteConfig {
                                         .setRetries(1)
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
+                        .uri(TERRITORY_SERVICE_URI))
+                // Pipeline MVT (F1): alta frecuencia, payload binario. CB sin
+                // fallback (un forward:/fallback/territory devolvería JSON en
+                // un content-type MVT) y SIN retry (no amplificar la estampida
+                // de tiles cuando el downstream está en cold start). Van antes
+                // del catch-all territory-service.
+                .route("territory-tiles", r -> r
+                        .path("/api/v1/territories/tiles/{z}/{x}/{y}.pbf")
+                        .filters(f -> f
+                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB)))
+                        .uri(TERRITORY_SERVICE_URI))
+                .route("territory-tiles-json", r -> r
+                        .path("/api/v1/territories/tiles.json")
+                        .filters(f -> f
+                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB)))
                         .uri(TERRITORY_SERVICE_URI))
                 .route("territory-service", r -> r
                         .path("/api/v1/territories/**")

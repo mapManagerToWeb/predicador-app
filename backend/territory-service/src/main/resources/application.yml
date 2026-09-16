@@ -133,6 +133,16 @@ app:
     secret: ${SESSION_SECRET:}
     ttl-hours: ${SESSION_TTL_HOURS:12}
     strict: ${SESSION_STRICT:true}
+  tiles:
+    # Defaults standalone (sin config-server): en runtime, config-server los
+    # sobreescribe; sin config-server el servicio arranca con estos valores.
+    max-zoom: ${APP_TILES_MAX_ZOOM:19}
+    s2-level: ${APP_TILES_S2_LEVEL:14}
+    s2-z-min: ${APP_TILES_S2_Z_MIN:12}
+    extent: ${APP_TILES_EXTENT:4096}
+    buffer: ${APP_TILES_BUFFER:64}
+    cache-max-size: ${APP_TILES_CACHE_MAX_SIZE:5000}
+    cache-ttl: ${APP_TILES_CACHE_TTL:10m}
 
 otel:
   service:

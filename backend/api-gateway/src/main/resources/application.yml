@@ -54,7 +54,7 @@ eureka:
 # Gateway los resuelve desde el application.yml LOCAL — el gateway no usa
 # config-server). Nombres alineados con RouteConfig.java:
 # territoryCB-colors / territoryCB-geojson / territoryCB-default /
-# reportingCB / encargadosCB / rumCB.
+# territoryCB-tiles / reportingCB / encargadosCB / rumCB.
 #
 # Timeouts generosos para arranque en frío: la primera consulta PostGIS tras
 # un restart puede tardar >5s (cache de Hibernate frío). Un TimeLimiter
@@ -75,6 +75,9 @@ resilience4j:
         cancel-running-future: true
       territoryCB-default:
         timeout-duration: 15s
+        cancel-running-future: true
+      territoryCB-tiles:
+        timeout-duration: 5s
         cancel-running-future: true
       reportingCB:
         timeout-duration: 20s
@@ -103,6 +106,8 @@ resilience4j:
       territoryCB-geojson:
         base-config: default
       territoryCB-default:
+        base-config: default
+      territoryCB-tiles:
         base-config: default
       reportingCB:
         base-config: default

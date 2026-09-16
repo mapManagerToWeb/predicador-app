@@ -21,3 +21,13 @@ management:
     web:
       exposure:
         include: health
+
+app:
+  tiles:
+    max-zoom: 19
+    s2-level: 14
+    s2-z-min: 12
+    extent: 4096
+    buffer: 64
+    cache-max-size: 5000
+    cache-ttl: 10m

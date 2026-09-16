@@ -46,14 +46,32 @@ public class CacheConfig {
      * Enables strong ETag generation on every GET response of this service.
      * Combined with Caffeine, a client that already holds the current version
      * of a territory GeoJSON gets a 304 Not Modified instead of the full body.
+     *
+     * <p>The MVT tile endpoints are excluded: they manage their own strong
+     * ETag ({@code "tile-{z}-{x}-{y}-v{data_version}"}) and the 304 / gzip
+     * negotiation themselves. Letting the shallow filter wrap those responses
+     * would overwrite the versioned ETag with a weak content hash.</p>
      */
     @Bean
     public FilterRegistrationBean<ShallowEtagHeaderFilter> etagFilter() {
         FilterRegistrationBean<ShallowEtagHeaderFilter> registration =
-                new FilterRegistrationBean<>(new ShallowEtagHeaderFilter());
+                new FilterRegistrationBean<>(new SkipTilesEtagFilter());
         registration.addUrlPatterns("/api/v1/territories/*");
         registration.setName("etagFilter");
         return registration;
+    }
+
+    /**
+     * Shallow ETag filter that skips the MVT pipeline
+     * ({@code /api/v1/territories/tiles...}).
+     */
+    static final class SkipTilesEtagFilter extends ShallowEtagHeaderFilter {
+        private static final String TILES_BASE_PATH = "/api/v1/territories/tiles";
+
+        @Override
+        protected boolean shouldNotFilter(jakarta.servlet.http.HttpServletRequest request) {
+            return request.getRequestURI().startsWith(TILES_BASE_PATH);
+        }
     }
 
     @Bean

@@ -72,6 +72,17 @@ app:
     secret: ${SESSION_SECRET}
     ttl-hours: ${SESSION_TTL_HOURS:12}
     strict: ${SESSION_STRICT:true}
+  tiles:
+    # Pipeline MVT (F1, SPEC-map-vector-tiles.md): niveles máximos de la
+    # pirámide, nivel S2 fijo del cover, extent/buffer MVT 2.1 y caché
+    # Caffeine de tiles. El ETag de cada tile incorpora data_version (app_meta).
+    max-zoom: ${APP_TILES_MAX_ZOOM:19}
+    s2-level: ${APP_TILES_S2_LEVEL:14}
+    s2-z-min: ${APP_TILES_S2_Z_MIN:12}
+    extent: ${APP_TILES_EXTENT:4096}
+    buffer: ${APP_TILES_BUFFER:64}
+    cache-max-size: ${APP_TILES_CACHE_MAX_SIZE:5000}
+    cache-ttl: ${APP_TILES_CACHE_TTL:10m}
 
 management:
   health:

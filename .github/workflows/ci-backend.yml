@@ -51,7 +51,10 @@ jobs:
           DB_PASSWORD: test
           TESTCONTAINERS_RYUK_DISABLED: "true"
           DOCKER_HOST: unix:///var/run/docker.sock
-        run: mvn verify -Pcoverage -B
+        # -Ddocker.available=true: habilita los tests de integración PostGIS
+        # (PostgisIntegrationTest + TilePipelineIntegrationTest), que habían
+        # quedado en skip permanente en CI al no declararse el flag.
+        run: mvn verify -Pcoverage -B -Ddocker.available=true
 
       - name: Upload JaCoCo reports
         if: always()

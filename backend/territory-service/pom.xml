@@ -88,6 +88,33 @@
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-spatial</artifactId>
         </dependency>
+        <!--
+            Encoder/decoder MVT (fork mantenido de wdtinc; Apache-2.0; JTS).
+            API: io.github.sebasbaumh.mapbox.vectortile (ver README del repo
+            sebasbaumh/mapbox-vector-tile-java 25.1.0).
+        -->
+        <dependency>
+            <groupId>io.github.sebasbaumh</groupId>
+            <artifactId>mapbox-vector-tile-java</artifactId>
+            <version>25.1.0</version>
+        </dependency>
+        <!-- Google S2: cobertura de rects/tiles a nivel fijo 14 (btree candidato). -->
+        <dependency>
+            <groupId>com.google.geometry</groupId>
+            <artifactId>s2-geometry</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+        <!--
+            jts-core explícito: hibernate-spatial lo trae en 1.19.0 pero el
+            encoder MVT pide 1.20.0 a la misma profundidad; fijar la versión
+            gestionada evita que el orden de declaración decida por mediación
+            de Maven. (Spring Boot no gestiona org.locationtech.jts.)
+        -->
+        <dependency>
+            <groupId>org.locationtech.jts</groupId>
+            <artifactId>jts-core</artifactId>
+            <version>1.20.0</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -99,6 +126,13 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Spring Boot 4: AutoConfigureMockMvc vive en un módulo separado
+             (spring-boot-starter-test ya no lo arrastra). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

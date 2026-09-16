@@ -57,6 +57,11 @@ class PostgisIntegrationTest {
         registry.add("spring.flyway.baseline-version", () -> "0");
         registry.add("eureka.client.enabled", () -> "false");
         registry.add("spring.cloud.config.enabled", () -> "false");
+
+        // SessionTokenService (strict=true sin perfil local) exige un secret
+        // de ≥32 bytes UTF-8 al bootear el contexto — sin esto el arranque
+        // lanza IllegalArgumentException al habilitar Docker en CI.
+        registry.add("app.session.secret", () -> "test-session-secret-0123456789ABCDEF0123");
     }
 
     @Autowired
