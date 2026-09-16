@@ -10,13 +10,15 @@ import java.time.Duration;
  * fuera de rango fallan al arrancar con un mensaje claro en vez de
  * degenerar en tiles rotos en runtime.
  *
- * @param maxZoom      zoom máximo servible (z en [0, maxZoom])
- * @param s2Level      nivel S2 fijo global (features + rects de tile)
- * @param s2ZMin       primer zoom que usa la ruta S2 (z menores → capa disuelta por GiST)
- * @param extent       extent MVT (4096 por spec 2.1)
- * @param buffer       buffer de clip en px de tile (64)
- * @param cacheMaxSize entradas máximas de la caché Caffeine de tiles
- * @param cacheTtl     TTL de la caché Caffeine de tiles
+ * @param maxZoom               zoom máximo servible (z en [0, maxZoom])
+ * @param s2Level               nivel S2 fijo global (features + rects de tile)
+ * @param s2ZMin                primer zoom que usa la ruta S2 (z menores → capa disuelta por GiST)
+ * @param extent                extent MVT (4096 por spec 2.1)
+ * @param buffer                buffer de clip en px de tile (64)
+ * @param cacheMaxSize          entradas máximas de la caché Caffeine de tiles
+ * @param cacheTtl              TTL de la caché Caffeine de tiles
+ * @param writeListenerPoolSize tamaño del thread pool para el listener
+ *                              asíncrono de escritura (F2)
  */
 @ConfigurationProperties(prefix = "app.tiles")
 public record TileProperties(
@@ -26,7 +28,8 @@ public record TileProperties(
         int extent,
         int buffer,
         long cacheMaxSize,
-        Duration cacheTtl) {
+        Duration cacheTtl,
+        int writeListenerPoolSize) {
 
     public TileProperties {
         if (maxZoom < 0 || maxZoom > 30) {
@@ -49,6 +52,9 @@ public record TileProperties(
         }
         if (cacheTtl == null || cacheTtl.isNegative() || cacheTtl.isZero()) {
             throw new IllegalArgumentException("app.tiles.cache-ttl debe ser positivo, recibido: " + cacheTtl);
+        }
+        if (writeListenerPoolSize <= 0) {
+            throw new IllegalArgumentException("app.tiles.write-listener-pool-size debe ser > 0, recibido: " + writeListenerPoolSize);
         }
     }
 }

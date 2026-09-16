@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class S2CoverServiceTest {
 
     private static final TileProperties PROPS =
-            new TileProperties(19, 14, 12, 4096, 64, 100, Duration.ofMinutes(10));
+            new TileProperties(19, 14, 12, 4096, 64, 100, Duration.ofMinutes(10), 2);
     private final S2CoverService service = new S2CoverService(PROPS, new SimpleMeterRegistry());
 
     // ---- determinismo ---------------------------------------------------

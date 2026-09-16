@@ -137,6 +137,15 @@ public class TileService {
         return cache.get(new TileKey(z, x, y, version), key -> buildTile(z, x, y, version));
     }
 
+    /**
+     * Invalida todas las entradas de la caché de tiles. Visible para tests
+     * de integración que necesitan forzar un rebuild después de un bump
+     * de versión (el TTL de 10 min es demasiado largo para tests).
+     */
+    public void invalidateCache() {
+        cache.invalidateAll();
+    }
+
     private TileEntry buildTile(int z, int x, int y, long version) {
         Timer.Sample sample = Timer.start();
         try {

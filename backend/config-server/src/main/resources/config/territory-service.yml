@@ -83,6 +83,9 @@ app:
     buffer: ${APP_TILES_BUFFER:64}
     cache-max-size: ${APP_TILES_CACHE_MAX_SIZE:5000}
     cache-ttl: ${APP_TILES_CACHE_TTL:10m}
+    # F2: thread pool para el listener async de escritura (bump versión,
+    # reindex S2, refresh disueltos). Pool pequeño y no bloqueante.
+    write-listener-pool-size: ${APP_TILES_WRITE_LISTENER_POOL_SIZE:2}
 
 management:
   health:

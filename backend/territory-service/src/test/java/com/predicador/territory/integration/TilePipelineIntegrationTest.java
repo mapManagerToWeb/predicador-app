@@ -6,6 +6,7 @@ import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.repository.TerritoryRepository;
 import com.predicador.territory.tile.S2BackfillService;
 import com.predicador.territory.tile.TileProperties;
+import com.predicador.territory.tile.TileService;
 import com.predicador.territory.tile.WebMercator;
 import io.github.sebasbaumh.mapbox.vectortile.VectorTile;
 import io.github.sebasbaumh.mapbox.vectortile.adapt.jts.MvtReader;
@@ -29,11 +30,13 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
@@ -89,6 +92,7 @@ class TilePipelineIntegrationTest {
         registry.add("app.tiles.buffer", () -> "64");
         registry.add("app.tiles.cache-max-size", () -> "500");
         registry.add("app.tiles.cache-ttl", () -> "10m");
+        registry.add("app.tiles.write-listener-pool-size", () -> "2");
     }
 
     @Autowired private MockMvc mockMvc;
@@ -96,6 +100,7 @@ class TilePipelineIntegrationTest {
     @Autowired private S2BackfillService backfill;
     @Autowired private TerritoryRepository territoryRepo;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private TileService tileService;
 
     // ────────────────────────────────────────────────────────────────────
     // Helpers
@@ -333,5 +338,93 @@ class TilePipelineIntegrationTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/v1/territories/tiles/20/0/0.pbf").accept(MVT_MEDIA))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // 8. assignColor bumps version → tile reflects new color (F2)
+    // ────────────────────────────────────────────────────────────────────
+
+    @Test
+    void assignColor_bumpsVersion_tileReflectsNewColor() throws Exception {
+        // 1. Setup: persist manzana + backfill
+        int z = 14;
+        Envelope tileBounds = WebMercator.tileBoundsLonLat(z, X14, Y14);
+        String ring = tileBounds.getMinX() + " " + tileBounds.getMinY() + ", "
+                + tileBounds.getMaxX() + " " + tileBounds.getMinY() + ", "
+                + tileBounds.getMaxX() + " " + tileBounds.getMaxY() + ", "
+                + tileBounds.getMinX() + " " + tileBounds.getMaxY() + ", "
+                + tileBounds.getMinX() + " " + tileBounds.getMinY();
+        persistManzana(8000, 50, "50.a", ring);
+        reRunBackfill();
+
+        // 2. Render tile → ETag con versión V (v1)
+        String expectedEtagV1 = "\"tile-14-" + X14 + "-" + Y14 + "-v1\"";
+        mockMvc.perform(get("/api/v1/territories/tiles/{z}/{x}/{y}.pbf", z, X14, Y14)
+                        .accept(MVT_MEDIA))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", expectedEtagV1));
+
+        // 3. assignColor via MockMvc PUT
+        String colorPayload = new ObjectMapper().writeValueAsString(
+                new com.predicador.territory.dto.TerritoryColorRequest("#ff0000"));
+        mockMvc.perform(put("/api/v1/territories/{number}/color", 50)
+                        .contentType("application/json")
+                        .content(colorPayload))
+                .andExpect(status().isOk());
+
+        // 4. Poll for async listener to bump version (up to 5s)
+        long deadline = System.currentTimeMillis() + 5_000;
+        Long version = 0L;
+        while (version < 2L && System.currentTimeMillis() < deadline) {
+            Thread.sleep(100);
+            version = jdbc.queryForObject(
+                    "SELECT v FROM app_meta WHERE k = 'data_version'", Long.class);
+        }
+        assertThat(version).as("data_version should be bumped to 2").isEqualTo(2L);
+
+        // 5. Invalidate Caffeine cache to force rebuild
+        tileService.invalidateCache();
+
+        // 6. Render tile de nuevo → ETag con versión V+1 (v2)
+        String expectedEtagV2 = "\"tile-14-" + X14 + "-" + Y14 + "-v2\"";
+        MvcResult secondResult = mockMvc.perform(get("/api/v1/territories/tiles/{z}/{x}/{y}.pbf", z, X14, Y14)
+                        .accept(MVT_MEDIA))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", expectedEtagV2))
+                .andReturn();
+
+        // 7. Decode MVT y verificar que el color #ff0000 aparece en la feature
+        byte[] gzipped = secondResult.getResponse().getContentAsByteArray();
+        byte[] pbf = gunzipBytes(gzipped);
+        VectorTile.Tile parsed = VectorTile.Tile.parseFrom(pbf);
+        assertThat(parsed.getLayersCount()).isEqualTo(1);
+        VectorTile.Tile.Layer layer = parsed.getLayers(0);
+        assertThat(layer.getName()).isEqualTo("manzana");
+        assertThat(layer.getFeaturesCount()).isGreaterThanOrEqualTo(1);
+
+        // Buscar la feature con id 8000 y verificar su tag "color"
+        VectorTile.Tile.Feature feature = layer.getFeaturesList().stream()
+                .filter(f -> f.getId() == 8000L)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Feature id=8000 not found in tile"));
+
+        // Los tags son pares de índices enteros alternados en la lista
+        // feature.getTagsList() → [keyIdx, valueIdx, keyIdx, valueIdx, ...]
+        // que referencian layer.getKeysList() y layer.getValuesList()
+        List<Integer> tags = feature.getTagsList();
+        List<VectorTile.Tile.Value> layerValues = layer.getValuesList();
+        List<String> layerKeys = layer.getKeysList();
+        boolean foundColor = false;
+        for (int i = 0; i < tags.size(); i += 2) {
+            int keyIdx = tags.get(i);
+            int valueIdx = tags.get(i + 1);
+            String keyName = layerKeys.get(keyIdx);
+            if ("color".equals(keyName)) {
+                assertThat(layerValues.get(valueIdx).getStringValue()).isEqualTo("#ff0000");
+                foundColor = true;
+                break;
+            }
+        }
+        assertThat(foundColor).as("Feature should have a 'color' property").isTrue();
     }
 }

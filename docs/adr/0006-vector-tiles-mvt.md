@@ -123,6 +123,22 @@ Recorded so the review findings survive context loss:
   ⊇ -33.45); tests and ETags were corrected from `9821` accordingly (a
   review draft cited `9808`, which does not contain -33.45).
 
+## Implementation notes (F2 review pass, 2026-09-16)
+
+- **Write-path via Spring `@EventListener(phase=AFTER_COMMIT) + @Async`:**
+  `DataChangedEvent` published inside the `@Transactional` of
+  `TerritoryService.assignColor`; `TileWriteService` bumps `data_version`
+  (`UPDATE SET v = v + 1` — idempotent, creates row if missing via
+  `ON CONFLICT`) and optionally refreshes S2 covers and dissolved layer
+  (conditional on event flags). Tiles in the versioned Caffeine cache become
+  orphaned by key — no destructive invalidation needed. Thread pool
+  `tilesWritePool` (configurable via `app.tiles.write-listener-pool-size`,
+  default 2) isolates write-path work from request threads.
+- **Resiliencia:** try/catch global en el listener — nunca relanza
+  excepciones. Un bump fallido se registra con `logger.warn` + counter
+  Micrometer `territory.tile.version.bump-failures`; el siguiente write lo
+  reintenta. Counter `territory.tile.version.bumps` en cada éxito.
+
 ## References
 
 - `SPEC-map-vector-tiles.md` (full specification: API contract, Mermaid

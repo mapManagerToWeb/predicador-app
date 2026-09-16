@@ -47,7 +47,7 @@ class TileControllerTest {
 
     @BeforeEach
     void setUp() {
-        TileProperties props = new TileProperties(19, 14, 12, 4096, 64, 100, Duration.ofMinutes(10));
+        TileProperties props = new TileProperties(19, 14, 12, 4096, 64, 100, Duration.ofMinutes(10), 2);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new TileController(tileService, tileJsonService, props))
                 .build();

@@ -50,4 +50,18 @@ public class DataVersionService {
         }
         return stored.get();
     }
+
+    /**
+     * Incrementa {@code data_version} en {@code app_meta}. Idempotente:
+     * {@code UPDATE SET v = v + 1} — la versión nunca baja.
+     *
+     * <p>Si la fila {@code k='data_version'} no existe (datos no migrados),
+     * la crea con v=2 (el backfill inicializa v=1).</p>
+     */
+    public void bumpVersion() {
+        repo.bumpDataVersion();
+        // Invalidar la caché local para que la siguiente lectura
+        // obtenga la versión fresca de la DB.
+        cache.invalidate(CACHE_KEY);
+    }
 }

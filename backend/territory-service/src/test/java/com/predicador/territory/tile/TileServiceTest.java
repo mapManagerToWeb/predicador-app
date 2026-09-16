@@ -51,7 +51,7 @@ class TileServiceTest {
 
     private TileService service;
     private final TileProperties props =
-            new TileProperties(19, 14, 12, 4096, 64, 1000, Duration.ofMinutes(10));
+            new TileProperties(19, 14, 12, 4096, 64, 1000, Duration.ofMinutes(10), 2);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     @BeforeEach

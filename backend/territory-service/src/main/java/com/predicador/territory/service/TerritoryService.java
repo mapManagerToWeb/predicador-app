@@ -7,6 +7,7 @@ import com.predicador.shared.exception.ResourceNotFoundException;
 import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
+import com.predicador.territory.tile.DataChangedEvent;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ public class TerritoryService {
     private final TerritoryGeoJsonSerializer geoJsonSerializer;
     private final ObjectProvider<TerritoryService> self;
     private final Timer geojsonLoadTimer;
+    private final ApplicationEventPublisher publisher;
 
     private static final String[] PALETTE = {
         "#DC143C", "#00A86B", "#007FFF", "#FF6600", "#8A2BE2",
@@ -38,16 +41,23 @@ public class TerritoryService {
     };
 
     public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry) {
-        this(territoryRepository, colorRepository, geoJsonSerializer, registry, null);
+        this(territoryRepository, colorRepository, geoJsonSerializer, registry, null, null);
     }
 
     @Autowired
     public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry,
                             ObjectProvider<TerritoryService> self) {
+        this(territoryRepository, colorRepository, geoJsonSerializer, registry, self, null);
+    }
+
+    @Autowired
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry,
+                            ObjectProvider<TerritoryService> self, ApplicationEventPublisher publisher) {
         this.territoryRepository = territoryRepository;
         this.colorRepository = colorRepository;
         this.geoJsonSerializer = geoJsonSerializer;
         this.self = self;
+        this.publisher = publisher;
         this.geojsonLoadTimer = Timer.builder("territory.geojson.load.duration")
                 .description("Tiempo para generar el GeoJSON completo de todos los territorios")
                 .register(registry);
@@ -123,6 +133,9 @@ public class TerritoryService {
     /**
      * Persists a color assignment and invalidates every derived cache so the
      * change is visible immediately to the frontend (admin panel flow).
+     *
+     * <p>After the color is saved, publishes a {@link DataChangedEvent} so
+     * the tile version is bumped and tiles are refreshed within seconds.</p>
      */
     @Transactional
     @Caching(evict = {
@@ -136,6 +149,12 @@ public class TerritoryService {
         tc.setTerritoryNumber(territoryNumber);
         tc.setColor(color);
         colorRepository.save(tc);
+
+        // Publicar evento para bump de versión tiles (F2).
+        // El publisher puede ser null en tests que no lo inyectan.
+        if (publisher != null) {
+            publisher.publishEvent(new DataChangedEvent(Set.of(), territoryNumber, false, false));
+        }
     }
 
     private String getColorForTerritory(Long number) {
