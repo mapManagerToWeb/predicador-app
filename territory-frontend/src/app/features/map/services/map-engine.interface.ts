@@ -46,6 +46,9 @@ export interface MapEngine {
   resize(): void;
   destroy(): void;
 
+  // Source management for version-aware refresh
+  setSourceUrl(sourceId: string, url: string): void;
+
   // Feature state for GPU highlighting
   setFeatureState(
     source: string,

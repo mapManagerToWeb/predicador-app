@@ -1,15 +1,20 @@
 import type { ManzanaIndex } from '../types/map.types';
 
 /**
- * Uniform spatial grid over manzana bounding boxes.
+ * @deprecated Spatial grid for hit-testing manzana bounding boxes. Used
+ * exclusively by the Leaflet engine path (via MapTerritoryLayerService).
+ * Will be replaced by GPU picking (queryRenderedFeatures) once F3.3
+ * completes the MapLibre interaction layer.
  *
- * Hit-testing a tap used to scan every manzana linearly (O(V)); this grid
- * buckets each manzana into every cell its bbox touches so a tap only
- * inspects the manzanas of one cell (O(1) on average).
+ * <p>Uniform spatial grid over manzana bounding boxes. Hit-testing a tap
+ * used to scan every manzana linearly (O(V)); this grid buckets each
+ * manzana into every cell its bbox touches so a tap only inspects the
+ * manzanas of one cell (O(1) on average).</p>
  *
- * The grid is a pure class (no Angular DI) so it can be unit-tested without
- * mocking Leaflet. Cell size is in degrees: 0.002° ≈ 200 m at the equator,
- * which keeps the per-cell candidate list small for city-scale manzanas.
+ * <p>The grid is a pure class (no Angular DI) so it can be unit-tested
+ * without mocking Leaflet. Cell size is in degrees: 0.002° ≈ 200 m at
+ * the equator, which keeps the per-cell candidate list small for
+ * city-scale manzanas.</p>
  */
 export class ManzanaSpatialIndex {
   static readonly DEFAULT_CELL_SIZE = 0.002;

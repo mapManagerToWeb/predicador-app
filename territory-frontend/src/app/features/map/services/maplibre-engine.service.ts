@@ -111,6 +111,14 @@ export class MaplibreEngineService implements MapEngine {
     this.map?.removeSource(id);
   }
 
+  setSourceUrl(sourceId: string, url: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const source = (this.map as any)?.getSource?.(sourceId);
+    if (source && typeof source.setUrl === 'function') {
+      source.setUrl(url);
+    }
+  }
+
   addLayer(layer: LayerSpecification): void {
     this.map?.addLayer(layer as Parameters<MapLibreMap['addLayer']>[0]);
   }

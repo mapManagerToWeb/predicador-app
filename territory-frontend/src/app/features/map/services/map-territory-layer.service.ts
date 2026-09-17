@@ -82,6 +82,10 @@ export type ManzanaClickHandler = (
 /**
  * Manages territory GeoJSON layers, indices, and viewport-based loading.
  *
+ * @deprecated Retained for the Leaflet fallback path during F3. Prefer
+ * {@link MapVectorTileService} for new code. Will be removed once the
+ * MapLibre engine is the sole renderer (F4).
+ *
  * <p>Uses plain Maps instead of signals for internal state so that hot-path
  * operations (territory add/remove, label lookup) are O(1) and never create
  * intermediate array copies.</p>
