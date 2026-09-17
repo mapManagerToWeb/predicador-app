@@ -5,7 +5,7 @@ import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { Toast } from '../../../core/services/toast';
-import { DraftMarksService } from '../../../core/services/map-draft';
+import { DraftMarksService } from './map-draft';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 import {
   getBaseTerritoryStyle,

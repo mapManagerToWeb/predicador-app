@@ -16,7 +16,7 @@ import { simplify } from '@turf/simplify';
 import { union } from '@turf/union';
 import { featureCollection } from '@turf/helpers';
 import { MAP_DEFAULTS, STYLE_DEFAULTS } from '../utils/map-constants';
-import { getColorForTerritorio } from '../utils/territory-colors';
+import { getColorForTerritorio } from '../../../core/models/territory-colors';
 import { MapEngineService } from './map-engine.service';
 import { getBaseTerritoryStyle } from './map-style.service';
 import { ManzanaSpatialIndex } from './manzana-spatial-index';

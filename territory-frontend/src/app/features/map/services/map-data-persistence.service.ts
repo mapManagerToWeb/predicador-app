@@ -8,7 +8,7 @@ import { MapStateService } from './map-state.service';
 import { MapCaptureService } from './map-capture.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 import { ReportCacheService } from '../../../core/services/report-cache';
-import { DraftMarksService } from '../../../core/services/map-draft';
+import { DraftMarksService } from './map-draft';
 import type { ManzanaMarcada } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 

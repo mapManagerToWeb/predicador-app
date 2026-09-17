@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MapPage } from './map';
 import { elegirUltimoReporte } from './utils/report-utils';
-import { getTerritoryFillOpacity } from './utils/territory-colors';
+import { getTerritoryFillOpacity } from '../../core/models/territory-colors';
 import type { Reporte } from '../../core/models/models';
 import { MapStateService } from './services/map-state.service';
 import { MapRenderingFacade } from './services/map-rendering.facade';

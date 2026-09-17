@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import type { SnappedPoint, Edge } from '../map-geometry';
 import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
-import { DraftMarksService, MapDraft } from '../../../core/services/map-draft';
+import { DraftMarksService, MapDraft } from './map-draft';
 import type * as GeoJSON from 'geojson';
 
 const SATELLITE_KEY = 'territory_satellite';

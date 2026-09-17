@@ -9,7 +9,7 @@ import {
 } from '../utils/http-retry';
 import type { Reporte, RegistroReporte, EstadoReporte, TipoSesion } from '../models/models';
 import { ReportCacheService } from './report-cache';
-import { DraftMarksService } from './map-draft';
+import { DraftMarksService } from '../../features/map/services/map-draft';
 
 interface ReportDto {
   id?: number;

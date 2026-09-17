@@ -6,7 +6,7 @@ import { TerritorioService } from '../../core/services/territorio';
 import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
-import { TERRITORY_COLORS } from '../map/utils/territory-colors';
+import { TERRITORY_COLORS } from '../../core/models/territory-colors';
 import { environment } from '../../../environments/environment';
 
 @Component({

@@ -6,7 +6,7 @@ import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { TerritorioService } from '../../../core/services/territorio';
-import { DraftMarksService } from '../../../core/services/map-draft';
+import { DraftMarksService } from './map-draft';
 import { Toast } from '../../../core/services/toast';
 
 describe('MapInitializationService', () => {

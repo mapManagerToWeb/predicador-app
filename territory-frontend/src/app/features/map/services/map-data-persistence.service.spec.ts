@@ -8,7 +8,7 @@ import { MapSelectionService } from './map-selection.service';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { ReportCacheService } from '../../../core/services/report-cache';
-import { DraftMarksService } from '../../../core/services/map-draft';
+import { DraftMarksService } from './map-draft';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 
 describe('MapDataPersistenceService', () => {

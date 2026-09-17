@@ -2,12 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { DomEvent, type LeafletMouseEvent } from 'leaflet';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
-import { DraftMarksService } from '../../../core/services/map-draft';
+import { DraftMarksService } from './map-draft';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
-import type { MapDraft } from '../../../core/services/map-draft';
+import type { MapDraft } from './map-draft';
 import type { Reporte } from '../../../core/models/models';
 import type { FeatureLayer } from '../types/map.types';
 

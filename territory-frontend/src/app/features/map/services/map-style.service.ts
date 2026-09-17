@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { Path, type PathOptions } from 'leaflet';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
-import { getTerritoryFillOpacity } from '../utils/territory-colors';
+import { getTerritoryFillOpacity } from '../../../core/models/territory-colors';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import type { FeatureLayer, ManzanaMarcada } from '../types/map.types';
 

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { DraftMarksService, MapDraft } from './map-draft';
+import { DraftMarksService, MapDraft } from '../../features/map/services/map-draft';
 import type { ManzanaMarcada } from '../types/map.types';
 
 function sampleDraft(): MapDraft {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MapStateService } from './map-state.service';
-import { DraftMarksService } from '../../../core/services/map-draft';
+import { DraftMarksService } from './map-draft';
 import { makeLatLng } from '../map-geometry';
 import type { ManzanaMarcada } from '../types/map.types';
 
