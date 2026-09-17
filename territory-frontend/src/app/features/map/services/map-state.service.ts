@@ -6,22 +6,8 @@ import type * as GeoJSON from 'geojson';
 
 const SATELLITE_KEY = 'territory_satellite';
 
-export type MapEngineChoice = 'leaflet' | 'maplibre' | 'auto';
-
 @Injectable({ providedIn: 'root' })
 export class MapStateService {
-  /**
-   * Feature flag controlling the active map rendering engine.
-   * - `'leaflet'` — current Leaflet 1.9 engine (default, safe rollback).
-   * - `'maplibre'` — MapLibre GL JS v6 (GPU-rendered vector tiles).
-   * - `'auto'` — auto-detect: MapLibre if WebGL2 is available, else Leaflet.
-   */
-  mapEngine = signal<MapEngineChoice>(
-    (typeof localStorage !== 'undefined'
-      ? localStorage.getItem('mapEngine') as MapEngineChoice | null
-      : null) ?? 'leaflet',
-  );
-
   manzanasById = signal<Map<string, ManzanaMarcada>>(new Map());
   manzanasCount = computed(() => this.manzanasById().size);
   manzanasMarcadaList = computed(() => {
@@ -113,11 +99,6 @@ export class MapStateService {
       const satellite = this.isSatellite();
       this.saveSatellite(satellite);
     });
-
-    effect(() => {
-      const engine = this.mapEngine();
-      this.saveMapEngine(engine);
-    });
   }
 
   private loadSatellite(): boolean {
@@ -128,14 +109,6 @@ export class MapStateService {
   private saveSatellite(value: boolean): void {
     try {
       localStorage.setItem(SATELLITE_KEY, String(value));
-    } catch {
-      // Storage can be unavailable (private mode)
-    }
-  }
-
-  private saveMapEngine(value: MapEngineChoice): void {
-    try {
-      localStorage.setItem('mapEngine', value);
     } catch {
       // Storage can be unavailable (private mode)
     }

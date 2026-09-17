@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type * as L from 'leaflet';
 import {
   makeLatLng,
   pointInPolygon,
@@ -11,6 +10,8 @@ import {
   SNAP_THRESHOLD_PX,
   type Edge,
   type SnappedPoint,
+  type LatLng,
+  type ProjectionMap,
 } from './map-geometry';
 
 function mapPoint(lat: number, lng: number) {
@@ -23,11 +24,11 @@ function mapPoint(lat: number, lng: number) {
   };
 }
 
-const mockMap = {
-  latLngToContainerPoint: (latlng: L.LatLng) => mapPoint(latlng.lat, latlng.lng),
-} as unknown as L.Map;
+const mockMap: ProjectionMap = {
+  latLngToContainerPoint: (latlng: LatLng) => mapPoint(latlng.lat, latlng.lng),
+};
 
-const square: L.LatLng[] = [
+const square: LatLng[] = [
   makeLatLng(0, 0),
   makeLatLng(0, 10),
   makeLatLng(10, 10),

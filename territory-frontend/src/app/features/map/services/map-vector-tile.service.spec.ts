@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MapVectorTileService } from './map-vector-tile.service';
-import { MapEngineService } from './map-engine.service';
 import { MaplibreEngineService } from './maplibre-engine.service';
 import type { MapEngine } from './map-engine.interface';
 
@@ -10,7 +9,7 @@ describe('MapVectorTileService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [MapVectorTileService, MapEngineService, MaplibreEngineService],
+      providers: [MapVectorTileService, MaplibreEngineService],
     });
     service = TestBed.inject(MapVectorTileService);
   });
@@ -26,12 +25,6 @@ describe('MapVectorTileService', () => {
   });
 
   describe('initLayers', () => {
-    it('should be a no-op for Leaflet engine', () => {
-      const leafletEngine = TestBed.inject(MapEngineService);
-      service.initLayers(leafletEngine);
-      expect(service.isInitialized()).toBe(false);
-    });
-
     it('should initialize with MapLibre engine', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
@@ -71,11 +64,6 @@ describe('MapVectorTileService', () => {
   });
 
   describe('updateTileUrl', () => {
-    it('should be a no-op for Leaflet engine', () => {
-      const leafletEngine = TestBed.inject(MapEngineService);
-      expect(() => service.updateTileUrl(leafletEngine, '/new/url')).not.toThrow();
-    });
-
     it('should call setSourceUrl on MapLibre engine', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
@@ -88,11 +76,6 @@ describe('MapVectorTileService', () => {
   });
 
   describe('setTerritoryFillOpacity', () => {
-    it('should be a no-op for Leaflet engine', () => {
-      const leafletEngine = TestBed.inject(MapEngineService);
-      expect(() => service.setTerritoryFillOpacity(leafletEngine, 1, 0.8)).not.toThrow();
-    });
-
     it('should set paint property on MapLibre engine', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
@@ -106,11 +89,6 @@ describe('MapVectorTileService', () => {
   });
 
   describe('resetFillOpacity', () => {
-    it('should be a no-op for Leaflet engine', () => {
-      const leafletEngine = TestBed.inject(MapEngineService);
-      expect(() => service.resetFillOpacity(leafletEngine)).not.toThrow();
-    });
-
     it('should set default opacity on MapLibre engine', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
@@ -124,11 +102,6 @@ describe('MapVectorTileService', () => {
   });
 
   describe('destroy', () => {
-    it('should be a no-op for Leaflet engine', () => {
-      const leafletEngine = TestBed.inject(MapEngineService);
-      expect(() => service.destroy(leafletEngine)).not.toThrow();
-    });
-
     it('should remove layers and source from MapLibre engine', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);

@@ -1,39 +1,19 @@
 import type { MapEngine } from './map-engine.interface';
+import type { ProjectionMap } from '../map-geometry';
 
 /**
  * Minimal adapter that bridges MapLibre's projection to the
  * `map.latLngToContainerPoint()` interface expected by
  * `map-geometry.ts` (`snapToContour`, `pointInPolygon`, `traceContourBetween`).
  *
- * <p>This adapter implements the structural subset of Leaflet's `Map` that the
- * geometry functions actually consume — the full Leaflet `Map` type is never
- * required. This enables reusing `map-geometry.ts` unchanged in MapLibre mode.</p>
+ * <p>This adapter implements the structural subset of a map projection that the
+ * geometry functions actually consume. This enables reusing `map-geometry.ts`
+ * unchanged in MapLibre mode.</p>
  *
  * <p>Thread safety: the adapter is stateless — each method call projects a
  * single coordinate against the current MapLibre view state. No internal
  * caching is performed.</p>
  */
-export interface LatLngProjection {
-  lat: number;
-  lng: number;
-}
-
-export interface PixelPoint {
-  x: number;
-  y: number;
-}
-
-export interface LatLngContainerPointProjection {
-  latLngToContainerPoint(ll: LatLngProjection): PixelPoint;
-}
-
-/**
- * Structural duck-type that matches what `map-geometry.ts` needs from a map.
- * Named `ProjectionMap` to avoid collision with the Leaflet `Map` type.
- */
-export interface ProjectionMap {
-  latLngToContainerPoint(ll: LatLngProjection): PixelPoint;
-}
 
 /**
  * Creates a projection adapter from a MapLibre engine instance.
@@ -48,9 +28,9 @@ export interface ProjectionMap {
  */
 export function createMapLibreProjectionAdapter(engine: MapEngine): ProjectionMap {
   return {
-    latLngToContainerPoint(ll: LatLngProjection): PixelPoint {
+    latLngToContainerPoint(ll: { lat: number; lng: number }) {
       const projected = projectLngLat(engine, [ll.lng, ll.lat]);
-      return { x: projected.x, y: projected.y };
+      return { x: projected.x, y: projected.y, distanceTo(other: { x: number; y: number }) { return Math.hypot(this.x - other.x, this.y - other.y); } };
     },
   };
 }

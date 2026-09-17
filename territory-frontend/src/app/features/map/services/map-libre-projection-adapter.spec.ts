@@ -69,7 +69,8 @@ describe('MapLibreProjectionAdapter', () => {
     const point = adapter.latLngToContainerPoint({ lat: -33.8688, lng: 151.2093 });
 
     expect(projectFn).toHaveBeenCalledWith([151.2093, -33.8688]);
-    expect(point).toEqual({ x: 100, y: 200 });
+    expect(point.x).toBe(100);
+    expect(point.y).toBe(200);
   });
 
   it('should use approximate projection when map.project is not available', () => {
@@ -92,7 +93,8 @@ describe('MapLibreProjectionAdapter', () => {
     const p1 = adapter.latLngToContainerPoint({ lat: -33.8688, lng: 151.2093 });
     const p2 = adapter.latLngToContainerPoint({ lat: -33.8688, lng: 151.2093 });
 
-    expect(p1).toEqual(p2);
+    expect(p1.x).toBe(p2.x);
+    expect(p1.y).toBe(p2.y);
   });
 
   it('should return different points for different coordinates', () => {
@@ -105,6 +107,7 @@ describe('MapLibreProjectionAdapter', () => {
     const p1 = adapter.latLngToContainerPoint({ lat: -33.8688, lng: 151.2093 });
     const p2 = adapter.latLngToContainerPoint({ lat: -33.8689, lng: 151.2094 });
 
-    expect(p1).not.toEqual(p2);
+    expect(p1.x).not.toBe(p2.x);
+    expect(p1.y).not.toBe(p2.y);
   });
 });

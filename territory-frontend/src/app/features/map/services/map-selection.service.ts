@@ -1,19 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { Polygon, Path, LatLng, LatLngBounds } from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
-import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { Toast } from '../../../core/services/toast';
 import { DraftMarksService } from './map-draft';
 import { TOAST_MESSAGES } from '../utils/map-constants';
-import {
-  getBaseTerritoryStyle,
-  getMarkedManzanaStyle,
-  getSelectedManzanaStyle,
-} from './map-style.service';
 import { getTerritoryProgress } from '../utils/territory-progress';
-import { collectLatLngRings } from './map-rings';
 import type { ModoMarcado } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 
@@ -21,73 +13,29 @@ import type { Reporte } from '../../../core/models/models';
 export class MapSelectionService {
   private readonly state = inject(MapStateService);
   private readonly rendering = inject(MapRenderingFacade);
-  private readonly registry = inject(MapLayerRegistry);
   private readonly restoration = inject(MapMarkRestorationService);
   private readonly toastService = inject(Toast);
   private readonly draftService = inject(DraftMarksService);
 
-  /** The currently selected manzana polygon (transient UI state, not in state). */
-  private selectedPolygon: Polygon | null = null;
-
-  seleccionarManzana(polygon: Polygon, color: string, nombreBloque: string, territorioNumero: number): void {
+  seleccionarManzana(_polygon: unknown, color: string, nombreBloque: string, territorioNumero: number): void {
     this.restaurarManzanaAnterior();
 
-    this.selectedPolygon = polygon;
     this.state.manzanaSeleccionadaColor.set(color);
     this.state.manzanaSeleccionadaNombre.set(nombreBloque);
     this.state.manzanaSeleccionadaTerritorio.set(territorioNumero);
-
-    // Leaflet 2.0 comparte Polygon/MultiPolygon: collectLatLngRings aplana la
-    // forma [[ring],[ring]] de un MultiPolygon para que el snapping del
-    // marcado parcial disponga de los edges de todas las partes (antes una
-    // manzana multiparte generaba 0 edges).
-    const edges: { from: LatLng; to: LatLng }[] = [];
-    for (const ring of collectLatLngRings(polygon.getLatLngs())) {
-      if (ring.length < 3) continue;
-      for (let i = 0; i < ring.length - 1; i++) {
-        edges.push({ from: ring[i], to: ring[i + 1] });
-      }
-      edges.push({ from: ring[ring.length - 1], to: ring[0] });
-    }
-    this.state.manzanaEdges.set(edges);
-
-    polygon.setStyle(getSelectedManzanaStyle());
+    this.state.manzanaEdges.set([]);
 
     if (!this.state.territoriosSeleccionados().includes(territorioNumero)) {
       this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
       this.state.territorioSeleccionado.set(
         this.state.territoriosSeleccionados().length === 1 ? territorioNumero : null
       );
-
-      const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero);
-      if (featureLayer) {
-        const total = this.rendering.getManzanaCountByTerritorio(territorioNumero);
-        const marcadas = this.state.manzanasByTerritorio().get(territorioNumero)?.length ?? 0;
-        const isComplete = total > 0 && marcadas >= total;
-
-        this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
-      }
-
-      this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-      this.state.totalManzanas.set(
-        this.state.territoriosSeleccionados().reduce(
-          (sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n), 0
-        )
-      );
+      this.updateTotalManzanas(this.state.territoriosSeleccionados());
     }
 
-    // Actualizar el color del territorio actual al color de la manzana seleccionada
     this.rendering.setCurrentTerritoryColor(color);
   }
 
-  /**
-   * Select a manzana by ID and metadata properties (MapLibre path).
-   *
-   * <p>Unlike {@link seleccionarManzana} which requires a Leaflet Polygon
-   * for edge extraction and visual styling, this method only updates the
-   * selection state. MapLibre handles highlighting via GPU feature-state
-   * (managed by MapPickingService).</p>
-   */
   selectManzanaById(
     manzanaId: string,
     nombreBloque: string,
@@ -106,54 +54,18 @@ export class MapSelectionService {
       this.state.territorioSeleccionado.set(
         this.state.territoriosSeleccionados().length === 1 ? territorioNumero : null
       );
-
-      const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero);
-      if (featureLayer) {
-        const total = this.rendering.getManzanaCountByTerritorio(territorioNumero);
-        const marcadas = this.state.manzanasByTerritorio().get(territorioNumero)?.length ?? 0;
-        const isComplete = total > 0 && marcadas >= total;
-
-        this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
-      }
-
-      this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-      this.state.totalManzanas.set(
-        this.state.territoriosSeleccionados().reduce(
-          (sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n), 0
-        )
-      );
+      this.updateTotalManzanas(this.state.territoriosSeleccionados());
     }
 
     this.rendering.setCurrentTerritoryColor(color);
   }
 
   restaurarManzanaAnterior(): void {
-    if (!this.selectedPolygon) return;
-
-    const territorios = this.state.territoriosSeleccionados();
-    if (territorios.length > 0) {
-      const total = this.rendering.getManzanaCountByTerritorio(territorios[0]);
-      const marcadas = this.state.manzanasByTerritorio().get(territorios[0])?.length ?? 0;
-      const isComplete = total > 0 && marcadas >= total;
-
-      this.selectedPolygon.setStyle(
-        getBaseTerritoryStyle(this.state.manzanaSeleccionadaColor(), isComplete)
-      );
-    }
-
-    this.selectedPolygon = null;
     this.state.manzanaSeleccionadaNombre.set('');
     this.state.manzanaSeleccionadaTerritorio.set(null);
     this.state.manzanaEdges.set([]);
   }
 
-  /**
-   * Toggle a manzana by ID and metadata (MapLibre path).
-   *
-   * <p>Unlike {@link toggleManzana} which requires a Leaflet Path for
-   * layer styling and registry, this method only manages selection state.
-   * MapLibre handles visual styling via GPU feature-state.</p>
-   */
   toggleManzanaById(id: string, nombreBloque: string, color: string, territorioNumero: number): void {
     if (this.state.manzanasById().has(id)) {
       this.desmarcarManzanaById(id, territorioNumero, color);
@@ -162,45 +74,20 @@ export class MapSelectionService {
     }
   }
 
-  toggleManzana(id: string, nombreBloque: string, layer: Path, color: string, territorioNumero: number): void {
+  toggleManzana(id: string, nombreBloque: string, _layer: unknown, color: string, territorioNumero: number): void {
     if (this.state.manzanasById().has(id)) {
-      this.desmarcarManzana(id, territorioNumero, color, layer);
+      this.desmarcarManzanaById(id, territorioNumero, color);
     } else {
-      this.marcarManzana(id, nombreBloque, layer, color, territorioNumero);
+      this.marcarManzanaById(id, nombreBloque, color, territorioNumero);
     }
   }
 
-  private desmarcarManzana(
-    id: string,
-    territorioNumero: number,
-    color: string,
-    layer: Path
-  ): void {
-    const newMap = new Map(this.state.manzanasById());
-    newMap.delete(id);
-    this.state.manzanasById.set(newMap);
-    const marcadas = this.state.manzanasByTerritorio().get(territorioNumero) ?? [];
-    const { marcadas: marcadasCount, isComplete } = getTerritoryProgress(this.rendering.getManzanaCountByTerritorio(territorioNumero), marcadas.length);
-    layer.setStyle(getBaseTerritoryStyle(color, isComplete));
-    this.registry.unregister(id);
-
-    if (marcadasCount === 0) {
-      this.state.territoriosSeleccionados.update(nums => nums.filter(n => n !== territorioNumero));
-      const seleccionados = this.state.territoriosSeleccionados();
-      this.state.territorioSeleccionado.set(seleccionados.length === 1 ? seleccionados[0] : null);
-      this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
-    }
-
-    this.updateTotalManzanas(this.state.territoriosSeleccionados());
-  }
-
-  private desmarcarManzanaById(id: string, territorioNumero: number, color: string): void {
+  private desmarcarManzanaById(id: string, territorioNumero: number, _color: string): void {
     const newMap = new Map(this.state.manzanasById());
     newMap.delete(id);
     this.state.manzanasById.set(newMap);
     const marcadas = this.state.manzanasByTerritorio().get(territorioNumero) ?? [];
     const { marcadas: marcadasCount } = getTerritoryProgress(this.rendering.getManzanaCountByTerritorio(territorioNumero), marcadas.length);
-    this.registry.unregister(id);
 
     if (marcadasCount === 0) {
       this.state.territoriosSeleccionados.update(nums => nums.filter(n => n !== territorioNumero));
@@ -228,13 +115,6 @@ export class MapSelectionService {
     const seleccionados = this.state.territoriosSeleccionados();
     this.state.territorioSeleccionado.set(seleccionados.length === 1 ? territorioNumero : null);
 
-    const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero);
-    if (featureLayer) {
-      const marcadas = this.state.manzanasByTerritorio().get(territorioNumero) ?? [];
-      const { isComplete } = getTerritoryProgress(this.rendering.getManzanaCountByTerritorio(territorioNumero), marcadas.length);
-      this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
-    }
-
     this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     this.updateTotalManzanas(this.state.territoriosSeleccionados());
   }
@@ -242,28 +122,19 @@ export class MapSelectionService {
   marcarManzana(
     id: string,
     nombreBloque: string,
-    layer: Path,
+    _layer: unknown,
     color: string,
     territorioNumero: number
   ): void {
     const newMap = new Map(this.state.manzanasById());
     newMap.set(id, { id, nombreBloque, color, territorioNumero });
     this.state.manzanasById.set(newMap);
-    this.registry.register(id, layer);
-    layer.setStyle(getMarkedManzanaStyle(color));
 
     if (this.state.territoriosSeleccionados().includes(territorioNumero)) return;
 
     this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
     const seleccionados = this.state.territoriosSeleccionados();
     this.state.territorioSeleccionado.set(seleccionados.length === 1 ? territorioNumero : null);
-
-    const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero);
-    if (featureLayer) {
-      const marcadas = this.state.manzanasByTerritorio().get(territorioNumero) ?? [];
-      const { isComplete } = getTerritoryProgress(this.rendering.getManzanaCountByTerritorio(territorioNumero), marcadas.length);
-      this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
-    }
 
     this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     this.updateTotalManzanas(this.state.territoriosSeleccionados());
@@ -272,13 +143,12 @@ export class MapSelectionService {
   prepareTerritorioSeleccionado(numeros: number[]): number[] {
     const estabaEnModoMarcado = this.state.modoMarcado() !== 'none';
 
-    // Limpiar explícitamente el estado parcial y de selección de manzana al cambiar de territorio
     this.limpiarParcial();
     this.restaurarManzanaAnterior();
 
     if (!estabaEnModoMarcado) {
-      this.resetUIState();
-      this.reemplazarSeleccionTerritorios(numeros);
+      this.state.modoMarcado.set('none');
+      this.state.territoriosSeleccionados.set(numeros);
     } else {
       this.rendering.clearExtraLayers();
       this.acumularSeleccionTerritorios(numeros);
@@ -288,52 +158,17 @@ export class MapSelectionService {
       this.state.territoriosSeleccionados().length === 1 ? this.state.territoriosSeleccionados()[0] : null
     );
 
-    for (const numero of numeros) {
-      this.rendering.ensureTerritoryLoaded(numero);
-    }
-
-    const numsAConsiderar = estabaEnModoMarcado ? this.state.territoriosSeleccionados() : numeros;
-    const combinedBounds = this.aplicarMarcasYCrearBounds(numsAConsiderar);
-
-    const map = this.rendering.getMap();
-    if (combinedBounds && combinedBounds.isValid() && map) {
-      map.fitBounds(combinedBounds, { padding: [30, 30] });
-    }
-
     this.rendering.cancelPendingStyleUpdates();
     this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-    this.updateTotalManzanas(numsAConsiderar);
+    this.updateTotalManzanas(numeros);
 
-    return numsAConsiderar;
+    return numeros;
   }
 
   private acumularSeleccionTerritorios(numeros: number[]): void {
     const existentes = new Set(this.state.territoriosSeleccionados());
     for (const n of numeros) existentes.add(n);
     this.state.territoriosSeleccionados.set(Array.from(existentes));
-  }
-
-  private reemplazarSeleccionTerritorios(numeros: number[]): void {
-    this.state.modoMarcado.set('none');
-    this.state.territoriosSeleccionados.set(numeros);
-  }
-
-  private aplicarMarcasYCrearBounds(nums: number[]): LatLngBounds | null {
-    let combinedBounds: LatLngBounds | null = null;
-    for (const numero of nums) {
-      const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero);
-      if (!featureLayer) continue;
-
-      this.rendering.setCurrentTerritoryColor(featureLayer.color);
-      this.reaplicarMarcasTerritorio(numero);
-
-      const bounds = featureLayer.layer.getBounds();
-      if (bounds.isValid()) {
-        if (!combinedBounds) combinedBounds = bounds;
-        else combinedBounds.extend(bounds);
-      }
-    }
-    return combinedBounds;
   }
 
   private updateTotalManzanas(numsAConsiderar: number[]): void {
@@ -376,35 +211,19 @@ export class MapSelectionService {
   }
 
   limpiarMarcas(): void {
-    this.registry.clear();
     this.state.manzanasById.set(new Map());
-    // Vaciar la selección ANTES de restaurar la visibilidad: resetUIState()
-    // pasa territoriosSeleccionados() a restaurarVisibilidadPoligonos, y si la
-    // selección vieja sigue poblada se recalcula hayFiltroActivo=true y se
-    // vuelven a ocultar los no seleccionados (nunca reaparecen tras el reload).
     this.state.territorioSeleccionado.set(null);
     this.state.territoriosSeleccionados.set([]);
-    this.resetUIState();
+    this.state.modoMarcado.set('none');
+    this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
     this.rendering.limpiarMarcasVisuales();
     this.state.totalManzanas.set(0);
     this.rendering.setCurrentTerritoryColor('');
     this.draftService.clear();
   }
 
-  private reaplicarMarcasTerritorio(territorioNumero: number): void {
-    this.rendering.reaplicarMarcasTerritorio(this.state.manzanasMarcadaList(), [territorioNumero]);
-  }
-
   reaplicarMarcasSeleccionadas(): void {
     this.rendering.reaplicarMarcasTerritorio(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
-  }
-
-  private resetUIState(): void {
-    this.limpiarParcial();
-    this.restaurarManzanaAnterior();
-    this.state.modoMarcado.set('none');
-    this.rendering.clearExtraLayers();
-    this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
   }
 
   limpiarParcial(): void {

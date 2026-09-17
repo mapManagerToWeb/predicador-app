@@ -48,7 +48,7 @@
               }
             ],
             "polyfills": [],
-                "styles": ["src/styles.css", "node_modules/leaflet/dist/leaflet.css", "node_modules/maplibre-gl/dist/maplibre-gl.css"],
+                "styles": ["src/styles.css", "node_modules/maplibre-gl/dist/maplibre-gl.css"],
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
@@ -65,7 +65,6 @@
              "production": {
                "optimization": true,
                "sourceMap": false,
-               "allowedCommonJsDependencies": ["leaflet"],
                 "budgets": [
                   {
                     "type": "initial",

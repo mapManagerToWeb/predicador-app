@@ -1,116 +1,31 @@
-import { Injectable, inject, signal, OnDestroy } from '@angular/core';
-import { TileLayer, Control } from 'leaflet';
-import { MAP_DEFAULTS, TILE_LAYERS, ATTRIBUTIONS } from '../utils/map-constants';
-import { MapEngineService } from './map-engine.service';
-
-const SATELLITE_KEY = 'territory_satellite';
+import { Injectable } from '@angular/core';
 
 /**
  * Manages tile layers (base, satellite) and theme switching.
  *
- * <p>Observes data-theme attribute changes via MutationObserver and swaps
- * tile URLs accordingly. Releases the observer on destroy.</p>
+ * <p>In MapLibre-only mode, tile management is handled by
+ * MapVectorTileService. This service is retained as a no-op for
+ * facade compatibility.</p>
  */
 @Injectable({ providedIn: 'root' })
-export class MapTileLayerService implements OnDestroy {
-  private tileLayer = signal<TileLayer | null>(null);
-  private satelliteLayer = signal<TileLayer | null>(null);
-  private themeObserver: MutationObserver | null = null;
-  private isSatelliteView = false;
-
-  private readonly engine = inject(MapEngineService);
-
+export class MapTileLayerService {
   initLayers(): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-
-    const theme = this.getCurrentTheme();
-    const tileLayer = new TileLayer(this.getTileLayerUrl(theme), {
-      maxZoom: MAP_DEFAULTS.maxZoom,
-      attribution: this.getMapAttribution(theme),
-      // CORS limpio para poder dibujar los tiles en el canvas de captura
-      // (los tres proveedores envían Access-Control-Allow-Origin: *).
-      crossOrigin: true,
-    }).addTo(map);
-
-    const satelliteLayer = new TileLayer(TILE_LAYERS.satellite, {
-      maxZoom: MAP_DEFAULTS.maxZoom,
-      attribution: ATTRIBUTIONS.satellite,
-      crossOrigin: true,
-    });
-
-    new Control.Zoom({ position: 'bottomright' }).addTo(map);
-
-    this.tileLayer.set(tileLayer);
-    this.satelliteLayer.set(satelliteLayer);
-
-    if (this.loadSatellite()) {
-      map.removeLayer(tileLayer);
-      satelliteLayer.addTo(map);
-      this.isSatelliteView = true;
-    }
-  }
-
-  private loadSatellite(): boolean {
-    if (typeof localStorage === 'undefined') return false;
-    return localStorage.getItem(SATELLITE_KEY) === 'true';
+    // No-op: MapLibre manages tiles via vector tile source
   }
 
   isSatellite(): boolean {
-    return this.isSatelliteView;
+    return false;
   }
 
   toggleSatellite(): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-
-    this.isSatelliteView = !this.isSatelliteView;
-
-    if (this.isSatelliteView) {
-      map.removeLayer(this.tileLayer()!);
-      this.satelliteLayer()!.addTo(map);
-    } else {
-      map.removeLayer(this.satelliteLayer()!);
-      this.tileLayer()!.addTo(map);
-    }
+    // No-op
   }
 
   observeThemeChanges(): void {
-    if (typeof MutationObserver === 'undefined') return;
-
-    this.themeObserver = new MutationObserver(() => {
-      if (!this.tileLayer() || this.isSatelliteView) return;
-      this.tileLayer()!.setUrl(this.getTileLayerUrl(this.getCurrentTheme()));
-    });
-
-    this.themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.themeObserver?.disconnect();
-    this.themeObserver = null;
+    // No-op
   }
 
   destroy(): void {
-    this.themeObserver?.disconnect();
-    this.themeObserver = null;
-    this.tileLayer.set(null);
-    this.satelliteLayer.set(null);
-    this.isSatelliteView = false;
-  }
-
-  private getCurrentTheme(): 'light' | 'dark' {
-    return document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light';
-  }
-
-  private getTileLayerUrl(theme: 'light' | 'dark'): string {
-    return theme === 'dark' ? TILE_LAYERS.dark : TILE_LAYERS.light;
-  }
-
-  private getMapAttribution(theme: 'light' | 'dark'): string {
-    return theme === 'dark' ? ATTRIBUTIONS.dark : ATTRIBUTIONS.light;
+    // No-op
   }
 }

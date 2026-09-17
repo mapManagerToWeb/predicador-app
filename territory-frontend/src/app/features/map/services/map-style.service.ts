@@ -1,13 +1,22 @@
-import { Injectable, OnDestroy, inject } from '@angular/core';
-import { Path, type PathOptions } from 'leaflet';
+import { Injectable, OnDestroy } from '@angular/core';
 import { STYLE_DEFAULTS } from '../utils/map-constants';
 import { getTerritoryFillOpacity } from '../../../core/models/territory-colors';
-import { MapLayerRegistry } from './map-layer-registry.service';
 import type { FeatureLayer, ManzanaMarcada } from '../types/map.types';
+
+/** Style options for territory layers — replaces Leaflet's PathOptions. */
+export interface PathOptions {
+  color?: string;
+  fillColor?: string;
+  fillOpacity?: number;
+  weight?: number;
+  opacity?: number;
+  stroke?: boolean;
+  dashArray?: string;
+}
 
 // ─── Pure style functions (the single source of truth) ──────────────
 // Every style decision in the map feature funnels through these. They are
-// deliberately pure (no Leaflet objects) so the interface is the test surface:
+// deliberately pure (no map library objects) so the interface is the test surface:
 // what the tests assert is exactly what production renders.
 
 export function getBaseTerritoryStyle(color: string, isComplete: boolean): PathOptions {
@@ -32,8 +41,6 @@ export function getMarkedManzanaStyle(color: string): PathOptions {
   };
 }
 
-// Singleton — Leaflet reads but never mutates the passed style object, so
-// returning a frozen constant avoids one allocation per hidden territory per frame.
 const HIDDEN_STYLE: PathOptions = Object.freeze({ ...STYLE_DEFAULTS.hiddenPolygon });
 export function getHiddenStyle(): PathOptions {
   return HIDDEN_STYLE;
@@ -74,14 +81,14 @@ export function getCaptureIncompleteStyle(color: string): PathOptions {
 /**
  * Centralizes visual styles and requestAnimationFrame batching.
  *
- * <p>Provides queueStyleUpdate() and cancelPendingStyleUpdates() for
- * batching DOM-heavy style operations to avoid layout thrashing.</p>
+ * <p>In MapLibre-only mode, the apply* methods are no-ops — territory
+ * styling is handled by data-driven tile layers. The queue/cancel
+ * mechanism remains functional for batched style operations.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapStyleService implements OnDestroy {
   private pendingStyleFrame: number | null = null;
   private pendingStyleQueue: Array<() => void> = [];
-  private readonly registry = inject(MapLayerRegistry);
 
   queueStyleUpdate(fn: () => void): void {
     this.pendingStyleQueue.push(fn);
@@ -101,81 +108,32 @@ export class MapStyleService implements OnDestroy {
     this.pendingStyleQueue = [];
   }
 
-  /**
-   * ¿El estilo entrante ya está aplicado? Compara solo las claves presentes en
-   * `next`, replicando la semántica de merge de Leaflet setStyle (Object.assign
-   * sobre options). PRECONDICIÓN: los estilos entrantes deben ser completos
-   * (getBaseTerritoryStyle/getHiddenStyle); un estilo parcial con valores
-   * equivalentes en sus claves se consideraría igual aunque falten claves.
-   */
-  private static stylesEqual(current: PathOptions, next: PathOptions): boolean {
-    const keys = Object.keys(next) as Array<keyof PathOptions>;
-    for (const key of keys) {
-      if (current[key] !== next[key]) return false;
-    }
-    return true;
-  }
-
-  applyStyleToFeatureLayer(fl: FeatureLayer, style: PathOptions | ((fl: FeatureLayer) => PathOptions)): void {
-    const resolved = typeof style === 'function' ? style(fl) : style;
-    fl.layer.eachLayer(l => {
-      if (l instanceof Path) {
-        // No-op si el estilo entrante ya es el efectivo: evita redibujos de
-        // canvas redundantes (ocultar/restaurar visibilidad recorre TODAS las
-        // capas aunque el estilo no haya cambiado).
-        if (!MapStyleService.stylesEqual(l.options, resolved)) {
-          l.setStyle(resolved);
-        }
-      }
-    });
+  applyStyleToFeatureLayer(_fl: FeatureLayer, _style: PathOptions | ((fl: FeatureLayer) => PathOptions)): void {
+    // No-op: MapLibre uses data-driven tile styling
   }
 
   applyBaseTerritoryStyle(
-    allTerritoriesLayer: FeatureLayer[],
-    manzanaIndex: Array<{ territorioNumero: number }>,
-    territorioNumero: number,
-    color: string,
-    marcadasCount: number,
-    options: { total?: number; isComplete?: boolean } = {}
+    _allTerritoriesLayer: FeatureLayer[],
+    _manzanaIndex: Array<{ territorioNumero: number }>,
+    _territorioNumero: number,
+    _color: string,
+    _marcadasCount: number,
+    _options: { total?: number; isComplete?: boolean } = {}
   ): void {
-    const total = options.total ?? manzanaIndex.filter(m => m.territorioNumero === territorioNumero).length;
-    const isComplete = options.isComplete ?? (total > 0 && marcadasCount >= total);
-    const style = getBaseTerritoryStyle(color, isComplete);
-
-    for (const fl of allTerritoriesLayer) {
-      if (fl.territorioPadre !== territorioNumero) continue;
-      this.applyStyleToFeatureLayer(fl, style);
-    }
+    // No-op: MapLibre uses data-driven tile styling
   }
 
   reaplicarMarcasTerritorio(
-    allTerritoriesLayer: FeatureLayer[],
-    manzanaIndex: Array<{ territorioNumero: number }>,
-    manzanasMarcadas: ManzanaMarcada[],
-    territorioNumeros: number[]
+    _allTerritoriesLayer: FeatureLayer[],
+    _manzanaIndex: Array<{ territorioNumero: number }>,
+    _manzanasMarcadas: ManzanaMarcada[],
+    _territorioNumeros: number[]
   ): void {
-    for (const num of territorioNumeros) {
-      const featureLayer = allTerritoriesLayer.find(f => f.territorioPadre === num);
-      if (!featureLayer) continue;
-
-      const total = manzanaIndex.filter(m => m.territorioNumero === num).length;
-      const marcadas = manzanasMarcadas.filter(m => m.territorioNumero === num).length;
-      const isComplete = total > 0 && marcadas >= total;
-
-      this.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
-
-      const marcadasLayers = manzanasMarcadas.filter(m => m.territorioNumero === num);
-      for (const m of marcadasLayers) {
-        const layer = this.registry.get(m.id);
-        if (layer) layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
-      }
-    }
+    // No-op: MapLibre handles marks via GPU picking
   }
 
-  limpiarMarcasVisuales(allTerritoriesLayer: FeatureLayer[]): void {
-    for (const fl of allTerritoriesLayer) {
-      this.applyStyleToFeatureLayer(fl, getBaseTerritoryStyle(fl.color, false));
-    }
+  limpiarMarcasVisuales(_allTerritoriesLayer: FeatureLayer[]): void {
+    // No-op: MapLibre handles marks via GPU picking
   }
 
   ngOnDestroy(): void {

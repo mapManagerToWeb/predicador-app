@@ -1,48 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { CircleMarker, Circle, LayerGroup } from 'leaflet';
 import { MapLocationService } from './map-location.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { Toast } from '../../../core/services/toast';
-
-const { fakeMap } = vi.hoisted(() => {
-  const southWest = { lat: -37.5, lng: -73.4 };
-  const northEast = { lat: -37.4, lng: -73.3 };
-  const m = {
-    setView: vi.fn(),
-    getZoom: vi.fn(() => 15),
-    getBounds: vi.fn(() => ({ pad: () => ({ contains: () => true }) })),
-    getPane: vi.fn(() => undefined),
-    createPane: vi.fn(() => ({ style: {} })),
-    options: {},
-    _southWest: southWest,
-    _northEast: northEast,
-  };
-  m.setView.mockReturnValue(m);
-  return { fakeMap: m };
-});
-
-vi.mock('leaflet', async importOriginal => {
-  const actual = await importOriginal<typeof import('leaflet')>();
-  function FakeCircleMarker() { return { setLatLng: vi.fn() }; }
-  function FakeCircle() {
-    return {
-      setLatLng: vi.fn(),
-      setRadius: vi.fn(),
-    };
-  }
-  function FakeLayerGroup() {
-    const group = { addTo: vi.fn(), remove: vi.fn() };
-    (group.addTo as ReturnType<typeof vi.fn>).mockReturnValue(group);
-    return group;
-  }
-  return {
-    ...actual,
-    CircleMarker: vi.fn().mockImplementation(FakeCircleMarker),
-    Circle: vi.fn().mockImplementation(FakeCircle),
-    LayerGroup: vi.fn().mockImplementation(FakeLayerGroup),
-  };
-});
 
 const geolocationMock = {
   watchPosition: vi.fn(),
@@ -77,7 +37,6 @@ describe('MapLocationService', () => {
       configurable: true,
       writable: true,
     });
-    // jsdom no define isSecureContext como true por defecto en todos los entornos.
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
 
     geolocationMock.watchPosition.mockImplementation((ok: WatchCallback, ko: ErrorCallback) => {
@@ -87,7 +46,7 @@ describe('MapLocationService', () => {
     });
 
     TestBed.configureTestingModule({
-      providers: [{ provide: MapRenderingFacade, useValue: { getMap: () => fakeMap } }],
+      providers: [{ provide: MapRenderingFacade, useValue: { getMap: () => ({}) } }],
     });
     const toast = TestBed.inject(Toast);
     toastShow = vi.spyOn(toast, 'show').mockImplementation(() => {});
@@ -98,29 +57,27 @@ describe('MapLocationService', () => {
     service.destroy();
   });
 
-  it('toggle inicia watch y pasa a locating', () => {
+  it('toggle starts watch and moves to locating', () => {
     service.toggle();
     expect(geolocationMock.watchPosition).toHaveBeenCalledTimes(1);
     expect(service.status()).toBe('locating');
   });
 
-  it('ignora taps mientras localiza el primer fix', () => {
+  it('ignores taps while locating', () => {
     service.toggle();
     service.toggle();
     service.toggle();
     expect(geolocationMock.watchPosition).toHaveBeenCalledTimes(1);
   });
 
-  it('el primer fix centra la vista y pasa a following con capas creadas', () => {
+  it('first fix moves to following', () => {
     service.toggle();
     watchCb(positionAt(-37.47, -73.35));
 
-    expect(fakeMap.setView).toHaveBeenCalled();
-    expect(LayerGroup).toHaveBeenCalled();
     expect(service.status()).toBe('following');
   });
 
-  it('un tap en following detiene el watch y limpia capas', () => {
+  it('tap in following stops the watch and clears', () => {
     service.toggle();
     watchCb(positionAt(-37.47, -73.35));
     service.toggle();
@@ -129,29 +86,7 @@ describe('MapLocationService', () => {
     expect(service.status()).toBe('idle');
   });
 
-  it('fix dentro del viewport no recentra la vista', () => {
-    service.toggle();
-    watchCb(positionAt(-37.47, -73.35)); // primer fix: centra
-    fakeMap.setView.mockClear();
-    watchCb(positionAt(-37.471, -73.351)); // sigue dentro
-
-    expect(fakeMap.setView).not.toHaveBeenCalled();
-  });
-
-  it('actualiza marcador y círculo con cada fix', () => {
-    service.toggle();
-    watchCb(positionAt(-37.47, -73.35));
-
-    const marker = (CircleMarker as ReturnType<typeof vi.fn>).mock.results[0].value;
-    const accuracyCircle = (Circle as ReturnType<typeof vi.fn>).mock.results[0].value;
-    watchCb(positionAt(-37.48, -73.36, 120));
-
-    expect(marker.setLatLng).toHaveBeenCalledTimes(2);
-    expect(accuracyCircle.setLatLng).toHaveBeenCalledTimes(2);
-    expect(accuracyCircle.setRadius).toHaveBeenCalledWith(120);
-  });
-
-  it('permiso denegado muestra toast, resetea a idle y limpia el watch', () => {
+  it('permission denied shows toast and resets to idle', () => {
     service.toggle();
     errorCb(errorOf(1));
 
@@ -160,17 +95,19 @@ describe('MapLocationService', () => {
     expect(service.status()).toBe('idle');
   });
 
-  it('timeout y posición no disponible muestran toast de indisponibilidad', () => {
+  it('timeout shows availability toast', () => {
     service.toggle();
     errorCb(errorOf(3));
     expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('No se pudo'));
+  });
 
+  it('position unavailable shows availability toast', () => {
     service.toggle();
     errorCb(errorOf(2));
     expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('No se pudo'));
   });
 
-  it('sin geolocation API o contexto inseguro avisa y no llama al navegador', () => {
+  it('no geolocation API warns and does not call the browser', () => {
     Object.defineProperty(globalThis, 'navigator', {
       value: { ...globalThis.navigator, geolocation: undefined },
       configurable: true,
@@ -179,25 +116,16 @@ describe('MapLocationService', () => {
     service.toggle();
     expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('no permite'));
     expect(geolocationMock.watchPosition).not.toHaveBeenCalled();
-
-    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
-    Object.defineProperty(globalThis, 'navigator', {
-      value: { ...globalThis.navigator, geolocation: geolocationMock },
-      configurable: true,
-      writable: true,
-    });
-    service.toggle();
-    expect(geolocationMock.watchPosition).not.toHaveBeenCalled();
   });
 
-  it('precisión baja avisa una sola vez', () => {
+  it('low accuracy warns once', () => {
     service.toggle();
     watchCb(positionAt(-37.47, -73.35, 500));
     watchCb(positionAt(-37.48, -73.36, 500));
     expect(toastShow).toHaveBeenCalledTimes(1);
   });
 
-  it('destroy detiene el watch aunque siga localizando', () => {
+  it('destroy stops the watch even while locating', () => {
     service.toggle();
     service.destroy();
     expect(geolocationMock.clearWatch).toHaveBeenCalledWith(42);

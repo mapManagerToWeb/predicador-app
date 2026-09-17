@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import type { MapEngine, LayerSpecification } from './map-engine.interface';
-import { MapEngineService } from './map-engine.service';
 
 /**
  * Source layer name for the manzana features in the MVT tiles.
@@ -71,7 +70,6 @@ export class MapVectorTileService {
    */
   initLayers(engine: MapEngine, tileUrl?: string): void {
     if (this.initialized) return;
-    if (this.isLeafletEngine(engine)) return;
 
     if (tileUrl) this.tileUrl = tileUrl;
 
@@ -90,7 +88,6 @@ export class MapVectorTileService {
    * @param newUrl  The new tile URL template (with updated `?v=` parameter).
    */
   updateTileUrl(engine: MapEngine, newUrl: string): void {
-    if (this.isLeafletEngine(engine)) return;
     this.tileUrl = newUrl;
     engine.setSourceUrl(TERRITORY_SOURCE_ID, newUrl);
   }
@@ -110,7 +107,6 @@ export class MapVectorTileService {
     territoryId: number,
     opacity: number,
   ): void {
-    if (this.isLeafletEngine(engine)) return;
     engine.setPaintProperty(
       FILL_LAYER_ID,
       'fill-opacity',
@@ -122,7 +118,6 @@ export class MapVectorTileService {
    * Reset the fill-opacity to the default constant value.
    */
   resetFillOpacity(engine: MapEngine): void {
-    if (this.isLeafletEngine(engine)) return;
     engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', DEFAULT_FILL_OPACITY);
   }
 
@@ -130,7 +125,6 @@ export class MapVectorTileService {
    * Remove all layers and source added by this service.
    */
   destroy(engine: MapEngine): void {
-    if (this.isLeafletEngine(engine)) return;
     if (!this.initialized) return;
 
     // Remove layers first (order doesn't matter for removal).
@@ -239,13 +233,5 @@ export class MapVectorTileService {
       opacity,
       DEFAULT_FILL_OPACITY,
     ];
-  }
-
-  /**
-   * Type guard: returns true if the engine is the Leaflet engine
-   * (MapEngineService), not the MapLibre engine.
-   */
-  private isLeafletEngine(engine: MapEngine): boolean {
-    return engine instanceof MapEngineService;
   }
 }

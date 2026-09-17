@@ -3,18 +3,16 @@ import { TestBed } from '@angular/core/testing';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
-import { MapLayerRegistry } from './map-layer-registry.service';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 
-function fakePath() {
-  return { setStyle: vi.fn(), getLatLngs: vi.fn(() => []) };
+function fakeManzana(id: string, territorioNumero: number) {
+  return { id, nombreBloque: `Bloque-${id}`, color: '#ff0000', territorioNumero };
 }
 
 describe('MapMarkRestorationService', () => {
   let service: MapMarkRestorationService;
   let state: MapStateService;
-  let registry: MapLayerRegistry;
   let rendering: {
     getManzanaIndex: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
@@ -23,6 +21,8 @@ describe('MapMarkRestorationService', () => {
     addExtraLayer: ReturnType<typeof vi.fn>;
     removeExtraLayer: ReturnType<typeof vi.fn>;
     getCurrentTerritoryColor: ReturnType<typeof vi.fn>;
+    getFeatureLayerByTerritorio: ReturnType<typeof vi.fn>;
+    getManzanaCountByTerritorio: ReturnType<typeof vi.fn>;
   };
   let territorioService: { getReportesPorTerritorio: ReturnType<typeof vi.fn> };
   let toast: { show: ReturnType<typeof vi.fn> };
@@ -46,24 +46,19 @@ describe('MapMarkRestorationService', () => {
         MapMarkRestorationService,
         MapStateService,
         { provide: MapRenderingFacade, useValue: rendering },
-        MapLayerRegistry,
         { provide: TerritorioService, useValue: territorioService },
         { provide: Toast, useValue: toast },
       ],
     });
     service = TestBed.inject(MapMarkRestorationService);
     state = TestBed.inject(MapStateService);
-    registry = TestBed.inject(MapLayerRegistry);
   });
 
   describe('restaurarDesdeDB', () => {
     it('restores marks from the last report', async () => {
-      rendering.getAllTerritoriesLayer.mockReturnValue([
-        { territorioPadre: 1, color: '#ff0000', layer: {} },
-      ]);
       rendering.getManzanaIndex.mockReturnValue([
-        { territorioNumero: 1, id: 'm1', nombreBloque: 'A', polygon: fakePath() },
-        { territorioNumero: 1, id: 'm2', nombreBloque: 'B', polygon: fakePath() },
+        fakeManzana('m1', 1),
+        fakeManzana('m2', 1),
       ]);
       territorioService.getReportesPorTerritorio.mockResolvedValue([
         { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: 'm1', manzanaId: null },
@@ -71,9 +66,7 @@ describe('MapMarkRestorationService', () => {
 
       await service.restaurarDesdeDB(1);
 
-      expect(rendering.applyBaseTerritoryStyle).toHaveBeenCalled();
       expect(state.manzanasMarcadaList().map(m => m.id)).toEqual(['m1']);
-      expect(registry.get('m1')).not.toBeNull();
     });
 
     it('shows a toast when the reports cannot be loaded', async () => {
@@ -86,84 +79,23 @@ describe('MapMarkRestorationService', () => {
   });
 
   describe('restaurarConReportes', () => {
-    it('applies base territory style with correct completion', () => {
-      rendering.getFeatureLayerByTerritorio.mockReturnValue({ territorioPadre: 1, color: '#ff0000', layer: {} });
-      rendering.getManzanaCountByTerritorio.mockReturnValue(1);
-
-      service.restaurarConReportes(1, [
-        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: 'm1', manzanaId: null } as never,
-      ]);
-
-      expect(rendering.applyBaseTerritoryStyle).toHaveBeenCalledWith(1, '#ff0000', 1, { total: 1, isComplete: true });
-    });
-
-    it('resets the territory style with zero marcadas when reports is empty', () => {
-      rendering.getManzanaCountByTerritorio.mockReturnValue(0);
-
-      service.restaurarConReportes(1, []);
-
-      expect(rendering.applyBaseTerritoryStyle).toHaveBeenCalledWith(1, '#fff', 0, { total: 0, isComplete: false });
-    });
-
-    it('cleans up previous partial marks before restoring fresh ones', () => {
+    it('applies marks based on the reports', () => {
       rendering.getManzanaIndex.mockReturnValue([
-        { territorioNumero: 1, id: 'm1', nombreBloque: 'A', polygon: fakePath() },
+        fakeManzana('m1', 1),
+        fakeManzana('m2', 1),
       ]);
-      const prevLayer = fakePath();
-      state.manzanasById.set(
-        new Map([
-          ['parcial-1', { id: 'parcial-1', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 }],
-        ]),
-      );
-      registry.register('parcial-1', prevLayer as never);
 
       service.restaurarConReportes(1, [
         { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: 'm1', manzanaId: null } as never,
       ]);
 
-      expect(rendering.removeExtraLayer).toHaveBeenCalledWith(prevLayer);
-      expect(registry.get('parcial-1')).toBeNull();
-      expect(state.manzanasById().has('parcial-1')).toBe(false);
-      expect(state.manzanasById().has('m1')).toBe(true);
+      expect(state.manzanasMarcadaList().map(m => m.id)).toEqual(['m1']);
     });
 
-    it('restores a partial geometry drawn in the last report', () => {
-      rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
-      const geometriaParcial = JSON.stringify({
-        type: 'Polygon',
-        coordinates: [[[0, 0], [0, 1], [1, 1], [0, 0]]],
-      });
-
-      service.restaurarConReportes(1, [
-        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: '', manzanaId: null, geometriaParcial } as never,
-      ]);
-
-      expect(rendering.addExtraLayer).toHaveBeenCalled();
-      expect([...state.manzanasById().keys()].some(k => k.startsWith('parcial-'))).toBe(true);
-    });
-
-    it('restores a multipolygon partial geometry from the last report', () => {
-      rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
-      const geometriaParcial = JSON.stringify({
-        type: 'MultiPolygon',
-        coordinates: [[[[0, 0], [0, 1], [1, 1], [0, 0]]]],
-      });
-
-      service.restaurarConReportes(1, [
-        { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: '', manzanaId: null, geometriaParcial } as never,
-      ]);
-
-      expect(rendering.addExtraLayer).toHaveBeenCalled();
-    });
-
-    it('shows an error toast when restoring a report fails', () => {
-      rendering.getManzanaCountByTerritorio.mockImplementation(() => {
-        throw new Error('boom');
-      });
-
+    it('resets the territory with empty state when reports is empty', () => {
       service.restaurarConReportes(1, []);
 
-      expect(toast.show).toHaveBeenCalled();
+      expect(state.manzanasMarcadaList()).toEqual([]);
     });
   });
 });

@@ -1,5 +1,3 @@
-import type * as L from 'leaflet';
-
 /**
  * Map Geometry Utilities
  *
@@ -15,19 +13,40 @@ import type * as L from 'leaflet';
  * moved to Web Workers with postMessage communication.
  */
 
+/** Lightweight LatLng — matches Leaflet's LatLng shape. */
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+/** Lightweight Point — matches Leaflet's Point shape. */
+export interface Point {
+  x: number;
+  y: number;
+  distanceTo(other: Point): number;
+}
+
+/**
+ * Minimal map projection interface used by geometry functions.
+ * Both Leaflet Map and MapLibreProjectionAdapter satisfy this contract.
+ */
+export interface ProjectionMap {
+  latLngToContainerPoint(latLng: LatLng): Point;
+}
+
 export interface SnappedPoint {
-  latlng: L.LatLng;
+  latlng: LatLng;
   edgeIdx: number;
   t: number;
 }
 
 export interface Edge {
-  from: L.LatLng;
-  to: L.LatLng;
+  from: LatLng;
+  to: LatLng;
 }
 
-export function makeLatLng(lat: number, lng: number): L.LatLng {
-  return { lat, lng } as L.LatLng;
+export function makeLatLng(lat: number, lng: number): LatLng {
+  return { lat, lng };
 }
 
 export const SNAP_THRESHOLD_PX = 100;
@@ -37,7 +56,7 @@ export const SNAP_THRESHOLD_PX = 100;
  * WEB WORKER CANDIDATE: This function performs repetitive geometric calculations
  * that can block the UI during extensive manzana selection operations.
  */
-export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
+export function pointInPolygon(point: LatLng, polygon: LatLng[]): boolean {
   const x = point.lat;
   const y = point.lng;
   let inside = false;
@@ -59,7 +78,7 @@ export function pointInPolygon(point: L.LatLng, polygon: L.LatLng[]): boolean {
  * Computes parameter t for projection of point onto segment AB.
  * WEB WORKER CANDIDATE: Pure mathematical calculation used in projection logic.
  */
-export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map): number {
+export function computeT(point: LatLng, a: LatLng, b: LatLng, map: ProjectionMap): number {
   const p = map.latLngToContainerPoint(point);
   const pa = map.latLngToContainerPoint(a);
   const pb = map.latLngToContainerPoint(b);
@@ -81,11 +100,11 @@ export function computeT(point: L.LatLng, a: L.LatLng, b: L.LatLng, map: L.Map):
  * WEB WORKER CANDIDATE: Geometric projection calculation used in snapping logic.
  */
 export function projectOnSegment(
-  point: L.LatLng,
-  a: L.LatLng,
-  b: L.LatLng,
-  map: L.Map
-): L.LatLng {
+  point: LatLng,
+  a: LatLng,
+  b: LatLng,
+  map: ProjectionMap
+): LatLng {
   const t = computeT(point, a, b, map);
   return makeLatLng(a.lat + t * (b.lat - a.lat), a.lng + t * (b.lng - a.lng));
 }
@@ -94,7 +113,7 @@ export function projectOnSegment(
  * Calculates pixel distance between two LatLng points.
  * WEB WORKER CANDIDATE: Distance calculation used in path building logic.
  */
-export function latLngDist(a: L.LatLng, b: L.LatLng, map: L.Map): number {
+export function latLngDist(a: LatLng, b: LatLng, map: ProjectionMap): number {
   const pa = map.latLngToContainerPoint(a);
   const pb = map.latLngToContainerPoint(b);
   return pa.distanceTo(pb);
@@ -112,24 +131,22 @@ export function latLngDist(a: L.LatLng, b: L.LatLng, map: L.Map): number {
  * - Called frequently during drag operations and point selection
  */
 export function snapToContour(
-  latlng: L.LatLng,
+  latlng: LatLng,
   edges: Edge[],
-  map: L.Map
+  map: ProjectionMap
 ): SnappedPoint {
   const fallback: SnappedPoint = { latlng, edgeIdx: -1, t: 0 };
   if (edges.length === 0) return fallback;
 
   const clickPt = map.latLngToContainerPoint(latlng);
-  let bestPoint: L.LatLng = latlng;
+  let bestPoint: LatLng = latlng;
   let bestEdgeIdx = -1;
   let bestT = 0;
   let bestDist = Infinity;
 
-  // Las aristas consecutivas comparten vértice (anillo cerrado), así que se
-  // cachea el punto contenedor por vértice para evitar reproyectar. En el hot
-  // path del drag esto reduce ~2 proyecciones por arista.
-  const containerCache = new Map<L.LatLng, { x: number; y: number }>();
-  const containerPointOf = (ll: L.LatLng): { x: number; y: number } => {
+  // Cache container points per vertex to avoid reprojection in the hot path.
+  const containerCache = new Map<LatLng, Point>();
+  const containerPointOf = (ll: LatLng): Point => {
     let pt = containerCache.get(ll);
     if (!pt) {
       pt = map.latLngToContainerPoint(ll);
@@ -183,8 +200,8 @@ export function traceContourBetween(
   a: SnappedPoint,
   b: SnappedPoint,
   edges: Edge[],
-  map: L.Map
-): L.LatLng[] {
+  map: ProjectionMap
+): LatLng[] {
   if (edges.length === 0 || a.edgeIdx < 0 || b.edgeIdx < 0) {
     return [a.latlng, b.latlng];
   }
@@ -210,7 +227,7 @@ export function traceContourBetween(
  * Helper function to get a point on an edge using parameter t.
  * WEB WORKER CANDIDATE: Simple interpolation calculation.
  */
-function pointOnEdge(edge: Edge, t: number): L.LatLng {
+function pointOnEdge(edge: Edge, t: number): LatLng {
   return makeLatLng(
     edge.from.lat + t * (edge.to.lat - edge.from.lat),
     edge.from.lng + t * (edge.to.lng - edge.from.lng)
@@ -224,13 +241,13 @@ function pointOnEdge(edge: Edge, t: number): L.LatLng {
 function buildForwardPath(
   a: SnappedPoint,
   edges: Edge[],
-  map: L.Map,
+  map: ProjectionMap,
   stepsForward: number,
-  startLatLng: L.LatLng,
-  endLatLng: L.LatLng
-): L.LatLng[] {
+  startLatLng: LatLng,
+  endLatLng: LatLng
+): LatLng[] {
   const n = edges.length;
-  const result: L.LatLng[] = [startLatLng];
+  const result: LatLng[] = [startLatLng];
 
   const nextVertex = edges[a.edgeIdx].to;
   if (latLngDist(startLatLng, nextVertex, map) > 1) {
@@ -253,13 +270,13 @@ function buildForwardPath(
 function buildBackwardPath(
   a: SnappedPoint,
   edges: Edge[],
-  map: L.Map,
+  map: ProjectionMap,
   stepsBackward: number,
-  startLatLng: L.LatLng,
-  endLatLng: L.LatLng
-): L.LatLng[] {
+  startLatLng: LatLng,
+  endLatLng: LatLng
+): LatLng[] {
   const n = edges.length;
-  const result: L.LatLng[] = [startLatLng];
+  const result: LatLng[] = [startLatLng];
 
   const prevVertex = edges[a.edgeIdx].from;
   if (latLngDist(startLatLng, prevVertex, map) > 1) {

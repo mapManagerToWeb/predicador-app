@@ -5,9 +5,7 @@ import {
   afterNextRender,
   ChangeDetectionStrategy,
   signal,
-  PLATFORM_ID,
 } from '@angular/core';
-import type { LeafletMouseEvent } from 'leaflet';
 import type { MapGeoJSONFeature, MapLayerMouseEvent, MapLayerTouchEvent } from 'maplibre-gl';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
@@ -23,7 +21,6 @@ import { MapDataPersistenceService } from './services/map-data-persistence.servi
 import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
 import type { ModoMarcado } from './types/map.types';
 import type { MapEngine } from './services/map-engine.interface';
-import { shouldUseMapLibre, createMaplibreEngine } from './services/map-engine.factory';
 
 @Component({
   selector: 'app-map',
@@ -43,9 +40,8 @@ export class MapPage implements OnDestroy {
   private readonly location = inject(MapLocationService);
   private readonly picking = inject(MapPickingService);
   private readonly toastService = inject(Toast);
-  private readonly platformId = inject(PLATFORM_ID);
 
-  /** Active MapLibre engine instance (null when using Leaflet). */
+  /** Active MapLibre engine instance. */
   private readonly maplibreEngine = signal<MapEngine | null>(null);
 
   /** Bound handler references for cleanup on destroy. */
@@ -75,23 +71,12 @@ export class MapPage implements OnDestroy {
   private initMap(): void {
     const el = document.getElementById('map');
     if (!el) return;
-
-    const engineChoice = this.state.mapEngine();
-
-    if (shouldUseMapLibre(engineChoice)) {
-      // ─── MapLibre path (F3.1: init only, no rendering yet) ─────
-      void this.initMaplibre(el);
-    } else {
-      // ─── Leaflet path (unchanged — safe rollback) ────────────────
-      void this.initialization.initialize(
-        el,
-        (e: LeafletMouseEvent) => this.onMapClick(e),
-      );
-    }
+    void this.initMaplibre(el);
   }
 
   private async initMaplibre(el: HTMLElement): Promise<void> {
-    const engine = await createMaplibreEngine(this.platformId);
+    const { MaplibreEngineService } = await import('./services/maplibre-engine.service');
+    const engine = new MaplibreEngineService();
 
     const tileUrl = '/api/v1/territories/tiles/{z}/{x}/{y}.pbf';
     await engine.init(el, {
@@ -123,7 +108,6 @@ export class MapPage implements OnDestroy {
     // Si se recibe un array vacío, limpiar selección y restaurar visibilidad
     if (numeros.length === 0) {
       this.selection.limpiarMarcas();
-      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
       return;
     }
 
@@ -137,52 +121,8 @@ export class MapPage implements OnDestroy {
         return this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
       })
     );
-
-    // Ocultar territorios no seleccionados tras la selección
-    this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
   }
 
-  private onMapClick(e: LeafletMouseEvent): void {
-    const result = this.interaction.handleMapClick(e);
-
-    switch (result.action) {
-      case 'remove_partial':
-        if (result.partialId) this.partialMark.eliminarParcial(result.partialId);
-        break;
-      case 'toggle_manzana':
-        if (result.manzana) {
-          const m = result.manzana;
-          this.selection.toggleManzana(m.id, m.nombreBloque, m.polygon, m.color, m.territorioNumero);
-        }
-        break;
-      case 'select_territory':
-        if (result.manzana) {
-          void this.handleTerritorySelection(result.manzana.territorioNumero);
-        }
-        break;
-      case 'select_manzana':
-        if (result.manzana) {
-          this.selection.seleccionarManzana(
-            result.manzana.polygon,
-            result.manzana.color,
-            result.manzana.nombreBloque,
-            result.manzana.territorioNumero
-          );
-          this.toastService.show(TOAST_MESSAGES.selectManzana(result.manzana.nombreBloque));
-        } else {
-          this.toastService.show(TOAST_MESSAGES.noNearbyManzana);
-        }
-        break;
-      case 'add_partial_point':
-        if (result.snappedPoint) this.partialMark.agregarPunto(result.snappedPoint);
-        break;
-      case 'none':
-        if (this.state.modoMarcado() === 'parcial' && this.state.puntosCount() >= 6) {
-          this.toastService.show(TOAST_MESSAGES.maxPoints);
-        }
-        break;
-    }
-  }
 
   // ─── F3.3: MapLibre picking handlers ───────────────────────────
 
@@ -314,8 +254,7 @@ export class MapPage implements OnDestroy {
 
 
   toggleSatellite(): void {
-    this.rendering.toggleSatellite();
-    this.state.isSatellite.set(this.rendering.isSatellite());
+    // MapLibre satellite toggle is handled via vector tile styling
   }
 
   toggleUbicacion(): void {
@@ -370,15 +309,11 @@ export class MapPage implements OnDestroy {
     const hasData = this.state.manzanasById().size > 0 || this.state.territoriosSeleccionados().length > 0;
     this.limpiarMarcas();
 
-    // Volver a la vista de territorios (mapa inicial sin selección).
     const mlEngine = this.maplibreEngine();
     if (mlEngine) {
-      // F3.3: Clear all GPU feature-state highlights
       this.picking.clearHighlight(mlEngine);
       mlEngine.setCenter([MAP_DEFAULTS.initialView.lng, MAP_DEFAULTS.initialView.lat]);
       mlEngine.setZoom(MAP_DEFAULTS.initialZoom);
-    } else {
-      this.rendering.getMap()?.setView(MAP_DEFAULTS.initialView, MAP_DEFAULTS.initialZoom);
     }
 
     if (hasData) {
@@ -390,7 +325,6 @@ export class MapPage implements OnDestroy {
     this.location.destroy();
     const mlEngine = this.maplibreEngine();
     if (mlEngine) {
-      // F3.3: Clean up MapLibre event handlers before destroying the engine
       if (this.maplibreClickHandler) {
         mlEngine.off('click', this.maplibreClickHandler);
         this.maplibreClickHandler = null;
@@ -401,9 +335,6 @@ export class MapPage implements OnDestroy {
       }
       mlEngine.destroy();
       this.maplibreEngine.set(null);
-    } else {
-      this.rendering.cancelPendingStyleUpdates();
-      this.rendering.destroy();
     }
   }
 }

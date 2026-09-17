@@ -1,5 +1,4 @@
 import { Injectable, inject } from '@angular/core';
-import { DomEvent, type LeafletMouseEvent } from 'leaflet';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { DraftMarksService } from './map-draft';
@@ -20,28 +19,7 @@ export class MapInitializationService {
   private readonly toastService = inject(Toast);
   private readonly draftService = inject(DraftMarksService);
 
-  async initialize(el: HTMLElement, onMapClick: (e: LeafletMouseEvent) => void): Promise<void> {
-    this.rendering.initializeMap(el);
-    const map = this.rendering.getMap();
-    if (!map) return;
-
-    this.rendering.setManzanaClickHandler((id, nombreBloque, polygon, color, territorioNumero, e) => {
-      if (this.state.modoMarcado() !== 'completa') return;
-
-      DomEvent.stop(e);
-      // En modo marcar-completo solo se marcan manzanas de territorios YA
-      // seleccionados y nunca se desmarcan: un manzana ya marcada es un no-op,
-      // y un click sobre un territorio ajeno lo agregaría a la selección
-      // (igual que el parcial bloquea clicks fuera del suyo).
-      if (!this.state.territoriosSeleccionados().includes(territorioNumero)) return;
-      if (this.state.manzanasById().has(id)) return;
-      this.selection.marcarManzana(id, nombreBloque, polygon, color, territorioNumero);
-    });
-
-    map.on('click', onMapClick);
-    map.on('zoomend', () => this.rendering.updateLabelsVisibility());
-    map.on('moveend', () => this.onMoveEnd());
-
+  async initialize(_el: HTMLElement, _onMapClick: unknown): Promise<void> {
     await this.loadAllTerritories();
   }
 
@@ -51,10 +29,6 @@ export class MapInitializationService {
 
     try {
       await this.reconciliarCaches();
-      await this.loadTerritoriesWithRetry();
-      this.onMoveEnd();
-      await this.rendering.whenTerritoryLoadsIdle();
-      await this.restoreAllMarks();
     } catch {
       this.toastService.show(TOAST_MESSAGES.loadError);
     } finally {
@@ -100,17 +74,7 @@ export class MapInitializationService {
   }
 
   private onMoveEnd(): void {
-    // La carga de territorios visibles es un stream por frames: el callback
-    // corre por cada batch recién agregado (nunca con lista vacía).
-    this.rendering.updateVisibleTerritories((newlyLoaded) => {
-      this.restaurarMarcasDeTerritorios(newlyLoaded);
-
-      // Ocultar los no seleccionados siempre que haya una selección activa
-      // (no solo en modo marcado), para que no reaparezcan al navegar el mapa.
-      if (this.state.territoriosSeleccionados().length > 0) {
-        this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-      }
-    });
+    // No-op: MapLibre manages viewport loading via tiles
   }
 
   /** Restaura marcas/cache para los territorios recién agregados al mapa. */

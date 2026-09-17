@@ -1,313 +1,60 @@
-import { Injectable, inject } from '@angular/core';
-import { Polygon, Marker, DivIcon, LatLng, type Map as LeafletMap, type LatLngExpression } from 'leaflet';
-import { STYLE_DEFAULTS } from '../utils/map-constants';
-import { latLngDist, traceContourBetween } from '../map-geometry';
-import polygonClipping from 'polygon-clipping';
-import { MapEngineService } from './map-engine.service';
-import { getPartialPolygonStyle } from './map-style.service';
+import { Injectable } from '@angular/core';
+import type { ProjectionMap } from '../map-geometry';
 import type { SnappedPoint, Edge } from '../map-geometry';
-import type { ProjectionMap } from './map-libre-projection-adapter';
 
 /**
- * Manages partial polygon drawing: points, markers, contour tracing,
- * and clipping within the parent manzana.
+ * Manages partial polygon drawing.
  *
- * <p>In MapLibre mode, an optional {@link ProjectionMap} adapter bridges
- * MapLibre's coordinate system to the `map-geometry.ts` functions that
- * expect Leaflet's `latLngToContainerPoint` interface.</p>
+ * <p>In MapLibre-only mode, partial draw uses the edit overlay
+ * (MapEditOverlayService). This service is retained as a no-op for
+ * facade compatibility.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapPartialDrawService {
-  private engine = inject(MapEngineService);
-  private poligonoParcial: Polygon | null = null;
-  private markersParciales: Marker[] = [];
-  private dragRaf = 0;
-  private pendingDrag: { index: number; marker: Marker } | null = null;
-
-  /**
-   * Projection adapter for MapLibre mode. When set, coordinate projection
-   * functions from `map-geometry.ts` use this adapter instead of the
-   * Leaflet map instance.
-   */
-  private projectionAdapter: ProjectionMap | null = null;
-
-  /**
-   * Set the projection adapter for MapLibre mode.
-   *
-   * <p>When set, `snapToContour` and `traceContourBetween` use the
-   * adapter's `latLngToContainerPoint` instead of the Leaflet map.</p>
-   *
-   * @param adapter - A `ProjectionMap` backed by MapLibre's projection.
-   */
-  setProjectionAdapter(adapter: ProjectionMap): void {
-    this.projectionAdapter = adapter;
+  setProjectionAdapter(_adapter: ProjectionMap): void {
+    // No-op
   }
 
-  /**
-   * Clear the projection adapter (e.g. when switching back to Leaflet mode).
-   */
   clearProjectionAdapter(): void {
-    this.projectionAdapter = null;
+    // No-op
   }
 
-  /**
-   * Get the active projection source: Leaflet map if available, else the adapter.
-   * Returns `null` if neither is available.
-   */
-  private getProjectionMap(): LeafletMap | ProjectionMap | null {
-    const leafletMap = this.engine.getMap();
-    if (leafletMap) return leafletMap;
-    return this.projectionAdapter;
-  }
-
-  getPoligonoParcial(): Polygon | null {
-    return this.poligonoParcial;
+  getPoligonoParcial(): unknown | null {
+    return null;
   }
 
   clearPoligonoParcialRef(): void {
-    this.poligonoParcial = null;
+    // No-op
   }
 
   limpiarCapasParciales(): void {
-    this.cancelPendingDrag();
-    const map = this.engine.getMap();
-    this.removePartialPolygon(map);
-    this.removePartialMarkers(map);
-  }
-
-  private removePartialPolygon(map: LeafletMap | null): void {
-    if (this.poligonoParcial && map) {
-      map.removeLayer(this.poligonoParcial);
-      this.poligonoParcial = null;
-    }
-  }
-
-  private removePartialMarkers(map: LeafletMap | null): void {
-    for (const m of this.markersParciales) {
-      map?.removeLayer(m);
-    }
-    this.markersParciales = [];
+    // No-op
   }
 
   redibujarParcial(
-    puntos: SnappedPoint[],
-    currentTerritoryColor: string,
-    manzanaEdges: Edge[],
-    onMarkerDrag: (index: number, marker: Marker) => void
+    _puntos: SnappedPoint[],
+    _currentTerritoryColor: string,
+    _manzanaEdges: Edge[],
+    _onMarkerDrag: (index: number, marker: unknown) => void
   ): void {
-    this.limpiarCapasParciales();
-
-    const latlngs = this.buildContourPolygon(puntos, manzanaEdges);
-    this.createPartialPolygonIfValid(latlngs, currentTerritoryColor);
-    this.agregarMarkersParciales(puntos, onMarkerDrag);
+    // No-op
   }
 
-  /**
-   * Actualiza el dibujo parcial durante el arrastre de un marker SIN destruir ni
-   * recrear ninguna capa. Recorre el contorno de nuevo y mueve el polígono con
-   * setLatLngs y el marker arrastrado con setLatLng. Esto elimina el churn de
-   * teardown/recreate por frame que era la principal fuente de jank en móvil.
-   *
-   * <p>La llamada llega ya throttled por rAF desde el handler de drag, así que
-   * nunca se ejecuta más de una vez por frame.</p>
-   */
   actualizarParcialEnDrag(
-    puntos: SnappedPoint[],
-    currentTerritoryColor: string,
-    manzanaEdges: Edge[],
-    index: number,
-    marker: Marker
+    _puntos: SnappedPoint[],
+    _currentTerritoryColor: string,
+    _manzanaEdges: Edge[],
+    _index: number,
+    _marker: unknown
   ): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-
-    const snapped = puntos[index];
-    if (snapped) marker.setLatLng(snapped.latlng);
-
-    const latlngs = this.buildContourPolygon(puntos, manzanaEdges);
-    this.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
+    // No-op
   }
 
-  private scheduleMarkerDrag(
-    index: number,
-    marker: Marker,
-    onMarkerDrag: (index: number, marker: Marker) => void
-  ): void {
-    this.pendingDrag = { index, marker };
-    if (this.dragRaf === 0) {
-      this.dragRaf = requestAnimationFrame(() => {
-        this.dragRaf = 0;
-        const pending = this.pendingDrag;
-        this.pendingDrag = null;
-        if (pending) onMarkerDrag(pending.index, pending.marker);
-      });
-    }
-  }
-
-  private cancelPendingDrag(): void {
-    if (this.dragRaf !== 0) {
-      cancelAnimationFrame(this.dragRaf);
-      this.dragRaf = 0;
-    }
-    this.pendingDrag = null;
-  }
-
-  private createPartialPolygonIfValid(latlngs: LatLng[], color: string): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-    this.createPolygonFromLatLngs(latlngs, color, map);
-  }
-
-  updatePartialPolygonLatLngs(latlngs: LatLngExpression[], currentTerritoryColor: string): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-
-    if (this.poligonoParcial) {
-      this.updateExistingPolygon(latlngs, map);
-    } else {
-      this.createNewPolygonIfValid(latlngs, currentTerritoryColor, map);
-    }
-  }
-
-  private updateExistingPolygon(latlngs: LatLngExpression[], map: LeafletMap): void {
-    if (latlngs.length >= 2) {
-      this.poligonoParcial!.setLatLngs(latlngs);
-    } else {
-      map.removeLayer(this.poligonoParcial!);
-      this.poligonoParcial = null;
-    }
-  }
-
-  private createNewPolygonIfValid(latlngs: LatLngExpression[], color: string, map: LeafletMap): void {
-    this.createPolygonFromLatLngs(latlngs, color, map);
-  }
-
-  private createPolygonFromLatLngs(latlngs: LatLngExpression[], color: string, map: LeafletMap): void {
-    if (latlngs.length < 2) return;
-    const fillColor = color || '#22c55e';
-    const polygon = new Polygon(latlngs, getPartialPolygonStyle(fillColor, latlngs.length < 3)).addTo(map);
-    this.poligonoParcial = polygon;
+  updatePartialPolygonLatLngs(_latlngs: unknown[], _currentTerritoryColor: string): void {
+    // No-op
   }
 
   destroy(): void {
-    this.limpiarCapasParciales();
-  }
-
-  private buildContourPolygon(puntos: SnappedPoint[], manzanaEdges: Edge[]): LatLng[] {
-    const projMap = this.getProjectionMap();
-    if (!projMap || puntos.length === 0) return [];
-    if (puntos.length === 1) return [puntos[0].latlng];
-
-    const result: LatLng[] = [];
-    this.traceAllSegments(puntos, manzanaEdges, projMap, result);
-
-    if (result.length >= 3 && manzanaEdges.length >= 3) {
-      const clipped = this.clipPolygonToManzana(result, manzanaEdges);
-      if (clipped.length >= 3) return clipped;
-    }
-
-    return result;
-  }
-
-  private traceAllSegments(
-    puntos: SnappedPoint[],
-    manzanaEdges: Edge[],
-    projMap: LeafletMap | ProjectionMap,
-    result: LatLng[]
-  ): void {
-    for (let i = 0; i < puntos.length - 1; i++) {
-      const segment = traceContourBetween(puntos[i], puntos[i + 1], manzanaEdges, projMap as never);
-      this.addUniquePoints(segment, projMap, result);
-    }
-  }
-
-  private addUniquePoints(segment: LatLng[], projMap: LeafletMap | ProjectionMap, result: LatLng[]): void {
-    for (const point of segment) {
-      if (result.length === 0 || latLngDist(result.at(-1)!, point, projMap as never) > 1) {
-        result.push(point);
-      }
-    }
-  }
-
-  private clipPolygonToManzana(polygon: LatLng[], manzanaEdges: Edge[]): LatLng[] {
-    try {
-      const subject = this.buildSubjectRing(polygon);
-      const manzanaRing = this.buildManzanaRing(manzanaEdges);
-
-      if (subject.length < 4 || manzanaRing.length < 4) return polygon;
-
-      const intersection = polygonClipping.intersection([subject], [manzanaRing]);
-      return this.extractClippedResult(intersection, polygon);
-    } catch {
-      return polygon;
-    }
-  }
-
-  private buildSubjectRing(polygon: LatLng[]): [number, number][] {
-    const subject: [number, number][] = polygon.map(p => [p.lng, p.lat]);
-    if (subject.length > 0 && !this.isRingClosed(subject)) {
-      subject.push([subject[0][0], subject[0][1]]);
-    }
-    return subject;
-  }
-
-  private buildManzanaRing(manzanaEdges: Edge[]): [number, number][] {
-    const manzanaRing: [number, number][] = manzanaEdges.map(e => [e.from.lng, e.from.lat]);
-    if (manzanaRing.length > 0) {
-      manzanaRing.push([manzanaRing[0][0], manzanaRing[0][1]]);
-    }
-    return manzanaRing;
-  }
-
-  private isRingClosed(ring: [number, number][]): boolean {
-    if (ring.length === 0) return false;
-    const first = ring[0];
-    const last = ring.at(-1)!;
-    return first[0] === last[0] && first[1] === last[1];
-  }
-
-  private extractClippedResult(intersection: polygonClipping.Polygon[], fallback: LatLng[]): LatLng[] {
-    if (!intersection || intersection.length === 0) return fallback;
-
-    const outerRing = intersection[0][0];
-    if (!outerRing || outerRing.length < 3) return fallback;
-
-    return outerRing.map(([lng, lat]) => new LatLng(lat, lng));
-  }
-
-  private agregarMarkersParciales(puntos: SnappedPoint[], onMarkerDrag: (index: number, marker: Marker) => void): void {
-    const map = this.engine.getMap();
-    if (!map) return;
-
-    const icon = this.createMarkerIcon();
-    const markers: Marker[] = [];
-
-    for (let i = 0; i < puntos.length; i++) {
-      const marker = this.createDraggableMarker(puntos[i].latlng, icon, map, i, onMarkerDrag);
-      markers.push(marker);
-    }
-
-    this.markersParciales = markers;
-  }
-
-  private createMarkerIcon(): DivIcon {
-    return new DivIcon({
-      className: STYLE_DEFAULTS.partialPoint.className,
-      html: '<div class="partial-dot"></div>',
-      iconSize: [...STYLE_DEFAULTS.partialPoint.iconSize],
-      iconAnchor: [...STYLE_DEFAULTS.partialPoint.iconAnchor],
-    });
-  }
-
-  private createDraggableMarker(
-    latlng: LatLng,
-    icon: DivIcon,
-    map: LeafletMap,
-    idx: number,
-    onMarkerDrag: (index: number, marker: Marker) => void
-  ): Marker {
-    const m = new Marker(latlng, { icon, draggable: true }).addTo(map);
-    m.on('drag', () => this.scheduleMarkerDrag(idx, m, onMarkerDrag));
-    return m;
+    // No-op
   }
 }

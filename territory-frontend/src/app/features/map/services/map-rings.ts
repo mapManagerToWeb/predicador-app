@@ -1,4 +1,4 @@
-import type { LatLng } from 'leaflet';
+import type { LatLng } from '../map-geometry';
 
 /**
  * Aplana el resultado de `Path.getLatLngs()` en rings de `LatLng`.

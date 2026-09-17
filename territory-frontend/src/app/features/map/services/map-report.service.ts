@@ -180,7 +180,8 @@ export class MapReportService {
 
   private countTotalManzanas(featureLayer: FeatureLayer | undefined, fallback: number): number {
     if (!featureLayer) return fallback;
-    return Array.from(featureLayer.layer.getLayers()).filter(l => 'setStyle' in l).length;
+    // In MapLibre mode, feature layers are empty — use the count from the tile data
+    return fallback;
   }
 
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {

@@ -1,13 +1,11 @@
-import type * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
-import { SnappedPoint, Edge } from '../map-geometry';
-export type { SnappedPoint, Edge };
+import { SnappedPoint, Edge, LatLng } from '../map-geometry';
+export type { SnappedPoint, Edge, LatLng };
 
 export type ModoMarcado = 'none' | 'completa' | 'parcial';
 
 /**
- * Pure data for a marked manzana — no Leaflet handles.
- * The live layer is resolved through the MapLayerRegistry seam.
+ * Pure data for a marked manzana — no map library handles.
  */
 export interface ManzanaMarcada {
   id: string;
@@ -16,10 +14,27 @@ export interface ManzanaMarcada {
   territorioNumero: number;
 }
 
+/**
+ * Minimal interface for a Leaflet-style layer that can be styled and iterated.
+ * Used by the Leaflet-legacy rendering path. In MapLibre mode these are empty.
+ */
+export interface LeafletStyleLayer {
+  setStyle(options: Record<string, unknown>): void;
+  eachLayer(fn: (l: LeafletStyleLayer) => void): void;
+  getBounds(): LeafletBounds;
+}
+
+/** Minimal bounds interface — replaces L.LatLngBounds. */
+export interface LeafletBounds {
+  isValid(): boolean;
+  extend(bounds: LeafletBounds): LeafletBounds;
+  getCenter(): LatLng;
+}
+
 export interface FeatureLayer {
   territorioPadre: number;
   color: string;
-  layer: L.GeoJSON;
+  layer: LeafletStyleLayer;
 }
 
 export interface DatosParciales {
@@ -28,7 +43,7 @@ export interface DatosParciales {
 }
 
 export interface ManzanaIndex {
-  polygon: L.Polygon;
+  polygon: { getLatLngs(): unknown; setStyle(s: Record<string, unknown>): void };
   id: string;
   nombreBloque: string;
   color: string;
@@ -41,6 +56,5 @@ export interface TerritorioCacheData {
   simplifiedFc: GeoJSON.FeatureCollection;
   dissolvedFeature: GeoJSON.Feature | null;
   color: string;
-  bounds: L.LatLngBounds;
+  bounds: LeafletBounds;
 }
-

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MapEditOverlayService } from './map-edit-overlay.service';
-import { MapEngineService } from './map-engine.service';
 import { MaplibreEngineService } from './maplibre-engine.service';
 import { MapStateService } from './map-state.service';
 import { TileVersionService } from './tile-version.service';
@@ -62,7 +61,6 @@ const SAMPLE_GEOJSON: GeoJSON.FeatureCollection = {
 describe('MapEditOverlayService', () => {
   let service: MapEditOverlayService;
   let mockEngine: ReturnType<typeof createMockMapLibreEngine>;
-  let leafletEngine: MapEngineService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -70,12 +68,10 @@ describe('MapEditOverlayService', () => {
         MapEditOverlayService,
         MapStateService,
         TileVersionService,
-        MapEngineService,
         MaplibreEngineService,
       ],
     });
     service = TestBed.inject(MapEditOverlayService);
-    leafletEngine = TestBed.inject(MapEngineService);
     mockEngine = createMockMapLibreEngine();
   });
 
@@ -94,12 +90,6 @@ describe('MapEditOverlayService', () => {
       expect(service.isOverlayActive()).toBe(true);
       expect(mockEngine.addGeoJsonSource).toHaveBeenCalledWith('edit-overlay', SAMPLE_GEOJSON);
       expect(mockEngine.addLayer).toHaveBeenCalledTimes(2);
-    });
-
-    it('should be a no-op for Leaflet engine', () => {
-      service.addOverlay(SAMPLE_GEOJSON, leafletEngine);
-
-      expect(service.isOverlayActive()).toBe(false);
     });
 
     it('should be a no-op if overlay is already active', () => {
@@ -136,12 +126,6 @@ describe('MapEditOverlayService', () => {
       service.updateOverlay(SAMPLE_GEOJSON, mockEngine);
       // No source exists, so getSource returns undefined — no error
     });
-
-    it('should be a no-op for Leaflet engine', () => {
-      service.addOverlay(SAMPLE_GEOJSON, mockEngine);
-      // Override to simulate Leaflet
-      expect(() => service.updateOverlay(SAMPLE_GEOJSON, leafletEngine)).not.toThrow();
-    });
   });
 
   describe('removeOverlay', () => {
@@ -160,11 +144,6 @@ describe('MapEditOverlayService', () => {
 
       expect(mockEngine.removeLayer).not.toHaveBeenCalled();
       expect(mockEngine.removeSource).not.toHaveBeenCalled();
-    });
-
-    it('should be a no-op for Leaflet engine', () => {
-      service.addOverlay(SAMPLE_GEOJSON, mockEngine);
-      expect(() => service.removeOverlay(leafletEngine)).not.toThrow();
     });
   });
 

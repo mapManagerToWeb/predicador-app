@@ -1,17 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Map as LeafletMap, Layer, Marker, Polygon, type PathOptions, type LatLngExpression } from 'leaflet';
-import { MapEngineService } from './map-engine.service';
-import {
-  getBaseTerritoryStyle,
-  getHiddenStyle,
-  getMarkedManzanaStyle,
-} from './map-style.service';
-import { MapLayerRegistry } from './map-layer-registry.service';
-import { MapTileLayerService } from './map-tile-layer.service';
-import { MapTerritoryLayerService, type ManzanaClickHandler } from './map-territory-layer.service';
 import { MapStyleService } from './map-style.service';
-import { MapCaptureService } from './map-capture.service';
-import { MapPartialDrawService } from './map-partial-draw.service';
 import { MapStateService } from './map-state.service';
 import type {
   ManzanaIndex,
@@ -23,157 +11,118 @@ import type {
 } from '../types/map.types';
 
 /**
- * Facade that coordinates all map sub-services.
+ * Facade that coordinates map sub-services.
  *
- * <p>Hot-path methods (applyBaseTerritoryStyle, reaplicarMarcasTerritorio,
- * computeBaseStyle, restaurarVisibilidadPoligonos) use O(1) Map lookups via
- * getFeatureLayerByTerritorio / getManzanaCountByTerritorio instead of
- * iterating the full territory array.</p>
+ * <p>In the MapLibre-only mode, most territory-layer and style methods are
+ * no-ops — territory rendering is handled by vector tiles and GPU picking.
+ * State-only methods (color, cancellation) remain functional.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapRenderingFacade {
-  private readonly engine = inject(MapEngineService);
-  private readonly tiles = inject(MapTileLayerService);
-  private readonly territories = inject(MapTerritoryLayerService);
   private readonly styles = inject(MapStyleService);
-  private readonly capture = inject(MapCaptureService);
-  private readonly partialDraw = inject(MapPartialDrawService);
   private readonly state = inject(MapStateService);
-  private readonly registry = inject(MapLayerRegistry);
-
-  // ─── Engine delegation ───────────────────────────────────────────
-
-  getMap(): LeafletMap | null {
-    return this.engine.getMap();
-  }
-
-  initializeMap(mapElement: HTMLElement): void {
-    this.engine.initializeMap(mapElement);
-    this.tiles.initLayers();
-    this.tiles.observeThemeChanges();
-  }
 
   // ─── Tile / satellite ────────────────────────────────────────────
 
   isSatellite(): boolean {
-    return this.tiles.isSatellite();
+    return false;
   }
 
   toggleSatellite(): void {
-    this.tiles.toggleSatellite();
+    // MapLibre satellite toggle is handled via vector tile styling
   }
 
   // ─── Click handler ───────────────────────────────────────────────
 
-  setManzanaClickHandler(handler: ManzanaClickHandler | null): void {
-    this.territories.setManzanaClickHandler(handler);
+  setManzanaClickHandler(_handler: unknown): void {
+    // No-op: MapLibre uses GPU picking via MapPickingService
   }
 
   // ─── Territory data ──────────────────────────────────────────────
 
-  async loadAllTerritories(territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
-    await this.territories.loadAllTerritories(territorioService);
+  async loadAllTerritories(_territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
+    // No-op: MapLibre loads territories via vector tiles
   }
 
-  updateVisibleTerritories(onBatchLoaded?: (newlyLoaded: number[]) => void): void {
-    this.territories.updateVisibleTerritories(onBatchLoaded);
+  updateVisibleTerritories(_onBatchLoaded?: (newlyLoaded: number[]) => void): void {
+    // No-op: MapLibre manages viewport-based tile loading
   }
 
-  /** Resuelve cuando el stream de carga de territorios visibles drena. */
   whenTerritoryLoadsIdle(): Promise<void> {
-    return this.territories.whenTerritoryLoadsIdle();
+    return Promise.resolve();
   }
 
-  /** Cancela la carga pendiente de territorios (frames + cola). */
   cancelPendingLoads(): void {
-    this.territories.cancelPendingLoads();
+    // No-op: no pending Leaflet loads
   }
 
-  ensureTerritoryLoaded(territorioNum: number): void {
-    this.territories.ensureTerritoryLoaded(territorioNum);
+  ensureTerritoryLoaded(_territorioNum: number): void {
+    // No-op: MapLibre loads tiles on demand
   }
 
   clearAllLayers(): void {
-    this.territories.clearAllLayers();
+    // No-op: MapLibre manages layers via vector tiles
   }
 
   // ─── Index / data access ─────────────────────────────────────────
 
   getManzanaIndex(): ManzanaIndex[] {
-    return this.territories.getManzanaIndex();
+    return [];
   }
 
-  /** Manzanas whose bbox covers the cell containing the point (O(1) lookup). */
-  queryManzanasAt(latlng: { lat: number; lng: number }): ManzanaIndex[] {
-    return this.territories.queryManzanasAt(latlng);
+  queryManzanasAt(_latlng: { lat: number; lng: number }): ManzanaIndex[] {
+    return [];
   }
 
-  /** Manzanas in the cells within `radiusCells` of the point's cell, deduplicated. */
-  queryManzanasNear(latlng: { lat: number; lng: number }, radiusCells = 1): ManzanaIndex[] {
-    return this.territories.queryManzanasNear(latlng, radiusCells);
+  queryManzanasNear(_latlng: { lat: number; lng: number }, _radiusCells = 1): ManzanaIndex[] {
+    return [];
   }
 
   getAllTerritoriesLayer(): FeatureLayer[] {
-    return this.territories.getAllTerritoriesLayer();
+    return [];
   }
 
   getTerritoryDataCache(): Map<number, TerritorioCacheData> {
-    return this.territories.getTerritoryDataCache();
+    return new Map();
   }
 
   hasCachedGeojson(): boolean {
-    return this.territories.hasCachedGeojson();
+    return false;
   }
 
-  podarGeojsonCache(vigentes: Set<number>): void {
-    this.territories.podarGeojsonCache(vigentes);
+  podarGeojsonCache(_vigentes: Set<number>): void {
+    // No-op
   }
 
-  getFeatureLayerByTerritorio(territorioNum: number): FeatureLayer | undefined {
-    return this.territories.getFeatureLayerByTerritorio(territorioNum);
+  getFeatureLayerByTerritorio(_territorioNum: number): FeatureLayer | undefined {
+    return undefined;
   }
 
-  getManzanaCountByTerritorio(territorioNum: number): number {
-    return this.territories.getManzanaCountByTerritorio(territorioNum);
+  getManzanaCountByTerritorio(_territorioNum: number): number {
+    return 0;
   }
 
   // ─── Style delegation ────────────────────────────────────────────
 
   applyBaseTerritoryStyle(
-    territorioNumero: number,
-    color: string,
-    marcadasCount: number,
-    options: { total?: number; isComplete?: boolean } = {}
+    _territorioNumero: number,
+    _color: string,
+    _marcadasCount: number,
+    _options: { total?: number; isComplete?: boolean } = {}
   ): void {
-    this.styles.applyBaseTerritoryStyle(
-      this.territories.getAllTerritoriesLayer(),
-      this.territories.getManzanaIndex(),
-      territorioNumero,
-      color,
-      marcadasCount,
-      options
-    );
+    // No-op: MapLibre uses data-driven tile styling
   }
 
-  applyStyleToFeatureLayer(fl: FeatureLayer, style: PathOptions | ((fl: FeatureLayer) => PathOptions)): void {
-    this.styles.applyStyleToFeatureLayer(fl, style);
+  applyStyleToFeatureLayer(_fl: FeatureLayer, _style: unknown): void {
+    // No-op: MapLibre uses GPU feature-state for styling
   }
 
-  /**
-   * Re-applies base + marked styles for the given territory numbers using O(1) lookups.
-   * Bypasses the MapStyleService array-scan version.
-   */
-  reaplicarMarcasTerritorio(manzanasMarcadaList: ManzanaMarcada[], territorioNumeros: number[]): void {
-    this.styles.reaplicarMarcasTerritorio(
-      this.territories.getAllTerritoriesLayer(),
-      this.territories.getManzanaIndex(),
-      manzanasMarcadaList,
-      territorioNumeros
-    );
+  reaplicarMarcasTerritorio(_manzanasMarcadaList: ManzanaMarcada[], _territorioNumeros: number[]): void {
+    // No-op: MapLibre handles marks via GPU picking
   }
 
   limpiarMarcasVisuales(): void {
-    this.styles.limpiarMarcasVisuales(this.territories.getAllTerritoriesLayer());
+    // No-op: MapLibre handles marks via GPU picking
   }
 
   queueStyleUpdate(fn: () => void): void {
@@ -187,160 +136,94 @@ export class MapRenderingFacade {
   // ─── Labels ──────────────────────────────────────────────────────
 
   updateLabelsVisibility(): void {
-    this.territories.updateLabelsVisibility();
+    // No-op: MapLibre uses symbol layers for labels
   }
 
-  updateLabelsForSelection(seleccionados: Set<number>): void {
-    this.territories.updateLabelsForSelection(seleccionados);
+  updateLabelsForSelection(_seleccionados: Set<number>): void {
+    // No-op: MapLibre uses symbol layers for labels
   }
 
-  getTerritoryLabels(): Marker[] {
-    return this.territories.getTerritoryLabels();
+  getTerritoryLabels(): unknown[] {
+    return [];
   }
 
   // ─── Visibility ──────────────────────────────────────────────────
 
-  ocultarPoligonosNoSeleccionados(seleccionados: number[]): void {
-    const seleccionadosSet = new Set(seleccionados);
-
-    this.styles.cancelPendingStyleUpdates();
-    this.styles.queueStyleUpdate(() => {
-      for (const fl of this.territories.getAllTerritoriesLayer()) {
-        if (seleccionadosSet.has(fl.territorioPadre)) continue;
-        this.styles.applyStyleToFeatureLayer(fl, getHiddenStyle());
-      }
-    });
-
-    this.territories.updateLabelsForSelection(seleccionadosSet);
+  ocultarPoligonosNoSeleccionados(_seleccionados: number[]): void {
+    // No-op: MapLibre uses tile-based rendering
   }
 
-  restaurarVisibilidadPoligonos(manzanasMarcadaList: ManzanaMarcada[], territoriosSeleccionados: number[]): void {
-    this.styles.cancelPendingStyleUpdates();
-
-    const seleccionadosSet = new Set(territoriosSeleccionados);
-    const hayFiltroActivo = seleccionadosSet.size > 0;
-
-    this.styles.queueStyleUpdate(() => {
-      for (const fl of this.territories.getAllTerritoriesLayer()) {
-        if (hayFiltroActivo && !seleccionadosSet.has(fl.territorioPadre)) {
-          this.styles.applyStyleToFeatureLayer(fl, getHiddenStyle());
-          continue;
-        }
-
-        this.styles.applyStyleToFeatureLayer(fl, this.computeBaseStyle(fl.territorioPadre, manzanasMarcadaList));
-      }
-
-      for (const num of territoriosSeleccionados) {
-        const featureLayer = this.territories.getFeatureLayerByTerritorio(num);
-        if (!featureLayer) continue;
-
-        const marcadas = manzanasMarcadaList.filter(m => m.territorioNumero === num);
-        for (const m of marcadas) {
-          const layer = this.registry.get(m.id);
-          if (layer) layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
-        }
-      }
-
-      if (hayFiltroActivo) {
-        this.territories.updateLabelsForSelection(seleccionadosSet);
-      } else {
-        this.territories.updateLabelsVisibility();
-      }
-    });
+  restaurarVisibilidadPoligonos(_manzanasMarcadaList: ManzanaMarcada[], _territoriosSeleccionados: number[]): void {
+    // No-op: MapLibre uses tile-based rendering
   }
 
-  /**
-   * Restores the full map view (every territory visible) while re-applying the
-   * marked-manzana styles. Used after a save/send so the user keeps seeing their
-   * marks without an active territory selection.
-   */
-  restaurarVistaConMarcas(manzanasMarcadaList: ManzanaMarcada[]): void {
-    this.styles.cancelPendingStyleUpdates();
-
-    this.styles.queueStyleUpdate(() => {
-      for (const fl of this.territories.getAllTerritoriesLayer()) {
-        this.styles.applyStyleToFeatureLayer(fl, this.computeBaseStyle(fl.territorioPadre, manzanasMarcadaList));
-      }
-
-      for (const m of manzanasMarcadaList) {
-        const layer = this.registry.get(m.id);
-        if (!layer) continue;
-        const featureLayer = this.territories.getFeatureLayerByTerritorio(m.territorioNumero);
-        if (!featureLayer) continue;
-        layer.setStyle(getMarkedManzanaStyle(featureLayer.color));
-      }
-
-      this.territories.updateLabelsVisibility();
-    });
+  restaurarVistaConMarcas(_manzanasMarcadaList: ManzanaMarcada[]): void {
+    // No-op: MapLibre uses tile-based rendering
   }
 
   // ─── Capture ─────────────────────────────────────────────────────
 
-  prepararCaptura(manzanasMarcadaList: ManzanaMarcada[], territoriosSeleccionados: number[]): Promise<void> {
-    return this.capture.prepararCaptura(manzanasMarcadaList, territoriosSeleccionados);
+  prepararCaptura(_manzanasMarcadaList: ManzanaMarcada[], _territoriosSeleccionados: number[]): Promise<void> {
+    return Promise.resolve();
   }
 
   restaurarMapaPostCaptura(
-    manzanasMarcadaList: ManzanaMarcada[],
-    territoriosSeleccionados: number[],
-    modoMarcado: string
+    _manzanasMarcadaList: ManzanaMarcada[],
+    _territoriosSeleccionados: number[],
+    _modoMarcado: string
   ): void {
-    this.capture.restaurarMapaPostCaptura(
-      manzanasMarcadaList,
-      territoriosSeleccionados,
-      modoMarcado
-    );
+    // No-op
   }
 
   // ─── Partial draw ────────────────────────────────────────────────
 
   redibujarParcial(
-    puntos: SnappedPoint[],
-    currentTerritoryColor: string,
-    manzanaEdges: Edge[],
-    onMarkerDrag: (index: number, marker: Marker) => void
+    _puntos: SnappedPoint[],
+    _currentTerritoryColor: string,
+    _manzanaEdges: Edge[],
+    _onMarkerDrag: (index: number, marker: unknown) => void
   ): void {
-    this.partialDraw.redibujarParcial(puntos, currentTerritoryColor, manzanaEdges, onMarkerDrag);
+    // No-op: MapLibre partial draw uses edit overlay
   }
 
-  updatePartialPolygonLatLngs(latlngs: LatLngExpression[], currentTerritoryColor: string): void {
-    this.partialDraw.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
+  updatePartialPolygonLatLngs(_latlngs: unknown[], _currentTerritoryColor: string): void {
+    // No-op
   }
 
   actualizarParcialEnDrag(
-    puntos: SnappedPoint[],
-    currentTerritoryColor: string,
-    manzanaEdges: Edge[],
-    index: number,
-    marker: Marker
+    _puntos: SnappedPoint[],
+    _currentTerritoryColor: string,
+    _manzanaEdges: Edge[],
+    _index: number,
+    _marker: unknown
   ): void {
-    this.partialDraw.actualizarParcialEnDrag(puntos, currentTerritoryColor, manzanaEdges, index, marker);
+    // No-op
   }
 
   limpiarCapasParciales(): void {
-    this.partialDraw.limpiarCapasParciales();
+    // No-op
   }
 
-  getPoligonoParcial(): Polygon | null {
-    return this.partialDraw.getPoligonoParcial();
+  getPoligonoParcial(): unknown | null {
+    return null;
   }
 
   clearPoligonoParcialRef(): void {
-    this.partialDraw.clearPoligonoParcialRef();
+    // No-op
   }
 
-  // ─── Extra layers (delegated to territory-layer) ─────────────────
+  // ─── Extra layers ───────────────────────────────────────────────
 
-  addExtraLayer(layer: Layer): void {
-    this.territories.addExtraLayer(layer);
+  addExtraLayer(_layer: unknown): void {
+    // No-op
   }
 
-  removeExtraLayer(layer: Layer): void {
-    this.territories.removeExtraLayer(layer);
+  removeExtraLayer(_layer: unknown): void {
+    // No-op
   }
 
   clearExtraLayers(): void {
-    this.territories.clearExtraLayers();
+    // No-op
   }
 
   // ─── Current territory color (delegated to state) ───────────────
@@ -353,22 +236,9 @@ export class MapRenderingFacade {
     return this.state.currentTerritoryColor();
   }
 
-  private computeBaseStyle(territorioNumero: number, manzanasMarcadaList: ManzanaMarcada[]): PathOptions {
-    const total = this.territories.getManzanaCountByTerritorio(territorioNumero);
-    const marcadas = manzanasMarcadaList.filter(m => m.territorioNumero === territorioNumero).length;
-    const isComplete = total > 0 && marcadas >= total;
-    const color = this.territories.getFeatureLayerByTerritorio(territorioNumero)?.color ?? '';
-    return getBaseTerritoryStyle(color, isComplete);
-  }
-
   // ─── Destroy ─────────────────────────────────────────────────────
 
   destroy(): void {
     this.styles.cancelPendingStyleUpdates();
-    this.territories.cancelPendingLoads();
-    this.clearExtraLayers();
-    this.partialDraw.destroy();
-    this.tiles.destroy();
-    this.engine.destroy();
   }
 }

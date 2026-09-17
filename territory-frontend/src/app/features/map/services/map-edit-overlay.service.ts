@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 import type { MapEngine, LayerSpecification } from './map-engine.interface';
-import { MapEngineService } from './map-engine.service';
 import { MapStateService } from './map-state.service';
 import { TileVersionService } from './tile-version.service';
 
@@ -37,7 +36,6 @@ const EDIT_LINE_COLOR = '#1d4ed8';
  */
 @Injectable({ providedIn: 'root' })
 export class MapEditOverlayService {
-  private readonly engine = inject(MapEngineService);
   private readonly state = inject(MapStateService);
   private readonly tileVersion = inject(TileVersionService);
 
@@ -60,7 +58,6 @@ export class MapEditOverlayService {
    */
   addOverlay(geoJson: GeoJSON.FeatureCollection, engine: MapEngine): void {
     if (this.overlayActive) return;
-    if (this.isLeafletEngine(engine)) return;
 
     this.addSource(engine, geoJson);
     this.addLayers(engine);
@@ -79,7 +76,6 @@ export class MapEditOverlayService {
    */
   updateOverlay(geoJson: GeoJSON.FeatureCollection, engine: MapEngine): void {
     if (!this.overlayActive) return;
-    if (this.isLeafletEngine(engine)) return;
 
     this.setSourceData(engine, geoJson);
   }
@@ -94,7 +90,6 @@ export class MapEditOverlayService {
    */
   removeOverlay(engine: MapEngine): void {
     if (!this.overlayActive) return;
-    if (this.isLeafletEngine(engine)) return;
 
     this.removeLayers(engine);
     this.removeSource(engine);
@@ -115,11 +110,6 @@ export class MapEditOverlayService {
     // Trigger an immediate version check so tiles refresh without waiting
     // for the next poll cycle.
     this.tileVersion.checkVersionNow(engine);
-  }
-
-  /** Whether the engine is the Leaflet engine (not MapLibre). */
-  private isLeafletEngine(engine: MapEngine): boolean {
-    return engine instanceof MapEngineService;
   }
 
   private addSource(engine: MapEngine, geoJson: GeoJSON.FeatureCollection): void {

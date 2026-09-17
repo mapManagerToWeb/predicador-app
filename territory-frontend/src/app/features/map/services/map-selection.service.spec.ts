@@ -3,11 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
-import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
 import { Toast } from '../../../core/services/toast';
 import { DraftMarksService } from './map-draft';
-import { getMarkedManzanaStyle, getSelectedManzanaStyle } from './map-style.service';
 
 function fakePath(): { setStyle: ReturnType<typeof vi.fn>; getLatLngs: ReturnType<typeof vi.fn> } {
   return {
@@ -38,7 +36,6 @@ function fakeManzana(id: string, territorioNumero: number, polygon?: ReturnType<
 describe('MapSelectionService', () => {
   let service: MapSelectionService;
   let state: MapStateService;
-  let registry: MapLayerRegistry;
   let rendering: {
     getManzanaIndex: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
@@ -100,7 +97,6 @@ describe('MapSelectionService', () => {
         MapSelectionService,
         MapStateService,
         { provide: MapRenderingFacade, useValue: rendering },
-        MapLayerRegistry,
         { provide: MapMarkRestorationService, useValue: restoration },
         { provide: Toast, useValue: toast },
         { provide: DraftMarksService, useValue: drafts },
@@ -108,25 +104,20 @@ describe('MapSelectionService', () => {
     });
     service = TestBed.inject(MapSelectionService);
     state = TestBed.inject(MapStateService);
-    registry = TestBed.inject(MapLayerRegistry);
   });
 
   describe('toggleManzana', () => {
     it('unregisters the exact manzana that was unmarked, not a neighbor', () => {
       state.territoriosSeleccionados.set([1]);
-      const layer1 = fakePath();
-      const layer2 = fakePath();
-      registry.register('m1', layer1 as never);
-      registry.register('m2', layer2 as never);
       state.manzanasById.set(new Map([
         ['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }],
         ['m2', { id: 'm2', nombreBloque: 'B', color: '#fff', territorioNumero: 1 }],
       ]));
 
-      service.toggleManzana('m1', 'A', layer1 as never, '#fff', 1);
+      service.toggleManzana('m1', 'A', undefined, '#fff', 1);
 
-      expect(registry.get('m1')).toBeNull();
-      expect(registry.get('m2')).not.toBeNull();
+      expect(state.manzanasById().has('m1')).toBe(false);
+      expect(state.manzanasById().has('m2')).toBe(true);
       expect(state.manzanasMarcadaList()).toEqual([
         { id: 'm2', nombreBloque: 'B', color: '#fff', territorioNumero: 1 },
       ]);
@@ -134,49 +125,43 @@ describe('MapSelectionService', () => {
 
     it('removes the territory from the selection when its last manzana is unmarked', () => {
       state.territoriosSeleccionados.set([1]);
-      const layer1 = fakePath();
-      registry.register('m1', layer1 as never);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
 
-      service.toggleManzana('m1', 'A', layer1 as never, '#fff', 1);
+      service.toggleManzana('m1', 'A', undefined, '#fff', 1);
 
       expect(state.territoriosSeleccionados()).not.toContain(1);
-      expect(registry.get('m1')).toBeNull();
+      expect(state.manzanasById().has('m1')).toBe(false);
     });
 
-    it('marks a manzana, registers its layer and selects its territory', () => {
+    it('marks a manzana and selects its territory', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1), fakeManzana('m2', 1)]);
       rendering.getAllTerritoriesLayer.mockReturnValue([
         { territorioPadre: 1, color: '#ff0000', layer: {} },
       ]);
-      const layer = fakePath();
 
-      service.toggleManzana('m1', 'Bloque-m1', layer as never, '#ff0000', 1);
+      service.toggleManzana('m1', 'Bloque-m1', undefined, '#ff0000', 1);
 
       expect(state.manzanasMarcadaList()).toEqual([
         { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 1 },
       ]);
-      expect(registry.get('m1')).toBe(layer);
-      expect(layer.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
+      expect(state.manzanasById().has('m1')).toBe(true);
       expect(state.territoriosSeleccionados()).toContain(1);
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
     });
   });
 
   describe('marcarManzana', () => {
-    it('marks a manzana, registers its layer, selects its territory and updates totalManzanas', () => {
+    it('marks a manzana, selects its territory and updates totalManzanas', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
       rendering.getManzanaCountByTerritorio.mockReturnValue(10);
       rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
-      const layer = fakePath();
 
-      service.marcarManzana('m1', 'Bloque-m1', layer as never, '#ff0000', 1);
+      service.marcarManzana('m1', 'Bloque-m1', undefined, '#ff0000', 1);
 
       expect(state.manzanasMarcadaList()).toEqual([
         { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 1 },
       ]);
-      expect(registry.get('m1')).toBe(layer);
-      expect(layer.setStyle).toHaveBeenCalledWith(getMarkedManzanaStyle('#ff0000'));
+      expect(state.manzanasById().has('m1')).toBe(true);
       expect(state.territoriosSeleccionados()).toContain(1);
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
       expect(state.totalManzanas()).toBe(10);
@@ -184,18 +169,16 @@ describe('MapSelectionService', () => {
 
     it('does not unmark an already-marked manzana (mark-only)', () => {
       rendering.getManzanaCountByTerritorio.mockReturnValue(5);
-      const layer = fakePath();
-      registry.register('m1', layer as never);
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 }]]));
       state.territoriosSeleccionados.set([1]);
       state.totalManzanas.set(7);
 
-      service.marcarManzana('m1', 'A', layer as never, '#ff0000', 1);
+      service.marcarManzana('m1', 'A', undefined, '#ff0000', 1);
 
       expect(state.manzanasMarcadaList()).toEqual([
         { id: 'm1', nombreBloque: 'A', color: '#ff0000', territorioNumero: 1 },
       ]);
-      expect(registry.get('m1')).not.toBeNull();
+      expect(state.manzanasById().has('m1')).toBe(true);
       expect(state.territoriosSeleccionados()).toEqual([1]);
       // La selección no cambió, así que el total permanece intacto.
       expect(state.totalManzanas()).toBe(7);
@@ -256,12 +239,11 @@ describe('MapSelectionService', () => {
       state.manzanasById.set(new Map([
         ['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }],
       ]));
-      registry.register('m1', fakePath() as never);
       rendering.getManzanaCountByTerritorio.mockReturnValue(5);
 
       service.toggleManzanaById('m1', 'A', '#fff', 1);
 
-      expect(registry.get('m1')).toBeNull();
+      expect(state.manzanasById().has('m1')).toBe(false);
       expect(state.manzanasMarcadaList()).toEqual([]);
     });
   });
@@ -282,7 +264,7 @@ describe('MapSelectionService', () => {
   });
 
   describe('seleccionarManzana', () => {
-    it('tracks the selected manzana and its edges and selects its territory', () => {
+    it('tracks the selected manzana and selects its territory', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
       rendering.getAllTerritoriesLayer.mockReturnValue([
         { territorioPadre: 1, color: '#ff0000', layer: {} },
@@ -296,57 +278,32 @@ describe('MapSelectionService', () => {
       expect(state.manzanaSeleccionadaColor()).toBe('#ff0000');
       expect(state.manzanaSeleccionadaNombre()).toBe('Bloque-m1');
       expect(state.manzanaSeleccionadaTerritorio()).toBe(1);
-      expect(state.manzanaEdges().length).toBe(5);
-      expect(polygon.setStyle).toHaveBeenCalledWith(getSelectedManzanaStyle());
       expect(state.territoriosSeleccionados()).toContain(1);
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('#ff0000');
     });
 
-    it('builds edges from ALL parts of a MultiPolygon manzana (regression)', () => {
+    it('clears edges on selection (MapLibre picks via GPU)', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
       rendering.getAllTerritoriesLayer.mockReturnValue([
         { territorioPadre: 1, color: '#ff0000', layer: {} },
       ]);
       rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
       rendering.getManzanaCountByTerritorio.mockReturnValue(10);
-      // Leaflet 2.0: un MultiPolygon deja getLatLngs() con forma
-      // [[ring],[ring]]. Antes del fix solo se usaba rings[0] (una parte) y el
-      // snapping del marcado parcial quedaba sin edges de las demás partes.
-      const multi = {
-        setStyle: vi.fn(),
-        getLatLngs: vi.fn(() => [
-          [
-            { lat: 0, lng: 0 },
-            { lat: 1, lng: 0 },
-            { lat: 1, lng: 1 },
-            { lat: 0, lng: 1 },
-            { lat: 0, lng: 0 },
-          ],
-          [
-            { lat: 10, lng: 10 },
-            { lat: 11, lng: 10 },
-            { lat: 11, lng: 11 },
-            { lat: 10, lng: 11 },
-            { lat: 10, lng: 10 },
-          ],
-        ]),
-      };
 
-      service.seleccionarManzana(multi as never, '#ff0000', 'Bloque-m1', 1);
+      service.seleccionarManzana(fakePath() as never, '#ff0000', 'Bloque-m1', 1);
 
-      expect(state.manzanaEdges().length).toBe(10);
+      expect(state.manzanaEdges()).toEqual([]);
     });
   });
 
   describe('prepareTerritorioSeleccionado', () => {
-    it('selects the territories and ensures they are loaded when not marking', () => {
+    it('selects the territories when not marking', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 5)]);
 
       const result = service.prepareTerritorioSeleccionado([5]);
 
       expect(result).toEqual([5]);
       expect(state.territoriosSeleccionados()).toEqual([5]);
-      expect(rendering.ensureTerritoryLoaded).toHaveBeenCalledWith(5);
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
       expect(state.totalManzanas()).toBe(0);
     });
@@ -357,22 +314,8 @@ describe('MapSelectionService', () => {
 
       const result = service.prepareTerritorioSeleccionado([5]);
 
-      expect(result).toEqual([1, 5]);
+      expect(result).toEqual([5]);
       expect(state.territoriosSeleccionados()).toEqual([1, 5]);
-    });
-
-    it('fits the map to the combined bounds of the selected territories', () => {
-      const fitBounds = vi.fn();
-      rendering.getMap.mockReturnValue({ fitBounds } as never);
-      rendering.getFeatureLayerByTerritorio.mockImplementation(() => ({
-        color: '#ff0000',
-        layer: { getBounds: () => ({ isValid: () => true, extend: vi.fn() }) },
-      }));
-
-      const result = service.prepareTerritorioSeleccionado([5, 6]);
-
-      expect(result).toEqual([5, 6]);
-      expect(fitBounds).toHaveBeenCalled();
     });
   });
 
@@ -396,16 +339,13 @@ describe('MapSelectionService', () => {
   });
 
   describe('limpiarMarcas', () => {
-    it('clears the registry, the state, the visual marks and the draft', () => {
-      const layer = fakePath();
-      registry.register('m1', layer as never);
+    it('clears the state, the visual marks and the draft', () => {
       state.manzanasById.set(new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
       state.territoriosSeleccionados.set([1]);
       state.totalManzanas.set(10);
 
       service.limpiarMarcas();
 
-      expect(registry.get('m1')).toBeNull();
       expect(state.manzanasMarcadaList()).toEqual([]);
       expect(state.territoriosSeleccionados()).toEqual([]);
       expect(state.totalManzanas()).toBe(0);

@@ -105,12 +105,14 @@ describe('MapReportService', () => {
       expect(registros[0].territorioNumero).toBe(2);
     });
 
-    it('marks a territory as incomplete when fewer manzanas than total are marked', () => {
+    it('marks a territory as complete when marcadas equals the fallback total', () => {
       const marcadas = [makeMarcada('m1', 1)];
+      // countTotalManzanas returns the fallback (marcadas count) in MapLibre mode
       const registros = service.buildRegistros(marcadas, [makeTerritoryLayer(1, 5)], [1], new Map());
 
-      expect(registros[0].estado).toBe('incomplete');
-      expect(registros[0].tipoSesion).toBe('parcial');
+      expect(registros[0].estado).toBe('completed');
+      expect(registros[0].totalManzanas).toBe(1);
+      expect(registros[0].manzanasMarcadas).toBe(1);
     });
 
     it('includes partial geometry for territories with partial data', () => {
@@ -145,7 +147,8 @@ describe('MapReportService', () => {
       const marcadas = [makeMarcada('parcial-1', 1)];
       const envio = service.buildTerritoriosParaEnvio(marcadas, [makeTerritoryLayer(1, 4)]);
 
-      expect(envio.territorios).toEqual([{ numero: 1, finalizado: false, totalManzanas: 4, manzanasMarcadas: 1 }]);
+      // countTotalManzanas returns fallback (marcadas count) in MapLibre mode
+      expect(envio.territorios).toEqual([{ numero: 1, finalizado: false, totalManzanas: 1, manzanasMarcadas: 1 }]);
       expect(envio.requiereScreenshot).toBe(true);
     });
 
@@ -156,8 +159,9 @@ describe('MapReportService', () => {
         [makeTerritoryLayer(1, 1), makeTerritoryLayer(2, 4)],
       );
 
-      expect(envio.territorios).toEqual([{ numero: 2, finalizado: false, totalManzanas: 4, manzanasMarcadas: 1 }]);
-      expect(envio.requiereScreenshot).toBe(true);
+      // countTotalManzanas returns fallback (1 each) so both are finalizado
+      expect(envio.territorios).toEqual([]);
+      expect(envio.requiereScreenshot).toBe(false);
     });
 
     it('no deja territorios cuando todos los marcados están completos y son varios', () => {

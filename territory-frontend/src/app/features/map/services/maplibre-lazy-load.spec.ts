@@ -2,7 +2,7 @@
  * Performance verification tests for MapLibre GL JS lazy-loading.
  *
  * Verifies that maplibre-gl is imported dynamically (via `import()`) and
- * never enters the main bundle.  This is critical for keeping the initial
+ * never enters the main bundle. This is critical for keeping the initial
  * JavaScript payload small — maplibre-gl is ~600 KB minified.
  *
  * Corresponds to OpenSpec F3.6 / T28 (Performance verification).
@@ -14,24 +14,21 @@ import * as path from 'node:path';
 const TERRITORY_ROOT = path.resolve(__dirname, '../../../../../');
 
 describe('MapLibre lazy-loading (T28)', () => {
-  it('createMaplibreEngine dynamically imports maplibre-engine.service', async () => {
-    const factoryModule = await import('./map-engine.factory');
-    const fnStr = factoryModule.createMaplibreEngine.toString();
+  it('MapPage dynamically imports maplibre-engine.service', async () => {
+    const mapPath = path.resolve(__dirname, '../map.ts');
+    const source = await fs.readFile(mapPath, 'utf-8');
 
-    // Vite transforms `import()` to `__vite_ssr_dynamic_import__` in test mode
+    // The map.ts should dynamically import maplibre-engine.service
     const hasDynamicImport =
-      fnStr.includes('import(') ||
-      fnStr.includes('__vite_ssr_dynamic_import__');
+      source.includes("import('./services/maplibre-engine.service')") ||
+      source.includes("import(\"./services/maplibre-engine.service\")");
     expect(hasDynamicImport).toBe(true);
-    expect(fnStr).toContain('maplibre-engine.service');
   });
 
   it('MaplibreEngineService.loadMaplibre dynamically imports maplibre-gl', async () => {
-    // Read the source file directly to check for dynamic import pattern
     const sourcePath = path.resolve(__dirname, './maplibre-engine.service.ts');
     const source = await fs.readFile(sourcePath, 'utf-8');
 
-    // The loadMaplibre method should contain `await import('maplibre-gl')`
     expect(source).toContain("await import('maplibre-gl')");
   });
 
@@ -87,26 +84,6 @@ describe('MapLibre lazy-loading (T28)', () => {
     for (const line of lines) {
       expect(line).toMatch(/import\s+type/);
     }
-  });
-
-  it('map-engine.factory.ts uses dynamic import (not static) for maplibre-engine.service', async () => {
-    const factoryPath = path.resolve(__dirname, './map-engine.factory.ts');
-    const source = await fs.readFile(factoryPath, 'utf-8');
-
-    // Should NOT have a static import of maplibre-engine.service
-    const hasStaticImport = source
-      .split('\n')
-      .some(
-        (line) =>
-          line.startsWith('import') &&
-          !line.startsWith('import type') &&
-          line.includes('maplibre-engine.service'),
-      );
-    expect(hasStaticImport).toBe(false);
-
-    // Should have a dynamic import() call (may be multi-line)
-    expect(source).toContain("import(");
-    expect(source).toContain("'./maplibre-engine.service'");
   });
 
   it('maplibre-engine.service.ts uses dynamic import for maplibre-gl (not static)', async () => {
