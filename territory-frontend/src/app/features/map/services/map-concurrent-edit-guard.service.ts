@@ -88,19 +88,6 @@ export class ConcurrentEditGuardService {
     this.activeEngine = null;
   }
 
-  /**
-   * Check if the current version differs from the baseline.
-   *
-   * <p>Used to gate save operations — if the version changed, the user
-   * should be warned before overwriting.</p>
-   *
-   * @returns `true` if a concurrent edit was detected.
-   */
-  hasConcurrentEdit(): boolean {
-    // If we haven't established a baseline yet, no concurrent edit.
-    return false;
-  }
-
   // ─── Private helpers ────────────────────────────────────────────
 
   private async captureBaseline(): Promise<void> {

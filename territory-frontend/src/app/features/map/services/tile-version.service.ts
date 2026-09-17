@@ -1,4 +1,5 @@
-import { Injectable, inject, NgZone } from '@angular/core';
+import { Injectable, inject, NgZone, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { MapEngine } from './map-engine.interface';
@@ -38,6 +39,8 @@ export class TileVersionService {
   private readonly http = inject(HttpClient);
   private readonly ngZone = inject(NgZone);
   private readonly vectorTile = inject(MapVectorTileService);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   private tileJsonUrl = DEFAULT_TILE_JSON_URL;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -61,7 +64,9 @@ export class TileVersionService {
 
       // Also listen for visibility changes — when the tab becomes visible
       // again, check immediately for fresher data.
-      document.addEventListener('visibilitychange', this.onVisibilityChange);
+      if (this.isBrowser) {
+        document.addEventListener('visibilitychange', this.onVisibilityChange);
+      }
     });
   }
 
@@ -71,7 +76,9 @@ export class TileVersionService {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
-    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    if (this.isBrowser) {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    }
     this.engine = null;
     this.previousBoundsHash = null;
   }
@@ -95,7 +102,7 @@ export class TileVersionService {
   // ─── Private helpers ────────────────────────────────────────────
 
   private onVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible') {
+    if (this.isBrowser && document.visibilityState === 'visible') {
       void this.checkVersion();
     }
   };

@@ -10,15 +10,26 @@ import type { MapGeoJSONFeature, LngLatBoundsLike } from 'maplibre-gl';
  * currently rendered tile features).</p>
  *
  * <p>Source/layer names match the tile configuration in
- * {@link MaplibreEngineService}: source = `'territories'`,
- * source-layer = `'manzana'`.</p>
+ * {@link MapVectorTileService}: source = `'territories'`,
+ * source-layer = `'manzana'` / `'territorio'`.
+ * The `layers` filter uses **layer IDs** (not source-layer names).</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapPickingService {
-  /** Vector tile source id — must match the name used in MaplibreEngineService. */
+  /** Vector tile source id — must match the name used in MapVectorTileService. */
   static readonly SOURCE_ID = 'territories';
   /** Vector tile source-layer — must match the PBX layer name from the backend. */
-  static readonly SOURCE_LAYER = 'manzana';
+  static readonly SOURCE_LAYER_MANZANA = 'manzana';
+
+  /**
+   * Layer IDs used for `queryRenderedFeatures` `layers` filter.
+   * These match the `id` properties passed to `addLayer` in
+   * {@link MapVectorTileService}.
+   */
+  static readonly PICKABLE_LAYER_IDS = [
+    'territory-fill',
+    'territory-dissolved-fill',
+  ];
 
   /**
    * Query the first rendered feature at the given pixel coordinate.
@@ -29,7 +40,7 @@ export class MapPickingService {
    */
   queryAt(point: [number, number], engine: MapEngine): MapGeoJSONFeature | null {
     const features = engine.queryRenderedFeatures(point, {
-      layers: [MapPickingService.SOURCE_LAYER],
+      layers: MapPickingService.PICKABLE_LAYER_IDS,
     });
     return features.length > 0 ? features[0] : null;
   }
@@ -43,7 +54,7 @@ export class MapPickingService {
    */
   queryNear(bounds: LngLatBoundsLike, engine: MapEngine): MapGeoJSONFeature[] {
     return engine.queryRenderedFeatures(bounds, {
-      layers: [MapPickingService.SOURCE_LAYER],
+      layers: MapPickingService.PICKABLE_LAYER_IDS,
     });
   }
 
@@ -59,7 +70,7 @@ export class MapPickingService {
   highlightFeature(engine: MapEngine, id: string | number): void {
     engine.setFeatureState(
       MapPickingService.SOURCE_ID,
-      MapPickingService.SOURCE_LAYER,
+      MapPickingService.SOURCE_LAYER_MANZANA,
       id,
       { selected: true },
     );
@@ -74,7 +85,7 @@ export class MapPickingService {
   clearHighlight(engine: MapEngine, id?: string | number): void {
     engine.removeFeatureState(
       MapPickingService.SOURCE_ID,
-      MapPickingService.SOURCE_LAYER,
+      MapPickingService.SOURCE_LAYER_MANZANA,
       id,
     );
   }

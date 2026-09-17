@@ -60,7 +60,7 @@ describe('MapPickingService', () => {
 
       expect(result).toBe(feature);
       expect(engine.queryRenderedFeatures).toHaveBeenCalledWith([100, 200], {
-        layers: ['manzana'],
+        layers: ['territory-fill', 'territory-dissolved-fill'],
       });
     });
 
@@ -84,7 +84,7 @@ describe('MapPickingService', () => {
 
       expect(result).toEqual([f1, f2]);
       expect(engine.queryRenderedFeatures).toHaveBeenCalledWith(bounds, {
-        layers: ['manzana'],
+        layers: ['territory-fill', 'territory-dissolved-fill'],
       });
     });
 
@@ -148,8 +148,15 @@ describe('MapPickingService', () => {
       expect(MapPickingService.SOURCE_ID).toBe('territories');
     });
 
-    it('SOURCE_LAYER matches the tile source-layer name', () => {
-      expect(MapPickingService.SOURCE_LAYER).toBe('manzana');
+    it('SOURCE_LAYER_MANZANA matches the tile source-layer name', () => {
+      expect(MapPickingService.SOURCE_LAYER_MANZANA).toBe('manzana');
+    });
+
+    it('PICKABLE_LAYER_IDS contains the fill layer IDs', () => {
+      expect(MapPickingService.PICKABLE_LAYER_IDS).toEqual([
+        'territory-fill',
+        'territory-dissolved-fill',
+      ]);
     });
   });
 });
