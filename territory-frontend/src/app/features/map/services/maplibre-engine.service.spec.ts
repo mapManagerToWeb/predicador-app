@@ -29,6 +29,7 @@ const fakeMapInstance = {
   setFeatureState: vi.fn(),
   removeFeatureState: vi.fn(),
   project: vi.fn().mockReturnValue({ x: 100, y: 200 }),
+  isStyleLoaded: vi.fn().mockReturnValue(true),
 };
 
 vi.mock('maplibre-gl', () => ({

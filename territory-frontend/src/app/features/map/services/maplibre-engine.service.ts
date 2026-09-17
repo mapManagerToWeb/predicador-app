@@ -55,7 +55,9 @@ export class MaplibreEngineService implements MapEngine {
   }
 
   async init(container: HTMLElement, options: MapEngineOptions): Promise<void> {
-    if (!isPlatformBrowser(this.platformId)) return;
+    // When instantiated via `new` (not DI), platformId is {} and
+    // isPlatformBrowser({}) returns false. Fall back to window check.
+    if (!isPlatformBrowser(this.platformId) && typeof window === 'undefined') return;
 
     const maplibregl = await this.loadMaplibre();
 
@@ -73,10 +75,25 @@ export class MaplibreEngineService implements MapEngine {
       fadeDuration: 0,
     });
 
+    // Wait for the style to finish loading before adding sources/layers.
+    // MapLibre v6 throws "Style is not done loading" if addSource is
+    // called before the style is ready.
+    await new Promise<void>(resolve => {
+      if (this.map!.isStyleLoaded()) {
+        resolve();
+      } else {
+        this.map!.on('load', () => resolve());
+      }
+    });
+
     // Add a lightweight raster basemap below the vector territory layers
     this.map.addSource('basemap', {
       type: 'raster',
-      tiles: ['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tiles: [
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      ],
       tileSize: 256,
       attribution: options.attribution ?? '© OpenStreetMap contributors',
     });
