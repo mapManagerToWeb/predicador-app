@@ -14,6 +14,9 @@ import { MapRenderingFacade } from './services/map-rendering.facade';
 import { MapInteractionService } from './services/map-interaction.service';
 import { MapSelectionService } from './services/map-selection.service';
 import { MapPickingService } from './services/map-picking.service';
+import { MapVectorTileService } from './services/map-vector-tile.service';
+import { MapLabelLayerService } from './services/map-label-layer.service';
+import { TileVersionService } from './services/tile-version.service';
 import { MapInitializationService } from './services/map-initialization.service';
 import { MapLocationService } from './services/map-location.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
@@ -39,6 +42,9 @@ export class MapPage implements OnDestroy {
   private readonly dataPersistence = inject(MapDataPersistenceService);
   private readonly location = inject(MapLocationService);
   private readonly picking = inject(MapPickingService);
+  private readonly vectorTile = inject(MapVectorTileService);
+  private readonly labelLayer = inject(MapLabelLayerService);
+  private readonly tileVersion = inject(TileVersionService);
   private readonly toastService = inject(Toast);
 
   /** Active MapLibre engine instance. */
@@ -87,6 +93,13 @@ export class MapPage implements OnDestroy {
     });
 
     this.maplibreEngine.set(engine);
+
+    // Initialize vector tile layers (fill, line, labels)
+    this.vectorTile.initLayers(engine);
+    this.labelLayer.initLabels(engine);
+
+    // Start version-aware refresh polling
+    this.tileVersion.startPolling(engine);
 
     // ─── F3.3: GPU Picking — register MapLibre event handlers ────
     this.maplibreClickHandler = (e: MapLayerMouseEvent | MapLayerTouchEvent) =>
@@ -323,8 +336,11 @@ export class MapPage implements OnDestroy {
 
   ngOnDestroy(): void {
     this.location.destroy();
+    this.tileVersion.stopPolling();
     const mlEngine = this.maplibreEngine();
     if (mlEngine) {
+      this.labelLayer.destroy(mlEngine);
+      this.vectorTile.destroy(mlEngine);
       if (this.maplibreClickHandler) {
         mlEngine.off('click', this.maplibreClickHandler);
         this.maplibreClickHandler = null;

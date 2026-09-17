@@ -59,21 +59,11 @@ export class MaplibreEngineService implements MapEngine {
 
     const maplibregl = await this.loadMaplibre();
 
-    const tileUrl = options.tileUrl;
-
     this.map = new maplibregl.Map({
       container,
       style: {
         version: 8,
-        sources: {
-          territories: {
-            type: 'vector',
-            tiles: [tileUrl],
-            minzoom: 0,
-            maxzoom: 19,
-            scheme: 'xyz',
-          },
-        },
+        sources: {},
         layers: [],
       },
       center: options.center,
