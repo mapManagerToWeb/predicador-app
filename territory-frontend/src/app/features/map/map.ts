@@ -4,6 +4,8 @@ import {
   inject,
   afterNextRender,
   ChangeDetectionStrategy,
+  signal,
+  PLATFORM_ID,
 } from '@angular/core';
 import { type LeafletMouseEvent } from 'leaflet';
 import { Toast } from '../../core/services/toast';
@@ -18,6 +20,8 @@ import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
 import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
 import type { ModoMarcado } from './types/map.types';
+import type { MapEngine } from './services/map-engine.interface';
+import { shouldUseMapLibre, createMaplibreEngine } from './services/map-engine.factory';
 
 @Component({
   selector: 'app-map',
@@ -36,6 +40,10 @@ export class MapPage implements OnDestroy {
   private readonly dataPersistence = inject(MapDataPersistenceService);
   private readonly location = inject(MapLocationService);
   private readonly toastService = inject(Toast);
+  private readonly platformId = inject(PLATFORM_ID);
+
+  /** Active MapLibre engine instance (null when using Leaflet). */
+  private readonly maplibreEngine = signal<MapEngine | null>(null);
 
   manzanasCount = this.state.manzanasCount;
   totalManzanas = this.state.totalManzanas;
@@ -61,7 +69,34 @@ export class MapPage implements OnDestroy {
     const el = document.getElementById('map');
     if (!el) return;
 
-    void this.initialization.initialize(el, (e: LeafletMouseEvent) => this.onMapClick(e));
+    const engineChoice = this.state.mapEngine();
+
+    if (shouldUseMapLibre(engineChoice)) {
+      // ─── MapLibre path (F3.1: init only, no rendering yet) ─────
+      void this.initMaplibre(el);
+    } else {
+      // ─── Leaflet path (unchanged — safe rollback) ────────────────
+      void this.initialization.initialize(
+        el,
+        (e: LeafletMouseEvent) => this.onMapClick(e),
+      );
+    }
+  }
+
+  private async initMaplibre(el: HTMLElement): Promise<void> {
+    const engine = await createMaplibreEngine(this.platformId);
+
+    const tileUrl = '/api/v1/territories/tiles/{z}/{x}/{y}.pbf';
+    await engine.init(el, {
+      center: [MAP_DEFAULTS.initialView.lng, MAP_DEFAULTS.initialView.lat],
+      zoom: MAP_DEFAULTS.initialZoom,
+      maxZoom: MAP_DEFAULTS.maxZoom,
+      tileUrl,
+    });
+
+    this.maplibreEngine.set(engine);
+    // F3.1: MapLibre is initialized but does not render territories yet.
+    // Styling, picking, and edit mode are F3.2/F3.3/F3.4.
   }
 
 
@@ -210,7 +245,13 @@ export class MapPage implements OnDestroy {
     this.limpiarMarcas();
 
     // Volver a la vista de territorios (mapa inicial sin selección).
-    this.rendering.getMap()?.setView(MAP_DEFAULTS.initialView, MAP_DEFAULTS.initialZoom);
+    const mlEngine = this.maplibreEngine();
+    if (mlEngine) {
+      mlEngine.setCenter([MAP_DEFAULTS.initialView.lng, MAP_DEFAULTS.initialView.lat]);
+      mlEngine.setZoom(MAP_DEFAULTS.initialZoom);
+    } else {
+      this.rendering.getMap()?.setView(MAP_DEFAULTS.initialView, MAP_DEFAULTS.initialZoom);
+    }
 
     if (hasData) {
       void this.initialization.reloadAllTerritories();
@@ -219,7 +260,13 @@ export class MapPage implements OnDestroy {
 
   ngOnDestroy(): void {
     this.location.destroy();
-    this.rendering.cancelPendingStyleUpdates();
-    this.rendering.destroy();
+    const mlEngine = this.maplibreEngine();
+    if (mlEngine) {
+      mlEngine.destroy();
+      this.maplibreEngine.set(null);
+    } else {
+      this.rendering.cancelPendingStyleUpdates();
+      this.rendering.destroy();
+    }
   }
 }

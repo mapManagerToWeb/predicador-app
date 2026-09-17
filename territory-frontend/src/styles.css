@@ -605,3 +605,38 @@ img {
 :root[data-theme="light"] .leaflet-control-attribution a {
   color: var(--color-primary);
 }
+
+/* ── MapLibre GL Overrides ── */
+.maplibregl-map {
+  background: var(--map-bg);
+}
+
+.maplibregl-ctrl-group {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  border-radius: var(--radius-sm);
+}
+
+.maplibregl-ctrl-group button {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--glass-border);
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: var(--surface-3);
+}
+
+.maplibregl-ctrl-attribution {
+  background: var(--glass-bg);
+  color: var(--ink-muted);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.maplibregl-ctrl-attribution a {
+  color: var(--color-primary);
+}
