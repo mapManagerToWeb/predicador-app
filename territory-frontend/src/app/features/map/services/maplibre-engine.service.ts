@@ -123,14 +123,23 @@ export class MaplibreEngineService implements MapEngine {
     return { x: point.x, y: point.y };
   }
 
-  addSource(id: string, url: string): void {
-    this.map?.addSource(id, {
-      type: 'vector',
-      tiles: [url],
-      minzoom: 0,
-      maxzoom: 19,
-      scheme: 'xyz',
-    });
+  addSource(id: string, urlOrTiles: string | string[], attribution?: string): void {
+    if (Array.isArray(urlOrTiles)) {
+      this.map?.addSource(id, {
+        type: 'raster',
+        tiles: urlOrTiles,
+        tileSize: 256,
+        attribution,
+      });
+    } else {
+      this.map?.addSource(id, {
+        type: 'vector',
+        tiles: [urlOrTiles],
+        minzoom: 0,
+        maxzoom: 19,
+        scheme: 'xyz',
+      });
+    }
   }
 
   removeSource(id: string): void {
@@ -145,8 +154,11 @@ export class MaplibreEngineService implements MapEngine {
     }
   }
 
-  addLayer(layer: LayerSpecification): void {
-    this.map?.addLayer(layer as Parameters<MapLibreMap['addLayer']>[0]);
+  addLayer(layer: LayerSpecification, beforeId?: string): void {
+    this.map?.addLayer(
+      layer as Parameters<MapLibreMap['addLayer']>[0],
+      beforeId,
+    );
   }
 
   removeLayer(id: string): void {

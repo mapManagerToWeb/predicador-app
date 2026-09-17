@@ -101,6 +101,9 @@ export class MapPage implements OnDestroy {
     // Start version-aware refresh polling
     this.tileVersion.startPolling(engine);
 
+    // Load territory metadata (colors, FeatureLayers) and restore marks
+    await this.initialization.loadAllTerritoriesPublic();
+
     // ─── F3.3: GPU Picking — register MapLibre event handlers ────
     this.maplibreClickHandler = (e: MapLayerMouseEvent | MapLayerTouchEvent) =>
       this.handleMaplibreClick(e);
@@ -169,11 +172,16 @@ export class MapPage implements OnDestroy {
     manzanaId: string,
     nombreBloque: string,
   ): void {
+    // Extract color from tile feature properties
+    const featureColor = (feature.properties?.['color'] as string) ?? '';
+
     if (this.state.manzanasById().has(manzanaId)) {
       this.picking.clearHighlight(this.maplibreEngine()!, manzanaId);
-      this.selection.selectManzanaById(manzanaId, nombreBloque, '', territorioNumero);
+      this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
     } else {
       this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
+      // Set the territory color from the tile feature for marking mode
+      this.rendering.setCurrentTerritoryColor(featureColor);
       void this.handleTerritorySelection(territorioNumero);
     }
   }
@@ -207,8 +215,9 @@ export class MapPage implements OnDestroy {
     if (this.state.manzanasById().has(manzanaId)) return;
 
     if (!this.state.manzanaSeleccionadaTerritorio()) {
+      const featureColor = (_feature.properties?.['color'] as string) ?? this.state.currentTerritoryColor();
       this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
-      this.selection.selectManzanaById(manzanaId, nombreBloque, '', territorioNumero);
+      this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
     }
     // Partial point snapping for MapLibre is deferred to F3.4 (hybrid edit mode).
   }
@@ -267,7 +276,31 @@ export class MapPage implements OnDestroy {
 
 
   toggleSatellite(): void {
-    // MapLibre satellite toggle is handled via vector tile styling
+    const engine = this.maplibreEngine();
+    if (!engine) return;
+
+    const newSatellite = !this.isSatellite();
+    this.state.isSatellite.set(newSatellite);
+
+    // Switch the basemap between OSM light and ArcGIS satellite
+    const basemapTiles = newSatellite
+      ? ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']
+      : [
+          'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        ];
+    const basemapAttribution = newSatellite
+      ? '© Esri, Maxar, Earthstar Geographics'
+      : '© OpenStreetMap contributors';
+
+    // Remove old basemap, add new one
+    engine.removeLayer('basemap-layer');
+    engine.removeSource('basemap');
+    engine.addSource('basemap', basemapTiles, basemapAttribution);
+
+    // Insert basemap BELOW the first territory layer so territories render on top
+    engine.addLayer({ id: 'basemap-layer', type: 'raster', source: 'basemap' }, 'territory-fill');
   }
 
   toggleUbicacion(): void {

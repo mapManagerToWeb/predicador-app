@@ -76,19 +76,33 @@ export class MapMarkRestorationService {
     ids: string[],
     actualizarEstadoMarcado: boolean
   ): void {
+    if (!actualizarEstadoMarcado) return;
+
     const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
     const existingIds = new Set(
       this.state.manzanasByTerritorio().get(territorioNumero)?.map(m => m.id) ?? []
     );
 
-    for (const mc of this.rendering.getManzanaIndex()) {
-      if (mc.territorioNumero !== territorioNumero) continue;
-      const isMarked = ids.includes(mc.id) || (manzanaId !== null && mc.id === manzanaId);
-      if (isMarked && actualizarEstadoMarcado && !existingIds.has(mc.id)) {
-        const newMap = new Map(this.state.manzanasById());
-        newMap.set(mc.id, { id: mc.id, nombreBloque: mc.nombreBloque, color, territorioNumero });
-        this.state.manzanasById.set(newMap);
+    // In MapLibre mode, ManzanaIndex is empty — create ManzanaMarcada entries
+    // directly from the report IDs. The IDs come from the tile features and
+    // are stored in the report's manzanasIds field.
+    const newMap = new Map(this.state.manzanasById());
+    let changed = false;
+
+    for (const id of ids) {
+      if (!existingIds.has(id)) {
+        newMap.set(id, { id, nombreBloque: '', color, territorioNumero });
+        changed = true;
       }
+    }
+
+    if (manzanaId && !existingIds.has(manzanaId)) {
+      newMap.set(manzanaId, { id: manzanaId, nombreBloque: '', color, territorioNumero });
+      changed = true;
+    }
+
+    if (changed) {
+      this.state.manzanasById.set(newMap);
     }
   }
 

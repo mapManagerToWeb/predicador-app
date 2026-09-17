@@ -28,7 +28,12 @@ export class MapInitializationService {
     this.state.isLoading.set(true);
 
     try {
-      await this.reconciliarCaches();
+      // In MapLibre mode, fetch territory colors to populate FeatureLayer
+      // metadata needed by selection, marking, restoration, and save flows.
+      await this.rendering.fetchAndBuildFeatureLayers(this.territorioService);
+
+      // Restore marks from DB/cache for previously worked territories
+      await this.restoreAllMarks();
     } catch {
       this.toastService.show(TOAST_MESSAGES.loadError);
     } finally {
@@ -205,6 +210,14 @@ export class MapInitializationService {
 
   async reloadAllTerritories(): Promise<void> {
     this.territorioService.limpiarCache();
+    await this.loadAllTerritories();
+  }
+
+  /**
+   * Public entry point for MapPage — loads territory metadata and restores marks.
+   * Called once after the MapLibre engine is initialized.
+   */
+  async loadAllTerritoriesPublic(): Promise<void> {
     await this.loadAllTerritories();
   }
 }

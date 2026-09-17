@@ -14,6 +14,7 @@ describe('MapInitializationService', () => {
   let rendering: {
     hasCachedGeojson: ReturnType<typeof vi.fn>;
     podarGeojsonCache: ReturnType<typeof vi.fn>;
+    fetchAndBuildFeatureLayers: ReturnType<typeof vi.fn>;
   };
   let selection: {
     restaurarMarcadoDesdeDB: ReturnType<typeof vi.fn>;
@@ -31,6 +32,7 @@ describe('MapInitializationService', () => {
     rendering = {
       hasCachedGeojson: vi.fn(() => false),
       podarGeojsonCache: vi.fn(),
+      fetchAndBuildFeatureLayers: vi.fn().mockResolvedValue(undefined),
     };
     selection = {
       restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined),
@@ -41,6 +43,7 @@ describe('MapInitializationService', () => {
       hasCacheReportes: vi.fn(() => false),
       reconciliarCacheConBackend: vi.fn(async () => null),
       limpiarCache: vi.fn(),
+      getColores: vi.fn(async () => ({})),
     };
     toast = { show: vi.fn() };
     TestBed.configureTestingModule({
@@ -66,34 +69,31 @@ describe('MapInitializationService', () => {
     expect(state.isLoading()).toBe(false);
   });
 
-  it('skips reconciliation when neither cache holds data', async () => {
+  it('fetches colors even when no cache exists', async () => {
     rendering.hasCachedGeojson.mockReturnValue(false);
     territorioService.hasCacheReportes.mockReturnValue(false);
 
     await service.initialize(document.createElement('div'), vi.fn());
 
-    expect(territorioService.reconciliarCacheConBackend).not.toHaveBeenCalled();
-    expect(rendering.podarGeojsonCache).not.toHaveBeenCalled();
+    expect(rendering.fetchAndBuildFeatureLayers).toHaveBeenCalled();
   });
 
-  it('prunes caches when the backend confirms deleted territories', async () => {
-    rendering.hasCachedGeojson.mockReturnValue(true);
-    const vigentes = new Set([1, 2]);
-    territorioService.reconciliarCacheConBackend.mockResolvedValue(vigentes);
+  it('fetches territory colors during initialization', async () => {
+    const colors = { 1: '#ff0000', 2: '#00ff00' };
+    territorioService.getColores.mockResolvedValue(colors);
 
     await service.initialize(document.createElement('div'), vi.fn());
 
-    expect(territorioService.reconciliarCacheConBackend).toHaveBeenCalled();
-    expect(rendering.podarGeojsonCache).toHaveBeenCalledWith(vigentes);
+    expect(rendering.fetchAndBuildFeatureLayers).toHaveBeenCalled();
   });
 
-  it('keeps caches when the backend is unreachable during reconciliation', async () => {
-    rendering.hasCachedGeojson.mockReturnValue(true);
-    territorioService.reconciliarCacheConBackend.mockResolvedValue(null);
+  it('handles fetch errors gracefully', async () => {
+    territorioService.getColores.mockRejectedValue(new Error('network'));
 
     await service.initialize(document.createElement('div'), vi.fn());
 
-    expect(rendering.podarGeojsonCache).not.toHaveBeenCalled();
+    expect(toast.show).toHaveBeenCalled();
+    expect(state.isLoading()).toBe(false);
   });
 
   it('reloadAllTerritories clears the report cache and reloads', async () => {

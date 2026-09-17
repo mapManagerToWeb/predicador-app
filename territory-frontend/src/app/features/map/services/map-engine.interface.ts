@@ -17,9 +17,11 @@ import type * as GeoJSON from 'geojson';
  */
 export interface MapEngine {
   init(container: HTMLElement, options: MapEngineOptions): void;
+  // Source management
   addSource(id: string, url: string): void;
+  addSource(id: string, tiles: string[], attribution?: string): void;
   removeSource(id: string): void;
-  addLayer(layer: LayerSpecification): void;
+  addLayer(layer: LayerSpecification, beforeId?: string): void;
   removeLayer(id: string): void;
   setPaintProperty(layer: string, property: string, value: unknown): void;
   setLayoutProperty(layer: string, property: string, value: unknown): void;
