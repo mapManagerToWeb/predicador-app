@@ -81,6 +81,17 @@ export class TileVersionService {
     return this.pollTimer !== null;
   }
 
+  /**
+   * Trigger an immediate version check (outside the normal poll cycle).
+   *
+   * <p>Used after a save to refresh tiles without waiting for the next
+   * 30-second poll interval.</p>
+   */
+  checkVersionNow(engine?: MapEngine): void {
+    if (engine) this.engine = engine;
+    void this.checkVersion();
+  }
+
   // ─── Private helpers ────────────────────────────────────────────
 
   private onVisibilityChange = (): void => {

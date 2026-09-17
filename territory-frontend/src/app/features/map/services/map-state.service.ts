@@ -2,6 +2,7 @@ import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import type { SnappedPoint, Edge } from '../map-geometry';
 import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
 import { DraftMarksService, MapDraft } from '../../../core/services/map-draft';
+import type * as GeoJSON from 'geojson';
 
 const SATELLITE_KEY = 'territory_satellite';
 
@@ -44,6 +45,37 @@ export class MapStateService {
   predicacion = signal<string>('tarde');
   screenshotPreview = signal<string | null>(null);
   currentTerritoryColor = signal('');
+
+  /**
+   * On-demand GeoJSON for the territory currently being edited.
+   *
+   * <p>Set when the user enters edit mode (partial draw, snap, polygon clip)
+   * in MapLibre mode. Contains the full-precision GeoJSON fetched from
+   * `GET /api/v1/territories/{number}/geojson`. Used for:</p>
+   * <ul>
+   *   <li>Rendering the edit overlay layer in MapLibre</li>
+   *   <li>Providing snap targets for partial draw operations</li>
+   *   <li>Building the geometry string for save operations</li>
+   * </ul>
+   *
+   * <p>Cleared on save or when exiting edit mode.</p>
+   */
+  editGeoJson = signal<GeoJSON.FeatureCollection | null>(null);
+
+  /**
+   * The territory number currently being edited (set alongside editGeoJson).
+   * Used for concurrent edit detection and save operations.
+   */
+  editTerritorioNumero = signal<number | null>(null);
+
+  /**
+   * GeoJSON representation of the current partial draw geometry.
+   *
+   * <p>Updated as the user adds/removes points during partial draw.
+   * The MapLibre overlay service uses this to render a live preview
+   * of the partial draw on top of the tile layer.</p>
+   */
+  partialDrawGeoJson = signal<GeoJSON.FeatureCollection | null>(null);
 
   manzanaSeleccionadaColor = signal('');
   manzanaSeleccionadaNombre = signal('');
@@ -180,5 +212,8 @@ export class MapStateService {
     this.manzanaSeleccionadaNombre.set('');
     this.manzanaSeleccionadaTerritorio.set(null);
     this.manzanaEdges.set([]);
+    this.editGeoJson.set(null);
+    this.editTerritorioNumero.set(null);
+    this.partialDrawGeoJson.set(null);
   }
 }

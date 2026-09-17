@@ -6,10 +6,15 @@ import polygonClipping from 'polygon-clipping';
 import { MapEngineService } from './map-engine.service';
 import { getPartialPolygonStyle } from './map-style.service';
 import type { SnappedPoint, Edge } from '../map-geometry';
+import type { ProjectionMap } from './map-libre-projection-adapter';
 
 /**
  * Manages partial polygon drawing: points, markers, contour tracing,
  * and clipping within the parent manzana.
+ *
+ * <p>In MapLibre mode, an optional {@link ProjectionMap} adapter bridges
+ * MapLibre's coordinate system to the `map-geometry.ts` functions that
+ * expect Leaflet's `latLngToContainerPoint` interface.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapPartialDrawService {
@@ -18,6 +23,42 @@ export class MapPartialDrawService {
   private markersParciales: Marker[] = [];
   private dragRaf = 0;
   private pendingDrag: { index: number; marker: Marker } | null = null;
+
+  /**
+   * Projection adapter for MapLibre mode. When set, coordinate projection
+   * functions from `map-geometry.ts` use this adapter instead of the
+   * Leaflet map instance.
+   */
+  private projectionAdapter: ProjectionMap | null = null;
+
+  /**
+   * Set the projection adapter for MapLibre mode.
+   *
+   * <p>When set, `snapToContour` and `traceContourBetween` use the
+   * adapter's `latLngToContainerPoint` instead of the Leaflet map.</p>
+   *
+   * @param adapter - A `ProjectionMap` backed by MapLibre's projection.
+   */
+  setProjectionAdapter(adapter: ProjectionMap): void {
+    this.projectionAdapter = adapter;
+  }
+
+  /**
+   * Clear the projection adapter (e.g. when switching back to Leaflet mode).
+   */
+  clearProjectionAdapter(): void {
+    this.projectionAdapter = null;
+  }
+
+  /**
+   * Get the active projection source: Leaflet map if available, else the adapter.
+   * Returns `null` if neither is available.
+   */
+  private getProjectionMap(): LeafletMap | ProjectionMap | null {
+    const leafletMap = this.engine.getMap();
+    if (leafletMap) return leafletMap;
+    return this.projectionAdapter;
+  }
 
   getPoligonoParcial(): Polygon | null {
     return this.poligonoParcial;
@@ -153,12 +194,12 @@ export class MapPartialDrawService {
   }
 
   private buildContourPolygon(puntos: SnappedPoint[], manzanaEdges: Edge[]): LatLng[] {
-    const map = this.engine.getMap();
-    if (!map || puntos.length === 0) return [];
+    const projMap = this.getProjectionMap();
+    if (!projMap || puntos.length === 0) return [];
     if (puntos.length === 1) return [puntos[0].latlng];
 
     const result: LatLng[] = [];
-    this.traceAllSegments(puntos, manzanaEdges, map, result);
+    this.traceAllSegments(puntos, manzanaEdges, projMap, result);
 
     if (result.length >= 3 && manzanaEdges.length >= 3) {
       const clipped = this.clipPolygonToManzana(result, manzanaEdges);
@@ -171,18 +212,18 @@ export class MapPartialDrawService {
   private traceAllSegments(
     puntos: SnappedPoint[],
     manzanaEdges: Edge[],
-    map: LeafletMap,
+    projMap: LeafletMap | ProjectionMap,
     result: LatLng[]
   ): void {
     for (let i = 0; i < puntos.length - 1; i++) {
-      const segment = traceContourBetween(puntos[i], puntos[i + 1], manzanaEdges, map);
-      this.addUniquePoints(segment, map, result);
+      const segment = traceContourBetween(puntos[i], puntos[i + 1], manzanaEdges, projMap as never);
+      this.addUniquePoints(segment, projMap, result);
     }
   }
 
-  private addUniquePoints(segment: LatLng[], map: LeafletMap, result: LatLng[]): void {
+  private addUniquePoints(segment: LatLng[], projMap: LeafletMap | ProjectionMap, result: LatLng[]): void {
     for (const point of segment) {
-      if (result.length === 0 || latLngDist(result.at(-1)!, point, map) > 1) {
+      if (result.length === 0 || latLngDist(result.at(-1)!, point, projMap as never) > 1) {
         result.push(point);
       }
     }
