@@ -34,6 +34,11 @@ function createMockMapLibreEngine(): MapEngine & {
     addSource: vi.fn((id: string, _url: string) => {
       sources.set(id, { type: 'vector' });
     }),
+    addGeoJsonSource: vi.fn((id: string, data: unknown) => {
+      sources.set(id, { type: 'geojson', data });
+    }),
+    updateGeoJsonSourceData: vi.fn(),
+    project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
     removeSource: vi.fn((id: string) => {
       sources.delete(id);
       sourceUrlMap.delete(id);

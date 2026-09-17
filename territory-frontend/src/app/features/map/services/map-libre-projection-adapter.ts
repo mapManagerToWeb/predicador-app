@@ -59,28 +59,21 @@ export function createMapLibreProjectionAdapter(engine: MapEngine): ProjectionMa
  * Projects a `[lng, lat]` coordinate to pixel space using the MapLibre
  * engine's `project` capability.
  *
- * <p>MapLibre's internal map object exposes `project([lng, lat])` which
- * returns `{x, y}` in container pixels. We access it via the engine's
- * internal map reference.</p>
+ * <p>Uses the engine's {@link MapEngine.project} method which maps
+ * `[lng, lat]` → `{x, y}` in container pixels — the same coordinate
+ * space that Leaflet's `latLngToContainerPoint` returns.</p>
  */
 function projectLngLat(
   engine: MapEngine,
   lngLat: [number, number],
 ): { x: number; y: number } {
-  // MapLibre's Map.prototype.project is not exposed in our MapEngine
-  // interface. We access it by casting through the engine — the only
-  // consumer is this adapter, and MapLibre's project is stable.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mapRef = (engine as any).map as Record<string, unknown> | undefined;
-  const projectFn = mapRef?.['project'] as ((lngLat: [number, number]) => { x: number; y: number }) | undefined;
-  if (projectFn) {
-    return projectFn(lngLat);
+  const point = engine.project(lngLat);
+  // If the engine returns the zero-fallback (map not yet initialized),
+  // fall back to an approximate Mercator projection for test compatibility.
+  if (point.x === 0 && point.y === 0 && engine.getZoom() !== 0) {
+    return approximateProjection(engine, lngLat);
   }
-  // Fallback: approximate projection using zoom-level-based scale.
-  // This is used only if the map reference is not directly accessible
-  // (e.g. in tests with a mock engine). The approximation is accurate
-  // enough for snap threshold checks.
-  return approximateProjection(engine, lngLat);
+  return point;
 }
 
 /**

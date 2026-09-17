@@ -7,7 +7,7 @@ import {
   signal,
   PLATFORM_ID,
 } from '@angular/core';
-import { type LeafletMouseEvent, Polygon as LeafletPolygon } from 'leaflet';
+import type { LeafletMouseEvent } from 'leaflet';
 import type { MapGeoJSONFeature, MapLayerMouseEvent, MapLayerTouchEvent } from 'maplibre-gl';
 import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
@@ -218,7 +218,7 @@ export class MapPage implements OnDestroy {
   ): void {
     if (this.state.manzanasById().has(manzanaId)) {
       this.picking.clearHighlight(this.maplibreEngine()!, manzanaId);
-      this.selection.toggleManzana(manzanaId, nombreBloque, new LeafletPolygon([]), '', territorioNumero);
+      this.selection.selectManzanaById(manzanaId, nombreBloque, '', territorioNumero);
     } else {
       this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
       void this.handleTerritorySelection(territorioNumero);
@@ -238,7 +238,7 @@ export class MapPage implements OnDestroy {
     if (this.state.manzanasById().has(manzanaId)) return;
     const color = this.state.currentTerritoryColor();
     this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
-    this.selection.marcarManzana(manzanaId, nombreBloque, new LeafletPolygon([]), color, territorioNumero);
+    this.selection.marcarManzanaById(manzanaId, nombreBloque, color, territorioNumero);
   }
 
   private handleMaplibreModoParcial(
@@ -255,9 +255,7 @@ export class MapPage implements OnDestroy {
 
     if (!this.state.manzanaSeleccionadaTerritorio()) {
       this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
-      this.selection.seleccionarManzana(
-        new LeafletPolygon([]), '', nombreBloque, territorioNumero,
-      );
+      this.selection.selectManzanaById(manzanaId, nombreBloque, '', territorioNumero);
     }
     // Partial point snapping for MapLibre is deferred to F3.4 (hybrid edit mode).
   }

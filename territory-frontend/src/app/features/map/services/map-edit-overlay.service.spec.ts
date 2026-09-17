@@ -8,23 +8,22 @@ import { TileVersionService } from './tile-version.service';
 import type { MapEngine } from './map-engine.interface';
 import type * as GeoJSON from 'geojson';
 
-function createMockMapLibreEngine(): MapEngine & { map: Record<string, unknown> } {
+function createMockMapLibreEngine(): MapEngine {
   const sources = new Map<string, Record<string, unknown>>();
   const sourceSpies = new Map<string, { setData: ReturnType<typeof vi.fn> }>();
   const layers = new Map<string, unknown>();
   return {
-    map: {
-      addSource: vi.fn((id: string, source: unknown) => {
-        sources.set(id, source as Record<string, unknown>);
-        sourceSpies.set(id, { setData: vi.fn() });
-      }),
-      getSource: vi.fn((id: string) => {
-        if (!sources.has(id)) return undefined;
-        return sourceSpies.get(id);
-      }),
-    },
     init: vi.fn(),
     addSource: vi.fn(),
+    addGeoJsonSource: vi.fn((id: string, data: unknown) => {
+      sources.set(id, { type: 'geojson', data });
+      sourceSpies.set(id, { setData: vi.fn() });
+    }),
+    updateGeoJsonSourceData: vi.fn((id: string, data: unknown) => {
+      const spy = sourceSpies.get(id);
+      if (spy) spy.setData(data);
+    }),
+    project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
     removeSource: vi.fn((id: string) => { sources.delete(id); }),
     addLayer: vi.fn((layer: { id: string }) => { layers.set(layer.id, layer); }),
     removeLayer: vi.fn((id: string) => { layers.delete(id); }),
@@ -93,10 +92,7 @@ describe('MapEditOverlayService', () => {
       service.addOverlay(SAMPLE_GEOJSON, mockEngine);
 
       expect(service.isOverlayActive()).toBe(true);
-      expect(mockEngine.map.addSource).toHaveBeenCalledWith('edit-overlay', {
-        type: 'geojson',
-        data: SAMPLE_GEOJSON,
-      });
+      expect(mockEngine.addGeoJsonSource).toHaveBeenCalledWith('edit-overlay', SAMPLE_GEOJSON);
       expect(mockEngine.addLayer).toHaveBeenCalledTimes(2);
     });
 
@@ -133,9 +129,7 @@ describe('MapEditOverlayService', () => {
 
       service.updateOverlay(updated, mockEngine);
 
-      // getSource returns a wrapper with setData spy
-      const source = mockEngine.map.getSource('edit-overlay') as { setData: ReturnType<typeof vi.fn> };
-      expect(source?.setData).toHaveBeenCalledWith(updated);
+      expect(mockEngine.updateGeoJsonSourceData).toHaveBeenCalledWith('edit-overlay', updated);
     });
 
     it('should be a no-op if overlay is not active', () => {

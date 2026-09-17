@@ -9,6 +9,7 @@ import type {
   LngLat,
   MapGeoJSONFeature,
 } from 'maplibre-gl';
+import type * as GeoJSON from 'geojson';
 import type {
   MapEngine,
   MapEngineOptions,
@@ -95,6 +96,24 @@ export class MaplibreEngineService implements MapEngine {
       type: 'raster',
       source: 'basemap',
     });
+  }
+
+  addGeoJsonSource(id: string, data: GeoJSON.GeoJSON): void {
+    this.map?.addSource(id, { type: 'geojson', data });
+  }
+
+  updateGeoJsonSourceData(id: string, data: GeoJSON.GeoJSON): void {
+    // MapLibre's GeoJSONSource has setData but it's not in the union type directly
+    const source = this.map?.getSource(id);
+    if (source && 'setData' in source && typeof source.setData === 'function') {
+      source.setData(data);
+    }
+  }
+
+  project(lngLat: [number, number]): { x: number; y: number } {
+    if (!this.map) return { x: 0, y: 0 };
+    const point = this.map.project(lngLat);
+    return { x: point.x, y: point.y };
   }
 
   addSource(id: string, url: string): void {

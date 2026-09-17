@@ -6,6 +6,7 @@ import type {
   LngLat,
   MapGeoJSONFeature,
 } from 'maplibre-gl';
+import type * as GeoJSON from 'geojson';
 
 /**
  * Engine-agnostic map abstraction.
@@ -45,6 +46,13 @@ export interface MapEngine {
   setCenter(center: [number, number]): void;
   resize(): void;
   destroy(): void;
+
+  // GeoJSON source management (for edit overlay)
+  addGeoJsonSource(id: string, data: GeoJSON.GeoJSON): void;
+  updateGeoJsonSourceData(id: string, data: GeoJSON.GeoJSON): void;
+
+  // Coordinate projection (lng/lat → pixel)
+  project(lngLat: [number, number]): { x: number; y: number };
 
   // Source management for version-aware refresh
   setSourceUrl(sourceId: string, url: string): void;

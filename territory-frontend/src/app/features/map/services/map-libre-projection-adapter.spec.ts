@@ -4,11 +4,13 @@ import type { MapEngine } from './map-engine.interface';
 
 function createMockEngineWithProject(
   projectFn: (lngLat: [number, number]) => { x: number; y: number },
-): MapEngine & { map: { project: typeof projectFn } } {
+): MapEngine {
   return {
-    map: { project: projectFn },
     init: vi.fn(),
     addSource: vi.fn(),
+    addGeoJsonSource: vi.fn(),
+    updateGeoJsonSourceData: vi.fn(),
+    project: projectFn,
     removeSource: vi.fn(),
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
@@ -34,6 +36,9 @@ function createMockEngineWithoutProject(): MapEngine {
   return {
     init: vi.fn(),
     addSource: vi.fn(),
+    addGeoJsonSource: vi.fn(),
+    updateGeoJsonSourceData: vi.fn(),
+    project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
     removeSource: vi.fn(),
     addLayer: vi.fn(),
     removeLayer: vi.fn(),

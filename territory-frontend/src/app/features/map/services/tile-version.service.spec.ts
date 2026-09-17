@@ -183,6 +183,9 @@ function createMockMapEngine(): MapEngine {
   return {
     init: vi.fn(),
     addSource: vi.fn(),
+    addGeoJsonSource: vi.fn(),
+    updateGeoJsonSourceData: vi.fn(),
+    project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
     removeSource: vi.fn(),
     addLayer: vi.fn(),
     removeLayer: vi.fn(),

@@ -80,6 +80,53 @@ export class MapSelectionService {
     this.rendering.setCurrentTerritoryColor(color);
   }
 
+  /**
+   * Select a manzana by ID and metadata properties (MapLibre path).
+   *
+   * <p>Unlike {@link seleccionarManzana} which requires a Leaflet Polygon
+   * for edge extraction and visual styling, this method only updates the
+   * selection state. MapLibre handles highlighting via GPU feature-state
+   * (managed by MapPickingService).</p>
+   */
+  selectManzanaById(
+    manzanaId: string,
+    nombreBloque: string,
+    color: string,
+    territorioNumero: number,
+  ): void {
+    this.restaurarManzanaAnterior();
+
+    this.state.manzanaSeleccionadaColor.set(color);
+    this.state.manzanaSeleccionadaNombre.set(nombreBloque);
+    this.state.manzanaSeleccionadaTerritorio.set(territorioNumero);
+    this.state.manzanaEdges.set([]);
+
+    if (!this.state.territoriosSeleccionados().includes(territorioNumero)) {
+      this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
+      this.state.territorioSeleccionado.set(
+        this.state.territoriosSeleccionados().length === 1 ? territorioNumero : null
+      );
+
+      const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero);
+      if (featureLayer) {
+        const total = this.rendering.getManzanaCountByTerritorio(territorioNumero);
+        const marcadas = this.state.manzanasByTerritorio().get(territorioNumero)?.length ?? 0;
+        const isComplete = total > 0 && marcadas >= total;
+
+        this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
+      }
+
+      this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
+      this.state.totalManzanas.set(
+        this.state.territoriosSeleccionados().reduce(
+          (sum, n) => sum + this.rendering.getManzanaCountByTerritorio(n), 0
+        )
+      );
+    }
+
+    this.rendering.setCurrentTerritoryColor(color);
+  }
+
   restaurarManzanaAnterior(): void {
     if (!this.selectedPolygon) return;
 
@@ -98,6 +145,21 @@ export class MapSelectionService {
     this.state.manzanaSeleccionadaNombre.set('');
     this.state.manzanaSeleccionadaTerritorio.set(null);
     this.state.manzanaEdges.set([]);
+  }
+
+  /**
+   * Toggle a manzana by ID and metadata (MapLibre path).
+   *
+   * <p>Unlike {@link toggleManzana} which requires a Leaflet Path for
+   * layer styling and registry, this method only manages selection state.
+   * MapLibre handles visual styling via GPU feature-state.</p>
+   */
+  toggleManzanaById(id: string, nombreBloque: string, color: string, territorioNumero: number): void {
+    if (this.state.manzanasById().has(id)) {
+      this.desmarcarManzanaById(id, territorioNumero, color);
+    } else {
+      this.marcarManzanaById(id, nombreBloque, color, territorioNumero);
+    }
   }
 
   toggleManzana(id: string, nombreBloque: string, layer: Path, color: string, territorioNumero: number): void {
@@ -129,6 +191,51 @@ export class MapSelectionService {
       this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     }
 
+    this.updateTotalManzanas(this.state.territoriosSeleccionados());
+  }
+
+  private desmarcarManzanaById(id: string, territorioNumero: number, color: string): void {
+    const newMap = new Map(this.state.manzanasById());
+    newMap.delete(id);
+    this.state.manzanasById.set(newMap);
+    const marcadas = this.state.manzanasByTerritorio().get(territorioNumero) ?? [];
+    const { marcadas: marcadasCount } = getTerritoryProgress(this.rendering.getManzanaCountByTerritorio(territorioNumero), marcadas.length);
+    this.registry.unregister(id);
+
+    if (marcadasCount === 0) {
+      this.state.territoriosSeleccionados.update(nums => nums.filter(n => n !== territorioNumero));
+      const seleccionados = this.state.territoriosSeleccionados();
+      this.state.territorioSeleccionado.set(seleccionados.length === 1 ? seleccionados[0] : null);
+      this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
+    }
+
+    this.updateTotalManzanas(this.state.territoriosSeleccionados());
+  }
+
+  marcarManzanaById(
+    id: string,
+    nombreBloque: string,
+    color: string,
+    territorioNumero: number,
+  ): void {
+    const newMap = new Map(this.state.manzanasById());
+    newMap.set(id, { id, nombreBloque, color, territorioNumero });
+    this.state.manzanasById.set(newMap);
+
+    if (this.state.territoriosSeleccionados().includes(territorioNumero)) return;
+
+    this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
+    const seleccionados = this.state.territoriosSeleccionados();
+    this.state.territorioSeleccionado.set(seleccionados.length === 1 ? territorioNumero : null);
+
+    const featureLayer = this.rendering.getFeatureLayerByTerritorio(territorioNumero);
+    if (featureLayer) {
+      const marcadas = this.state.manzanasByTerritorio().get(territorioNumero) ?? [];
+      const { isComplete } = getTerritoryProgress(this.rendering.getManzanaCountByTerritorio(territorioNumero), marcadas.length);
+      this.rendering.applyStyleToFeatureLayer(featureLayer, getBaseTerritoryStyle(featureLayer.color, isComplete));
+    }
+
+    this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     this.updateTotalManzanas(this.state.territoriosSeleccionados());
   }
 

@@ -123,15 +123,7 @@ export class MapEditOverlayService {
   }
 
   private addSource(engine: MapEngine, geoJson: GeoJSON.FeatureCollection): void {
-    // Use MapLibre's addSource with type 'geojson' and inline data.
-    // Our MapEngine interface only has addSource(id, url) for vector tiles,
-    // so we access the raw MapLibre map for GeoJSON source support.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mapRef = (engine as any).map as Record<string, ((id: string, source: unknown) => void) | undefined> | undefined;
-    mapRef?.['addSource']?.(EDIT_SOURCE_ID, {
-      type: 'geojson',
-      data: geoJson,
-    });
+    engine.addGeoJsonSource(EDIT_SOURCE_ID, geoJson);
   }
 
   private addLayers(engine: MapEngine): void {
@@ -161,12 +153,7 @@ export class MapEditOverlayService {
   }
 
   private setSourceData(engine: MapEngine, geoJson: GeoJSON.FeatureCollection): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mapRef = (engine as any).map as Record<string, unknown> | undefined;
-    const getSourceFn = mapRef?.['getSource'] as ((id: string) => Record<string, unknown> | undefined) | undefined;
-    const source = getSourceFn?.(EDIT_SOURCE_ID);
-    const setDataFn = source?.['setData'] as ((data: GeoJSON.FeatureCollection) => void) | undefined;
-    setDataFn?.(geoJson);
+    engine.updateGeoJsonSourceData(EDIT_SOURCE_ID, geoJson);
   }
 
   private removeLayers(engine: MapEngine): void {

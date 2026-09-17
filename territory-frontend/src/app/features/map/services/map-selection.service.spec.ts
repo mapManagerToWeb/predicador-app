@@ -202,6 +202,85 @@ describe('MapSelectionService', () => {
     });
   });
 
+  describe('selectManzanaById', () => {
+    it('sets selection state and selects territory without requiring a Leaflet Polygon', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      rendering.getAllTerritoriesLayer.mockReturnValue([
+        { territorioPadre: 1, color: '#ff0000', layer: {} },
+      ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+
+      service.selectManzanaById('m1', 'Bloque-m1', '#ff0000', 1);
+
+      expect(state.manzanaSeleccionadaColor()).toBe('#ff0000');
+      expect(state.manzanaSeleccionadaNombre()).toBe('Bloque-m1');
+      expect(state.manzanaSeleccionadaTerritorio()).toBe(1);
+      expect(state.manzanaEdges()).toEqual([]);
+      expect(state.territoriosSeleccionados()).toContain(1);
+      expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('#ff0000');
+    });
+
+    it('restores previous selection before selecting a new one', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      rendering.getAllTerritoriesLayer.mockReturnValue([
+        { territorioPadre: 1, color: '#ff0000', layer: {} },
+      ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+
+      service.selectManzanaById('m1', 'A', '#ff0000', 1);
+      expect(state.manzanaSeleccionadaNombre()).toBe('A');
+
+      service.selectManzanaById('m2', 'B', '#00ff00', 1);
+      expect(state.manzanaSeleccionadaNombre()).toBe('B');
+      expect(state.manzanaSeleccionadaColor()).toBe('#00ff00');
+    });
+  });
+
+  describe('toggleManzanaById', () => {
+    it('marks a manzana by ID without requiring a Leaflet Path', () => {
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+
+      service.toggleManzanaById('m1', 'Bloque-m1', '#ff0000', 1);
+
+      expect(state.manzanasMarcadaList()).toEqual([
+        { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 1 },
+      ]);
+      expect(state.territoriosSeleccionados()).toContain(1);
+    });
+
+    it('unmarks a manzana by ID', () => {
+      state.territoriosSeleccionados.set([1]);
+      state.manzanasById.set(new Map([
+        ['m1', { id: 'm1', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }],
+      ]));
+      registry.register('m1', fakePath() as never);
+      rendering.getManzanaCountByTerritorio.mockReturnValue(5);
+
+      service.toggleManzanaById('m1', 'A', '#fff', 1);
+
+      expect(registry.get('m1')).toBeNull();
+      expect(state.manzanasMarcadaList()).toEqual([]);
+    });
+  });
+
+  describe('marcarManzanaById', () => {
+    it('marks a manzana by ID and selects its territory', () => {
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+
+      service.marcarManzanaById('m1', 'Bloque-m1', '#ff0000', 1);
+
+      expect(state.manzanasMarcadaList()).toEqual([
+        { id: 'm1', nombreBloque: 'Bloque-m1', color: '#ff0000', territorioNumero: 1 },
+      ]);
+      expect(state.territoriosSeleccionados()).toContain(1);
+      expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
+    });
+  });
+
   describe('seleccionarManzana', () => {
     it('tracks the selected manzana and its edges and selects its territory', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);

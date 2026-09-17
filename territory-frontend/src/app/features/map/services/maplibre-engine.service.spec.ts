@@ -10,6 +10,7 @@ vi.mock('@angular/common', async (importOriginal) => {
 
 const fakeMapInstance = {
   addSource: vi.fn(),
+  getSource: vi.fn().mockReturnValue(undefined),
   removeSource: vi.fn(),
   addLayer: vi.fn(),
   removeLayer: vi.fn(),
@@ -27,6 +28,7 @@ const fakeMapInstance = {
   remove: vi.fn(),
   setFeatureState: vi.fn(),
   removeFeatureState: vi.fn(),
+  project: vi.fn().mockReturnValue({ x: 100, y: 200 }),
 };
 
 vi.mock('maplibre-gl', () => ({
@@ -263,5 +265,75 @@ describe('MaplibreEngineService', () => {
 
   it('destroy is safe when no map exists', () => {
     expect(() => service.destroy()).not.toThrow();
+  });
+
+  it('delegates addGeoJsonSource to the underlying map', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    const geoJson = { type: 'Point' as const, coordinates: [0, 0] };
+    service.addGeoJsonSource('my-geojson', geoJson);
+
+    expect(fakeMapInstance.addSource).toHaveBeenCalledWith('my-geojson', {
+      type: 'geojson',
+      data: geoJson,
+    });
+  });
+
+  it('updateGeoJsonSourceData calls setData on the source', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    const setDataSpy = vi.fn();
+    fakeMapInstance.getSource.mockReturnValue({ setData: setDataSpy });
+
+    const geoJson = { type: 'Point' as const, coordinates: [0, 0] };
+    service.updateGeoJsonSourceData('my-geojson', geoJson);
+
+    expect(fakeMapInstance.getSource).toHaveBeenCalledWith('my-geojson');
+    expect(setDataSpy).toHaveBeenCalledWith(geoJson);
+  });
+
+  it('updateGeoJsonSourceData is a no-op when source does not exist', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    fakeMapInstance.getSource.mockReturnValue(undefined);
+
+    const geoJson = { type: 'Point' as const, coordinates: [0, 0] };
+    expect(() => service.updateGeoJsonSourceData('nonexistent', geoJson)).not.toThrow();
+  });
+
+  it('project delegates to map.project and returns pixel coordinates', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    fakeMapInstance.project.mockReturnValue({ x: 250, y: 350 });
+
+    const result = service.project([-73.345, -37.4779]);
+
+    expect(fakeMapInstance.project).toHaveBeenCalledWith([-73.345, -37.4779]);
+    expect(result).toEqual({ x: 250, y: 350 });
+  });
+
+  it('project returns zero when map is not initialized', () => {
+    const result = service.project([-73.345, -37.4779]);
+    expect(result).toEqual({ x: 0, y: 0 });
   });
 });
