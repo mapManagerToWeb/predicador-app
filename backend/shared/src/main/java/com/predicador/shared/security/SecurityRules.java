@@ -28,6 +28,7 @@ public final class SecurityRules {
     
     public static final List<SecurityRule> REPORTING = List.of(
             SecurityRule.any(List.of("GET", "POST"), REPORTS_PATH, null),
+            SecurityRule.of("DELETE", REPORTS_PATH, null),
             SecurityRule.of("PUT", "^/api/v1/encargados/[0-9]+$", null),
             SecurityRule.of("GET", "^/api/v1/encargados/?$", null),
             SecurityRule.of("GET", "^/api/v1/encargados/buscar$", null),

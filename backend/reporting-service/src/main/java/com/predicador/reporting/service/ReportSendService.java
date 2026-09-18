@@ -84,6 +84,13 @@ public class ReportSendService {
         WhatsAppDelivery delivery = reservation.delivery();
         long start = System.nanoTime();
         try {
+            if (!whatsappConfigured()) {
+                throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                        "Envío WhatsApp no configurado: se requieren WHATSAPP_ACCESS_TOKEN, "
+                                + "WHATSAPP_PHONE_ID y WHATSAPP_DESTINATION",
+                        503, null);
+            }
+
             Map<String, String> templateParams = messageService.generarParametrosTemplate(request);
 
             List<Map<String, Object>> components = new ArrayList<>();
@@ -182,6 +189,12 @@ public class ReportSendService {
             long elapsed = System.nanoTime() - start;
             sendTimer.record(elapsed, TimeUnit.NANOSECONDS);
         }
+    }
+
+    private boolean whatsappConfigured() {
+        return props.accessToken() != null && !props.accessToken().isBlank()
+                && props.phoneNumberId() != null && !props.phoneNumberId().isBlank()
+                && props.destinationNumber() != null && !props.destinationNumber().isBlank();
     }
 
     Reservation reserve(String idempotencyKey) {
