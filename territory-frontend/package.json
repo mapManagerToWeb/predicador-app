@@ -28,7 +28,7 @@
     "@types/compression": "^1.8.1",
     "compression": "^1.8.1",
     "express": "^5.1.0",
-    "maplibre-gl": "^6.9.0",
+    "maplibre-gl": "6.10.0",
     "polygon-clipping": "^0.15.7",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

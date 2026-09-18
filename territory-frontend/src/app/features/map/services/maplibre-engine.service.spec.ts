@@ -37,10 +37,12 @@ vi.mock('maplibre-gl', () => ({
     Map: vi.fn().mockImplementation(function () {
       return fakeMapInstance;
     }),
+    setWorkerUrl: vi.fn(),
   },
   Map: vi.fn().mockImplementation(function () {
     return fakeMapInstance;
   }),
+  setWorkerUrl: vi.fn(),
 }));
 
 // Must import AFTER mocks are set up
@@ -70,6 +72,24 @@ describe('MaplibreEngineService', () => {
 
     expect(fakeMapInstance.addSource).toHaveBeenCalled();
     expect(fakeMapInstance.addLayer).toHaveBeenCalled();
+  });
+
+  it('registers the vendor worker URL when maplibre-gl loads', async () => {
+    const container = document.createElement('div');
+
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    // MapLibre v6 worker never loads without setWorkerUrl(); it must point at
+    // the vendored worker (`public/maplibre/`), which is served at `/maplibre/`.
+    const setWorkerUrl = (await import('maplibre-gl')).setWorkerUrl as ReturnType<
+      typeof vi.fn
+    >;
+    expect(setWorkerUrl).toHaveBeenCalledTimes(1);
+    expect(setWorkerUrl).toHaveBeenCalledWith('/maplibre/maplibre-gl-worker.mjs');
   });
 
   it('delegates addSource to the underlying map', async () => {
@@ -315,6 +335,58 @@ describe('MaplibreEngineService', () => {
 
     const geoJson = { type: 'Point' as const, coordinates: [0, 0] };
     expect(() => service.updateGeoJsonSourceData('nonexistent', geoJson)).not.toThrow();
+  });
+
+  it('setSourceUrl sets the vector tiles template via setTiles', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    const setTilesSpy = vi.fn();
+    fakeMapInstance.getSource.mockReturnValue({ setTiles: setTilesSpy });
+
+    service.setSourceUrl('territories', '/api/v1/territories/tiles/{z}/{x}/{y}.pbf?v=7');
+
+    expect(fakeMapInstance.getSource).toHaveBeenCalledWith('territories');
+    expect(setTilesSpy).toHaveBeenCalledWith([
+      '/api/v1/territories/tiles/{z}/{x}/{y}.pbf?v=7',
+    ]);
+  });
+
+  it('setSourceUrl does not fall back to setUrl when setTiles is available', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    const setTilesSpy = vi.fn();
+    const setUrlSpy = vi.fn();
+    fakeMapInstance.getSource.mockReturnValue({ setTiles: setTilesSpy, setUrl: setUrlSpy });
+
+    service.setSourceUrl('territories', '/api/v1/territories/tiles/{z}/{x}/{y}.pbf?v=7');
+
+    expect(setTilesSpy).toHaveBeenCalled();
+    expect(setUrlSpy).not.toHaveBeenCalled();
+  });
+
+  it('setSourceUrl is a no-op when the source does not exist', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    fakeMapInstance.getSource.mockReturnValue(undefined);
+
+    expect(() =>
+      service.setSourceUrl('nonexistent', '/tiles/{z}/{x}/{y}.pbf'),
+    ).not.toThrow();
   });
 
   it('project delegates to map.project and returns pixel coordinates', async () => {

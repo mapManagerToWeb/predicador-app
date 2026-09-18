@@ -37,12 +37,12 @@ describe('MapLabelLayerService', () => {
       expect(layer.minzoom).toBe(14);
     });
 
-    it('should configure text-field to get nombre property', () => {
+    it('should configure text-field from the bloque property with empty fallback', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
       const layer = mockEngine.addLayer.mock.calls[0][0];
-      expect(layer.layout['text-field']).toEqual(['get', 'nombre']);
+      expect(layer.layout['text-field']).toEqual(['coalesce', ['get', 'bloque'], '']);
     });
 
     it('should configure text-size to 12', () => {

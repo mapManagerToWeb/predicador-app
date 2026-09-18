@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Toast } from '../../../core/services/toast';
 import { MapRenderingFacade } from './map-rendering.facade';
-import { MapInteractionService } from './map-interaction.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import type { SnappedPoint } from '../map-geometry';
@@ -10,7 +9,6 @@ import { TOAST_MESSAGES, nextParcialId } from '../utils/map-constants';
 @Injectable({ providedIn: 'root' })
 export class MapPartialMarkService {
   private readonly rendering = inject(MapRenderingFacade);
-  private readonly interaction = inject(MapInteractionService);
   private readonly selection = inject(MapSelectionService);
   private readonly state = inject(MapStateService);
   private readonly toastService = inject(Toast);
@@ -73,7 +71,6 @@ export class MapPartialMarkService {
     newMap.set(id, { id, nombreBloque, color, territorioNumero: territorio });
     this.state.manzanasById.set(newMap);
 
-    this.rendering.limpiarCapasParciales();
     this.state.puntosParciales.set([]);
     this.selection.restaurarManzanaAnterior();
     this.state.modoMarcado.set('none');

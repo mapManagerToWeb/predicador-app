@@ -32,13 +32,17 @@ describe('MapLibre lazy-loading (T28)', () => {
     expect(source).toContain("await import('maplibre-gl')");
   });
 
-  it('maplibre-gl is listed as a production dependency', async () => {
+  it('maplibre-gl is listed as a production dependency, exactly pinned', async () => {
     const pkgPath = path.resolve(TERRITORY_ROOT, 'package.json');
     const raw = await fs.readFile(pkgPath, 'utf-8');
     const pkg = JSON.parse(raw) as { dependencies?: Record<string, string> };
     expect(pkg.dependencies).toBeDefined();
     expect(pkg.dependencies!['maplibre-gl']).toBeDefined();
-    expect(pkg.dependencies!['maplibre-gl']).toMatch(/^\^/);
+    // Exact pin (no ^/~/range): the worker pair is vendored into
+    // public/maplibre/ and MUST match the main bundle version — a range
+    // would let `pnpm update` desync the worker from the bundle with no
+    // error until tiles silently stay empty.
+    expect(pkg.dependencies!['maplibre-gl']).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it('MapEngine interface only uses type-only imports from maplibre-gl', async () => {

@@ -49,7 +49,6 @@ describe('MapDataPersistenceService', () => {
           provide: MapRenderingFacade,
           useValue: {
             getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
-            restaurarVistaConMarcas: vi.fn(),
             restaurarVisibilidadPoligonos: vi.fn(),
           },
         },
@@ -169,15 +168,11 @@ describe('MapDataPersistenceService', () => {
     report.saveToDatabase.mockRejectedValue(new Error('boom'));
     const toast = TestBed.inject(Toast);
     const show = toast.show as ReturnType<typeof vi.fn>;
-    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
-      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
-    };
 
     await service.guardarYEnviar();
 
     expect(report.sendWhatsApp).not.toHaveBeenCalled();
     expect(report.eliminarReportes).not.toHaveBeenCalled();
-    expect(rendering.restaurarVistaConMarcas).not.toHaveBeenCalled();
     expect(state.manzanasById().size).toBeGreaterThan(0);
     expect(state.territoriosSeleccionados()).toEqual([1]);
     expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
@@ -268,9 +263,6 @@ describe('MapDataPersistenceService', () => {
     const drafts = TestBed.inject(DraftMarksService) as unknown as {
       eliminarTerritorios: ReturnType<typeof vi.fn>;
     };
-    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
-      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
-    };
 
     await service.guardarYEnviar();
 
@@ -278,7 +270,6 @@ describe('MapDataPersistenceService', () => {
     expect(report.eliminarReportes).toHaveBeenCalledWith([guardado]);
     expect(cache.setTerritorio).not.toHaveBeenCalled();
     expect(drafts.eliminarTerritorios).not.toHaveBeenCalled();
-    expect(rendering.restaurarVistaConMarcas).not.toHaveBeenCalled();
     expect(state.manzanasById().size).toBeGreaterThan(0);
     expect(state.territoriosSeleccionados()).toEqual([1]);
     expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.sendRollbackError);
@@ -402,29 +393,20 @@ describe('MapDataPersistenceService', () => {
     expect(state.enviando()).toBe(false);
   });
 
-  it('restores the full view with marks (no active selection) after a successful save', async () => {
+  it('clears the selection state after a successful save', async () => {
     state.manzanasById.set(
       new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]),
     );
-    const marcadas = state.manzanasMarcadaList();
 
     await service.guardarEnBaseDeDatos();
 
-    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
-      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
-      restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
-    };
-    expect(rendering.restaurarVistaConMarcas).toHaveBeenCalledWith(
-      expect.arrayContaining(marcadas),
-    );
-    expect(rendering.restaurarVisibilidadPoligonos).not.toHaveBeenCalled();
     expect(state.territoriosSeleccionados()).toEqual([]);
     expect(state.territorioSeleccionado()).toBeNull();
     expect(state.modoMarcado()).toBe('none');
     expect(state.manzanasById().size).toBe(0);
   });
 
-  it('restores the full view with marks after a successful send', async () => {
+  it('clears the selection state after a successful send', async () => {
     state.manzanasById.set(
       new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]),
     );
@@ -445,18 +427,12 @@ describe('MapDataPersistenceService', () => {
 
     await service.guardarYEnviar();
 
-    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
-      restaurarVistaConMarcas: ReturnType<typeof vi.fn>;
-      restaurarVisibilidadPoligonos: ReturnType<typeof vi.fn>;
-    };
-    expect(rendering.restaurarVistaConMarcas).toHaveBeenCalled();
-    expect(rendering.restaurarVisibilidadPoligonos).not.toHaveBeenCalled();
     expect(state.territoriosSeleccionados()).toEqual([]);
     expect(state.modoMarcado()).toBe('none');
     expect(state.manzanasById().size).toBe(0);
   });
 
-  it('restores the full view with marks in the whatsapp-sent catch branch', async () => {
+  it('clears the selection state when post-send cleanup fails (catch branch)', async () => {
     state.manzanasById.set(
       new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]),
     );
@@ -474,10 +450,10 @@ describe('MapDataPersistenceService', () => {
       screenshotBase64: null,
       destinationNumber: '56912345678',
     });
-    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
-      restaurarVistaConMarcas: { mockImplementationOnce: (fn: () => void) => void };
+    const drafts = TestBed.inject(DraftMarksService) as unknown as {
+      eliminarTerritorios: { mockImplementationOnce: (fn: () => void) => void };
     };
-    rendering.restaurarVistaConMarcas.mockImplementationOnce(() => {
+    drafts.eliminarTerritorios.mockImplementationOnce(() => {
       throw new Error('boom');
     });
 

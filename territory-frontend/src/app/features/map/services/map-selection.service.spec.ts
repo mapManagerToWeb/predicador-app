@@ -349,7 +349,6 @@ describe('MapSelectionService', () => {
       expect(state.manzanasMarcadaList()).toEqual([]);
       expect(state.territoriosSeleccionados()).toEqual([]);
       expect(state.totalManzanas()).toBe(0);
-      expect(rendering.limpiarMarcasVisuales).toHaveBeenCalled();
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('');
       expect(drafts.clear).toHaveBeenCalled();
     });
@@ -362,7 +361,7 @@ describe('MapSelectionService', () => {
 
       service.limpiarMarcas();
 
-      expect(rendering.restaurarVisibilidadPoligonos).toHaveBeenCalledWith([], []);
+      expect(rendering.restaurarVisibilidadPoligonos).toHaveBeenCalled();
     });
   });
 });

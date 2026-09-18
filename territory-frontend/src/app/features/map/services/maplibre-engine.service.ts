@@ -29,6 +29,17 @@ import { MAP_DEFAULTS } from '../utils/map-constants';
  */
 @Injectable({ providedIn: 'root' })
 export class MaplibreEngineService implements MapEngine {
+  /**
+   * MapLibre v6 runs vector-tile parsing in a dedicated worker module
+   * (`maplibre-gl-worker.mjs`) that imports its sibling `maplibre-gl-shared.mjs`
+   * by relative path. The files are vendored into `public/maplibre/` (see
+   * the README there): the dev server serves `public/` at the root and the
+   * production builder copies it into the browser output, so both files always
+   * land next to each other. Without setWorkerUrl() the worker silently never
+   * loads and vector tile sources stay empty.
+   */
+  private static readonly WORKER_URL = '/maplibre/maplibre-gl-worker.mjs';
+
   private readonly platformId: object;
   private map: MapLibreMap | null = null;
 
@@ -50,6 +61,9 @@ export class MaplibreEngineService implements MapEngine {
   private async loadMaplibre(): Promise<typeof import('maplibre-gl')> {
     if (!this.maplibregl) {
       this.maplibregl = await import('maplibre-gl');
+      if (typeof this.maplibregl.setWorkerUrl === 'function') {
+        this.maplibregl.setWorkerUrl(MaplibreEngineService.WORKER_URL);
+      }
     }
     return this.maplibregl;
   }
@@ -147,9 +161,14 @@ export class MaplibreEngineService implements MapEngine {
   }
 
   setSourceUrl(sourceId: string, url: string): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const source = (this.map as any)?.getSource?.(sourceId);
-    if (source && typeof source.setUrl === 'function') {
+    const source = this.map?.getSource(sourceId);
+    if (!source) return;
+    // `url` is a tile URL template (e.g. `/tiles/{z}/{x}/{y}.pbf?v=1`), not a
+    // TileJSON endpoint. VectorTileSource.setTiles/GeoJSONSource.setUrl accept
+    // the template directly; MapLibre v6 has no Map.setSourceProperty.
+    if ('setTiles' in source && typeof source.setTiles === 'function') {
+      source.setTiles([url]);
+    } else if ('setUrl' in source && typeof source.setUrl === 'function') {
       source.setUrl(url);
     }
   }

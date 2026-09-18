@@ -5,7 +5,6 @@ import { getTerritoryFillOpacity } from '../../core/models/territory-colors';
 import type { Reporte } from '../../core/models/models';
 import { MapStateService } from './services/map-state.service';
 import { MapRenderingFacade } from './services/map-rendering.facade';
-import { MapInteractionService } from './services/map-interaction.service';
 import { MapSelectionService } from './services/map-selection.service';
 import { MapInitializationService } from './services/map-initialization.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
@@ -90,8 +89,6 @@ describe('MapPage', () => {
   };
   let dataPersistence: {
     guardarEnBaseDeDatos: ReturnType<typeof vi.fn>;
-    prepararCaptura: ReturnType<typeof vi.fn>;
-    restaurarMapaPostCaptura: ReturnType<typeof vi.fn>;
     guardarYEnviar: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
@@ -108,8 +105,6 @@ describe('MapPage', () => {
     toast = { show: vi.fn() };
     dataPersistence = {
       guardarEnBaseDeDatos: vi.fn().mockResolvedValue(undefined),
-      prepararCaptura: vi.fn().mockResolvedValue(undefined),
-      restaurarMapaPostCaptura: vi.fn(),
       guardarYEnviar: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -117,8 +112,7 @@ describe('MapPage', () => {
       imports: [MapPage],
       providers: [
         MapStateService,
-        { provide: MapRenderingFacade, useValue: {} },
-        { provide: MapInteractionService, useValue: {} },
+        { provide: MapRenderingFacade, useValue: { attachEngine: vi.fn() } },
         { provide: MapSelectionService, useValue: selection },
         { provide: MapInitializationService, useValue: initialization },
         { provide: MapPartialMarkService, useValue: partialMark },
@@ -208,14 +202,6 @@ describe('MapPage', () => {
       await component.guardarEnBaseDeDatos();
 
       expect(dataPersistence.guardarEnBaseDeDatos).toHaveBeenCalled();
-    });
-
-    it('delegates the capture cycle', async () => {
-      await component.prepararCaptura();
-      component.restaurarMapaPostCaptura();
-
-      expect(dataPersistence.prepararCaptura).toHaveBeenCalled();
-      expect(dataPersistence.restaurarMapaPostCaptura).toHaveBeenCalled();
     });
 
     it('delegates limpiarMarcas and guardarYEnviar', async () => {

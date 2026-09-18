@@ -3,7 +3,6 @@ import { TestBed } from '@angular/core/testing';
 import { MapPartialMarkService } from './map-partial-mark.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
-import { MapInteractionService } from './map-interaction.service';
 import { MapSelectionService } from './map-selection.service';
 import { Toast } from '../../../core/services/toast';
 
@@ -11,10 +10,8 @@ describe('MapPartialMarkService', () => {
   let service: MapPartialMarkService;
   let state: MapStateService;
   let rendering: {
-    getMap: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getCurrentTerritoryColor: ReturnType<typeof vi.fn>;
-    limpiarCapasParciales: ReturnType<typeof vi.fn>;
   };
   let selection: {
     restaurarManzanaAnterior: ReturnType<typeof vi.fn>;
@@ -24,10 +21,8 @@ describe('MapPartialMarkService', () => {
 
   beforeEach(() => {
     rendering = {
-      getMap: vi.fn().mockReturnValue(null),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getCurrentTerritoryColor: vi.fn().mockReturnValue('#22c55e'),
-      limpiarCapasParciales: vi.fn(),
     };
     selection = { restaurarManzanaAnterior: vi.fn(), limpiarParcial: vi.fn() };
     toast = { show: vi.fn() };
@@ -36,7 +31,6 @@ describe('MapPartialMarkService', () => {
         MapPartialMarkService,
         MapStateService,
         { provide: MapRenderingFacade, useValue: rendering },
-        { provide: MapInteractionService, useValue: { handleMarkerDrag: vi.fn() } },
         { provide: MapSelectionService, useValue: selection },
         { provide: Toast, useValue: toast },
       ],

@@ -61,6 +61,29 @@ describe('MapVectorTileService', () => {
       expect(layerIds).toContain('territory-dissolved-fill');
       expect(layerIds).toContain('territory-dissolved-line');
     });
+
+    it('should use the feature-state case expression for fill colors on both fill layers', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine);
+
+      const featureStateCase = [
+        'case',
+        ['boolean', ['feature-state', 'selected'], false],
+        '#fbbf24',
+        ['coalesce', ['get', 'color'], '#94a3b8'],
+      ];
+
+      const layerCalls = mockEngine.addLayer.mock.calls as [
+        { id: string; paint: Record<string, unknown> },
+      ][];
+      const manzanaFill = layerCalls.find(call => call[0].id === 'territory-fill');
+      expect(manzanaFill?.[0].paint['fill-color']).toEqual(featureStateCase);
+      expect(manzanaFill?.[0].paint['fill-outline-color']).toEqual(featureStateCase);
+
+      const dissolvedFill = layerCalls.find(call => call[0].id === 'territory-dissolved-fill');
+      expect(dissolvedFill?.[0].paint['fill-color']).toEqual(featureStateCase);
+      expect(dissolvedFill?.[0].paint['fill-outline-color']).toEqual(featureStateCase);
+    });
   });
 
   describe('updateTileUrl', () => {
@@ -76,20 +99,25 @@ describe('MapVectorTileService', () => {
   });
 
   describe('setTerritoryFillOpacity', () => {
-    it('should set paint property on MapLibre engine', () => {
+    it('should set paint property on both fill layers with the proper key', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
       service.setTerritoryFillOpacity(mockEngine, 5, 0.9);
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-fill',
         'fill-opacity',
-        expect.arrayContaining(['match', expect.anything(), 5, 0.9, 0.6]),
+        expect.arrayContaining(['match', ['get', 'territorio'], 5, 0.9, 0.6]),
+      );
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-dissolved-fill',
+        'fill-opacity',
+        expect.arrayContaining(['match', ['get', 'tid'], 5, 0.9, 0.6]),
       );
     });
   });
 
   describe('resetFillOpacity', () => {
-    it('should set default opacity on MapLibre engine', () => {
+    it('should set default opacity on both fill layers', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
       service.resetFillOpacity(mockEngine);
@@ -97,6 +125,29 @@ describe('MapVectorTileService', () => {
         'territory-fill',
         'fill-opacity',
         0.6,
+      );
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-dissolved-fill',
+        'fill-opacity',
+        0.6,
+      );
+    });
+  });
+
+  describe('setSelectedTerritoriesOpacity', () => {
+    it('should dim non-selected territories with an in/literal case expression', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine);
+      service.setSelectedTerritoriesOpacity(mockEngine, [1, 2]);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-fill',
+        'fill-opacity',
+        ['case', ['in', ['get', 'territorio'], ['literal', [1, 2]]], 0.6, 0.15],
+      );
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-dissolved-fill',
+        'fill-opacity',
+        ['case', ['in', ['get', 'tid'], ['literal', [1, 2]]], 0.6, 0.15],
       );
     });
   });

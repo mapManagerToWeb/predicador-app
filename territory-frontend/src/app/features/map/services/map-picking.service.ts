@@ -64,10 +64,16 @@ export class MapPickingService {
    * <p>MapLibre applies the state update directly on the GPU-painted
    * features without any DOM manipulation.</p>
    *
+   * <p>Feature ids must match the numeric MVT feature id (`fid`) for the
+   * state to stick. Dissolved `territorio` features carry NO feature id,
+   * so they are skipped entirely — a guard returns early for missing or
+   * empty ids instead of issuing a useless `setFeatureState` call.</p>
+   *
    * @param engine - The active MapEngine.
-   * @param id - Feature id (from the `id` property of a MapGeoJSONFeature).
+   * @param id - Feature id (from the `fid` property of a MapGeoJSONFeature).
    */
   highlightFeature(engine: MapEngine, id: string | number): void {
+    if (id === undefined || id === null || id === '') return;
     engine.setFeatureState(
       MapPickingService.SOURCE_ID,
       MapPickingService.SOURCE_LAYER_MANZANA,

@@ -31,6 +31,12 @@ const DEFAULT_FILL_OPACITY = 0.6;
 /** Fallback color when tile feature lacks a `color` property. */
 const FALLBACK_COLOR = '#94a3b8';
 
+/** Highlight color applied via feature-state when a manzana is selected. */
+const HIGHLIGHT_COLOR = '#fbbf24';
+
+/** Opacity applied to non-selected territory fill while a selection is active. */
+const DIM_OPACITY = 0.15;
+
 /**
  * Manages the MapLibre vector tile source and data-driven fill/line layers
  * for territory rendering.
@@ -42,8 +48,11 @@ const FALLBACK_COLOR = '#94a3b8';
  * <p>Layer configuration follows the backend MVT schema:
  * - Source: `territories` (vector tiles at `/tiles/{z}/{x}/{y}.pbf`)
  * - Source layers: `manzana` (z ≥ 12) and `territorio` (z < 12)
- * - Data-driven `fill-color` from tile `color` property
- * - Constant `fill-opacity` 0.6 (overridden per-territory when selected)</p>
+ * - Data-driven `fill-color` from tile `color` property, overridden by the
+ *   `selected` feature-state (manzana features only — they carry ids; the
+ *   dissolved `territorio` features have no ids, so they never feature-state)
+ * - Constant `fill-opacity` 0.6 (dimmed per-selection via
+ *   {@link setSelectedTerritoriesOpacity})</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapVectorTileService {
@@ -93,10 +102,11 @@ export class MapVectorTileService {
   }
 
   /**
-   * Update the fill-opacity for a specific territory's manzana features.
+   * Update the fill-opacity for a specific territory's features.
    *
-   * <p>Uses MapLibre data-driven styling: the opacity expression is
-   * rebuilt as a match expression mapping `territorio` → opacity.</p>
+   * <p>Applies the same match expression to BOTH fill layers: the manzana
+   * layer keys on `territorio`, the dissolved territorio layer keys on
+   * `tid` (the MVT property names for the territory number).</p>
    *
    * @param engine         The active MapEngine.
    * @param territoryId    The territory number.
@@ -110,15 +120,42 @@ export class MapVectorTileService {
     engine.setPaintProperty(
       FILL_LAYER_ID,
       'fill-opacity',
-      this.buildOpacityExpression(territoryId, opacity),
+      this.buildOpacityExpression('territorio', territoryId, opacity),
+    );
+    engine.setPaintProperty(
+      FILL_DISSOLVED_LAYER_ID,
+      'fill-opacity',
+      this.buildOpacityExpression('tid', territoryId, opacity),
     );
   }
 
   /**
-   * Reset the fill-opacity to the default constant value.
+   * Reset the fill-opacity to the default constant value on BOTH fill layers.
    */
   resetFillOpacity(engine: MapEngine): void {
     engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', DEFAULT_FILL_OPACITY);
+    engine.setPaintProperty(
+      FILL_DISSOLVED_LAYER_ID,
+      'fill-opacity',
+      DEFAULT_FILL_OPACITY,
+    );
+  }
+
+  /**
+   * Dim every territory that is NOT in the `selected` list.
+   *
+   * <p>Selected territories keep `DEFAULT_FILL_OPACITY`; everything else
+   * drops to `DIM_OPACITY`. Applied to BOTH fill layers (manzana keys on
+   * `territorio`, dissolved keys on `tid`).</p>
+   *
+   * @param engine   The active MapEngine.
+   * @param selected The territory numbers to keep at full opacity.
+   */
+  setSelectedTerritoriesOpacity(engine: MapEngine, selected: number[]): void {
+    const expression = (key: string) =>
+      ['case', ['in', ['get', key], ['literal', selected]], DEFAULT_FILL_OPACITY, DIM_OPACITY];
+    engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', expression('territorio'));
+    engine.setPaintProperty(FILL_DISSOLVED_LAYER_ID, 'fill-opacity', expression('tid'));
   }
 
   /**
@@ -169,9 +206,9 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_MANZANA,
       paint: {
-        'fill-color': ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+        'fill-color': this.selectedCaseExpression(),
         'fill-opacity': DEFAULT_FILL_OPACITY,
-        'fill-outline-color': ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+        'fill-outline-color': this.selectedCaseExpression(),
       },
     };
     engine.addLayer(manzanaFillLayer);
@@ -196,9 +233,9 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_TERRITORIO,
       paint: {
-        'fill-color': ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+        'fill-color': this.selectedCaseExpression(),
         'fill-opacity': DEFAULT_FILL_OPACITY,
-        'fill-outline-color': ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+        'fill-outline-color': this.selectedCaseExpression(),
       },
     };
     engine.addLayer(territorioFillLayer);
@@ -218,17 +255,38 @@ export class MapVectorTileService {
   }
 
   /**
+   * Build the color expression shared by both fill layers: highlight the
+   * feature when its `selected` feature-state is true, otherwise fall back
+   * to the tile `color` property.
+   *
+   * <p>Feature-state only works for features that carry a numeric id — the
+   * manzana layer features do (MVT `fid`), the dissolved territorio layer
+   * features do not, so they always take the default branch. That is
+   * expected: dissolved polygons never need per-feature highlighting.</p>
+   */
+  private selectedCaseExpression(): unknown[] {
+    return [
+      'case',
+      ['boolean', ['feature-state', 'selected'], false],
+      HIGHLIGHT_COLOR,
+      ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+    ];
+  }
+
+  /**
    * Build a MapLibre data-driven opacity expression that maps the
-   * given territory to the specified opacity and defaults to
+   * given property key (`territorio` for manzanas, `tid` for dissolved
+   * territories) to the specified opacity and defaults to
    * `DEFAULT_FILL_OPACITY` for all other territories.
    */
   private buildOpacityExpression(
+    key: string,
     territoryId: number,
     opacity: number,
   ): unknown[] {
     return [
       'match',
-      ['get', 'territorio'],
+      ['get', key],
       territoryId,
       opacity,
       DEFAULT_FILL_OPACITY,

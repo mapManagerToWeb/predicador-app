@@ -148,7 +148,6 @@ export class MapInitializationService {
     const sinDraft = todos.filter(n => !territoriosConDraft.has(n));
 
     if (sinDraft.length === 0) {
-      this.selection.reaplicarMarcasSeleccionadas();
       return;
     }
 

@@ -10,6 +10,7 @@ interface TileJsonResponse {
   tilejson: string;
   bounds: number[];
   tiles: string[];
+  data_version?: number;
 }
 
 /** Default polling interval for data version checks (ms). */
@@ -29,10 +30,12 @@ const DEFAULT_TILE_JSON_URL = '/api/v1/territories/tiles.json';
  *       polling when the tab is hidden.</li>
  * </ul>
  *
- * <p>Version detection uses the `bounds` array from the TileJSON response
- * as a proxy for data_version (bounds change when territories are
- * added/removed). A cache-busting `?v=` parameter is appended to the
- * tile URL template so the browser re-fetches affected tiles.</p>
+ * <p>Version detection prefers the `data_version` field exposed by the
+ * TileJSON endpoint (deterministic `?v=N` cache-busting). When the field is
+ * absent (legacy backend), the `bounds` array is used as a proxy for
+ * data_version (bounds change when territories are added/removed) and a
+ * `Date.now()` version is appended to the tile URL template so the browser
+ * re-fetches affected tiles.</p>
  */
 @Injectable({ providedIn: 'root' })
 export class TileVersionService {
@@ -45,6 +48,7 @@ export class TileVersionService {
   private tileJsonUrl = DEFAULT_TILE_JSON_URL;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private previousBoundsHash: string | null = null;
+  private previousVersion: number | null = null;
   private engine: MapEngine | null = null;
 
   /** Start polling for tile version changes. */
@@ -81,6 +85,7 @@ export class TileVersionService {
     }
     this.engine = null;
     this.previousBoundsHash = null;
+    this.previousVersion = null;
   }
 
   /** Whether polling is currently active. */
@@ -115,11 +120,31 @@ export class TileVersionService {
         this.http.get<TileJsonResponse>(this.tileJsonUrl),
       );
 
+      // Polling may have stopped while the fetch was in flight — do not
+      // touch the (possibly nulled) engine after teardown.
+      if (!this.engine) return;
+
+      if (tileJson.data_version !== undefined && tileJson.data_version !== null) {
+        // Backend exposes data_version: use a deterministic `?v=N` version.
+        const version: number = tileJson.data_version;
+        if (this.previousVersion === null || version !== this.previousVersion) {
+          // Applies on the very first poll too, so tiles use a stable
+          // versioned URL from the start instead of an unversioned one.
+          const newUrl = this.buildVersionedTileUrl(tileJson.tiles[0], version);
+          this.vectorTile.updateTileUrl(this.engine, newUrl);
+        }
+        this.previousVersion = version;
+        this.previousBoundsHash = this.hashBounds(tileJson.bounds);
+        return;
+      }
+
+      // Legacy backend without data_version: fall back to bounds-hash
+      // detection with a Date.now() cache-busting version.
       const boundsHash = this.hashBounds(tileJson.bounds);
 
       if (this.previousBoundsHash !== null && boundsHash !== this.previousBoundsHash) {
         // Data changed — update tile URL with cache-busting version param.
-        const newUrl = this.buildVersionedTileUrl(tileJson.tiles[0]);
+        const newUrl = this.buildVersionedTileUrl(tileJson.tiles[0], Date.now());
         this.vectorTile.updateTileUrl(this.engine, newUrl);
       }
 
@@ -141,10 +166,11 @@ export class TileVersionService {
 
   /**
    * Append a cache-busting `?v=` parameter to the tile URL template.
-   * Uses `Date.now()` so each version bump produces a unique URL.
+   *
+   * @param tileUrl The raw tile URL template.
+   * @param version The data version to embed (deterministic `?v=N`).
    */
-  private buildVersionedTileUrl(tileUrl: string): string {
-    const version = Date.now();
+  private buildVersionedTileUrl(tileUrl: string, version: number): string {
     const separator = tileUrl.includes('?') ? '&' : '?';
     return `${tileUrl}${separator}v=${version}`;
   }

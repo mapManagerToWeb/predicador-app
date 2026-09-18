@@ -11,7 +11,6 @@ import { Toast } from '../../core/services/toast';
 import { TerritorySearch } from './territory-search/territory-search';
 import { MapStateService } from './services/map-state.service';
 import { MapRenderingFacade } from './services/map-rendering.facade';
-import { MapInteractionService } from './services/map-interaction.service';
 import { MapSelectionService } from './services/map-selection.service';
 import { MapPickingService } from './services/map-picking.service';
 import { MapVectorTileService } from './services/map-vector-tile.service';
@@ -35,7 +34,6 @@ import type { MapEngine } from './services/map-engine.interface';
 export class MapPage implements OnDestroy {
   private readonly state = inject(MapStateService);
   private readonly rendering = inject(MapRenderingFacade);
-  private readonly interaction = inject(MapInteractionService);
   private readonly selection = inject(MapSelectionService);
   private readonly initialization = inject(MapInitializationService);
   private readonly partialMark = inject(MapPartialMarkService);
@@ -96,6 +94,7 @@ export class MapPage implements OnDestroy {
 
     // Initialize vector tile layers (fill, line, labels)
     this.vectorTile.initLayers(engine);
+    this.rendering.attachEngine(engine);
     this.labelLayer.initLabels(engine);
 
     // Start version-aware refresh polling
@@ -174,12 +173,13 @@ export class MapPage implements OnDestroy {
   ): void {
     // Extract color from tile feature properties
     const featureColor = (feature.properties?.['color'] as string) ?? '';
+    const fid = this.extractManzanaFid(feature);
 
     if (this.state.manzanasById().has(manzanaId)) {
-      this.picking.clearHighlight(this.maplibreEngine()!, manzanaId);
+      if (fid !== null) this.picking.clearHighlight(this.maplibreEngine()!, fid);
       this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
     } else {
-      this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
+      if (fid !== null) this.picking.highlightFeature(this.maplibreEngine()!, fid);
       // Set the territory color from the tile feature for marking mode
       this.rendering.setCurrentTerritoryColor(featureColor);
       void this.handleTerritorySelection(territorioNumero);
@@ -187,7 +187,7 @@ export class MapPage implements OnDestroy {
   }
 
   private handleMaplibreModoCompleta(
-    _feature: MapGeoJSONFeature,
+    feature: MapGeoJSONFeature,
     territorioNumero: number,
     manzanaId: string,
     nombreBloque: string,
@@ -197,13 +197,14 @@ export class MapPage implements OnDestroy {
       return;
     }
     if (this.state.manzanasById().has(manzanaId)) return;
+    const fid = this.extractManzanaFid(feature);
     const color = this.state.currentTerritoryColor();
-    this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
+    if (fid !== null) this.picking.highlightFeature(this.maplibreEngine()!, fid);
     this.selection.marcarManzanaById(manzanaId, nombreBloque, color, territorioNumero);
   }
 
   private handleMaplibreModoParcial(
-    _feature: MapGeoJSONFeature,
+    feature: MapGeoJSONFeature,
     territorioNumero: number,
     manzanaId: string,
     nombreBloque: string,
@@ -215,8 +216,9 @@ export class MapPage implements OnDestroy {
     if (this.state.manzanasById().has(manzanaId)) return;
 
     if (!this.state.manzanaSeleccionadaTerritorio()) {
-      const featureColor = (_feature.properties?.['color'] as string) ?? this.state.currentTerritoryColor();
-      this.picking.highlightFeature(this.maplibreEngine()!, manzanaId);
+      const fid = this.extractManzanaFid(feature);
+      const featureColor = (feature.properties?.['color'] as string) ?? this.state.currentTerritoryColor();
+      if (fid !== null) this.picking.highlightFeature(this.maplibreEngine()!, fid);
       this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
     }
     // Partial point snapping for MapLibre is deferred to F3.4 (hybrid edit mode).
@@ -240,17 +242,24 @@ export class MapPage implements OnDestroy {
   }
 
   private extractTerritorioNumero(feature: MapGeoJSONFeature): number {
-    const val = feature.properties?.['territorioNumero'] ?? feature.properties?.['territorio'];
-    return typeof val === 'number' ? val : 0;
+    const val = feature.properties?.['tid'] ?? feature.properties?.['territorio'];
+    const n = typeof val === 'number' ? val : Number(val);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  private extractManzanaFid(feature: MapGeoJSONFeature): number | null {
+    const val = feature.properties?.['fid'] ?? feature.id;
+    const n = typeof val === 'number' ? val : Number(val);
+    return Number.isInteger(n) && n > 0 ? n : null;
   }
 
   private extractManzanaId(feature: MapGeoJSONFeature): string {
-    const val = feature.properties?.['id'] ?? feature.id;
-    return String(val ?? '');
+    const fid = this.extractManzanaFid(feature);
+    return fid !== null ? String(fid) : '';
   }
 
   private extractNombreBloque(feature: MapGeoJSONFeature): string {
-    const val = feature.properties?.['nombre'] ?? feature.properties?.['nombreBloque'];
+    const val = feature.properties?.['bloque'] ?? feature.properties?.['nombre'] ?? feature.properties?.['nombreBloque'];
     return typeof val === 'string' ? val : '';
   }
 
@@ -333,14 +342,6 @@ export class MapPage implements OnDestroy {
 
   async guardarEnBaseDeDatos(): Promise<void> {
     await this.dataPersistence.guardarEnBaseDeDatos();
-  }
-
-  prepararCaptura(): Promise<void> {
-    return this.dataPersistence.prepararCaptura();
-  }
-
-  restaurarMapaPostCaptura(): void {
-    this.dataPersistence.restaurarMapaPostCaptura();
   }
 
   limpiarMarcas(): void {

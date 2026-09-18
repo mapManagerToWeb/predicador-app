@@ -6,6 +6,9 @@ import { TileVersionService } from './tile-version.service';
 import { MapVectorTileService } from './map-vector-tile.service';
 import type { MapEngine } from './map-engine.interface';
 
+const TILE_URL = '/tiles/{z}/{x}/{y}.pbf';
+const BOUNDS = [-74, -38, -72, -36];
+
 describe('TileVersionService', () => {
   let service: TileVersionService;
   let httpMock: HttpTestingController;
@@ -46,7 +49,7 @@ describe('TileVersionService', () => {
 
       const req = httpMock.expectOne('/api/v1/territories/tiles.json');
       expect(req.request.method).toBe('GET');
-      req.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       // Let the firstValueFrom promise resolve
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -56,7 +59,7 @@ describe('TileVersionService', () => {
       service.startPolling(mockEngine);
 
       const req = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
     });
 
@@ -64,57 +67,94 @@ describe('TileVersionService', () => {
       service.startPolling(mockEngine, '/custom/tiles.json');
 
       const req = httpMock.expectOne('/custom/tiles.json');
-      req.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    it('should not update tile URL on first fetch (no previous bounds)', async () => {
+    it('applies ?v=<number> immediately on the first poll when data_version is present', async () => {
       service.startPolling(mockEngine);
 
       const req = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
-      await vi.advanceTimersByTimeAsync(0);
-
-      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
-    });
-
-    it('should update tile URL when bounds change after interval', async () => {
-      service.startPolling(mockEngine);
-
-      // First fetch — baseline
-      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req1.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
-      await vi.advanceTimersByTimeAsync(0);
-
-      // Advance past the polling interval (30s)
-      await vi.advanceTimersByTimeAsync(30_000);
-
-      // Second fetch — bounds changed
-      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req2.flush({ tilejson: '3.0.0', bounds: [-75, -39, -71, -35], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
 
       expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
       expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(
         mockEngine,
-        expect.stringMatching(/\/tiles\/\{z\}\/\{x\}\/\{y\}\.pbf\?v=\d+/),
+        expect.stringMatching(/\/tiles\/\{z\}\/\{x\}\/\{y\}\.pbf\?v=\d+$/),
       );
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(mockEngine, `${TILE_URL}?v=1`);
     });
 
-    it('should not update tile URL when bounds are unchanged', async () => {
+    it('does not update tile URL on first fetch when data_version is absent (legacy bounds-hash)', async () => {
+      service.startPolling(mockEngine);
+
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL] });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+    });
+
+    it('updates the tile URL when data_version changes even if bounds are unchanged', async () => {
+      service.startPolling(mockEngine);
+
+      // First poll — baseline + immediate ?v=1
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+
+      // Advance past the polling interval (30s) — same bounds, new data_version
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 2 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(2);
+      expect(vectorTile.updateTileUrl).toHaveBeenLastCalledWith(mockEngine, `${TILE_URL}?v=2`);
+    });
+
+    it('does not update tile URL when data_version is unchanged', async () => {
       service.startPolling(mockEngine);
 
       const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req1.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(30_000);
 
       const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req2.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
 
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to bounds-hash + Date.now versioning when data_version is absent', async () => {
+      service.startPolling(mockEngine);
+
+      // First fetch — baseline (legacy: no update on first poll)
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL] });
+      await vi.advanceTimersByTimeAsync(0);
       expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+
+      // Advance past the polling interval (30s)
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Second fetch — bounds changed (no data_version field anywhere)
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: [-75, -39, -71, -35], tiles: [TILE_URL] });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(
+        mockEngine,
+        expect.stringMatching(/\/tiles\/\{z\}\/\{x\}\/\{y\}\.pbf\?v=\d+$/),
+      );
     });
 
     it('should warn and not throw when TileJSON endpoint returns 404', async () => {
@@ -149,7 +189,7 @@ describe('TileVersionService', () => {
     it('should stop polling', async () => {
       service.startPolling(mockEngine);
       const req = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
 
       service.stopPolling();
@@ -173,7 +213,7 @@ describe('TileVersionService', () => {
       expect(service.isPolling()).toBe(true);
       // Flush the pending request to avoid afterEach verify failure
       const req = httpMock.expectOne('/api/v1/territories/tiles.json');
-      req.flush({ tilejson: '3.0.0', bounds: [-74, -38, -72, -36], tiles: ['/tiles/{z}/{x}/{y}.pbf'] });
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
       await vi.advanceTimersByTimeAsync(0);
     });
   });

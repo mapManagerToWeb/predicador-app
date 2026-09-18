@@ -122,6 +122,14 @@ describe('MapPickingService', () => {
         { selected: true },
       );
     });
+
+    it('does NOT call setFeatureState for missing/empty ids (dissolved features)', () => {
+      service.highlightFeature(engine, '');
+      service.highlightFeature(engine, undefined as unknown as string);
+      service.highlightFeature(engine, null as unknown as string);
+
+      expect(engine.setFeatureState).not.toHaveBeenCalled();
+    });
   });
 
   describe('clearHighlight', () => {

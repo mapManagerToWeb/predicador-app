@@ -13,7 +13,7 @@ const LABEL_LAYER_ID = 'territory-labels';
 /**
  * Manages the territory label layer for MapLibre GL JS.
  *
- * <p>Renders the `nombre` property of manzana features as a symbol
+ * <p>Renders the `bloque` property of manzana features as a symbol
  * layer with collision-aware text placement. Labels are only visible
  * at zoom ≥ 14 to avoid clutter at lower zoom levels.</p>
  *
@@ -43,7 +43,7 @@ export class MapLabelLayerService {
       'source-layer': SOURCE_LAYER_MANZANA,
       minzoom: 14,
       layout: {
-        'text-field': ['get', 'nombre'],
+        'text-field': ['coalesce', ['get', 'bloque'], ''],
         'text-size': 12,
         'text-anchor': 'center',
         'symbol-avoid-edges': true,

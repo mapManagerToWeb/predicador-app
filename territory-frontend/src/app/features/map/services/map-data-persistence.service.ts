@@ -69,14 +69,10 @@ export class MapDataPersistenceService {
       const territoriosGuardados = this.state.territoriosSeleccionados();
       this.persistirEnCacheYLimpiarDraft(saved, territoriosGuardados);
 
-      this.selection.reaplicarMarcasSeleccionadas();
       this.toastService.show(TOAST_MESSAGES.saveSuccess);
-
-      const marcadasParaRestaurar = this.state.manzanasMarcadaList();
 
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
-      this.rendering.restaurarVistaConMarcas(marcadasParaRestaurar);
       this.state.totalManzanas.set(0);
       this.state.modoMarcado.set('none');
       this.state.manzanasById.set(new Map());
@@ -142,7 +138,7 @@ export class MapDataPersistenceService {
               this.rendering.getAllTerritoriesLayer(),
               (num: number) => this.rendering.getManzanaCountByTerritorio(num)
             ),
-            () => this.restaurarMapaPostCaptura()
+            () => undefined
           )
         : null;
 
@@ -178,8 +174,6 @@ export class MapDataPersistenceService {
       const territoriosGuardados = this.state.territoriosSeleccionados();
       this.persistirEnCacheYLimpiarDraft(guardados, territoriosGuardados);
 
-      this.selection.reaplicarMarcasSeleccionadas();
-
       this.toastService.show(
         TOAST_MESSAGES.sendSuccessTitle,
         4000,
@@ -190,7 +184,6 @@ export class MapDataPersistenceService {
       this.state.clearDatosParciales();
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
-      this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
       this.state.totalManzanas.set(0);
       this.state.modoMarcado.set('none');
       this.state.manzanasById.set(new Map());
@@ -211,7 +204,6 @@ export class MapDataPersistenceService {
         this.state.clearDatosParciales();
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
-        this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
         this.state.totalManzanas.set(0);
         this.state.modoMarcado.set('none');
         this.state.manzanasById.set(new Map());
@@ -251,20 +243,5 @@ export class MapDataPersistenceService {
       }
     }
     this.draftMarksService.eliminarTerritorios(territorios);
-  }
-
-  prepararCaptura(): Promise<void> {
-    const marcadas = this.state.manzanasMarcadaList();
-    if (marcadas.length === 0) return Promise.resolve();
-
-    return this.rendering.prepararCaptura(marcadas, this.state.territoriosSeleccionados());
-  }
-
-  restaurarMapaPostCaptura(): void {
-    this.rendering.restaurarMapaPostCaptura(
-      this.state.manzanasMarcadaList(),
-      this.state.territoriosSeleccionados(),
-      this.state.modoMarcado()
-    );
   }
 }

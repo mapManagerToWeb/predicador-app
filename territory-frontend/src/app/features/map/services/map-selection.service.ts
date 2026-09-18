@@ -150,7 +150,6 @@ export class MapSelectionService {
       this.state.modoMarcado.set('none');
       this.state.territoriosSeleccionados.set(numeros);
     } else {
-      this.rendering.clearExtraLayers();
       this.acumularSeleccionTerritorios(numeros);
     }
 
@@ -158,7 +157,6 @@ export class MapSelectionService {
       this.state.territoriosSeleccionados().length === 1 ? this.state.territoriosSeleccionados()[0] : null
     );
 
-    this.rendering.cancelPendingStyleUpdates();
     this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
     this.updateTotalManzanas(numeros);
 
@@ -206,7 +204,7 @@ export class MapSelectionService {
       this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
       this.toastService.show(modo === 'parcial' ? TOAST_MESSAGES.partialMode : TOAST_MESSAGES.completeMode);
     } else {
-      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
+      this.rendering.restaurarVisibilidadPoligonos();
     }
   }
 
@@ -215,19 +213,13 @@ export class MapSelectionService {
     this.state.territorioSeleccionado.set(null);
     this.state.territoriosSeleccionados.set([]);
     this.state.modoMarcado.set('none');
-    this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
-    this.rendering.limpiarMarcasVisuales();
+    this.rendering.restaurarVisibilidadPoligonos();
     this.state.totalManzanas.set(0);
     this.rendering.setCurrentTerritoryColor('');
     this.draftService.clear();
   }
 
-  reaplicarMarcasSeleccionadas(): void {
-    this.rendering.reaplicarMarcasTerritorio(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
-  }
-
   limpiarParcial(): void {
-    this.rendering.limpiarCapasParciales();
     this.state.puntosParciales.set([]);
   }
 }
