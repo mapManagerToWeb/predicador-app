@@ -71,6 +71,7 @@ class ReportSendServiceTest {
         when(mediaClient.uploadImage("base64image", "image/jpeg")).thenReturn("media_123");
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
+        when(props.accessToken()).thenReturn("token-abc");
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
@@ -104,6 +105,7 @@ class ReportSendServiceTest {
         when(messageService.requiereScreenshot(request)).thenReturn(false);
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
+        when(props.accessToken()).thenReturn("token-abc");
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
@@ -137,6 +139,7 @@ class ReportSendServiceTest {
         when(messageService.requiereScreenshot(request)).thenReturn(false);
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
+        when(props.accessToken()).thenReturn("token-abc");
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56936577203");
@@ -169,6 +172,7 @@ class ReportSendServiceTest {
         when(mediaClient.uploadImage("base64image", "image/jpeg")).thenReturn("media_123");
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
+        when(props.accessToken()).thenReturn("token-abc");
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("56999999999");
@@ -200,6 +204,8 @@ class ReportSendServiceTest {
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("+54911111111");
+        when(props.phoneNumberId()).thenReturn("123");
+        when(props.accessToken()).thenReturn("token-abc");
         when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
         // Reserve must succeed so we have a delivery to mark FAILED.
         WhatsAppDelivery delivery = new WhatsAppDelivery("idempotent-key-fallback");
@@ -222,6 +228,37 @@ class ReportSendServiceTest {
         assertEquals(com.predicador.reporting.model.WhatsAppDeliveryStatus.FAILED, saved.getStatus());
         assertEquals(502, saved.getStatusCode());
         assertNotNull(saved.getError());
+    }
+
+    @Test
+    void sendReport_whatsappSinConfigurar_noNPE_fallaConMensajeClaro() {
+        var request = new WhatsAppSendRequest(
+            "Daniel", "Uribe", "21-07-2026", "tarde",
+            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
+            null, null
+        );
+
+        // props sin stubbear: destinationNumber/accessToken/phoneNumberId → null.
+        // Antes del fix esto reventaba con NPE al construir el header
+        // (Map.of("link", props.defaultImageUrl()) con defaultImageUrl null).
+        WhatsAppDelivery delivery = new WhatsAppDelivery("idempotent-unconfigured");
+        when(deliveryRepository.saveAndFlush(any(WhatsAppDelivery.class))).thenReturn(delivery);
+
+        com.predicador.reporting.client.WhatsAppIntegrationException thrown =
+            assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
+                () -> sendService.sendReport(request, "idempotent-unconfigured"));
+
+        assertEquals(503, thrown.status());
+        assertTrue(thrown.getMessage().contains("no configurado"));
+        // La compuerta corta antes de construir parámetros o llamar al cliente.
+        verify(messageService, never()).generarParametrosTemplate(any());
+        verify(messageClient, never()).sendTemplateMessage(anyString(), anyString(), anyString(), anyList());
+
+        // La entrega queda registrada como FAILED con el mensaje legible.
+        ArgumentCaptor<WhatsAppDelivery> captor = ArgumentCaptor.forClass(WhatsAppDelivery.class);
+        verify(deliveryRepository).save(captor.capture());
+        assertEquals(com.predicador.reporting.model.WhatsAppDeliveryStatus.FAILED, captor.getValue().getStatus());
+        assertTrue(captor.getValue().getError().contains("no configurado"));
     }
 
     @SuppressWarnings("unchecked")

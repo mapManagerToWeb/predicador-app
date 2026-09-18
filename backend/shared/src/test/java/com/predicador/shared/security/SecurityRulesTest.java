@@ -25,5 +25,11 @@ class SecurityRulesTest {
                 r.methods().contains("GET") && r.pattern().matcher("/api/v1/reports").matches()));
         assertTrue(SecurityRules.REPORTING.stream().anyMatch(r ->
                 r.methods().contains("GET") && r.pattern().matcher("/api/v1/encargados").matches()));
+        // La compensación ACID del envío usa DELETE /api/v1/reports?id=…; sin esta
+        // regla el filtro downstream no autentica y authorizeOwner falla con 403.
+        assertTrue(SecurityRules.REPORTING.stream().anyMatch(r ->
+                r.methods().contains("DELETE") && r.pattern().matcher("/api/v1/reports").matches()));
+        assertTrue(SecurityRules.REPORTING.stream().anyMatch(r ->
+                r.methods().contains("DELETE") && r.pattern().matcher("/api/v1/reports/123").matches()));
     }
 }
