@@ -49,6 +49,9 @@ class TileServiceTest {
     @Mock
     private S2CoverService s2Cover;
 
+    @Mock
+    private TerritoryColorResolver colorResolver;
+
     private TileService service;
     private final TileProperties props =
             new TileProperties(19, 14, 12, 4096, 64, 1000, Duration.ofMinutes(10), 2);
@@ -56,7 +59,7 @@ class TileServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TileService(repo, s2Cover, versions, props, registry);
+        service = new TileService(repo, s2Cover, versions, colorResolver, props, registry);
     }
 
     // ---- helpers --------------------------------------------------------
@@ -250,6 +253,65 @@ class TileServiceTest {
         // El feature clipeado conserva las tags del disuelto (tid/color/nombre/total)
         // aunque el id MVT quede sin set (la capa disuelta no emite "fid").
         assertThat(tile.getLayers(0).getFeatures(0).hasId()).isFalse();
+    }
+
+    // ---- Color: fallback a paleta del endpoint /colors ---------------
+
+    @Test
+    void render_z14_colorFallsBackToPaletteResolver_whenSettingsRowMissing() throws Exception {
+        Envelope tileEnv = WebMercator.tileEnvelopeMeters(Z14, X14, Y14);
+        byte[] wkb = polygonWkb(
+                tileEnv.getMinX() + 10, tileEnv.getMinY() + 10,
+                tileEnv.getMaxX() - 10, tileEnv.getMaxY() - 10);
+
+        when(versions.current()).thenReturn(1L);
+        when(s2Cover.coverOfTile(eq(Z14), eq(X14), eq(Y14), any(Envelope.class))).thenReturn(List.of(1L));
+        when(repo.findManzanaCandidatesByS2Cover(
+                anyList(), anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of(manzanaRow(5003, 12, "12.c", null, wkb))); // sin fila territory_settings
+        when(colorResolver.colorFor(12L)).thenReturn("#6A5ACD"); // paleta del endpoint /colors
+
+        TileEntry entry = service.render(Z14, X14, Y14);
+        VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(entry.gzippedPbf()));
+        VectorTile.Tile.Layer layer = tile.getLayers(0);
+
+        assertThat(layer.getName()).isEqualTo("manzana");
+        assertThat(decodeColorTag(layer)).isEqualTo("#6A5ACD");
+        verify(colorResolver).colorFor(12L);
+    }
+
+    @Test
+    void render_z0_dissolvedColorFallsBackToPaletteResolver() throws Exception {
+        Envelope worldEnv = WebMercator.tileEnvelopeMeters(0, 0, 0);
+        byte[] wkb = polygonWkb(
+                worldEnv.getMinX() + 1000, worldEnv.getMinY() + 1000,
+                worldEnv.getMaxX() - 1000, worldEnv.getMaxY() - 1000);
+
+        when(versions.current()).thenReturn(1L);
+        when(repo.findDisueltoCandidates(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of(disueltoRow(7, 25, null, wkb))); // sin fila territory_settings
+        when(colorResolver.colorFor(7L)).thenReturn("#E0115F");
+
+        TileEntry entry = service.render(0, 0, 0);
+        VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(entry.gzippedPbf()));
+
+        assertThat(tile.getLayers(0).getName()).isEqualTo("territorio");
+        assertThat(decodeColorTag(tile.getLayers(0))).isEqualTo("#E0115F");
+        verify(colorResolver).colorFor(7L);
+    }
+
+    /** Decodifica el tag {@code color} del primer feature de la capa MVT. */
+    private static String decodeColorTag(VectorTile.Tile.Layer layer) {
+        int colorKey = layer.getKeysList().indexOf("color");
+        assertThat(colorKey).isGreaterThanOrEqualTo(0);
+        VectorTile.Tile.Feature feature = layer.getFeatures(0);
+        List<Integer> tags = feature.getTagsList();
+        for (int i = 0; i + 1 < tags.size(); i += 2) {
+            if (tags.get(i) == colorKey) {
+                return layer.getValuesList().get(tags.get(i + 1)).getStringValue();
+            }
+        }
+        return null;
     }
 
     // ---- Tile vacío: MVT válido sin capas --------------------------------
