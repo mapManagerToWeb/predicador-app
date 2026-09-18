@@ -40,6 +40,7 @@ describe('MapSelectionService', () => {
     getManzanaIndex: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     ocultarPoligonosNoSeleccionados: ReturnType<typeof vi.fn>;
+    fitBoundsToTerritorios: ReturnType<typeof vi.fn>;
     setCurrentTerritoryColor: ReturnType<typeof vi.fn>;
     getCurrentTerritoryColor: ReturnType<typeof vi.fn>;
     ensureTerritoryLoaded: ReturnType<typeof vi.fn>;
@@ -69,6 +70,7 @@ describe('MapSelectionService', () => {
       getManzanaIndex: vi.fn().mockReturnValue([{ territorioNumero: 1 }]),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       ocultarPoligonosNoSeleccionados: vi.fn(),
+      fitBoundsToTerritorios: vi.fn(),
       setCurrentTerritoryColor: vi.fn(),
       getCurrentTerritoryColor: vi.fn().mockReturnValue('#fff'),
       ensureTerritoryLoaded: vi.fn(),
@@ -305,6 +307,7 @@ describe('MapSelectionService', () => {
       expect(result).toEqual([5]);
       expect(state.territoriosSeleccionados()).toEqual([5]);
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
+      expect(rendering.fitBoundsToTerritorios).toHaveBeenCalledWith([5]);
       expect(state.totalManzanas()).toBe(0);
     });
 
@@ -316,6 +319,7 @@ describe('MapSelectionService', () => {
 
       expect(result).toEqual([5]);
       expect(state.territoriosSeleccionados()).toEqual([1, 5]);
+      expect(rendering.fitBoundsToTerritorios).toHaveBeenCalledWith([1, 5]);
     });
   });
 

@@ -15,6 +15,7 @@ describe('MapInitializationService', () => {
     hasCachedGeojson: ReturnType<typeof vi.fn>;
     podarGeojsonCache: ReturnType<typeof vi.fn>;
     fetchAndBuildFeatureLayers: ReturnType<typeof vi.fn>;
+    loadGeoJsonMetadata: ReturnType<typeof vi.fn>;
   };
   let selection: {
     restaurarMarcadoDesdeDB: ReturnType<typeof vi.fn>;
@@ -33,6 +34,7 @@ describe('MapInitializationService', () => {
       hasCachedGeojson: vi.fn(() => false),
       podarGeojsonCache: vi.fn(),
       fetchAndBuildFeatureLayers: vi.fn().mockResolvedValue(undefined),
+      loadGeoJsonMetadata: vi.fn().mockResolvedValue(undefined),
     };
     selection = {
       restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined),
@@ -85,6 +87,7 @@ describe('MapInitializationService', () => {
     await service.initialize(document.createElement('div'), vi.fn());
 
     expect(rendering.fetchAndBuildFeatureLayers).toHaveBeenCalled();
+    expect(rendering.loadGeoJsonMetadata).toHaveBeenCalled();
   });
 
   it('handles fetch errors gracefully', async () => {

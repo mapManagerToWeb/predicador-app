@@ -5,6 +5,7 @@ import { Profile } from '../../../core/services/profile';
 import { Toast } from '../../../core/services/toast';
 import { WhatsAppService } from './whatsapp';
 import { MapCanvasCaptureService } from './map-canvas-capture.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import type { ManzanaMarcada, FeatureLayer, DatosParciales } from '../types/map.types';
 import { makeLatLng } from '../map-geometry';
 import type { UserProfile } from '../../../core/models/models';
@@ -27,6 +28,7 @@ describe('MapReportService', () => {
         { provide: Toast, useValue: {} },
         { provide: WhatsAppService, useValue: {} },
         { provide: MapCanvasCaptureService, useValue: canvasCapture },
+        { provide: MapRenderingFacade, useValue: { getManzanaCountByTerritorio: () => 0 } },
       ],
     });
     service = TestBed.inject(MapReportService);
