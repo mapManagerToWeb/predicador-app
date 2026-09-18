@@ -67,6 +67,7 @@ public class TileService {
     private final TerritoryTileRepository repo;
     private final S2CoverService s2Cover;
     private final DataVersionService versions;
+    private final TerritoryColorResolver colorResolver;
     private final TileProperties props;
     private final GeometryFactory geometryFactory = new GeometryFactory();
     private final WKBReader wkbReader;
@@ -81,10 +82,12 @@ public class TileService {
     private final Counter routeDissolved;
 
     public TileService(TerritoryTileRepository repo, S2CoverService s2Cover,
-                       DataVersionService versions, TileProperties props, MeterRegistry registry) {
+                       DataVersionService versions, TerritoryColorResolver colorResolver,
+                       TileProperties props, MeterRegistry registry) {
         this.repo = repo;
         this.s2Cover = s2Cover;
         this.versions = versions;
+        this.colorResolver = colorResolver;
         this.props = props;
         this.wkbReader = new WKBReader(geometryFactory);
         this.cache = Caffeine.newBuilder()
@@ -216,6 +219,20 @@ public class TileService {
         }
     }
 
+    /**
+     * Color del feature MVT: la fila DB gana; si {@code territory_settings}
+     * no tiene color, se resuelve con la misma paleta del endpoint
+     * {@code /colors} (paridad con el mapa desplegado). El gris
+     * {@link #DEFAULT_COLOR} queda solo como último recurso.
+     */
+    private String resolveColor(Long territorioNumero, String rowColor) {
+        if (rowColor != null) {
+            return rowColor;
+        }
+        String resolved = colorResolver.colorFor(territorioNumero);
+        return resolved != null ? resolved : DEFAULT_COLOR;
+    }
+
     private int encodeManzanas(VectorTile.Tile.Layer.Builder layer, MvtLayerProps layerProps,
                                UserDataKeyValueMapConverter converter,
                                List<TerritoryTileRepository.ManzanaTileRow> rows,
@@ -238,7 +255,7 @@ public class TileService {
                         "fid", row.getId(),
                         "territorio", row.getTerritorioPadre(),
                         "bloque", row.getNombreBloque() != null ? row.getNombreBloque() : "",
-                        "color", row.getColor() != null ? row.getColor() : DEFAULT_COLOR));
+                        "color", resolveColor(row.getTerritorioPadre(), row.getColor())));
                 JtsAdapter.addFeatures(layer, tileGeom, layerProps, converter);
                 count++;
             } catch (Exception ex) {
@@ -270,7 +287,7 @@ public class TileService {
                 }
                 tileGeom.setUserData(Map.<String, Object>of(
                         "tid", row.getTerritorioPadre(),
-                        "color", row.getColor() != null ? row.getColor() : DEFAULT_COLOR,
+                        "color", resolveColor(row.getTerritorioPadre(), row.getColor()),
                         "nombre", "Territorio " + row.getTerritorioPadre(),
                         "total", row.getTotalManzanas()));
                 JtsAdapter.addFeatures(layer, tileGeom, layerProps, converter);
