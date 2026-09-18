@@ -158,6 +158,7 @@ export class MapSelectionService {
     );
 
     this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
+    this.rendering.fitBoundsToTerritorios(this.state.territoriosSeleccionados());
     this.updateTotalManzanas(numeros);
 
     return numeros;

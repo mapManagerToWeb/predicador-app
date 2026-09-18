@@ -4,6 +4,107 @@ import { MapVectorTileService } from './map-vector-tile.service';
 import type { TerritorioService } from '../../../core/services/territorio';
 import type { FeatureLayer, TerritorioCacheData } from '../types/map.types';
 import type { MapEngine } from './map-engine.interface';
+import type * as GeoJSON from 'geojson';
+
+/** Bounding box expressed as [west, south, east, north] in lng/lat. */
+export type GeojsonBounds = [number, number, number, number];
+
+/**
+ * Per-territory metadata derived once from the `/all/geojson` snapshot
+ * (the source of truth also used by the deployed Leaflet app):
+ * manzana counts, bounds (fitBounds focus), label centroids (bounds
+ * center) and the raw features (marked overlay / partial draw).
+ */
+export interface TerritorioMetadata {
+  manzanaCounts: Map<number, number>;
+  boundsByTerritorio: Map<number, GeojsonBounds>;
+  centroidsByTerritorio: Map<number, [number, number]>;
+  featuresByTerritorio: Map<number, GeoJSON.Feature[]>;
+}
+
+/** FitBounds padding for territory focus (Leaflet parity: [30, 30]). */
+const TERRITORY_FOCUS_PADDING: [number, number] = [30, 30];
+
+/**
+ * Derives per-territory metadata from the GeoJSON FeatureCollection.
+ * Feature properties use the snake_case keys served by the backend
+ * (`territorio_padre`, `id`, `nombre_bloque`, `color`).
+ */
+export function buildTerritorioMetadata(fc: GeoJSON.FeatureCollection): TerritorioMetadata {
+  const manzanaCounts = new Map<number, number>();
+  const boundsByTerritorio = new Map<number, GeojsonBounds>();
+  const centroidsByTerritorio = new Map<number, [number, number]>();
+  const featuresByTerritorio = new Map<number, GeoJSON.Feature[]>();
+
+  for (const feature of fc.features) {
+    const num = Number(feature.properties?.['territorio_padre']);
+    if (!Number.isFinite(num)) continue;
+
+    manzanaCounts.set(num, (manzanaCounts.get(num) ?? 0) + 1);
+
+    const list = featuresByTerritorio.get(num) ?? [];
+    list.push(feature);
+    featuresByTerritorio.set(num, list);
+
+    const bbox = featureBBox(feature.geometry);
+    if (!bbox) continue;
+    const current = boundsByTerritorio.get(num);
+    boundsByTerritorio.set(
+      num,
+      current
+        ? [
+            Math.min(current[0], bbox[0]),
+            Math.min(current[1], bbox[1]),
+            Math.max(current[2], bbox[2]),
+            Math.max(current[3], bbox[3]),
+          ]
+        : bbox,
+    );
+  }
+
+  for (const [num, b] of boundsByTerritorio) {
+    centroidsByTerritorio.set(num, [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
+  }
+
+  return { manzanaCounts, boundsByTerritorio, centroidsByTerritorio, featuresByTerritorio };
+}
+
+/** Bounding box of a feature geometry (polygons and points only — the app's data). */
+function featureBBox(geometry: GeoJSON.Geometry | null): GeojsonBounds | null {
+  if (!geometry) return null;
+  switch (geometry.type) {
+    case 'Polygon':
+      return coordinatesBBox(geometry.coordinates);
+    case 'MultiPolygon':
+      return coordinatesBBox(geometry.coordinates.flat());
+    case 'Point':
+      return [
+        geometry.coordinates[0],
+        geometry.coordinates[1],
+        geometry.coordinates[0],
+        geometry.coordinates[1],
+      ];
+    default:
+      return null;
+  }
+}
+
+function coordinatesBBox(rings: GeoJSON.Position[][]): GeojsonBounds | null {
+  let bbox: GeojsonBounds | null = null;
+  for (const ring of rings) {
+    for (const [x, y] of ring) {
+      if (!bbox) {
+        bbox = [x, y, x, y];
+      } else {
+        if (x < bbox[0]) bbox[0] = x;
+        if (y < bbox[1]) bbox[1] = y;
+        if (x > bbox[2]) bbox[2] = x;
+        if (y > bbox[3]) bbox[3] = y;
+      }
+    }
+  }
+  return bbox;
+}
 
 /**
  * Facade that coordinates map sub-services.
@@ -35,11 +136,12 @@ export class MapRenderingFacade {
   private readonly featureLayers = new Map<number, FeatureLayer>();
 
   /**
-   * Manzana count per territory, populated alongside featureLayers.
-   * In MapLibre mode this is 0 until we query tile data — used as a
-   * fallback for the progress display.
+   * Per-territory metadata derived from the `/all/geojson` snapshot.
+   * Populated by {@link loadGeoJsonMetadata}; absent (null) when the
+   * fetch fails — tiles still render, but counters/labels/overlay are
+   * unavailable (same degradation as the colors-only path).
    */
-  private readonly manzanaCounts = new Map<number, number>();
+  private metadata: TerritorioMetadata | null = null;
 
   /**
    * Attach the active map engine. Called once during map initialization;
@@ -100,8 +202,83 @@ export class MapRenderingFacade {
     return this.featureLayers.get(territorioNum);
   }
 
+  // ─── GeoJSON metadata (counts, bounds, centroids, features) ─────────
+
+  /**
+   * Fetches and parses the one-time `/all/geojson` snapshot, deriving
+   * per-territory manzana COUNTS, BOUNDS (fitBounds focus), label
+   * CENTROIDS and the raw FEATURES (marked overlay / partial draw).
+   * Fail-tolerant: on error the metadata stays null and tiles keep
+   * rendering normally.
+   */
+  async loadGeoJsonMetadata(territorioService: TerritorioService): Promise<void> {
+    try {
+      const raw = await territorioService.getAllGeoJson();
+      this.metadata = buildTerritorioMetadata(JSON.parse(raw) as GeoJSON.FeatureCollection);
+    } catch {
+      this.metadata = null;
+    }
+  }
+
+  /** Real per-territory manzana count from the GeoJSON snapshot. */
   getManzanaCountByTerritorio(territorioNum: number): number {
-    return this.manzanaCounts.get(territorioNum) ?? 0;
+    return this.metadata?.manzanaCounts.get(territorioNum) ?? 0;
+  }
+
+  /** Territory bounding box from the GeoJSON snapshot, or null if unknown. */
+  getBoundsByTerritorio(territorioNum: number): GeojsonBounds | null {
+    return this.metadata?.boundsByTerritorio.get(territorioNum) ?? null;
+  }
+
+  /** Label centroid (bounds center) for a territory, or null if unknown. */
+  getCentroidByTerritorio(territorioNum: number): [number, number] | null {
+    return this.metadata?.centroidsByTerritorio.get(territorioNum) ?? null;
+  }
+
+  /** Raw GeoJSON features of a territory (marked overlay / partial draw). */
+  getGeoJsonFeaturesByTerritorio(territorioNum: number): GeoJSON.Feature[] {
+    return this.metadata?.featuresByTerritorio.get(territorioNum) ?? [];
+  }
+
+  /** Territory numbers present in the GeoJSON metadata. */
+  getTerritoriosConMetadata(): number[] {
+    return this.metadata ? Array.from(this.metadata.manzanaCounts.keys()) : [];
+  }
+
+  hasGeoJsonMetadata(): boolean {
+    return this.metadata !== null;
+  }
+
+  /**
+   * Focus the map on the union of the given territories (Leaflet parity:
+   * fitBounds with [30, 30] padding). No-op when the engine is not
+   * attached or the bounds are unknown (metadata not loaded yet).
+   */
+  fitBoundsToTerritorios(numeros: number[]): void {
+    if (!this.engine || numeros.length === 0) return;
+
+    let union: GeojsonBounds | null = null;
+    for (const n of numeros) {
+      const b = this.getBoundsByTerritorio(n);
+      if (!b) continue;
+      union = union
+        ? [
+            Math.min(union[0], b[0]),
+            Math.min(union[1], b[1]),
+            Math.max(union[2], b[2]),
+            Math.max(union[3], b[3]),
+          ]
+        : b;
+    }
+    if (!union) return;
+
+    this.engine.fitBounds(
+      [
+        [union[0], union[1]],
+        [union[2], union[3]],
+      ],
+      { padding: TERRITORY_FOCUS_PADDING },
+    );
   }
 
   // ─── Visibility ──────────────────────────────────────────────────

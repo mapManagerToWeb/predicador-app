@@ -4,6 +4,7 @@ import { Profile } from '../../../core/services/profile';
 import { Toast } from '../../../core/services/toast';
 import { WhatsAppService } from './whatsapp';
 import { MapCanvasCaptureService } from './map-canvas-capture.service';
+import { MapRenderingFacade } from './map-rendering.facade';
 import type {
   RegistroReporte,
   Reporte,
@@ -22,6 +23,7 @@ export class MapReportService {
   private toastService = inject(Toast);
   private whatsappService = inject(WhatsAppService);
   private canvasCapture = inject(MapCanvasCaptureService);
+  private rendering = inject(MapRenderingFacade);
 
   buildRegistros(
     marcadas: ManzanaMarcada[],
@@ -180,8 +182,9 @@ export class MapReportService {
 
   private countTotalManzanas(featureLayer: FeatureLayer | undefined, fallback: number): number {
     if (!featureLayer) return fallback;
-    // In MapLibre mode, feature layers are empty — use the count from the tile data
-    return fallback;
+    // Real per-territory count from the /all/geojson snapshot (Leaflet parity).
+    const total = this.rendering.getManzanaCountByTerritorio(featureLayer.territorioPadre);
+    return total > 0 ? total : fallback;
   }
 
   async sendWhatsApp(request: WhatsAppSendRequest): Promise<boolean> {

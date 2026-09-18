@@ -92,16 +92,19 @@ export class MapPage implements OnDestroy {
 
     this.maplibreEngine.set(engine);
 
-    // Initialize vector tile layers (fill, line, labels)
+    // Initialize vector tile layers (fill, line)
     this.vectorTile.initLayers(engine);
     this.rendering.attachEngine(engine);
-    this.labelLayer.initLabels(engine);
 
     // Start version-aware refresh polling
     this.tileVersion.startPolling(engine);
 
-    // Load territory metadata (colors, FeatureLayers) and restore marks
+    // Load territory metadata (colors, GeoJSON snapshot) and restore marks,
+    // then initialize labels from the snapshot centroids (Leaflet parity:
+    // territory number at the territory centroid, filtered to selection).
     await this.initialization.loadAllTerritoriesPublic();
+    this.labelLayer.initLabels(engine);
+    this.labelLayer.updateLabels(engine, this.state.territoriosSeleccionados());
 
     // ─── F3.3: GPU Picking — register MapLibre event handlers ────
     this.maplibreClickHandler = (e: MapLayerMouseEvent | MapLayerTouchEvent) =>
@@ -123,6 +126,7 @@ export class MapPage implements OnDestroy {
     // Si se recibe un array vacío, limpiar selección y restaurar visibilidad
     if (numeros.length === 0) {
       this.selection.limpiarMarcas();
+      this.syncLabels();
       return;
     }
 
@@ -136,6 +140,15 @@ export class MapPage implements OnDestroy {
         return this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
       })
     );
+
+    this.syncLabels();
+  }
+
+  /** Reflect the current selection on the label layer (territory numbers). */
+  private syncLabels(): void {
+    const engine = this.maplibreEngine();
+    if (!engine) return;
+    this.labelLayer.updateLabels(engine, this.state.territoriosSeleccionados());
   }
 
 
@@ -346,6 +359,7 @@ export class MapPage implements OnDestroy {
 
   limpiarMarcas(): void {
     this.selection.limpiarMarcas();
+    this.syncLabels();
   }
 
   async guardarYEnviar(): Promise<void> {

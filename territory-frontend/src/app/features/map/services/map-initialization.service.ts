@@ -28,9 +28,13 @@ export class MapInitializationService {
     this.state.isLoading.set(true);
 
     try {
-      // In MapLibre mode, fetch territory colors to populate FeatureLayer
-      // metadata needed by selection, marking, restoration, and save flows.
-      await this.rendering.fetchAndBuildFeatureLayers(this.territorioService);
+      // In MapLibre mode, fetch territory colors + the one-time GeoJSON
+      // snapshot (counts, bounds, label centroids, raw features) needed by
+      // selection, marking, restoration, counters, labels and save flows.
+      await Promise.all([
+        this.rendering.fetchAndBuildFeatureLayers(this.territorioService),
+        this.rendering.loadGeoJsonMetadata(this.territorioService),
+      ]);
 
       // Restore marks from DB/cache for previously worked territories
       await this.restoreAllMarks();
