@@ -2,8 +2,6 @@ package com.predicador.territory.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.predicador.territory.model.ManzanaTerritorio;
-import com.predicador.territory.repository.TerritoryRepository;
 import com.predicador.territory.tile.S2BackfillService;
 import com.predicador.territory.tile.TileProperties;
 import com.predicador.territory.tile.TileService;
@@ -98,7 +96,6 @@ class TilePipelineIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private TileProperties props;
     @Autowired private S2BackfillService backfill;
-    @Autowired private TerritoryRepository territoryRepo;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TileService tileService;
 
@@ -114,12 +111,11 @@ class TilePipelineIntegrationTest {
     private static final int Y14 = 9809;
 
     private void persistManzana(long id, long territorio, String bloque, String ringWkt) {
-        ManzanaTerritorio m = new ManzanaTerritorio();
-        m.setId(id);
-        m.setTerritorioPadre(territorio);
-        m.setNombreBloque(bloque);
-        m.setGeometry("SRID=4326;POLYGON ((" + ringWkt + "))");
-        territoryRepo.save(m);
+        // The schema requires GeometryZ; bind WKT as text and convert explicitly in PostGIS.
+        jdbc.update("""
+                INSERT INTO manzanas_territorio (id, territorio_padre, nombre_bloque, geometry)
+                VALUES (?, ?, ?, ST_Force3D(ST_GeomFromText(?, 4326)))
+                """, id, territorio, bloque, "POLYGON ((" + ringWkt + "))");
     }
 
     private void reRunBackfill() {
@@ -308,6 +304,7 @@ class TilePipelineIntegrationTest {
                 .andExpect(jsonPath("$.tilejson").value("3.0.0"))
                 .andExpect(jsonPath("$.minzoom").value(0))
                 .andExpect(jsonPath("$.maxzoom").value(19))
+                .andExpect(jsonPath("$.data_version").value(1))
                 .andExpect(jsonPath("$.tiles[0]").value("/api/v1/territories/tiles/{z}/{x}/{y}.pbf"))
                 .andExpect(jsonPath("$.vector_layers[?(@.id == 'manzana')]").exists())
                 .andExpect(jsonPath("$.vector_layers[?(@.id == 'territorio')]").exists())

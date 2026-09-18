@@ -1,5 +1,7 @@
 package com.predicador.territory.tile;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 
 /**
@@ -14,6 +16,8 @@ import java.util.List;
  * @param bounds       [minlon, minlat, maxlon, maxlat] en grados (WGS-84)
  * @param tiles        plantillas de URL de tiles (xyz)
  * @param vectorLayers descripción de capas y campos (schema de propiedades)
+ * @param dataVersion  versión de datos vigente (app_meta.data_version) para
+ *                     cache-busting determinista de tiles en el cliente
  */
 public record TileJson(
         String tilejson,
@@ -22,7 +26,8 @@ public record TileJson(
         int maxzoom,
         double[] bounds,
         List<String> tiles,
-        List<TileJsonVectorLayer> vector_layers) {
+        List<TileJsonVectorLayer> vector_layers,
+        @JsonProperty("data_version") long dataVersion) {
 
     public TileJson {
         if (bounds != null && bounds.length != 4) {

@@ -145,13 +145,15 @@ class TileControllerTest {
                 List.of("/api/v1/territories/tiles/{z}/{x}/{y}.pbf"),
                 List.of(
                         new TileJsonVectorLayer("manzana", Map.of("fid", "Number"), 12, 19),
-                        new TileJsonVectorLayer("territorio", Map.of("tid", "Number"), 0, 11)));
+                        new TileJsonVectorLayer("territorio", Map.of("tid", "Number"), 0, 11)),
+                1L);
         when(tileJsonService.tileJson()).thenReturn(tj);
 
         mockMvc.perform(get("/api/v1/territories/tiles.json"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.tilejson").value("3.0.0"))
+                .andExpect(jsonPath("$.data_version").value(1))
                 .andExpect(jsonPath("$.maxzoom").value(19))
                 .andExpect(jsonPath("$.vector_layers[?(@.id == 'manzana')].minzoom")
                         .value(org.hamcrest.Matchers.hasItem(12)))

@@ -25,11 +25,16 @@ public class TileJsonService {
 
     private final TerritoryTileRepository repo;
     private final TileProperties props;
+    private final DataVersionService dataVersionService;
     private final Cache<String, double[]> boundsCache;
 
-    public TileJsonService(TerritoryTileRepository repo, TileProperties props) {
+    public TileJsonService(
+            TerritoryTileRepository repo,
+            TileProperties props,
+            DataVersionService dataVersionService) {
         this.repo = repo;
         this.props = props;
+        this.dataVersionService = dataVersionService;
         this.boundsCache = Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofHours(1))
                 .maximumSize(1)
@@ -62,7 +67,8 @@ public class TileJsonService {
                                         "nombre", "String",
                                         "total", "Number"),
                                 0,
-                                props.s2ZMin() - 1)));
+                                props.s2ZMin() - 1)),
+                dataVersionService.current());
     }
 
     private double[] bounds() {

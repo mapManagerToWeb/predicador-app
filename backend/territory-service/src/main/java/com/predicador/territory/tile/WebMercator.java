@@ -3,15 +3,31 @@ package com.predicador.territory.tile;
 import org.locationtech.jts.geom.Envelope;
 
 /**
- * Conversión Web Mercator (EPSG:3857) bidireccional para tiles xyz.
+ * Conversión Web Mercator (EPSG:3857) bidireccional para tiles xyz (TMS).
  *
- * <p>El tile en coordenadas de tile (0..extent) es la jurisdicción del
- * encoder MVT. El tile en metros 3857 es la jurisdicción de JTS
- * (simplify, clip). El tile en lon/lat es la jurisdicción de S2
- * (cobertura de rects).</p>
+ * <p>Convenciones de coordenadas:</p>
+ * <ul>
+ *   <li><b>lon/lat</b>: grados, latitud norte positiva.</li>
+ *   <li><b>metros 3857</b>: eje y con origen en el ecuador y positivo al
+ *       norte (misma convención que {@code ST_Transform(..., 3857)} y el
+ *       encoder JTS). El mundo abarca {@code [-WORLD_WIDTH/2, +WORLD_WIDTH/2]}.</li>
+ *   <li><b>xyz/TMS</b>: {@code y = 0} en el borde norte; las filas crecen
+ *       hacia el sur.</li>
+ * </ul>
  *
- * <p>Width del mundo: {@code 2 * PI * 6378137 = 40075016.686 m}
- * (WGS-84 semieje mayor).</p>
+ * <p><b>Fix (2026-09-17/18):</b> {@code tileEnvelopeMeters} usaba
+ * coordenadas de <em>grilla TMS</em> ({@code x ∈ [0, WORLD_WIDTH]},
+ * {@code y ∈ [0, WORLD_WIDTH]} con origen en el sur) mientras
+ * {@code metersToLonLat} las interpretaba con origen en el norte y el
+ * oeste. La composición espejaba toda latitud al hemisferio opuesto y
+ * desplazaba el eje x medio mundo al este: el envelope de cada tile quedaba
+ * a ~20.000 km de las geometrías reales (tiles MVT vacíos en producción,
+ * clip JTS sin intersecciones). Ahora el envelope en metros es EPSG:3857
+ * real en AMBOS ejes (x ∈ [−WORLD_WIDTH/2, +WORLD_WIDTH/2], y = 0 en el
+ * ecuador, norte positivo) — la misma convención que
+ * {@code ST_Transform(geometry, 3857)} — y la latitud usa
+ * {@code atan(sinh(y/R))}. {@code metersToLonLat} ya no aplica el offset
+ * de ±180°: la longitud es la conversión directa {@code x * 360 / W}.</p>
  */
 public final class WebMercator {
 
@@ -20,28 +36,38 @@ public final class WebMercator {
 
     /**
      * Latitud máxima de Web Mercator (clamp): más allá de este valor
-     * la proyección es asintótica. La fórmula de yMetersToLat ya trunca
-     * para evitar celdas S2 degeneradas en polos.
+     * la proyección es asintótica. La fórmula de {@code metersToLat} ya
+     * trunca para evitar celdas S2 degeneradas en polos.
      */
     public static final double MAX_LATITUDE = 85.05112877980659;
+
+    /** Radio terrestre WGS-84 (semieje mayor) en metros = WORLD_WIDTH / 2π. */
+    private static final double EARTH_RADIUS = WORLD_WIDTH / (2.0 * Math.PI);
 
     private WebMercator() {
         // util class
     }
 
     /**
-     * Envelope en metros 3857 de un tile xyz. x/y son 0-based en el
+     * Envelope en metros EPSG:3857 de un tile xyz. x/y son 0-based en el
      * esquema Tile Map Service (TMS): y = 0 → borde norte.
      *
-     * @return envelope con eje x ∈ [0, WORLD_WIDTH], eje y ∈ [0, WORLD_WIDTH]
+     * <p>Convención EPSG:3857 absoluta (idéntica a {@code ST_Transform(…,
+     * 3857)}): {@code x ∈ [−WORLD_WIDTH/2, +WORLD_WIDTH/2]} con el
+     * antimeridiano en {@code -WORLD_WIDTH/2}, e {@code y ∈ [−WORLD_WIDTH/2,
+     * +WORLD_WIDTH/2]} con el ecuador en 0. El clip del encoder JTS y las
+     * geometrías leídas de PostGIS comparten este sistema — la regresión de
+     * 2026-09-18 (tiles vacíos por desajuste de medio mundo en x).</p>
+     *
+     * @return envelope con ambos ejes en [−WORLD_WIDTH/2, +WORLD_WIDTH/2]
      */
     public static Envelope tileEnvelopeMeters(int z, int x, int y) {
         long n = 1L << z;
         double tileSize = WORLD_WIDTH / n;
-        double minx = x * tileSize;
-        double maxx = (x + 1) * tileSize;
-        double maxy = WORLD_WIDTH - y * tileSize;
-        double miny = WORLD_WIDTH - (y + 1) * tileSize;
+        double minx = -WORLD_WIDTH / 2.0 + x * tileSize;
+        double maxx = -WORLD_WIDTH / 2.0 + (x + 1) * tileSize;
+        double maxy = WORLD_WIDTH / 2.0 - y * tileSize;
+        double miny = WORLD_WIDTH / 2.0 - (y + 1) * tileSize;
         return new Envelope(minx, maxx, miny, maxy);
     }
 
@@ -52,17 +78,7 @@ public final class WebMercator {
      * @return envelope con x = lon (grados), y = lat (grados, norte arriba)
      */
     public static Envelope tileBoundsLonLat(int z, int x, int y) {
-        long n = 1L << z;
-        double minLon = x * 360.0 / n - 180.0;
-        double maxLon = (x + 1) * 360.0 / n - 180.0;
-        double latTop = yMetersToLat(y * WORLD_WIDTH / n);
-        double latBottom = yMetersToLat((y + 1) * WORLD_WIDTH / n);
-        // Clamp explícito: yMetersToLat ya trunca, pero por robustez
-        double clampedTop = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latTop));
-        double clampedBottom = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latBottom));
-        double south = Math.min(clampedTop, clampedBottom);
-        double north = Math.max(clampedTop, clampedBottom);
-        return new Envelope(minLon, maxLon, south, north);
+        return metersToLonLat(tileEnvelopeMeters(z, x, y));
     }
 
     /**
@@ -73,11 +89,11 @@ public final class WebMercator {
     }
 
     /**
-     * Convierte la fila xyz de TMS a grados de latitud (sistema
-     * {@link com.google.common.geometry.S2LatLng} — clamped a ±85.05°).
+     * Convierte la fila xyz de TMS a grados de latitud del borde norte
+     * de la fila (sistema TMS — la fila 0 empieza en +85.05°).
      */
     public static double yToLat(int z, int y) {
-        return yMetersToLat(y * WORLD_WIDTH / (1L << z));
+        return metersToLat(WORLD_WIDTH / 2.0 - y * (WORLD_WIDTH / (1L << z)));
     }
 
     /**
@@ -89,19 +105,28 @@ public final class WebMercator {
      * {@link S2CoverService#coverOfTile(int, int, int, Envelope)} normaliza.
      * La latitud sí se clampa a ±{@link #MAX_LATITUDE} (la proyección es
      * asintótica en los polos y un rect de tile nunca la supera).</p>
+     *
+     * <p>Convención EPSG:3857 absoluta (fix 2026-09-18): la longitud es
+     * {@code x * 360 / WORLD_WIDTH} — un x negativo (oeste del meridiano 0)
+     * da una longitud negativa, sin offset de ±180 como antes.</p>
      */
     public static Envelope metersToLonLat(Envelope metersEnv) {
-        double minLon = metersEnv.getMinX() / WORLD_WIDTH * 360.0 - 180.0;
-        double maxLon = metersEnv.getMaxX() / WORLD_WIDTH * 360.0 - 180.0;
-        double minLat = yMetersToLat(metersEnv.getMinY());
-        double maxLat = yMetersToLat(metersEnv.getMaxY());
+        double minLon = metersEnv.getMinX() / WORLD_WIDTH * 360.0;
+        double maxLon = metersEnv.getMaxX() / WORLD_WIDTH * 360.0;
+        double minLat = metersToLat(metersEnv.getMinY());
+        double maxLat = metersToLat(metersEnv.getMaxY());
         double south = Math.min(minLat, maxLat);
         double north = Math.max(minLat, maxLat);
         return new Envelope(minLon, maxLon, south, north);
     }
 
-    private static double yMetersToLat(double yMeters) {
-        double latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * yMeters / WORLD_WIDTH)));
+    /**
+     * Latitud en grados (clamp ±{@link #MAX_LATITUDE}) desde y-meters
+     * EPSG:3857 (ecuador = 0, norte positivo). Inversa de la proyección
+     * Mercator esférica: {@code lat = atan(sinh(y / R))}.
+     */
+    private static double metersToLat(double yMeters) {
+        double latRad = Math.atan(Math.sinh(yMeters / EARTH_RADIUS));
         double latDeg = Math.toDegrees(latRad);
         return Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latDeg));
     }

@@ -202,6 +202,56 @@ class TileServiceTest {
         verifyNoMoreInteractions(repo);
     }
 
+    // ---- Regresión del eje x EPSG:3857 (fix 2026-09-18) ------------------
+    // Producción: ST_Transform(geometry, 3857) devuelve x NEGATIVA para
+    // Chile (oeste del meridiano 0). Antes el envelope del tile se construía
+    // con la posición de grilla TMS x ∈ [0, WORLD_WIDTH] (~ +11.86e6 m para
+    // z10/303) → el clip JTS nunca intersectaba las geometrías reales
+    // (~ -8.17e6 m) y TODOS los tiles salían vacíos.
+
+    @Test
+    void render_z10_dissolvedGeometryWithNegativeX_encodesFeature() throws Exception {
+        // Polígono disuelto realista en EPSG:3857 absoluto (Concepción),
+        // dentro del tile z10/303/627.
+        Envelope tileEnv = WebMercator.tileEnvelopeMeters(10, 303, 627);
+        double cx = -8174894.46; // lon -73.44
+        double cy = -4508396.0;  // lat -37.5
+        byte[] wkb = polygonWkb(cx - 2000, cy - 2000, cx + 2000, cy + 2000);
+
+        when(versions.current()).thenReturn(1L);
+        when(repo.findDisueltoCandidates(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of(disueltoRow(7, 25, "#3cb44b", wkb)));
+
+        TileEntry entry = service.render(10, 303, 627);
+
+        VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(entry.gzippedPbf()));
+        assertThat(tile.getLayersCount()).isEqualTo(1);
+        assertThat(tile.getLayers(0).getName()).isEqualTo("territorio");
+        assertThat(tile.getLayers(0).getFeaturesCount()).isEqualTo(1);
+    }
+
+    @Test
+    void render_z10_dissolvedGeometrySpanningTileBoundary_clipsAndEncodes() throws Exception {
+        // Geometría gigante (todo Concepción, ~10 km) que EXCEDE el tile por
+        // el oeste: el encoder debe intersectar/clipear, no descartar.
+        double cx = -8174894.46;
+        double cy = -4508396.0;
+        byte[] wkb = polygonWkb(cx - 5000, cy - 6000, cx + 20000, cy + 4000);
+
+        when(versions.current()).thenReturn(1L);
+        when(repo.findDisueltoCandidates(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of(disueltoRow(7, 25, "#3cb44b", wkb)));
+
+        TileEntry entry = service.render(10, 303, 627);
+
+        VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(entry.gzippedPbf()));
+        assertThat(tile.getLayers(0).getName()).isEqualTo("territorio");
+        assertThat(tile.getLayers(0).getFeaturesCount()).isEqualTo(1);
+        // El feature clipeado conserva las tags del disuelto (tid/color/nombre/total)
+        // aunque el id MVT quede sin set (la capa disuelta no emite "fid").
+        assertThat(tile.getLayers(0).getFeatures(0).hasId()).isFalse();
+    }
+
     // ---- Tile vacío: MVT válido sin capas --------------------------------
 
     @Test
