@@ -160,6 +160,108 @@ describe('MapEditOverlayService', () => {
     });
   });
 
+  describe('updatePartialPreview', () => {
+    it('creates the preview source and layers on first use', () => {
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      expect(mockEngine.addGeoJsonSource).toHaveBeenCalledWith('partial-preview', {
+        type: 'FeatureCollection',
+        features: [],
+      });
+      expect(mockEngine.addLayer).toHaveBeenCalledTimes(2);
+    });
+
+    it('paints the Leaflet partialPolygon style (fill 0.75, weight 4, dash 8/8)', () => {
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      expect(mockEngine.addLayer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'partial-preview-fill',
+          type: 'fill',
+          source: 'partial-preview',
+          paint: {
+            'fill-color': ['coalesce', ['get', 'color'], '#22c55e'],
+            'fill-opacity': 0.75,
+          },
+        }),
+      );
+      expect(mockEngine.addLayer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'partial-preview-line',
+          type: 'line',
+          source: 'partial-preview',
+          paint: {
+            'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
+            'line-width': 4,
+            // MapLibre scales line-dasharray by line-width: [2, 2] × 4px = Leaflet's '8, 8'.
+            'line-dasharray': [2, 2],
+          },
+        }),
+      );
+    });
+
+    it('pushes the polygon into the source', () => {
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      expect(mockEngine.updateGeoJsonSourceData).toHaveBeenCalledWith(
+        'partial-preview',
+        SAMPLE_GEOJSON,
+      );
+    });
+
+    it('does not recreate the layers on subsequent updates', () => {
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+      mockEngine.addLayer.mockClear();
+
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      expect(mockEngine.addLayer).not.toHaveBeenCalled();
+      expect(mockEngine.updateGeoJsonSourceData).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not require the edit overlay to be active', () => {
+      // The preview is pushed while drawing, before any geometry is edited.
+      expect(service.isOverlayActive()).toBe(false);
+
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      expect(mockEngine.updateGeoJsonSourceData).toHaveBeenCalledWith(
+        'partial-preview',
+        SAMPLE_GEOJSON,
+      );
+    });
+  });
+
+  describe('removePartialPreview', () => {
+    it('removes the preview layers and source', () => {
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      service.removePartialPreview(mockEngine);
+
+      expect(mockEngine.removeLayer).toHaveBeenCalledWith('partial-preview-fill');
+      expect(mockEngine.removeLayer).toHaveBeenCalledWith('partial-preview-line');
+      expect(mockEngine.removeSource).toHaveBeenCalledWith('partial-preview');
+    });
+
+    it('is a no-op when the preview was never created', () => {
+      service.removePartialPreview(mockEngine);
+
+      expect(mockEngine.removeLayer).not.toHaveBeenCalled();
+      expect(mockEngine.removeSource).not.toHaveBeenCalled();
+    });
+
+    it('is torn down together with the edit overlay', () => {
+      service.addOverlay(SAMPLE_GEOJSON, mockEngine);
+      service.updatePartialPreview(SAMPLE_GEOJSON, mockEngine);
+
+      service.removeOverlay(mockEngine);
+
+      expect(mockEngine.removeLayer).toHaveBeenCalledWith('partial-preview-fill');
+      expect(mockEngine.removeLayer).toHaveBeenCalledWith('partial-preview-line');
+      expect(mockEngine.removeSource).toHaveBeenCalledWith('partial-preview');
+    });
+  });
+
   describe('saveAndRefreshTiles', () => {
     it('should remove overlay and trigger version check', () => {
       service.addOverlay(SAMPLE_GEOJSON, mockEngine);

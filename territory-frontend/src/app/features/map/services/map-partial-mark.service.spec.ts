@@ -78,6 +78,8 @@ describe('MapPartialMarkService', () => {
   let overlay: {
     addOverlay: ReturnType<typeof vi.fn>;
     updateOverlay: ReturnType<typeof vi.fn>;
+    updatePartialPreview: ReturnType<typeof vi.fn>;
+    removePartialPreview: ReturnType<typeof vi.fn>;
     removeOverlay: ReturnType<typeof vi.fn>;
   };
   let territorios: { getGeoJsonByTerritorio: ReturnType<typeof vi.fn> };
@@ -94,7 +96,13 @@ describe('MapPartialMarkService', () => {
       restaurarManzanaAnterior: vi.fn(),
       limpiarParcial: vi.fn(),
     };
-    overlay = { addOverlay: vi.fn(), updateOverlay: vi.fn(), removeOverlay: vi.fn() };
+    overlay = {
+      addOverlay: vi.fn(),
+      updateOverlay: vi.fn(),
+      updatePartialPreview: vi.fn(),
+      removePartialPreview: vi.fn(),
+      removeOverlay: vi.fn(),
+    };
     territorios = {
       getGeoJsonByTerritorio: vi.fn().mockResolvedValue(JSON.stringify(TERRITORY_GEOJSON)),
     };
@@ -220,10 +228,10 @@ describe('MapPartialMarkService', () => {
       expect(toast.show).toHaveBeenCalledWith('Máximo 6 puntos');
     });
 
-    it('builds a LineString preview with the active color when the engine is set', async () => {
+    it('builds a LineString preview with the active color until the polygon can close', async () => {
       await service.iniciarDibujo('554', '56.a', '#ff0000', 56, engine);
       overlay.addOverlay.mockClear();
-      overlay.updateOverlay.mockClear();
+      overlay.updatePartialPreview.mockClear();
       rendering.getCurrentTerritoryColor.mockReturnValue('#ff0000');
 
       service.agregarPunto({ latlng: { lat: -37.35, lng: -73.25 }, edgeIdx: 0, t: 0 });
@@ -236,21 +244,43 @@ describe('MapPartialMarkService', () => {
         [-73.2, -37.3],
       ]);
       expect(fc?.features[0].properties?.['color']).toBe('#ff0000');
-      expect(overlay.updateOverlay).toHaveBeenCalledWith(fc, engine);
+      expect(overlay.updatePartialPreview).toHaveBeenCalledWith(fc, engine);
+    });
+
+    it('builds a closed, filled polygon preview once there are 3 points', async () => {
+      await service.iniciarDibujo('554', '56.a', '#ff0000', 56, engine);
+      rendering.getCurrentTerritoryColor.mockReturnValue('#ff0000');
+      overlay.updatePartialPreview.mockClear();
+
+      service.agregarPunto({ latlng: { lat: 0, lng: 0 }, edgeIdx: 0, t: 0 });
+      service.agregarPunto({ latlng: { lat: 0, lng: 1 }, edgeIdx: 0, t: 0.5 });
+      service.agregarPunto({ latlng: { lat: 1, lng: 0 }, edgeIdx: 0, t: 1 });
+
+      const fc = state.partialDrawGeoJson();
+      expect(fc?.features[0].geometry.type).toBe('Polygon');
+      expect((fc?.features[0].geometry as GeoJSON.Polygon).coordinates).toEqual([
+        [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [0, 0],
+        ],
+      ]);
+      expect(overlay.updatePartialPreview).toHaveBeenCalledWith(fc, engine);
     });
   });
 
   describe('deshacerPunto', () => {
     it('removes the last point and shrinks the preview', async () => {
       await service.iniciarDibujo('554', '56.a', '#ff0000', 56, engine);
-      overlay.updateOverlay.mockClear();
+      overlay.updatePartialPreview.mockClear();
       service.agregarPunto({ latlng: { lat: 0, lng: 0 }, edgeIdx: 0, t: 0 });
       service.agregarPunto({ latlng: { lat: 1, lng: 1 }, edgeIdx: 0, t: 0.5 });
 
       service.deshacerPunto();
 
       expect(state.puntosParciales()).toHaveLength(1);
-      expect(overlay.updateOverlay).toHaveBeenCalled();
+      expect(overlay.updatePartialPreview).toHaveBeenCalled();
     });
 
     it('clears the preview when the last point is removed', async () => {
@@ -259,6 +289,10 @@ describe('MapPartialMarkService', () => {
       service.deshacerPunto();
 
       expect(state.partialDrawGeoJson()).toBeNull();
+      expect(overlay.updatePartialPreview).toHaveBeenLastCalledWith(
+        { type: 'FeatureCollection', features: [] },
+        engine,
+      );
     });
 
     it('does nothing when empty', () => {

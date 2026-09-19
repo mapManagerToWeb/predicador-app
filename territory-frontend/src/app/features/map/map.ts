@@ -111,6 +111,7 @@ export class MapPage implements OnDestroy {
     // under the territory-number labels, which are filtered to selection).
     await this.initialization.loadAllTerritoriesPublic();
     this.rendering.initMarkedOverlay(engine);
+    this.rendering.initSelectedManzanaOverlay(engine);
     this.labelLayer.initLabels(engine);
     this.labelLayer.updateLabels(engine, this.state.territoriosSeleccionados());
     // Apply completion opacity (0.6 complete / 0.05 incomplete) and the
@@ -140,6 +141,10 @@ export class MapPage implements OnDestroy {
 
     // Si se recibe un array vacío, limpiar selección y restaurar visibilidad
     if (numeros.length === 0) {
+      // Same teardown as `limpiarTodo()`: the search-clear must abandon any
+      // in-flight partial draw, otherwise its edit/preview overlay stays
+      // painted (limpiarMarcas owns selection state, not the overlay).
+      this.partialMark.cancelarParcial();
       this.selection.limpiarMarcas();
       this.syncLabels();
       return;
@@ -216,7 +221,13 @@ export class MapPage implements OnDestroy {
     } else {
       // Set the territory color from the tile feature for marking mode
       this.rendering.setCurrentTerritoryColor(featureColor);
-      void this.handleTerritorySelection(territorioNumero);
+      void this.handleTerritorySelection(territorioNumero).then(() => {
+        // Highlight the tapped manzana AFTER the selection settles:
+        // prepareTerritorioSeleccionado clears the previous highlight.
+        if (this.state.territoriosSeleccionados().includes(territorioNumero)) {
+          this.rendering.setSelectedManzana(manzanaId, nombreBloque, territorioNumero);
+        }
+      });
     }
   }
 
@@ -362,11 +373,21 @@ export class MapPage implements OnDestroy {
   }
 
   setModoMarcado(modo: ModoMarcado): void {
+    // Leaving parcial mode mid-draw must tear the draw overlay down — the
+    // selection service owns mode state, not the overlay, so without this a
+    // stale preview survives the mode switch.
+    if (this.state.modoMarcado() === 'parcial' && modo !== 'parcial') {
+      this.partialMark.limpiarDibujo();
+    }
     this.selection.setModoMarcado(modo);
   }
 
   toggleModoCompleto(): void {
-    this.setModoMarcado(this.modoMarcado() === 'completa' ? 'none' : 'completa');
+    const actual = this.state.modoMarcado();
+    if (actual === 'parcial') {
+      this.partialMark.limpiarDibujo();
+    }
+    this.selection.setModoMarcado(actual === 'completa' ? 'none' : 'completa');
   }
 
   deshacerPunto(): void {
@@ -396,6 +417,13 @@ export class MapPage implements OnDestroy {
 
   limpiarTodo(): void {
     const hasData = this.state.manzanasById().size > 0 || this.state.territoriosSeleccionados().length > 0;
+
+    // This button doubles as "Cancelar" while a mode is active, including
+    // mid partial-draw. `limpiarMarcas()` does not own the draw overlay, so
+    // tear the in-flight draw down first — otherwise the edit geometry and
+    // the dashed preview stay painted on the map with no way to remove them.
+    this.partialMark.cancelarParcial();
+
     this.limpiarMarcas();
 
     const mlEngine = this.maplibreEngine();
@@ -421,6 +449,8 @@ export class MapPage implements OnDestroy {
       // on the next map visit (root singleton, idempotent init otherwise
       // skips the fresh engine and marks silently vanish).
       this.markedOverlay.destroy(mlEngine);
+      this.rendering.destroySelectedManzanaOverlay(mlEngine);
+      this.partialMark.limpiarDibujo();
       if (this.maplibreClickHandler) {
         mlEngine.off('click', this.maplibreClickHandler);
         this.maplibreClickHandler = null;

@@ -88,6 +88,7 @@ describe('MapPage', () => {
     deshacerPunto: ReturnType<typeof vi.fn>;
     finalizarParcial: ReturnType<typeof vi.fn>;
     cancelarParcial: ReturnType<typeof vi.fn>;
+    limpiarDibujo: ReturnType<typeof vi.fn>;
   };
   let dataPersistence: {
     guardarEnBaseDeDatos: ReturnType<typeof vi.fn>;
@@ -103,7 +104,7 @@ describe('MapPage', () => {
       setModoMarcado: vi.fn(),
     };
     initialization = { reloadAllTerritories: vi.fn().mockResolvedValue(undefined) };
-    partialMark = { deshacerPunto: vi.fn(), finalizarParcial: vi.fn(), cancelarParcial: vi.fn() };
+    partialMark = { deshacerPunto: vi.fn(), finalizarParcial: vi.fn(), cancelarParcial: vi.fn(), limpiarDibujo: vi.fn() };
     toast = { show: vi.fn() };
     dataPersistence = {
       guardarEnBaseDeDatos: vi.fn().mockResolvedValue(undefined),
@@ -114,7 +115,7 @@ describe('MapPage', () => {
       imports: [MapPage],
       providers: [
         MapStateService,
-        { provide: MapRenderingFacade, useValue: { attachEngine: vi.fn() } },
+        { provide: MapRenderingFacade, useValue: { attachEngine: vi.fn(), destroySelectedManzanaOverlay: vi.fn() } },
         { provide: MapSelectionService, useValue: selection },
         { provide: MapInitializationService, useValue: initialization },
         { provide: MapPartialMarkService, useValue: partialMark },
@@ -132,7 +133,20 @@ describe('MapPage', () => {
     it('clears marks when the selection is emptied', async () => {
       await component.onTerritorioSeleccionado([]);
 
+      // The search-clear must abandon an in-flight partial draw first:
+      // limpiarMarcas owns selection state, not the edit/preview overlay.
+      expect(partialMark.cancelarParcial).toHaveBeenCalled();
       expect(selection.limpiarMarcas).toHaveBeenCalled();
+    });
+
+    it('abandons the in-flight draw before clearing marks on search-clear', () => {
+      const order: string[] = [];
+      partialMark.cancelarParcial.mockImplementation(() => order.push('draw'));
+      selection.limpiarMarcas.mockImplementation(() => order.push('marks'));
+
+      void component.onTerritorioSeleccionado([]);
+
+      expect(order).toEqual(['draw', 'marks']);
     });
 
     it('prepares the territories and restores marks from the database', async () => {
@@ -188,6 +202,44 @@ describe('MapPage', () => {
       expect(selection.setModoMarcado).toHaveBeenCalledWith('none');
     });
 
+    it('setModoMarcado leaving parcial tears the in-flight draw down first', () => {
+      state.modoMarcado.set('parcial');
+
+      component.setModoMarcado('completa');
+
+      expect(partialMark.limpiarDibujo).toHaveBeenCalled();
+      expect(selection.setModoMarcado).toHaveBeenCalledWith('completa');
+    });
+
+    it('setModoMarcado into parcial does not tear the draw down', () => {
+      state.modoMarcado.set('none');
+
+      component.setModoMarcado('parcial');
+
+      expect(partialMark.limpiarDibujo).not.toHaveBeenCalled();
+      expect(selection.setModoMarcado).toHaveBeenCalledWith('parcial');
+    });
+
+    it('toggleModoCompleto while drawing activates completa and tears the draw down', () => {
+      state.modoMarcado.set('parcial');
+
+      component.toggleModoCompleto();
+
+      expect(partialMark.limpiarDibujo).toHaveBeenCalled();
+      expect(selection.setModoMarcado).toHaveBeenCalledWith('completa');
+    });
+
+    it('orders draw teardown before the mode switch', () => {
+      const order: string[] = [];
+      partialMark.limpiarDibujo.mockImplementation(() => order.push('draw'));
+      selection.setModoMarcado.mockImplementation(() => order.push('mode'));
+      state.modoMarcado.set('parcial');
+
+      component.setModoMarcado('completa');
+
+      expect(order).toEqual(['draw', 'mode']);
+    });
+
     it('delegates partial drawing actions', () => {
       component.deshacerPunto();
       component.finalizarParcial();
@@ -231,6 +283,24 @@ describe('MapPage', () => {
       expect(selection.limpiarMarcas).toHaveBeenCalled();
       expect(initialization.reloadAllTerritories).not.toHaveBeenCalled();
     });
+
+    it('tears down an in-flight partial draw so the preview cannot be left painted', () => {
+      // The button doubles as "Cancelar" while drawing; `limpiarMarcas()`
+      // does not own the edit/preview overlay.
+      component.limpiarTodo();
+
+      expect(partialMark.cancelarParcial).toHaveBeenCalled();
+    });
+
+    it('tears the draw down before clearing the marks', () => {
+      const order: string[] = [];
+      partialMark.cancelarParcial.mockImplementation(() => order.push('draw'));
+      selection.limpiarMarcas.mockImplementation(() => order.push('marks'));
+
+      component.limpiarTodo();
+
+      expect(order).toEqual(['draw', 'marks']);
+    });
   });
 
   it('ngOnDestroy does not throw', () => {
@@ -254,6 +324,27 @@ describe('MapPage', () => {
     // visit's initOverlay early-returns — the overlay silently never renders.
     expect(markedOverlay.isInitialized()).toBe(false);
     expect(engine.removeSource).toHaveBeenCalledWith('marked');
+  });
+
+  it('tears down the tapped-manzana highlight with the engine so a 2nd map visit re-initializes it', () => {
+    const engine = createMockMapEngine();
+    (component as unknown as { maplibreEngine: { set: (e: MapEngine) => void } }).maplibreEngine.set(engine);
+    const rendering = TestBed.inject(MapRenderingFacade) as unknown as {
+      destroySelectedManzanaOverlay: ReturnType<typeof vi.fn>;
+    };
+
+    fixture.destroy();
+
+    expect(rendering.destroySelectedManzanaOverlay).toHaveBeenCalledWith(engine);
+  });
+
+  it('tears down an in-flight partial draw when the page is destroyed', () => {
+    const engine = createMockMapEngine();
+    (component as unknown as { maplibreEngine: { set: (e: MapEngine) => void } }).maplibreEngine.set(engine);
+
+    fixture.destroy();
+
+    expect(partialMark.limpiarDibujo).toHaveBeenCalled();
   });
 });
 

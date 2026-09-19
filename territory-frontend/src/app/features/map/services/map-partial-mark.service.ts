@@ -11,6 +11,9 @@ import { makeLatLng } from '../map-geometry';
 import { TOAST_MESSAGES, MAX_PUNTOS_PARCIAL, nextParcialId } from '../utils/map-constants';
 import type * as GeoJSON from 'geojson';
 
+/** Empty preview pushed while a draw has no points yet. */
+const EMPTY_PREVIEW: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+
 /**
  * Locates the manzana feature of a territory GeoJSON snapshot that
  * corresponds to the tapped MVT manzana.
@@ -141,31 +144,41 @@ export class MapPartialMarkService {
   }
 
   /**
-   * Rebuilds the partial-draw preview (open path through the added points,
-   * in the active territory color) and pushes it through the edit overlay.
+   * Rebuilds the partial-draw preview and pushes it through the edit overlay.
+   *
+   * <p>Leaflet parity (`STYLE_DEFAULTS.partialPolygon`): from three points on,
+   * the preview is a closed, filled and dashed polygon in the active territory
+   * color, so the area being drawn is visible while it is drawn. With fewer
+   * points a polygon encloses no area, so the preview stays an open path.</p>
    */
   private actualizarPreview(): void {
     const puntos = this.state.puntosParciales();
     if (puntos.length === 0) {
       this.state.partialDrawGeoJson.set(null);
+      // Keep the preview layers in place but empty — limpiarDibujo() tears
+      // them down when the draw session ends.
+      if (this.engine) this.overlay.updatePartialPreview(EMPTY_PREVIEW, this.engine);
       return;
     }
+
+    const coordinates = puntos.map(p => [p.latlng.lng, p.latlng.lat] as [number, number]);
+    const geometry: GeoJSON.Geometry =
+      coordinates.length >= 3
+        ? { type: 'Polygon', coordinates: [[...coordinates, coordinates[0]]] }
+        : { type: 'LineString', coordinates };
 
     const fc: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: [
         {
           type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: puntos.map(p => [p.latlng.lng, p.latlng.lat] as [number, number]),
-          },
+          geometry,
           properties: { color: this.colorTerritorioActivo() },
         },
       ],
     };
     this.state.partialDrawGeoJson.set(fc);
-    if (this.engine) this.overlay.updateOverlay(fc, this.engine);
+    if (this.engine) this.overlay.updatePartialPreview(fc, this.engine);
   }
 
   private colorTerritorioActivo(): string {
@@ -244,7 +257,14 @@ export class MapPartialMarkService {
   }
 
   /** Tears down the draw overlay and preview after confirm/cancel. */
-  private limpiarDibujo(): void {
+  /**
+   * End the draw session: remove the edit/preview overlay from the engine
+   * and drop the engine reference. Public so the page can tear an in-flight
+   * draw down when the map is destroyed mid-draw (keeps the preview from
+   * leaking into a fresh engine on the next visit). Unlike
+   * `cancelarParcial()` it does not touch the draft or selection state.
+   */
+  limpiarDibujo(): void {
     if (this.engine) this.overlay.removeOverlay(this.engine);
     this.engine = null;
     this.state.partialDrawGeoJson.set(null);
