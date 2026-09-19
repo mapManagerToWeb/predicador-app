@@ -146,7 +146,15 @@ export class MapInitializationService {
   }
 
   private async revalidarTodos(layers: FeatureLayer[]): Promise<void> {
-    const todos = Array.from(this.rendering.getTerritoryDataCache().keys());
+    // MapLibre mode has no TerritoryData cache (that structure was Leaflet-era:
+    // `getTerritoryDataCache()` returns an empty map), so the loaded feature
+    // layers are the source of truth for "every known territory". Without this
+    // union the list is empty, the revalidation never runs and the marks already
+    // stored in the DB stay invisible until the user selects a territory.
+    const todos = Array.from(new Set([
+      ...layers.map(fl => fl.territorioPadre),
+      ...this.rendering.getTerritoryDataCache().keys(),
+    ]));
     const draft = this.draftService.cargar();
     const territoriosConDraft = new Set(draft?.territoriosSeleccionados ?? []);
     const sinDraft = todos.filter(n => !territoriosConDraft.has(n));

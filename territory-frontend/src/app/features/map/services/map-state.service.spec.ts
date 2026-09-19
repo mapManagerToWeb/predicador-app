@@ -113,6 +113,58 @@ describe('MapStateService', () => {
     expect(service.manzanaSeleccionadaTerritorio()).toBeNull();
     expect(service.manzanaEdges()).toEqual([]);
   });
+
+  describe('restored (display-only) marks', () => {
+    const restored = (id: string, territorioNumero: number): ManzanaMarcada =>
+      ({ id, nombreBloque: '', color: '#00A86B', territorioNumero });
+
+    it('renders restored marks without registering them as editable marks', () => {
+      service.setRestoredMarksForTerritorio(1, [restored('m1', 1), restored('m2', 1)]);
+
+      // Visible for rendering…
+      expect(service.manzanasVisiblesList().map(m => m.id).sort()).toEqual(['m1', 'm2']);
+      expect(service.manzanasVisiblesByTerritorio().get(1)).toHaveLength(2);
+      // …but NOT part of the editable marks that drive counters and the
+      // save/send payload (no duplicate WhatsApp sends for reported territories).
+      expect(service.manzanasMarcadaList()).toEqual([]);
+      expect(service.manzanasCount()).toBe(0);
+      expect(service.manzanasByTerritorio().size).toBe(0);
+    });
+
+    it('lets editable marks win over a restored mark with the same id', () => {
+      service.setRestoredMarksForTerritorio(1, [restored('m1', 1), restored('m2', 1)]);
+      service.manzanasById.set(new Map([['m2', { ...restored('m2', 1), color: '#3b82f6' }]]));
+
+      const visibles = service.manzanasVisiblesList();
+      expect(visibles).toHaveLength(2);
+      expect(visibles.find(m => m.id === 'm2')?.color).toBe('#3b82f6');
+    });
+
+    it('replaces the restored marks of one territory only', () => {
+      service.setRestoredMarksForTerritorio(1, [restored('m1', 1), restored('m2', 1)]);
+      service.setRestoredMarksForTerritorio(2, [restored('m9', 2)]);
+
+      service.setRestoredMarksForTerritorio(1, [restored('m3', 1)]);
+
+      expect(service.manzanasVisiblesList().map(m => m.id).sort()).toEqual(['m3', 'm9']);
+    });
+
+    it('drops the restored marks of a territory when handed an empty list', () => {
+      service.setRestoredMarksForTerritorio(1, [restored('m1', 1)]);
+
+      service.setRestoredMarksForTerritorio(1, []);
+
+      expect(service.manzanasVisiblesList()).toEqual([]);
+    });
+
+    it('clears restored marks on resetUIState', () => {
+      service.setRestoredMarksForTerritorio(1, [restored('m1', 1)]);
+
+      service.resetUIState();
+
+      expect(service.manzanasVisiblesList()).toEqual([]);
+    });
+  });
 });
 
 describe('MapStateService draft effect', () => {

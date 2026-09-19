@@ -161,15 +161,15 @@ describe('MapVectorTileService', () => {
       );
     });
 
-    it('should restore the base 1px line width on both line layers', () => {
+    it('should restore the base 2px line width on both line layers', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
       service.resetFillOpacity(mockEngine, []);
-      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith('territory-line', 'line-width', 1);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith('territory-line', 'line-width', 2);
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-line',
         'line-width',
-        1,
+        2,
       );
     });
   });
@@ -226,12 +226,12 @@ describe('MapVectorTileService', () => {
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-line',
         'line-width',
-        ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 1, 0],
+        ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 2, 0],
       );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-line',
         'line-width',
-        ['case', ['in', ['get', 'tid'], ['literal', [1]]], 1, 0],
+        ['case', ['in', ['get', 'tid'], ['literal', [1]]], 2, 0],
       );
     });
   });

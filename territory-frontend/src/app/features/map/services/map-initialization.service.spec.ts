@@ -16,6 +16,8 @@ describe('MapInitializationService', () => {
     podarGeojsonCache: ReturnType<typeof vi.fn>;
     fetchAndBuildFeatureLayers: ReturnType<typeof vi.fn>;
     loadGeoJsonMetadata: ReturnType<typeof vi.fn>;
+    getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
+    getTerritoryDataCache: ReturnType<typeof vi.fn>;
   };
   let selection: {
     restaurarMarcadoDesdeDB: ReturnType<typeof vi.fn>;
@@ -26,6 +28,8 @@ describe('MapInitializationService', () => {
     hasCacheReportes: ReturnType<typeof vi.fn>;
     reconciliarCacheConBackend: ReturnType<typeof vi.fn>;
     limpiarCache: ReturnType<typeof vi.fn>;
+    getReportesDesdeCache: ReturnType<typeof vi.fn>;
+    revalidarReportes: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
 
@@ -35,6 +39,8 @@ describe('MapInitializationService', () => {
       podarGeojsonCache: vi.fn(),
       fetchAndBuildFeatureLayers: vi.fn().mockResolvedValue(undefined),
       loadGeoJsonMetadata: vi.fn().mockResolvedValue(undefined),
+      getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
+      getTerritoryDataCache: vi.fn().mockReturnValue(new Map()),
     };
     selection = {
       restaurarMarcadoDesdeDB: vi.fn().mockResolvedValue(undefined),
@@ -46,6 +52,8 @@ describe('MapInitializationService', () => {
       reconciliarCacheConBackend: vi.fn(async () => null),
       limpiarCache: vi.fn(),
       getColores: vi.fn(async () => ({})),
+      getReportesDesdeCache: vi.fn(() => new Map()),
+      revalidarReportes: vi.fn(async () => new Map()),
     };
     toast = { show: vi.fn() };
     TestBed.configureTestingModule({
@@ -91,7 +99,7 @@ describe('MapInitializationService', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    territorioService.getColores.mockRejectedValue(new Error('network'));
+    rendering.fetchAndBuildFeatureLayers.mockRejectedValue(new Error('network'));
 
     await service.initialize(document.createElement('div'), vi.fn());
 
@@ -103,5 +111,42 @@ describe('MapInitializationService', () => {
     await service.reloadAllTerritories();
 
     expect(territorioService.limpiarCache).toHaveBeenCalled();
+  });
+
+  it('revalidates every loaded territory at load (the territory data cache is empty in MapLibre mode)', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 56, color: '#ff0000' },
+      { territorioPadre: 57, color: '#00ff00' },
+    ] as never);
+    rendering.getTerritoryDataCache.mockReturnValue(new Map());
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map());
+    territorioService.revalidarReportes.mockResolvedValue(new Map());
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    expect(territorioService.revalidarReportes).toHaveBeenCalledWith([56, 57]);
+  });
+
+  it('never asks for the versions of territories that hold a local draft', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 56, color: '#ff0000' },
+      { territorioPadre: 57, color: '#00ff00' },
+    ] as never);
+    rendering.getTerritoryDataCache.mockReturnValue(new Map());
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map());
+    territorioService.revalidarReportes.mockResolvedValue(new Map());
+    TestBed.inject(DraftMarksService).guardar({
+      manzanasById: { m1: { id: 'm1', nombreBloque: '', color: '#fff', territorioNumero: 56 } },
+      territoriosSeleccionados: [56],
+      territorioSeleccionado: 56,
+      datosParcialesGuardados: {},
+      modoMarcado: 'none',
+      predicacion: 'tarde',
+      savedAt: Date.now(),
+    });
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    expect(territorioService.revalidarReportes).toHaveBeenCalledWith([57]);
   });
 });

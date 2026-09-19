@@ -6,6 +6,7 @@ import { Toast } from '../../../core/services/toast';
 import { TOAST_MESSAGES, nextParcialId } from '../utils/map-constants';
 import { elegirUltimoReporte } from '../utils/report-utils';
 import type { Reporte } from '../../../core/models/models';
+import type { ManzanaMarcada } from '../types/map.types';
 
 @Injectable({ providedIn: 'root' })
 export class MapMarkRestorationService {
@@ -37,19 +38,28 @@ export class MapMarkRestorationService {
       const color = this.resolveColor(territorioNumero, colorOverride);
       const { actualizarEstadoMarcado = true } = options;
 
-      if (actualizarEstadoMarcado) {
-        this.limpiarMarcasParcialesPrevias(territorioNumero);
-      }
-
       const ultimo = elegirUltimoReporte(reportes);
       const ids = ultimo?.manzanasIds ? ultimo.manzanasIds.split(',').filter(Boolean) : [];
+      const manzanaId = ultimo?.manzanaId ? String(ultimo.manzanaId) : null;
 
-      if (!reportes.length || !ultimo) return;
+      if (actualizarEstadoMarcado) {
+        if (!reportes.length || !ultimo) return;
 
-      this.aplicarMarcas(territorioNumero, color, ultimo, ids, actualizarEstadoMarcado);
+        this.limpiarMarcasParcialesPrevias(territorioNumero);
+        // The territory's marks are promoted to editable state: drop the
+        // display-only copies so toggling one off cannot resurrect it.
+        this.state.setRestoredMarksForTerritorio(territorioNumero, []);
 
-      if (ultimo.geometriaParcial) {
-        this.restaurarGeometriaParcial(ultimo.geometriaParcial, color, territorioNumero, actualizarEstadoMarcado);
+        this.aplicarMarcas(territorioNumero, color, manzanaId, ids, true);
+
+        if (ultimo.geometriaParcial) {
+          this.restaurarGeometriaParcial(ultimo.geometriaParcial, color, territorioNumero, true);
+        }
+      } else {
+        // Display-only restore (load time / background revalidation). Always
+        // called — even without a report — so a territory whose report was
+        // deleted server-side stops rendering its cached marks.
+        this.aplicarMarcas(territorioNumero, color, manzanaId, ids, false);
       }
 
       // Re-apply completion opacity + marked overlay with the restored marks.
@@ -75,32 +85,39 @@ export class MapMarkRestorationService {
   private aplicarMarcas(
     territorioNumero: number,
     color: string,
-    ultimo: Reporte,
+    manzanaId: string | null,
     ids: string[],
     actualizarEstadoMarcado: boolean
   ): void {
-    if (!actualizarEstadoMarcado) return;
+    // In MapLibre mode, ManzanaIndex is empty — create ManzanaMarcada entries
+    // directly from the report IDs. The IDs come from the tile features and
+    // are stored in the report's manzanasIds field.
+    const marcas = new Map<string, ManzanaMarcada>();
+    for (const id of ids) {
+      marcas.set(id, { id, nombreBloque: '', color, territorioNumero });
+    }
+    if (manzanaId) {
+      marcas.set(manzanaId, { id: manzanaId, nombreBloque: '', color, territorioNumero });
+    }
 
-    const manzanaId = ultimo.manzanaId ? String(ultimo.manzanaId) : null;
+    if (!actualizarEstadoMarcado) {
+      // Display-only: painting is derived from state in MapLibre, so the marks
+      // must land somewhere rendering can see — just not in `manzanasById`,
+      // which drives the save/send payload.
+      this.state.setRestoredMarksForTerritorio(territorioNumero, Array.from(marcas.values()));
+      return;
+    }
+
     const existingIds = new Set(
       this.state.manzanasByTerritorio().get(territorioNumero)?.map(m => m.id) ?? []
     );
 
-    // In MapLibre mode, ManzanaIndex is empty — create ManzanaMarcada entries
-    // directly from the report IDs. The IDs come from the tile features and
-    // are stored in the report's manzanasIds field.
     const newMap = new Map(this.state.manzanasById());
     let changed = false;
 
-    for (const id of ids) {
-      if (!existingIds.has(id)) {
-        newMap.set(id, { id, nombreBloque: '', color, territorioNumero });
-        changed = true;
-      }
-    }
-
-    if (manzanaId && !existingIds.has(manzanaId)) {
-      newMap.set(manzanaId, { id: manzanaId, nombreBloque: '', color, territorioNumero });
+    for (const [id, marca] of marcas) {
+      if (existingIds.has(id)) continue;
+      newMap.set(id, marca);
       changed = true;
     }
 

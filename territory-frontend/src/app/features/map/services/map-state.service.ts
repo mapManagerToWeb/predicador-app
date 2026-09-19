@@ -78,6 +78,54 @@ export class MapStateService {
     return map;
   });
 
+  /**
+   * Marks rebuilt from the backend (DB or localStorage cache) for DISPLAY ONLY.
+   *
+   * <p>Leaflet parity (`restaurarConReportes(..., { actualizarEstadoMarcado: false })`):
+   * a previously reported territory is painted without joining the user's
+   * editable marks. Rendering reads {@link manzanasVisiblesList}, while the
+   * counters, draft and the save/send payload keep reading
+   * {@link manzanasById} — so loading the map never queues already-reported
+   * territories for another WhatsApp send.</p>
+   */
+  restoredMarksById = signal<Map<string, ManzanaMarcada>>(new Map());
+
+  /**
+   * Marks that must be rendered: editable marks win over restored ones when the
+   * same manzana id appears in both.
+   */
+  manzanasVisiblesList = computed(() => {
+    const merged = new Map(this.restoredMarksById());
+    for (const [id, mark] of this.manzanasById()) merged.set(id, mark);
+    return Array.from(merged.values());
+  });
+
+  /** Per-territory marks including restored ones (drives completion opacity). */
+  manzanasVisiblesByTerritorio = computed(() => {
+    const map = new Map<number, ManzanaMarcada[]>();
+    for (const m of this.manzanasVisiblesList()) {
+      const list = map.get(m.territorioNumero) ?? [];
+      list.push(m);
+      if (list.length === 1) map.set(m.territorioNumero, list);
+    }
+    return map;
+  });
+
+  /**
+   * Replace the display-only restored marks of a single territory. An empty
+   * array drops whatever was painted for it — used when the backend no longer
+   * has a report, so a stale localStorage-cached mark cannot outlive it, and
+   * when the marks are promoted to editable state on selection.
+   */
+  setRestoredMarksForTerritorio(territorioNumero: number, marks: ManzanaMarcada[]): void {
+    const next = new Map(this.restoredMarksById());
+    for (const [id, mark] of next) {
+      if (mark.territorioNumero === territorioNumero) next.delete(id);
+    }
+    for (const mark of marks) next.set(mark.id, mark);
+    this.restoredMarksById.set(next);
+  }
+
   private _datosParcialesGuardados: Map<number, { puntos: SnappedPoint[]; geometria: string }> = new Map();
 
   private readonly draftService = inject(DraftMarksService);
@@ -171,6 +219,7 @@ export class MapStateService {
 
   resetUIState(): void {
     this.manzanasById.set(new Map());
+    this.restoredMarksById.set(new Map());
     this.totalManzanas.set(0);
     this.territorioSeleccionado.set(null);
     this.territoriosSeleccionados.set([]);

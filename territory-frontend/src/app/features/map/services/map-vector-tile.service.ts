@@ -40,8 +40,8 @@ const HIDDEN_FILL_OPACITY = 0;
 /** Line width for territories OUTSIDE the active selection (hidden). */
 const HIDDEN_LINE_WIDTH = 0;
 
-/** Base line width for territory boundaries. */
-const DEFAULT_LINE_WIDTH = 1;
+/** Base line width for territory boundaries — Leaflet `polygon.weight: 2`. */
+const DEFAULT_LINE_WIDTH = 2;
 
 /**
  * Manages the MapLibre vector tile source and data-driven fill/line layers
