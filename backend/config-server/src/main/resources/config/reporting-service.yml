@@ -116,6 +116,10 @@ whatsapp:
   template-name: ${WHATSAPP_TEMPLATE:}
   language-code: ${WHATSAPP_LANG:es_CL}
   destination-number: ${WHATSAPP_DESTINATION:}
+  # Imagen del header del template cuando se anuncia un territorio completado
+  # sin captura de pantalla. Debe estar presente: sin ella el componente del
+  # mensaje no se puede construir y el envío falla.
+  default-image-url: ${WHATSAPP_DEFAULT_IMAGE_URL:https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png}
 
 ---
 # Profile: local — explicitly permits an unset session secret for local-only use.

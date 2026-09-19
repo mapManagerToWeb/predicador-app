@@ -261,6 +261,48 @@ class ReportSendServiceTest {
         assertTrue(captor.getValue().getError().contains("no configurado"));
     }
 
+    @Test
+    void sendReport_sinImagenPorDefecto_noNPE_fallaConMensajeClaro() {
+        var request = new WhatsAppSendRequest(
+            "Daniel", "Uribe", "21-07-2026", "tarde",
+            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
+            null, null
+        );
+
+        // WhatsApp configurado salvo la imagen por defecto. Antes del fix esto
+        // reventaba con NPE al construir el header del template
+        // (Map.of("link", props.defaultImageUrl()) con defaultImageUrl null) y
+        // la entrega quedaba FAILED sin causa legible.
+        when(messageService.generarParametrosTemplate(request)).thenReturn(Map.of(
+            "fecha", "21-07-2026",
+            "encargado", "Daniel Uribe",
+            "territorio", "1",
+            "estado", "tarde"
+        ));
+        when(messageService.requiereScreenshot(request)).thenReturn(false);
+        when(props.phoneNumberId()).thenReturn("123");
+        when(props.accessToken()).thenReturn("token-abc");
+        when(props.destinationNumber()).thenReturn("56936577203");
+        when(props.defaultImageUrl()).thenReturn(null);
+
+        WhatsAppDelivery delivery = new WhatsAppDelivery("idempotent-sin-imagen");
+        when(deliveryRepository.saveAndFlush(any(WhatsAppDelivery.class))).thenReturn(delivery);
+
+        com.predicador.reporting.client.WhatsAppIntegrationException thrown =
+            assertThrows(com.predicador.reporting.client.WhatsAppIntegrationException.class,
+                () -> sendService.sendReport(request, "idempotent-sin-imagen"));
+
+        assertEquals(502, thrown.status());
+        assertTrue(thrown.getMessage().contains("WHATSAPP_DEFAULT_IMAGE_URL"));
+        // Nunca se llama a Meta sin el header del template.
+        verify(messageClient, never()).sendTemplateMessage(anyString(), anyString(), anyString(), anyList());
+
+        ArgumentCaptor<WhatsAppDelivery> captor = ArgumentCaptor.forClass(WhatsAppDelivery.class);
+        verify(deliveryRepository).save(captor.capture());
+        assertEquals(com.predicador.reporting.model.WhatsAppDeliveryStatus.FAILED, captor.getValue().getStatus());
+        assertEquals(502, captor.getValue().getStatusCode());
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     void reserve_raceCondition_usesSeparateTransactionForRecovery() {

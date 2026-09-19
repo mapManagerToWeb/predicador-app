@@ -120,7 +120,7 @@ public class ReportSendService {
                     PARAMETERS, List.of(
                         Map.of(
                             "type", IMAGE,
-                            IMAGE, Map.of("link", props.defaultImageUrl())
+                            IMAGE, Map.of("link", requireDefaultImageUrl())
                         )
                     )
                 ));
@@ -195,6 +195,26 @@ public class ReportSendService {
         return props.accessToken() != null && !props.accessToken().isBlank()
                 && props.phoneNumberId() != null && !props.phoneNumberId().isBlank()
                 && props.destinationNumber() != null && !props.destinationNumber().isBlank();
+    }
+
+    /**
+     * Header image link used to announce a completed territory without a
+     * screenshot.
+     *
+     * <p>{@code whatsapp.default-image-url} must resolve to a URL:
+     * {@code Map.of} rejects a null value (this used to surface as a
+     * NullPointerException on the send path, marking the delivery FAILED) and
+     * Meta rejects an empty link. Report the misconfiguration explicitly
+     * instead of failing while building the request.</p>
+     */
+    private String requireDefaultImageUrl() {
+        String url = props.defaultImageUrl();
+        if (url == null || url.isBlank()) {
+            throw new com.predicador.reporting.client.WhatsAppIntegrationException(
+                    "Envío WhatsApp no configurado: falta WHATSAPP_DEFAULT_IMAGE_URL "
+                            + "(imagen del header del template)", 502, null);
+        }
+        return url;
     }
 
     Reservation reserve(String idempotencyKey) {
