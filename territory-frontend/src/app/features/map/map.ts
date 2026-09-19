@@ -100,11 +100,16 @@ export class MapPage implements OnDestroy {
     this.tileVersion.startPolling(engine);
 
     // Load territory metadata (colors, GeoJSON snapshot) and restore marks,
-    // then initialize labels from the snapshot centroids (Leaflet parity:
-    // territory number at the territory centroid, filtered to selection).
+    // then initialize the marked overlay and labels from the snapshot
+    // (Leaflet parity: marked manzanas get a distinct fill + 3px stroke
+    // under the territory-number labels, which are filtered to selection).
     await this.initialization.loadAllTerritoriesPublic();
+    this.rendering.initMarkedOverlay(engine);
     this.labelLayer.initLabels(engine);
     this.labelLayer.updateLabels(engine, this.state.territoriosSeleccionados());
+    // Apply completion opacity (0.6 complete / 0.05 incomplete) and the
+    // marked overlay from the restored marks.
+    this.rendering.refreshMarksVisual();
 
     // ─── F3.3: GPU Picking — register MapLibre event handlers ────
     this.maplibreClickHandler = (e: MapLayerMouseEvent | MapLayerTouchEvent) =>
@@ -186,13 +191,13 @@ export class MapPage implements OnDestroy {
   ): void {
     // Extract color from tile feature properties
     const featureColor = (feature.properties?.['color'] as string) ?? '';
-    const fid = this.extractManzanaFid(feature);
 
     if (this.state.manzanasById().has(manzanaId)) {
-      if (fid !== null) this.picking.clearHighlight(this.maplibreEngine()!, fid);
-      this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
+      // Leaflet parity (F8): clicking an already-marked manzana in default
+      // mode TOGGLES it off instead of just selecting it.
+      this.selection.toggleManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
+      this.syncLabels();
     } else {
-      if (fid !== null) this.picking.highlightFeature(this.maplibreEngine()!, fid);
       // Set the territory color from the tile feature for marking mode
       this.rendering.setCurrentTerritoryColor(featureColor);
       void this.handleTerritorySelection(territorioNumero);
@@ -210,9 +215,7 @@ export class MapPage implements OnDestroy {
       return;
     }
     if (this.state.manzanasById().has(manzanaId)) return;
-    const fid = this.extractManzanaFid(feature);
     const color = this.state.currentTerritoryColor();
-    if (fid !== null) this.picking.highlightFeature(this.maplibreEngine()!, fid);
     this.selection.marcarManzanaById(manzanaId, nombreBloque, color, territorioNumero);
   }
 
@@ -229,9 +232,7 @@ export class MapPage implements OnDestroy {
     if (this.state.manzanasById().has(manzanaId)) return;
 
     if (!this.state.manzanaSeleccionadaTerritorio()) {
-      const fid = this.extractManzanaFid(feature);
       const featureColor = (feature.properties?.['color'] as string) ?? this.state.currentTerritoryColor();
-      if (fid !== null) this.picking.highlightFeature(this.maplibreEngine()!, fid);
       this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
     }
     // Partial point snapping for MapLibre is deferred to F3.4 (hybrid edit mode).

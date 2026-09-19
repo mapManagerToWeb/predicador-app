@@ -25,17 +25,23 @@ const LINE_DISSOLVED_LAYER_ID = 'territory-dissolved-line';
 /** Default tile URL template — the backend serves MVT at this path. */
 const DEFAULT_TILE_URL = '/api/v1/territories/tiles/{z}/{x}/{y}.pbf';
 
-/** Default opacity for territory fill. */
+/** Default opacity for territory fill (also the COMPLETED territory value). */
 const DEFAULT_FILL_OPACITY = 0.6;
 
 /** Fallback color when tile feature lacks a `color` property. */
 const FALLBACK_COLOR = '#94a3b8';
 
-/** Highlight color applied via feature-state when a manzana is selected. */
-const HIGHLIGHT_COLOR = '#fbbf24';
+/** Opacity for an INCOMPLETE territory (not fully marked) — Leaflet parity. */
+const INCOMPLETE_FILL_OPACITY = 0.05;
 
-/** Opacity applied to non-selected territory fill while a selection is active. */
-const DIM_OPACITY = 0.15;
+/** Opacity for territories OUTSIDE the active selection (hidden) — Leaflet parity. */
+const HIDDEN_FILL_OPACITY = 0;
+
+/** Line width for territories OUTSIDE the active selection (hidden). */
+const HIDDEN_LINE_WIDTH = 0;
+
+/** Base line width for territory boundaries. */
+const DEFAULT_LINE_WIDTH = 1;
 
 /**
  * Manages the MapLibre vector tile source and data-driven fill/line layers
@@ -48,11 +54,11 @@ const DIM_OPACITY = 0.15;
  * <p>Layer configuration follows the backend MVT schema:
  * - Source: `territories` (vector tiles at `/tiles/{z}/{x}/{y}.pbf`)
  * - Source layers: `manzana` (z ≥ 12) and `territorio` (z < 12)
- * - Data-driven `fill-color` from tile `color` property, overridden by the
- *   `selected` feature-state (manzana features only — they carry ids; the
- *   dissolved `territorio` features have no ids, so they never feature-state)
- * - Constant `fill-opacity` 0.6 (dimmed per-selection via
- *   {@link setSelectedTerritoriesOpacity})</p>
+ * - Data-driven `fill-color` from the tile `color` property (no feature-state
+ *   highlight — amber was removed for Leaflet parity)
+ * - Data-driven `fill-opacity` by completeness: COMPLETED territories render
+ *   at 0.6, incomplete at 0.05 (Leaflet parity); with an active selection,
+ *   non-selected territories are hidden (opacity 0, line 0)</p>
  */
 @Injectable({ providedIn: 'root' })
 export class MapVectorTileService {
@@ -130,32 +136,63 @@ export class MapVectorTileService {
   }
 
   /**
-   * Reset the fill-opacity to the default constant value on BOTH fill layers.
+   * Apply the base completion-driven fill-opacity to BOTH fill layers:
+   * territories in `completed` render at `DEFAULT_FILL_OPACITY` (0.6),
+   * everything else at `INCOMPLETE_FILL_OPACITY` (0.05) — Leaflet parity.
+   *
+   * @param engine    The active MapEngine.
+   * @param completed Territory numbers whose manzanas are ALL marked.
    */
-  resetFillOpacity(engine: MapEngine): void {
-    engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', DEFAULT_FILL_OPACITY);
+  setCompletionOpacity(engine: MapEngine, completed: number[]): void {
+    engine.setPaintProperty(
+      FILL_LAYER_ID,
+      'fill-opacity',
+      this.completionOpacityExpression('territorio', completed),
+    );
     engine.setPaintProperty(
       FILL_DISSOLVED_LAYER_ID,
       'fill-opacity',
-      DEFAULT_FILL_OPACITY,
+      this.completionOpacityExpression('tid', completed),
     );
   }
 
   /**
-   * Dim every territory that is NOT in the `selected` list.
+   * Reset the fill-opacity to the base completion-driven expression on BOTH
+   * fill layers and restore the base line width on both line layers.
    *
-   * <p>Selected territories keep `DEFAULT_FILL_OPACITY`; everything else
-   * drops to `DIM_OPACITY`. Applied to BOTH fill layers (manzana keys on
-   * `territorio`, dissolved keys on `tid`).</p>
-   *
-   * @param engine   The active MapEngine.
-   * @param selected The territory numbers to keep at full opacity.
+   * @param engine    The active MapEngine.
+   * @param completed Territory numbers whose manzanas are ALL marked.
    */
-  setSelectedTerritoriesOpacity(engine: MapEngine, selected: number[]): void {
-    const expression = (key: string) =>
-      ['case', ['in', ['get', key], ['literal', selected]], DEFAULT_FILL_OPACITY, DIM_OPACITY];
-    engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', expression('territorio'));
-    engine.setPaintProperty(FILL_DISSOLVED_LAYER_ID, 'fill-opacity', expression('tid'));
+  resetFillOpacity(engine: MapEngine, completed: number[] = []): void {
+    this.setCompletionOpacity(engine, completed);
+    engine.setPaintProperty(LINE_LAYER_ID, 'line-width', DEFAULT_LINE_WIDTH);
+    engine.setPaintProperty(LINE_DISSOLVED_LAYER_ID, 'line-width', DEFAULT_LINE_WIDTH);
+  }
+
+  /**
+   * Hide every territory that is NOT in the `selected` list (opacity 0 +
+   * line width 0 — Leaflet {@code hiddenPolygon} parity) and render the
+   * selected ones by completeness: completed → 0.6, incomplete → 0.05.
+   * Applied to BOTH fill layers and BOTH line layers (manzana keys on
+   * `territorio`, dissolved keys on `tid`).
+   *
+   * @param engine    The active MapEngine.
+   * @param selected  The territory numbers to keep visible.
+   * @param completed Territory numbers whose manzanas are ALL marked.
+   */
+  setSelectedTerritoriesOpacity(engine: MapEngine, selected: number[], completed: number[]): void {
+    const fillExpression = (key: string) =>
+      ['case', ['in', ['get', key], ['literal', selected]],
+        this.completionOpacityExpression(key, completed),
+        HIDDEN_FILL_OPACITY,
+      ];
+    const lineExpression = (key: string) =>
+      ['case', ['in', ['get', key], ['literal', selected]], DEFAULT_LINE_WIDTH, HIDDEN_LINE_WIDTH];
+
+    engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', fillExpression('territorio'));
+    engine.setPaintProperty(FILL_DISSOLVED_LAYER_ID, 'fill-opacity', fillExpression('tid'));
+    engine.setPaintProperty(LINE_LAYER_ID, 'line-width', lineExpression('territorio'));
+    engine.setPaintProperty(LINE_DISSOLVED_LAYER_ID, 'line-width', lineExpression('tid'));
   }
 
   /**
@@ -199,6 +236,8 @@ export class MapVectorTileService {
   }
 
   private addLayers(engine: MapEngine): void {
+    const fillColor: unknown[] = ['coalesce', ['get', 'color'], FALLBACK_COLOR];
+
     // Manzana fill layer (z ≥ 12)
     const manzanaFillLayer: LayerSpecification = {
       id: FILL_LAYER_ID,
@@ -206,9 +245,10 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_MANZANA,
       paint: {
-        'fill-color': this.selectedCaseExpression(),
-        'fill-opacity': DEFAULT_FILL_OPACITY,
-        'fill-outline-color': this.selectedCaseExpression(),
+        'fill-color': fillColor,
+        // Base completion expression — updated once marks restore.
+        'fill-opacity': this.completionOpacityExpression('territorio', []),
+        'fill-outline-color': fillColor,
       },
     };
     engine.addLayer(manzanaFillLayer);
@@ -220,8 +260,8 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_MANZANA,
       paint: {
-        'line-width': 1,
-        'line-color': ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+        'line-width': DEFAULT_LINE_WIDTH,
+        'line-color': fillColor,
       },
     };
     engine.addLayer(manzanaLineLayer);
@@ -233,9 +273,9 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_TERRITORIO,
       paint: {
-        'fill-color': this.selectedCaseExpression(),
-        'fill-opacity': DEFAULT_FILL_OPACITY,
-        'fill-outline-color': this.selectedCaseExpression(),
+        'fill-color': fillColor,
+        'fill-opacity': this.completionOpacityExpression('tid', []),
+        'fill-outline-color': fillColor,
       },
     };
     engine.addLayer(territorioFillLayer);
@@ -247,29 +287,24 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_TERRITORIO,
       paint: {
-        'line-width': 1,
-        'line-color': ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+        'line-width': DEFAULT_LINE_WIDTH,
+        'line-color': fillColor,
       },
     };
     engine.addLayer(territorioLineLayer);
   }
 
   /**
-   * Build the color expression shared by both fill layers: highlight the
-   * feature when its `selected` feature-state is true, otherwise fall back
-   * to the tile `color` property.
-   *
-   * <p>Feature-state only works for features that carry a numeric id — the
-   * manzana layer features do (MVT `fid`), the dissolved territorio layer
-   * features do not, so they always take the default branch. That is
-   * expected: dissolved polygons never need per-feature highlighting.</p>
+   * Build the base completion-driven opacity expression: territories in the
+   * `completed` literal list render at `DEFAULT_FILL_OPACITY` (0.6),
+   * everyone else at `INCOMPLETE_FILL_OPACITY` (0.05) — Leaflet parity.
    */
-  private selectedCaseExpression(): unknown[] {
+  private completionOpacityExpression(key: string, completed: number[]): unknown[] {
     return [
       'case',
-      ['boolean', ['feature-state', 'selected'], false],
-      HIGHLIGHT_COLOR,
-      ['coalesce', ['get', 'color'], FALLBACK_COLOR],
+      ['in', ['get', key], ['literal', completed]],
+      DEFAULT_FILL_OPACITY,
+      INCOMPLETE_FILL_OPACITY,
     ];
   }
 

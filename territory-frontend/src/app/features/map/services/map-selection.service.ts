@@ -97,6 +97,7 @@ export class MapSelectionService {
     }
 
     this.updateTotalManzanas(this.state.territoriosSeleccionados());
+    this.rendering.refreshMarksVisual();
   }
 
   marcarManzanaById(
@@ -109,7 +110,10 @@ export class MapSelectionService {
     newMap.set(id, { id, nombreBloque, color, territorioNumero });
     this.state.manzanasById.set(newMap);
 
-    if (this.state.territoriosSeleccionados().includes(territorioNumero)) return;
+    if (this.state.territoriosSeleccionados().includes(territorioNumero)) {
+      this.rendering.refreshMarksVisual();
+      return;
+    }
 
     this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
     const seleccionados = this.state.territoriosSeleccionados();
@@ -117,6 +121,7 @@ export class MapSelectionService {
 
     this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     this.updateTotalManzanas(this.state.territoriosSeleccionados());
+    this.rendering.refreshMarksVisual();
   }
 
   marcarManzana(
@@ -130,7 +135,10 @@ export class MapSelectionService {
     newMap.set(id, { id, nombreBloque, color, territorioNumero });
     this.state.manzanasById.set(newMap);
 
-    if (this.state.territoriosSeleccionados().includes(territorioNumero)) return;
+    if (this.state.territoriosSeleccionados().includes(territorioNumero)) {
+      this.rendering.refreshMarksVisual();
+      return;
+    }
 
     this.state.territoriosSeleccionados.update(nums => [...nums, territorioNumero]);
     const seleccionados = this.state.territoriosSeleccionados();
@@ -138,6 +146,7 @@ export class MapSelectionService {
 
     this.rendering.ocultarPoligonosNoSeleccionados(seleccionados);
     this.updateTotalManzanas(this.state.territoriosSeleccionados());
+    this.rendering.refreshMarksVisual();
   }
 
   prepareTerritorioSeleccionado(numeros: number[]): number[] {
@@ -218,6 +227,7 @@ export class MapSelectionService {
     this.state.totalManzanas.set(0);
     this.rendering.setCurrentTerritoryColor('');
     this.draftService.clear();
+    this.rendering.refreshMarksVisual();
   }
 
   limpiarParcial(): void {

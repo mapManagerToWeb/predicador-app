@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { MapStateService } from './map-state.service';
 import { MapVectorTileService } from './map-vector-tile.service';
+import { MapMarkedOverlayService, matchMarkedFeature } from './map-marked-overlay.service';
 import type { TerritorioService } from '../../../core/services/territorio';
-import type { FeatureLayer, TerritorioCacheData } from '../types/map.types';
+import type { FeatureLayer, TerritorioCacheData, ManzanaMarcada } from '../types/map.types';
 import type { MapEngine } from './map-engine.interface';
 import type * as GeoJSON from 'geojson';
 
@@ -22,8 +23,8 @@ export interface TerritorioMetadata {
   featuresByTerritorio: Map<number, GeoJSON.Feature[]>;
 }
 
-/** FitBounds padding for territory focus (Leaflet parity: [30, 30]). */
-const TERRITORY_FOCUS_PADDING: [number, number] = [30, 30];
+/** FitBounds padding for territory focus (Leaflet parity: 30px each side). */
+const TERRITORY_FOCUS_PADDING = 30;
 
 /**
  * Derives per-territory metadata from the GeoJSON FeatureCollection.
@@ -122,6 +123,7 @@ function coordinatesBBox(rings: GeoJSON.Position[][]): GeojsonBounds | null {
 @Injectable({ providedIn: 'root' })
 export class MapRenderingFacade {
   private readonly vectorTile = inject(MapVectorTileService);
+  private readonly markedOverlay = inject(MapMarkedOverlayService);
   private readonly state = inject(MapStateService);
 
   /** Active map engine, attached once by {@link attachEngine}. */
@@ -284,22 +286,98 @@ export class MapRenderingFacade {
   // ─── Visibility ──────────────────────────────────────────────────
 
   /**
-   * Dim every territory that is NOT in the selection, keeping the selected
-   * ones at full opacity. An empty selection restores full opacity to all.
+   * Territory numbers whose manzanas are ALL marked (partial marks
+   * excluded). Completion drives the base opacity (0.6 complete vs
+   * 0.05 incomplete) — the Leaflet parity rule.
+   */
+  getCompletedTerritorios(): number[] {
+    if (!this.metadata) return [];
+    const completed: number[] = [];
+    for (const [num, total] of this.metadata.manzanaCounts) {
+      const marks = this.state.manzanasByTerritorio().get(num) ?? [];
+      const real = marks.filter((m: ManzanaMarcada) => !m.id.startsWith('parcial-')).length;
+      if (total > 0 && real >= total) completed.push(num);
+    }
+    return completed;
+  }
+
+  /**
+   * Hide every territory that is NOT in the selection (opacity 0 + line 0)
+   * and render selected ones by completeness (0.6 complete / 0.05
+   * incomplete). An empty selection restores the base completion opacity.
    */
   ocultarPoligonosNoSeleccionados(seleccionados: number[]): void {
     if (!this.engine) return;
+    const completed = this.getCompletedTerritorios();
     if (seleccionados.length === 0) {
-      this.vectorTile.resetFillOpacity(this.engine);
+      this.vectorTile.resetFillOpacity(this.engine, completed);
       return;
     }
-    this.vectorTile.setSelectedTerritoriesOpacity(this.engine, seleccionados);
+    this.vectorTile.setSelectedTerritoriesOpacity(this.engine, seleccionados, completed);
   }
 
-  /** Restore the default fill opacity on all territory layers. */
+  /** Restore the base completion-driven fill opacity on all territory layers. */
   restaurarVisibilidadPoligonos(): void {
     if (!this.engine) return;
-    this.vectorTile.resetFillOpacity(this.engine);
+    this.vectorTile.resetFillOpacity(this.engine, this.getCompletedTerritorios());
+  }
+
+  // ─── Marked overlay & visual refresh ─────────────────────────────
+
+  /**
+   * Initialize the marked-manzana GeoJSON overlay and populate it with the
+   * current marks. Must be called once after the engine is attached and
+   * the GeoJSON metadata is loaded (and BEFORE the label layer, so marks
+   * render below the territory-number labels).
+   */
+  initMarkedOverlay(engine: MapEngine): void {
+    this.markedOverlay.initOverlay(engine);
+    this.refreshOverlayMarks();
+  }
+
+  /**
+   * Rebuild the marked overlay from the current marks. Marks are matched
+   * against the `/all/geojson` snapshot by fid / "{t}-{b}" id / bloque;
+   * matched features carry the mark color and a `completo` flag.
+   */
+  refreshOverlayMarks(): void {
+    if (!this.engine || !this.markedOverlay.isInitialized()) return;
+
+    const marks = Array.from(this.state.manzanasById().values());
+    const completed = new Set(this.getCompletedTerritorios());
+    const features: GeoJSON.Feature[] = [];
+
+    for (const mark of marks) {
+      const matched = matchMarkedFeature(mark, this.getGeoJsonFeaturesByTerritorio(mark.territorioNumero));
+      if (!matched) continue;
+      features.push({
+        ...matched,
+        properties: {
+          ...(matched.properties ?? {}),
+          color: mark.color,
+          completo: completed.has(mark.territorioNumero),
+        },
+      });
+    }
+
+    this.markedOverlay.updateOverlay(this.engine, features);
+  }
+
+  /**
+   * Re-apply the full visual state after marks change: the base
+   * completion opacity (or the selection-aware opacity when a selection is
+   * active) AND the marked overlay. Call this after every mark/unmark/
+   * restore mutation.
+   */
+  refreshMarksVisual(): void {
+    if (!this.engine) return;
+    const seleccionados = this.state.territoriosSeleccionados();
+    if (seleccionados.length > 0) {
+      this.ocultarPoligonosNoSeleccionados(seleccionados);
+    } else {
+      this.restaurarVisibilidadPoligonos();
+    }
+    this.refreshOverlayMarks();
   }
 
   // ─── Current territory color (delegated to state) ───────────────

@@ -51,6 +51,9 @@ export class MapMarkRestorationService {
       if (ultimo.geometriaParcial) {
         this.restaurarGeometriaParcial(ultimo.geometriaParcial, color, territorioNumero, actualizarEstadoMarcado);
       }
+
+      // Re-apply completion opacity + marked overlay with the restored marks.
+      this.rendering.refreshMarksVisual();
     } catch {
       this.toastService.show(TOAST_MESSAGES.restoreError);
     }

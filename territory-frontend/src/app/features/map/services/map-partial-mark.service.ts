@@ -74,6 +74,7 @@ export class MapPartialMarkService {
     this.state.puntosParciales.set([]);
     this.selection.restaurarManzanaAnterior();
     this.state.modoMarcado.set('none');
+    this.rendering.refreshMarksVisual();
     this.toastService.show(TOAST_MESSAGES.partialMarked);
   }
 
@@ -92,6 +93,7 @@ export class MapPartialMarkService {
     newMap.delete(id);
     this.state.manzanasById.set(newMap);
     this.state.clearDatosParciales(removed.territorioNumero);
+    this.rendering.refreshMarksVisual();
     this.toastService.show(TOAST_MESSAGES.partialDeleted);
   }
 }

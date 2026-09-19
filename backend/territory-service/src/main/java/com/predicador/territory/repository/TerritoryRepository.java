@@ -51,6 +51,7 @@ public interface TerritoryRepository extends JpaRepository<ManzanaTerritorio, Lo
             + "'id', m.territorio_padre || '-' || COALESCE(m.nombre_bloque, ''), "
             + "'nombre_bloque', COALESCE(m.nombre_bloque, ''), "
             + "'territorio_padre', m.territorio_padre, "
+            + "'fid', m.id, "
             + "'color', ts.color"
             + "))), '[]'::json))::text "
             + "FROM manzanas_territorio m "
