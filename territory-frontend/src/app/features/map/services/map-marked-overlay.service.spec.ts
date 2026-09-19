@@ -142,6 +142,22 @@ describe('MapMarkedOverlayService', () => {
       service.destroy(mockEngine);
       expect(mockEngine.removeSource).not.toHaveBeenCalled();
     });
+
+    it('re-initializes on a fresh engine after destroy (2nd map visit)', () => {
+      const engineA = createMockMapEngine();
+      const engineB = createMockMapEngine();
+      service.initOverlay(engineA);
+      service.destroy(engineA);
+
+      service.initOverlay(engineB);
+
+      expect(engineB.addGeoJsonSource).toHaveBeenCalledWith(
+        'marked',
+        expect.objectContaining({ type: 'FeatureCollection' }),
+      );
+      expect(engineB.addLayer).toHaveBeenCalledTimes(2);
+      expect(service.isInitialized()).toBe(true);
+    });
   });
 });
 

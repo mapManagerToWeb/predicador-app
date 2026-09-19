@@ -9,7 +9,9 @@ import { MapSelectionService } from './services/map-selection.service';
 import { MapInitializationService } from './services/map-initialization.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
+import { MapMarkedOverlayService } from './services/map-marked-overlay.service';
 import { Toast } from '../../core/services/toast';
+import type { MapEngine } from './services/map-engine.interface';
 
 describe('elegirUltimoReporte', () => {
   it('should choose the most recent report by session time', () => {
@@ -234,4 +236,51 @@ describe('MapPage', () => {
   it('ngOnDestroy does not throw', () => {
     expect(() => component.ngOnDestroy()).not.toThrow();
   });
+
+  it('tears down the marked overlay with the engine so a 2nd map visit re-initializes it', () => {
+    const markedOverlay = TestBed.inject(MapMarkedOverlayService);
+    const engine = createMockMapEngine();
+
+    // Visit 1: the rendering facade initialized the overlay on this engine.
+    markedOverlay.initOverlay(engine);
+    expect(markedOverlay.isInitialized()).toBe(true);
+
+    // Simulate the mounted engine so ngOnDestroy tears it down with the page.
+    (component as unknown as { maplibreEngine: { set: (e: MapEngine) => void } }).maplibreEngine.set(engine);
+
+    fixture.destroy();
+
+    // Without the teardown the root-singleton flag stays true and the next
+    // visit's initOverlay early-returns — the overlay silently never renders.
+    expect(markedOverlay.isInitialized()).toBe(false);
+    expect(engine.removeSource).toHaveBeenCalledWith('marked');
+  });
 });
+
+function createMockMapEngine(): MapEngine {
+  return {
+    init: vi.fn(),
+    addSource: vi.fn(),
+    addGeoJsonSource: vi.fn(),
+    updateGeoJsonSourceData: vi.fn(),
+    project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
+    removeSource: vi.fn(),
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
+    setPaintProperty: vi.fn(),
+    setLayoutProperty: vi.fn(),
+    setSourceUrl: vi.fn(),
+    queryRenderedFeatures: vi.fn().mockReturnValue([]),
+    on: vi.fn(),
+    off: vi.fn(),
+    fitBounds: vi.fn(),
+    getZoom: vi.fn().mockReturnValue(15),
+    setZoom: vi.fn(),
+    getCenter: vi.fn().mockReturnValue({ lng: 0, lat: 0 }),
+    setCenter: vi.fn(),
+    resize: vi.fn(),
+    destroy: vi.fn(),
+    setFeatureState: vi.fn(),
+    removeFeatureState: vi.fn(),
+  };
+}
