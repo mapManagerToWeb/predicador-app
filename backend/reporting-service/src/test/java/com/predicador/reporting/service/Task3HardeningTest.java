@@ -88,6 +88,8 @@ class Task3HardeningTest {
                 "fecha", "31-07-2026", "encargado", "Daniel Uribe", "territorio", "1", "estado", "tarde"));
         when(properties.templateName()).thenReturn("template");
         when(properties.languageCode()).thenReturn("es_CL");
+        when(properties.accessToken()).thenReturn("test-token");
+        when(properties.phoneNumberId()).thenReturn("123456789012");
         when(properties.destinationNumber()).thenReturn("56912345678");
         when(properties.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
@@ -123,6 +125,8 @@ class Task3HardeningTest {
                 "fecha", "31-07-2026", "encargado", "Daniel Uribe", "territorio", "1", "estado", "tarde"));
         when(properties.templateName()).thenReturn("template");
         when(properties.languageCode()).thenReturn("es_CL");
+        when(properties.accessToken()).thenReturn("test-token");
+        when(properties.phoneNumberId()).thenReturn("123456789012");
         when(properties.destinationNumber()).thenReturn("56912345678");
         when(properties.defaultImageUrl()).thenReturn("https://example.com/image.png");
         when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
