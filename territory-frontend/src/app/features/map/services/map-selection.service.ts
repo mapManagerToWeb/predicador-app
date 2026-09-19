@@ -57,6 +57,9 @@ export class MapSelectionService {
       this.updateTotalManzanas(this.state.territoriosSeleccionados());
     }
 
+    // Leaflet parity: the tapped manzana stays highlighted in yellow
+    // (`STYLE_DEFAULTS.selectedManzana`) while it anchors a partial draw.
+    this.rendering.setSelectedManzana(manzanaId, nombreBloque, territorioNumero);
     this.rendering.setCurrentTerritoryColor(color);
   }
 
@@ -64,6 +67,7 @@ export class MapSelectionService {
     this.state.manzanaSeleccionadaNombre.set('');
     this.state.manzanaSeleccionadaTerritorio.set(null);
     this.state.manzanaEdges.set([]);
+    this.rendering.clearSelectedManzana();
   }
 
   toggleManzanaById(id: string, nombreBloque: string, color: string, territorioNumero: number): void {
@@ -169,6 +173,12 @@ export class MapSelectionService {
     this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
     this.rendering.fitBoundsToTerritorios(this.state.territoriosSeleccionados());
     this.updateTotalManzanas(numeros);
+    // Re-apply the marked overlay + highlight for the new selection. Without
+    // this, the overlay keeps showing the previous selection's marks until
+    // the async DB restore finishes — and if the selected territory has no
+    // reports, restaurarConReportes early-returns and the overlay would
+    // never refresh at all.
+    this.rendering.refreshMarksVisual();
 
     return numeros;
   }
@@ -223,6 +233,7 @@ export class MapSelectionService {
     this.state.territorioSeleccionado.set(null);
     this.state.territoriosSeleccionados.set([]);
     this.state.modoMarcado.set('none');
+    this.rendering.clearSelectedManzana();
     this.rendering.restaurarVisibilidadPoligonos();
     this.state.totalManzanas.set(0);
     this.rendering.setCurrentTerritoryColor('');

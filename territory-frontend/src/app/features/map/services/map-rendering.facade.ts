@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { MapStateService } from './map-state.service';
 import { MapVectorTileService } from './map-vector-tile.service';
 import { MapMarkedOverlayService, matchMarkedFeature } from './map-marked-overlay.service';
+import { MapSelectedManzanaOverlayService } from './map-selected-manzana-overlay.service';
 import type { TerritorioService } from '../../../core/services/territorio';
 import type { FeatureLayer, TerritorioCacheData, ManzanaMarcada } from '../types/map.types';
 import type { MapEngine } from './map-engine.interface';
@@ -124,10 +125,19 @@ function coordinatesBBox(rings: GeoJSON.Position[][]): GeojsonBounds | null {
 export class MapRenderingFacade {
   private readonly vectorTile = inject(MapVectorTileService);
   private readonly markedOverlay = inject(MapMarkedOverlayService);
+  private readonly selectedOverlay = inject(MapSelectedManzanaOverlayService);
   private readonly state = inject(MapStateService);
 
   /** Active map engine, attached once by {@link attachEngine}. */
   private engine: MapEngine | null = null;
+
+  /**
+   * Currently highlighted manzana (Leaflet's `selectedManzana`). Kept on the
+   * facade so the highlight survives metadata (re)loads and engine changes.
+   */
+  private selectedManzanaId: string | null = null;
+  private selectedManzanaNombre = '';
+  private selectedManzanaTerritorio: number | null = null;
 
   /**
    * FeatureLayer metadata indexed by territory number.
@@ -288,13 +298,15 @@ export class MapRenderingFacade {
   /**
    * Territory numbers whose manzanas are ALL marked (partial marks
    * excluded). Completion drives the base opacity (0.6 complete vs
-   * 0.05 incomplete) — the Leaflet parity rule.
+   * 0.05 incomplete) — the Leaflet parity rule. Marks restored from the
+   * backend count too: a territory reported in a previous session must render
+   * completed the moment the map loads.
    */
   getCompletedTerritorios(): number[] {
     if (!this.metadata) return [];
     const completed: number[] = [];
     for (const [num, total] of this.metadata.manzanaCounts) {
-      const marks = this.state.manzanasByTerritorio().get(num) ?? [];
+      const marks = this.state.manzanasVisiblesByTerritorio().get(num) ?? [];
       const real = marks.filter((m: ManzanaMarcada) => !m.id.startsWith('parcial-')).length;
       if (total > 0 && real >= total) completed.push(num);
     }
@@ -336,18 +348,102 @@ export class MapRenderingFacade {
   }
 
   /**
-   * Rebuild the marked overlay from the current marks. Marks are matched
-   * against the `/all/geojson` snapshot by fid / "{t}-{b}" id / bloque;
-   * matched features carry the mark color and a `completo` flag.
+   * Initialize the selected-manzana highlight overlay. Must run after
+   * {@link initMarkedOverlay} so the yellow highlight renders above the marks.
+   */
+  initSelectedManzanaOverlay(engine: MapEngine): void {
+    this.selectedOverlay.initOverlay(engine);
+    this.renderSelectedManzana();
+  }
+
+  /**
+   * Highlight the tapped manzana (Leaflet parity: `selectedManzana` yellow
+   * `#facc15`, fill 0.15, 4px stroke). The geometry comes from the
+   * `/all/geojson` snapshot, matched by fid / "{t}-{b}" / bloque.
+   *
+   * <p>When the feature cannot be resolved (snapshot still loading) the
+   * previous highlight is cleared rather than left stale.</p>
+   */
+  setSelectedManzana(manzanaId: string, nombreBloque: string, territorioNumero: number): void {
+    this.selectedManzanaId = manzanaId;
+    this.selectedManzanaNombre = nombreBloque;
+    this.selectedManzanaTerritorio = territorioNumero;
+    this.renderSelectedManzana();
+  }
+
+  /** Remove the manzana highlight (selection cleared / territory deselected). */
+  clearSelectedManzana(): void {
+    if (this.selectedManzanaId === null && this.selectedManzanaTerritorio === null) return;
+    this.selectedManzanaId = null;
+    this.selectedManzanaNombre = '';
+    this.selectedManzanaTerritorio = null;
+    this.renderSelectedManzana();
+  }
+
+  /**
+   * Per-engine teardown for the tapped-manzana highlight, run from the
+   * page's ngOnDestroy. The overlay service is a root singleton with an
+   * idempotent init, so without this the next map visit would skip
+   * re-creating the source/layers on the fresh engine and the highlight
+   * would silently stop rendering (same failure class as the marked
+   * overlay — see 82835c1).
+   */
+  destroySelectedManzanaOverlay(engine: MapEngine): void {
+    this.selectedManzanaId = null;
+    this.selectedManzanaNombre = '';
+    this.selectedManzanaTerritorio = null;
+    this.selectedOverlay.destroy(engine);
+  }
+
+  private renderSelectedManzana(): void {
+    if (!this.engine || !this.selectedOverlay.isInitialized()) return;
+
+    const id = this.selectedManzanaId;
+    const territorioNumero = this.selectedManzanaTerritorio;
+    let feature: GeoJSON.Feature | null = null;
+
+    // The highlight only makes sense while its territory is part of the
+    // selection: deselecting must not leave a stale yellow polygon behind.
+    if (
+      id !== null &&
+      territorioNumero !== null &&
+      this.state.territoriosSeleccionados().includes(territorioNumero)
+    ) {
+      feature = matchMarkedFeature(
+        {
+          id,
+          nombreBloque: this.selectedManzanaNombre,
+          color: '',
+          territorioNumero,
+        },
+        this.getGeoJsonFeaturesByTerritorio(territorioNumero),
+      );
+    }
+
+    this.selectedOverlay.setSelected(this.engine, feature);
+  }
+
+  /**
+   * Rebuild the marked overlay from the current marks — editable marks plus the
+   * display-only ones restored from the backend. Marks are matched against the
+   * `/all/geojson` snapshot by fid / "{t}-{b}" id / bloque; matched features
+   * carry the mark color and a `completo` flag.
    */
   refreshOverlayMarks(): void {
     if (!this.engine || !this.markedOverlay.isInitialized()) return;
 
-    const marks = Array.from(this.state.manzanasById().values());
+    const marks = this.state.manzanasVisiblesList();
     const completed = new Set(this.getCompletedTerritorios());
+    // Leaflet parity: `ocultarPoligonosNoSeleccionados` hid the marks of
+    // non-selected territories together with their polygons. With an active
+    // selection the marked overlay must therefore only render the selected
+    // territories' marks — otherwise foreign marks keep glowing above the
+    // hidden tiles while the selected territory looks flat.
+    const seleccionados = new Set(this.state.territoriosSeleccionados());
     const features: GeoJSON.Feature[] = [];
 
     for (const mark of marks) {
+      if (seleccionados.size > 0 && !seleccionados.has(mark.territorioNumero)) continue;
       const matched = matchMarkedFeature(mark, this.getGeoJsonFeaturesByTerritorio(mark.territorioNumero));
       if (!matched) continue;
       features.push({
@@ -378,6 +474,7 @@ export class MapRenderingFacade {
       this.restaurarVisibilidadPoligonos();
     }
     this.refreshOverlayMarks();
+    this.renderSelectedManzana();
   }
 
   // ─── Current territory color (delegated to state) ───────────────

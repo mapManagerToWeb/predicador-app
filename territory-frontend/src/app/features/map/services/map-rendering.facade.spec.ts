@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { MapRenderingFacade, buildTerritorioMetadata } from './map-rendering.facade';
 import { MapVectorTileService } from './map-vector-tile.service';
 import { MapMarkedOverlayService } from './map-marked-overlay.service';
+import { MapSelectedManzanaOverlayService } from './map-selected-manzana-overlay.service';
 import { MapStateService } from './map-state.service';
 
 describe('MapRenderingFacade', () => {
@@ -15,6 +16,12 @@ describe('MapRenderingFacade', () => {
   let markedOverlay: {
     initOverlay: ReturnType<typeof vi.fn>;
     updateOverlay: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+    isInitialized: ReturnType<typeof vi.fn>;
+  };
+  let selectedOverlay: {
+    initOverlay: ReturnType<typeof vi.fn>;
+    setSelected: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
     isInitialized: ReturnType<typeof vi.fn>;
   };
@@ -91,12 +98,19 @@ describe('MapRenderingFacade', () => {
       destroy: vi.fn(),
       isInitialized: vi.fn().mockReturnValue(false),
     };
+    selectedOverlay = {
+      initOverlay: vi.fn(),
+      setSelected: vi.fn(),
+      destroy: vi.fn(),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
     TestBed.configureTestingModule({
       providers: [
         MapRenderingFacade,
         MapStateService,
         { provide: MapVectorTileService, useValue: vectorTile },
         { provide: MapMarkedOverlayService, useValue: markedOverlay },
+        { provide: MapSelectedManzanaOverlayService, useValue: selectedOverlay },
       ],
     });
 
@@ -327,6 +341,18 @@ describe('MapRenderingFacade', () => {
     it('returns an empty list when metadata is missing', () => {
       expect(facade.getCompletedTerritorios()).toEqual([]);
     });
+
+    it('counts marks restored from the backend as completion', () => {
+      const s = serviceWithMetadata();
+      // Marks restored at load are display-only: they never join manzanasById.
+      state.setRestoredMarksForTerritorio(56, [
+        { id: '56-56.a', nombreBloque: '', color: '#00A86B', territorioNumero: 56 },
+        { id: '56-56.b', nombreBloque: '', color: '#00A86B', territorioNumero: 56 },
+      ]);
+
+      expect(state.manzanasById().size).toBe(0);
+      expect(s.getCompletedTerritorios()).toEqual([56]);
+    });
   });
 
   describe('refreshOverlayMarks', () => {
@@ -355,9 +381,72 @@ describe('MapRenderingFacade', () => {
       expect(features[0].properties['completo']).toBe(false);
     });
 
+    it('renders display-only restored marks too', () => {
+      serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      // The DB says 56.a was already reported; 56.b is restored alongside it.
+      state.setRestoredMarksForTerritorio(56, [
+        { id: '56-56.a', nombreBloque: '56.a', color: '#00A86B', territorioNumero: 56 },
+        { id: '56-56.b', nombreBloque: '56.b', color: '#00A86B', territorioNumero: 56 },
+      ]);
+
+      facade.refreshOverlayMarks();
+
+      const [, features] = markedOverlay.updateOverlay.mock.calls[0] as [
+        unknown,
+        Array<{ properties: Record<string, unknown> }>,
+      ];
+      expect(features).toHaveLength(2);
+      expect(features.every(f => f.properties['color'] === '#00A86B')).toBe(true);
+      // Both restored manzanas complete the territory → 0.6 fill, not grey.
+      expect(features.every(f => f.properties['completo'] === true)).toBe(true);
+    });
+
     it('no-ops before initOverlay and without an engine', () => {
       facade.refreshOverlayMarks();
       expect(markedOverlay.updateOverlay).not.toHaveBeenCalled();
+    });
+
+    it('only renders the selected territories\u2019 marks when a selection is active', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.territoriosSeleccionados.set([57]);
+
+      const map = new Map<string, { id: string; nombreBloque: string; color: string; territorioNumero: number }>();
+      map.set('56-56.a', { id: '56-56.a', nombreBloque: '56.a', color: '#ff0000', territorioNumero: 56 });
+      map.set('57-57.a', { id: '57-57.a', nombreBloque: '57.a', color: '#00ff00', territorioNumero: 57 });
+      state.manzanasById.set(map);
+
+      s.refreshOverlayMarks();
+
+      const [, features] = markedOverlay.updateOverlay.mock.calls[0] as [
+        unknown,
+        Array<{ properties: Record<string, unknown> }>,
+      ];
+      expect(features).toHaveLength(1);
+      expect(features[0].properties['color']).toBe('#00ff00');
+    });
+
+    it('renders marks of every territory once the selection is cleared', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.territoriosSeleccionados.set([]);
+
+      const map = new Map<string, { id: string; nombreBloque: string; color: string; territorioNumero: number }>();
+      map.set('56-56.a', { id: '56-56.a', nombreBloque: '56.a', color: '#ff0000', territorioNumero: 56 });
+      map.set('57-57.a', { id: '57-57.a', nombreBloque: '57.a', color: '#00ff00', territorioNumero: 57 });
+      state.manzanasById.set(map);
+
+      s.refreshOverlayMarks();
+
+      const [, features] = markedOverlay.updateOverlay.mock.calls[0] as [
+        unknown,
+        Array<{ properties: Record<string, unknown> }>,
+      ];
+      expect(features).toHaveLength(2);
     });
   });
 
@@ -393,6 +482,134 @@ describe('MapRenderingFacade', () => {
 
       expect(vectorTile.resetFillOpacity).toHaveBeenCalledWith(fakeEngine, []);
       expect(markedOverlay.updateOverlay).toHaveBeenCalled();
+    });
+  });
+
+  describe('selected manzana highlight', () => {
+    it('initializes the overlay when the engine is attached', () => {
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+
+      expect(selectedOverlay.initOverlay).toHaveBeenCalledWith(fakeEngine);
+    });
+
+    it('highlights the tapped manzana from the GeoJSON snapshot', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      state.territoriosSeleccionados.set([56]);
+      selectedOverlay.setSelected.mockClear();
+
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+
+      expect(selectedOverlay.setSelected).toHaveBeenCalledWith(
+        fakeEngine,
+        expect.objectContaining({
+          type: 'Feature',
+          properties: expect.objectContaining({ id: '56-56.a', territorio_padre: 56 }),
+        }),
+      );
+    });
+
+    it('clears the highlight instead of leaving a stale polygon when the feature is unknown', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      state.territoriosSeleccionados.set([56]);
+
+      facade.setSelectedManzana('999', 'no-existe', 56);
+
+      expect(selectedOverlay.setSelected).toHaveBeenCalledWith(fakeEngine, null);
+    });
+
+    it('does not highlight a manzana whose territory is no longer selected', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      // Territory 56 is NOT in the selection.
+      selectedOverlay.setSelected.mockClear();
+
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+
+      expect(selectedOverlay.setSelected).toHaveBeenCalledWith(fakeEngine, null);
+    });
+
+    it('re-renders the highlight when a selection is refreshed', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      state.territoriosSeleccionados.set([56]);
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+      selectedOverlay.setSelected.mockClear();
+
+      facade.refreshMarksVisual();
+
+      expect(selectedOverlay.setSelected).toHaveBeenCalled();
+    });
+
+    it('drops the highlight once the territory is deselected', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      state.territoriosSeleccionados.set([56]);
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+      selectedOverlay.setSelected.mockClear();
+
+      state.territoriosSeleccionados.set([]);
+      facade.refreshMarksVisual();
+
+      expect(selectedOverlay.setSelected).toHaveBeenCalledWith(fakeEngine, null);
+    });
+
+    it('clears an active highlight on request', () => {
+      facade.attachEngine(fakeEngine as never);
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+      selectedOverlay.setSelected.mockClear();
+
+      facade.clearSelectedManzana();
+
+      expect(selectedOverlay.setSelected).toHaveBeenCalledWith(fakeEngine, null);
+    });
+
+    it('destroys the highlight with the engine and resets the cached selection', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+      selectedOverlay.destroy.mockClear();
+
+      facade.destroySelectedManzanaOverlay(fakeEngine as never);
+
+      expect(selectedOverlay.destroy).toHaveBeenCalledWith(fakeEngine);
+    });
+
+    it('cannot render a highlight once the overlay was destroyed (fresh engine)', () => {
+      facade = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      facade.initSelectedManzanaOverlay(fakeEngine as never);
+      facade.destroySelectedManzanaOverlay(fakeEngine as never);
+      selectedOverlay.isInitialized.mockReturnValue(false);
+      selectedOverlay.setSelected.mockClear();
+
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+
+      expect(selectedOverlay.setSelected).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when nothing is highlighted', () => {
+      facade.attachEngine(fakeEngine as never);
+
+      facade.clearSelectedManzana();
+
+      expect(selectedOverlay.setSelected).not.toHaveBeenCalled();
+    });
+
+    it('renders nothing before the overlay is initialized', () => {
+      facade.attachEngine(fakeEngine as never);
+      selectedOverlay.isInitialized.mockReturnValue(false);
+
+      facade.setSelectedManzana('56-56.a', '56.a', 56);
+
+      expect(selectedOverlay.setSelected).not.toHaveBeenCalled();
     });
   });
 });

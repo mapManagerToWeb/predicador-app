@@ -57,6 +57,8 @@ describe('MapSelectionService', () => {
     cancelPendingStyleUpdates: ReturnType<typeof vi.fn>;
     getFeatureLayerByTerritorio: ReturnType<typeof vi.fn>;
     getManzanaCountByTerritorio: ReturnType<typeof vi.fn>;
+    setSelectedManzana: ReturnType<typeof vi.fn>;
+    clearSelectedManzana: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
   let restoration: {
@@ -88,6 +90,8 @@ describe('MapSelectionService', () => {
       cancelPendingStyleUpdates: vi.fn(),
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
       getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
+      setSelectedManzana: vi.fn(),
+      clearSelectedManzana: vi.fn(),
     };
     toast = { show: vi.fn() };
     restoration = {
@@ -222,6 +226,39 @@ describe('MapSelectionService', () => {
       expect(state.manzanaSeleccionadaNombre()).toBe('B');
       expect(state.manzanaSeleccionadaColor()).toBe('#00ff00');
     });
+
+    it('highlights the tapped manzana (Leaflet selectedManzana parity)', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      rendering.getAllTerritoriesLayer.mockReturnValue([
+        { territorioPadre: 1, color: '#ff0000', layer: {} },
+      ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+
+      service.selectManzanaById('m1', 'Bloque-m1', '#ff0000', 1);
+
+      expect(rendering.clearSelectedManzana).toHaveBeenCalled();
+      expect(rendering.setSelectedManzana).toHaveBeenCalledWith('m1', 'Bloque-m1', 1);
+    });
+  });
+
+  describe('restaurarManzanaAnterior', () => {
+    it('clears the tapped-manzana highlight together with the draw state', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      rendering.getAllTerritoriesLayer.mockReturnValue([
+        { territorioPadre: 1, color: '#ff0000', layer: {} },
+      ]);
+      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
+      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
+      service.selectManzanaById('m1', 'Bloque-m1', '#ff0000', 1);
+      rendering.clearSelectedManzana.mockClear();
+
+      service.restaurarManzanaAnterior();
+
+      expect(state.manzanaSeleccionadaNombre()).toBe('');
+      expect(state.manzanaSeleccionadaTerritorio()).toBeNull();
+      expect(rendering.clearSelectedManzana).toHaveBeenCalled();
+    });
   });
 
   describe('toggleManzanaById', () => {
@@ -311,6 +348,9 @@ describe('MapSelectionService', () => {
       expect(state.territoriosSeleccionados()).toEqual([5]);
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
       expect(rendering.fitBoundsToTerritorios).toHaveBeenCalledWith([5]);
+      // The overlay must be re-filtered for the new selection even before
+      // the async DB restore finishes (no-report territories early-return).
+      expect(rendering.refreshMarksVisual).toHaveBeenCalled();
       expect(state.totalManzanas()).toBe(0);
     });
 
