@@ -18,6 +18,7 @@ import { MapLabelLayerService } from './services/map-label-layer.service';
 import { TileVersionService } from './services/tile-version.service';
 import { MapInitializationService } from './services/map-initialization.service';
 import { MapLocationService } from './services/map-location.service';
+import { MapMarkedOverlayService } from './services/map-marked-overlay.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
 import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
@@ -45,6 +46,7 @@ export class MapPage implements OnDestroy {
   private readonly picking = inject(MapPickingService);
   private readonly vectorTile = inject(MapVectorTileService);
   private readonly labelLayer = inject(MapLabelLayerService);
+  private readonly markedOverlay = inject(MapMarkedOverlayService);
   private readonly tileVersion = inject(TileVersionService);
   private readonly toastService = inject(Toast);
 
@@ -415,6 +417,10 @@ export class MapPage implements OnDestroy {
     if (mlEngine) {
       this.labelLayer.destroy(mlEngine);
       this.vectorTile.destroy(mlEngine);
+      // Per-engine resources must be torn down so the overlay re-initializes
+      // on the next map visit (root singleton, idempotent init otherwise
+      // skips the fresh engine and marks silently vanish).
+      this.markedOverlay.destroy(mlEngine);
       if (this.maplibreClickHandler) {
         mlEngine.off('click', this.maplibreClickHandler);
         this.maplibreClickHandler = null;
