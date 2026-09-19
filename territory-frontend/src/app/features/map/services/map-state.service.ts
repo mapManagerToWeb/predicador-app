@@ -23,7 +23,7 @@ export class MapStateService {
   modoMarcado = signal<ModoMarcado>('none');
   puntosParciales = signal<SnappedPoint[]>([]);
   puntosCount = computed(() => this.puntosParciales().length);
-  puedeConfirmar = computed(() => this.puntosCount() >= 2);
+  puedeConfirmar = computed(() => this.puntosCount() >= 3);
 
   enviando = signal(false);
   isLoading = signal(false);

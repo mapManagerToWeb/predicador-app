@@ -132,7 +132,9 @@ export class MapEditOverlayService {
       type: 'line',
       source: EDIT_SOURCE_ID,
       paint: {
-        'line-color': EDIT_LINE_COLOR,
+        // Data-driven color so the partial-draw preview renders in the
+        // active territory color (Leaflet parity) when features carry one.
+        'line-color': ['coalesce', ['get', 'color'], EDIT_LINE_COLOR],
         'line-width': 2,
       },
     };

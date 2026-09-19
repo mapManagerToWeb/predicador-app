@@ -94,7 +94,7 @@ export const TOAST_MESSAGES = {
   sendRollbackError: 'El reporte no se guardó porque falló el envío por WhatsApp',
   processError: 'Error al procesar el reporte',
   maxPoints: `Máximo ${MAX_PUNTOS_PARCIAL} puntos`,
-  minPoints: 'Necesitás al menos 2 puntos',
+  minPoints: 'Necesitás al menos 3 puntos',
   partialMarked: 'Zona parcial marcada — tocá para eliminar',
   partialDeleted: 'Zona parcial eliminada',
   noNearbyManzana: 'No se encontró una manzana cerca',

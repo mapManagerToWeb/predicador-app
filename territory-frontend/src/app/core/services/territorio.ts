@@ -52,6 +52,12 @@ export class TerritorioService {
     );
   }
 
+  async getGeoJsonByTerritorio(numero: number): Promise<string> {
+    return firstValueFrom(
+      this.http.get(`${this.apiUrl}/${numero}/geojson`, { responseType: 'text' })
+    );
+  }
+
   async getColores(): Promise<Record<number, string>> {
     return firstValueFrom(this.http.get<Record<number, string>>(`${this.apiUrl}/colors`));
   }

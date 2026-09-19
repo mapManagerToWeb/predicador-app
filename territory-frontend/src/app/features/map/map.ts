@@ -23,6 +23,9 @@ import { MapDataPersistenceService } from './services/map-data-persistence.servi
 import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
 import type { ModoMarcado } from './types/map.types';
 import type { MapEngine } from './services/map-engine.interface';
+import type { LatLng } from './map-geometry';
+import { snapToContour } from './map-geometry';
+import { createMapLibreProjectionAdapter } from './services/map-libre-projection-adapter';
 
 @Component({
   selector: 'app-map',
@@ -179,7 +182,13 @@ export class MapPage implements OnDestroy {
     } else if (modo === 'completa') {
       this.handleMaplibreModoCompleta(feature, territorioNumero, manzanaId, nombreBloque);
     } else if (modo === 'parcial') {
-      this.handleMaplibreModoParcial(feature, territorioNumero, manzanaId, nombreBloque);
+      this.handleMaplibreModoParcial(
+        e.lngLat as LatLng,
+        feature,
+        territorioNumero,
+        manzanaId,
+        nombreBloque,
+      );
     }
   }
 
@@ -220,6 +229,7 @@ export class MapPage implements OnDestroy {
   }
 
   private handleMaplibreModoParcial(
+    latlng: LatLng,
     feature: MapGeoJSONFeature,
     territorioNumero: number,
     manzanaId: string,
@@ -231,11 +241,21 @@ export class MapPage implements OnDestroy {
     }
     if (this.state.manzanasById().has(manzanaId)) return;
 
+    const engine = this.maplibreEngine();
+    if (!engine) return;
+
     if (!this.state.manzanaSeleccionadaTerritorio()) {
+      // First tap: anchor the draw on this manzana (load its territory
+      // geometry for contour snapping — Leaflet parity F6).
       const featureColor = (feature.properties?.['color'] as string) ?? this.state.currentTerritoryColor();
-      this.selection.selectManzanaById(manzanaId, nombreBloque, featureColor, territorioNumero);
+      void this.partialMark.iniciarDibujo(manzanaId, nombreBloque, featureColor, territorioNumero, engine);
+    } else {
+      // Subsequent taps: snap to the active manzana contour and add a
+      // partial-draw point (max 6, with live preview).
+      const adapter = createMapLibreProjectionAdapter(engine);
+      const snapped = snapToContour(latlng, this.state.manzanaEdges(), adapter);
+      this.partialMark.agregarPunto(snapped);
     }
-    // Partial point snapping for MapLibre is deferred to F3.4 (hybrid edit mode).
   }
 
   private handleMaplibreHover(e: MapLayerMouseEvent | MapLayerTouchEvent): void {
