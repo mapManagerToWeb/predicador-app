@@ -12,12 +12,12 @@ const BOUNDS = [-74, -38, -72, -36];
 describe('TileVersionService', () => {
   let service: TileVersionService;
   let httpMock: HttpTestingController;
-  let vectorTile: { updateTileUrl: ReturnType<typeof vi.fn> };
+  let vectorTile: { updateTileUrl: ReturnType<typeof vi.fn>; getBaseTileUrl: ReturnType<typeof vi.fn> };
   let mockEngine: MapEngine;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vectorTile = { updateTileUrl: vi.fn() };
+    vectorTile = { updateTileUrl: vi.fn(), getBaseTileUrl: vi.fn().mockReturnValue(TILE_URL) };
     mockEngine = createMockMapEngine();
 
     TestBed.configureTestingModule({
@@ -182,6 +182,64 @@ describe('TileVersionService', () => {
 
       expect(warnSpy).toHaveBeenCalled();
       warnSpy.mockRestore();
+    });
+  });
+
+  describe('handleTileError', () => {
+    async function startWithVersionOne(): Promise<void> {
+      service.startPolling(mockEngine);
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+    }
+
+    it('forces a cache-busted tile refresh when data_version is unchanged', async () => {
+      await startWithVersionOne();
+      vectorTile.updateTileUrl.mockClear();
+
+      service.handleTileError();
+      // recoverTiles refetches TileJSON first (no version bump expected).
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(
+        mockEngine,
+        expect.stringMatching(/\/tiles\/\{z\}\/\{x\}\/\{y\}\.pbf\?v=\d+$/),
+      );
+    });
+
+    it('swallows repeated errors inside the recovery cooldown (backoff)', async () => {
+      await startWithVersionOne();
+      vectorTile.updateTileUrl.mockClear();
+
+      service.handleTileError();
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+
+      // A second error inside the 5s cooldown window is ignored.
+      service.handleTileError();
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(httpMock.match('/api/v1/territories/tiles.json')).toHaveLength(0);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+
+      // After the cooldown expires, the next error triggers a refresh again.
+      await vi.advanceTimersByTimeAsync(1);
+      service.handleTileError();
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(2);
+    });
+
+    it('does nothing without an attached engine', () => {
+      service.handleTileError();
+      expect(httpMock.match('/api/v1/territories/tiles.json')).toHaveLength(0);
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
     });
   });
 

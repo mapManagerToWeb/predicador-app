@@ -111,6 +111,21 @@ describe('MapVectorTileService', () => {
     });
   });
 
+  describe('getBaseTileUrl', () => {
+    it('strips the ?v= cache-buster from the configured template', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine, '/tiles/{z}/{x}/{y}.pbf?v=99');
+      expect(service.getBaseTileUrl()).toBe('/tiles/{z}/{x}/{y}.pbf');
+    });
+
+    it('strips the version from the URL after a versioned update', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine, '/tiles/{z}/{x}/{y}.pbf');
+      service.updateTileUrl(mockEngine, '/tiles/{z}/{x}/{y}.pbf?v=12345');
+      expect(service.getBaseTileUrl()).toBe('/tiles/{z}/{x}/{y}.pbf');
+    });
+  });
+
   describe('setTerritoryFillOpacity', () => {
     it('should set paint property on both fill layers with the proper key', () => {
       const mockEngine = createMockMapEngine();
