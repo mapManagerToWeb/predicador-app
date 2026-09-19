@@ -37,10 +37,17 @@ describe('MapStateService', () => {
     expect(service.tieneTerritorio()).toBe(true);
   });
 
-  it('derives puedeConfirmar from partial points', () => {
+  it('derives puedeConfirmar from partial points (polygon needs 3)', () => {
     service.puntosParciales.set([
       { latlng: makeLatLng(0, 0), edgeIdx: 0, t: 0 },
       { latlng: makeLatLng(1, 1), edgeIdx: 0, t: 1 },
+    ]);
+    expect(service.puedeConfirmar()).toBe(false);
+
+    service.puntosParciales.set([
+      { latlng: makeLatLng(0, 0), edgeIdx: 0, t: 0 },
+      { latlng: makeLatLng(1, 1), edgeIdx: 0, t: 1 },
+      { latlng: makeLatLng(2, 2), edgeIdx: 0, t: 2 },
     ]);
     expect(service.puedeConfirmar()).toBe(true);
   });

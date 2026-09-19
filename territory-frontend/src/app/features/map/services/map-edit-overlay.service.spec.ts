@@ -92,6 +92,19 @@ describe('MapEditOverlayService', () => {
       expect(mockEngine.addLayer).toHaveBeenCalledTimes(2);
     });
 
+    it('paints the line layer with a data-driven color (partial-draw preview in territory color)', () => {
+      service.addOverlay(SAMPLE_GEOJSON, mockEngine);
+
+      expect(mockEngine.addLayer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'edit-overlay-line',
+          paint: expect.objectContaining({
+            'line-color': ['coalesce', ['get', 'color'], '#1d4ed8'],
+          }),
+        }),
+      );
+    });
+
     it('should be a no-op if overlay is already active', () => {
       service.addOverlay(SAMPLE_GEOJSON, mockEngine);
       mockEngine.addLayer.mockClear();
