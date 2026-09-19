@@ -108,6 +108,20 @@ export class MapVectorTileService {
   }
 
   /**
+   * Base tile URL template without the `?v=` cache-busting parameter.
+   *
+   * <p>Used by {@link TileVersionService} to force a tile refresh after a
+   * tile fetch error: MapLibre skips `setSourceUrl` when the URL string is
+   * unchanged, so the recovery path strips any existing version and appends
+   * a fresh cache-buster.</p>
+   */
+  getBaseTileUrl(): string {
+    return this.tileUrl
+      .replace(/([?&])v=[^&#]*(&|$)/, (_match, pre: string, post: string) => (post ? pre : ''))
+      .replace(/[?&]$/, '');
+  }
+
+  /**
    * Update the fill-opacity for a specific territory's features.
    *
    * <p>Applies the same match expression to BOTH fill layers: the manzana

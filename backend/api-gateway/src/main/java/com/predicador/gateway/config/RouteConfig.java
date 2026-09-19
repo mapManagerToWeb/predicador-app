@@ -78,13 +78,18 @@ public class RouteConfig {
                         .uri(TERRITORY_SERVICE_URI))
                 // Pipeline MVT (F1): alta frecuencia, payload binario. CB sin
                 // fallback (un forward:/fallback/territory devolvería JSON en
-                // un content-type MVT) y SIN retry (no amplificar la estampida
-                // de tiles cuando el downstream está en cold start). Van antes
-                // del catch-all territory-service.
+                // un content-type MVT). Retry GET 1 con backoff 100ms–1s
+                // (paridad con el catch-all) + cooldown de recuperación en el
+                // frontend: un 503 transitorio se recupera sin amplificar la
+                // estampida de tiles durante el cold start.
                 .route("territory-tiles", r -> r
                         .path("/api/v1/territories/tiles/{z}/{x}/{y}.pbf")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB)))
+                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB))
+                                .retry(config -> config
+                                        .setRetries(1)
+                                        .setMethods(HttpMethod.GET)
+                                        .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
                         .uri(TERRITORY_SERVICE_URI))
                 .route("territory-tiles-json", r -> r
                         .path("/api/v1/territories/tiles.json")

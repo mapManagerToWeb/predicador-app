@@ -54,6 +54,7 @@ export class MapPage implements OnDestroy {
   /** Bound handler references for cleanup on destroy. */
   private maplibreClickHandler: ((e: MapLayerMouseEvent | MapLayerTouchEvent) => void) | null = null;
   private maplibreMoveHandler: ((e: MapLayerMouseEvent | MapLayerTouchEvent) => void) | null = null;
+  private maplibreErrorHandler: (() => void) | null = null;
 
   manzanasCount = this.state.manzanasCount;
   totalManzanas = this.state.totalManzanas;
@@ -121,6 +122,10 @@ export class MapPage implements OnDestroy {
       this.handleMaplibreHover(e);
     engine.on('click', this.maplibreClickHandler);
     engine.on('mousemove', this.maplibreMoveHandler);
+    // Tile resilience (F7 parity): recover from 500/503 tile bursts by
+    // forcing a cache-busted tile refresh (throttled inside TileVersionService).
+    this.maplibreErrorHandler = () => this.tileVersion.handleTileError();
+    engine.on('error', this.maplibreErrorHandler);
   }
 
 
@@ -417,6 +422,10 @@ export class MapPage implements OnDestroy {
       if (this.maplibreMoveHandler) {
         mlEngine.off('mousemove', this.maplibreMoveHandler);
         this.maplibreMoveHandler = null;
+      }
+      if (this.maplibreErrorHandler) {
+        mlEngine.off('error', this.maplibreErrorHandler);
+        this.maplibreErrorHandler = null;
       }
       mlEngine.destroy();
       this.maplibreEngine.set(null);

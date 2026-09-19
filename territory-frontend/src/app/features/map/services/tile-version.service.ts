@@ -20,6 +20,14 @@ const POLL_INTERVAL_MS = 30_000;
 const DEFAULT_TILE_JSON_URL = '/api/v1/territories/tiles.json';
 
 /**
+ * Minimum interval between forced tile refreshes triggered by tile errors
+ * (ms). Prevents a hot loop while the backend restarts or recovers from an
+ * OOM — Leaflet parity: the deployed app recovered from 500/503 tile bursts
+ * without hammering the upstream.
+ */
+const TILE_RECOVERY_COOLDOWN_MS = 5_000;
+
+/**
  * Detects data version changes by polling the TileJSON endpoint and
  * refreshing the vector tile source URL when new data is available.
  *
@@ -50,6 +58,7 @@ export class TileVersionService {
   private previousBoundsHash: string | null = null;
   private previousVersion: number | null = null;
   private engine: MapEngine | null = null;
+  private lastTileErrorAt = 0;
 
   /** Start polling for tile version changes. */
   startPolling(engine: MapEngine, tileJsonUrl?: string): void {
@@ -104,7 +113,45 @@ export class TileVersionService {
     void this.checkVersion();
   }
 
+  /**
+   * Reacts to a MapLibre `error` event (failed tile/source fetch) by forcing
+   * a cache-busted tile refresh so the browser re-requests the failed tiles.
+   *
+   * <p>Throttled by {@link TILE_RECOVERY_COOLDOWN_MS} to avoid a hot loop
+   * while the backend is down. A data_version bump (detected via the TileJSON
+   * poll) refreshes with the deterministic `?v=<version>`; when the version is
+   * unchanged, a fresh `Date.now()` cache-buster is appended instead because
+   * MapLibre skips `setSourceUrl` calls whose URL is identical — the failed
+   * tiles would otherwise stay blank until the next 30s poll.</p>
+   */
+  handleTileError(): void {
+    if (!this.engine) return;
+
+    const now = Date.now();
+    if (now - this.lastTileErrorAt < TILE_RECOVERY_COOLDOWN_MS) return;
+    this.lastTileErrorAt = now;
+
+    // Run outside the Angular zone — recovery needs no change detection.
+    this.ngZone.runOutsideAngular(() => {
+      void this.recoverTiles();
+    });
+  }
+
   // ─── Private helpers ────────────────────────────────────────────
+
+  private async recoverTiles(): Promise<void> {
+    if (!this.engine) return;
+
+    const versionBefore = this.previousVersion;
+    await this.checkVersion();
+    if (!this.engine) return;
+
+    if (this.previousVersion === versionBefore && this.previousVersion !== null) {
+      const base = this.vectorTile.getBaseTileUrl();
+      const busted = this.buildVersionedTileUrl(base, Date.now());
+      this.vectorTile.updateTileUrl(this.engine, busted);
+    }
+  }
 
   private onVisibilityChange = (): void => {
     if (this.isBrowser && document.visibilityState === 'visible') {
