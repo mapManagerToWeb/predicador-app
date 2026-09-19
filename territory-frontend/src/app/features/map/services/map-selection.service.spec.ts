@@ -84,6 +84,7 @@ describe('MapSelectionService', () => {
       limpiarMarcasVisuales: vi.fn(),
       reaplicarMarcasTerritorio: vi.fn(),
       restaurarVisibilidadPoligonos: vi.fn(),
+      refreshMarksVisual: vi.fn(),
       cancelPendingStyleUpdates: vi.fn(),
       getFeatureLayerByTerritorio: vi.fn().mockReturnValue(undefined),
       getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
@@ -247,6 +248,7 @@ describe('MapSelectionService', () => {
 
       expect(state.manzanasById().has('m1')).toBe(false);
       expect(state.manzanasMarcadaList()).toEqual([]);
+      expect(rendering.refreshMarksVisual).toHaveBeenCalled();
     });
   });
 
@@ -262,6 +264,7 @@ describe('MapSelectionService', () => {
       ]);
       expect(state.territoriosSeleccionados()).toContain(1);
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
+      expect(rendering.refreshMarksVisual).toHaveBeenCalled();
     });
   });
 
@@ -354,6 +357,7 @@ describe('MapSelectionService', () => {
       expect(state.territoriosSeleccionados()).toEqual([]);
       expect(state.totalManzanas()).toBe(0);
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('');
+      expect(rendering.refreshMarksVisual).toHaveBeenCalled();
       expect(drafts.clear).toHaveBeenCalled();
     });
 

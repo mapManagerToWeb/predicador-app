@@ -62,27 +62,40 @@ describe('MapVectorTileService', () => {
       expect(layerIds).toContain('territory-dissolved-line');
     });
 
-    it('should use the feature-state case expression for fill colors on both fill layers', () => {
+    it('should use coalesce color expressions (no feature-state amber) on both fill layers', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
 
-      const featureStateCase = [
-        'case',
-        ['boolean', ['feature-state', 'selected'], false],
-        '#fbbf24',
-        ['coalesce', ['get', 'color'], '#94a3b8'],
-      ];
+      const coalesceColor = ['coalesce', ['get', 'color'], '#94a3b8'];
 
       const layerCalls = mockEngine.addLayer.mock.calls as [
         { id: string; paint: Record<string, unknown> },
       ][];
       const manzanaFill = layerCalls.find(call => call[0].id === 'territory-fill');
-      expect(manzanaFill?.[0].paint['fill-color']).toEqual(featureStateCase);
-      expect(manzanaFill?.[0].paint['fill-outline-color']).toEqual(featureStateCase);
+      expect(manzanaFill?.[0].paint['fill-color']).toEqual(coalesceColor);
+      expect(manzanaFill?.[0].paint['fill-outline-color']).toEqual(coalesceColor);
 
       const dissolvedFill = layerCalls.find(call => call[0].id === 'territory-dissolved-fill');
-      expect(dissolvedFill?.[0].paint['fill-color']).toEqual(featureStateCase);
-      expect(dissolvedFill?.[0].paint['fill-outline-color']).toEqual(featureStateCase);
+      expect(dissolvedFill?.[0].paint['fill-color']).toEqual(coalesceColor);
+      expect(dissolvedFill?.[0].paint['fill-outline-color']).toEqual(coalesceColor);
+    });
+
+    it('should seed the base completion opacity expression on both fill layers', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine);
+
+      const layerCalls = mockEngine.addLayer.mock.calls as [
+        { id: string; paint: Record<string, unknown> },
+      ][];
+      const manzanaFill = layerCalls.find(call => call[0].id === 'territory-fill');
+      expect(manzanaFill?.[0].paint['fill-opacity']).toEqual(
+        ['case', ['in', ['get', 'territorio'], ['literal', []]], 0.6, 0.05],
+      );
+
+      const dissolvedFill = layerCalls.find(call => call[0].id === 'territory-dissolved-fill');
+      expect(dissolvedFill?.[0].paint['fill-opacity']).toEqual(
+        ['case', ['in', ['get', 'tid'], ['literal', []]], 0.6, 0.05],
+      );
     });
   });
 
@@ -117,37 +130,93 @@ describe('MapVectorTileService', () => {
   });
 
   describe('resetFillOpacity', () => {
-    it('should set default opacity on both fill layers', () => {
+    it('should set the completion-driven opacity on both fill layers', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
-      service.resetFillOpacity(mockEngine);
+      service.resetFillOpacity(mockEngine, [1, 2]);
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-fill',
         'fill-opacity',
-        0.6,
+        ['case', ['in', ['get', 'territorio'], ['literal', [1, 2]]], 0.6, 0.05],
       );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-fill',
         'fill-opacity',
-        0.6,
+        ['case', ['in', ['get', 'tid'], ['literal', [1, 2]]], 0.6, 0.05],
+      );
+    });
+
+    it('should restore the base 1px line width on both line layers', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine);
+      service.resetFillOpacity(mockEngine, []);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith('territory-line', 'line-width', 1);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-dissolved-line',
+        'line-width',
+        1,
+      );
+    });
+  });
+
+  describe('setCompletionOpacity', () => {
+    it('should apply 0.6 for completed territories and 0.05 otherwise on both fill layers', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine);
+      service.setCompletionOpacity(mockEngine, [3]);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-fill',
+        'fill-opacity',
+        ['case', ['in', ['get', 'territorio'], ['literal', [3]]], 0.6, 0.05],
+      );
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-dissolved-fill',
+        'fill-opacity',
+        ['case', ['in', ['get', 'tid'], ['literal', [3]]], 0.6, 0.05],
       );
     });
   });
 
   describe('setSelectedTerritoriesOpacity', () => {
-    it('should dim non-selected territories with an in/literal case expression', () => {
+    it('should hide non-selected territories and render selected ones by completeness', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
-      service.setSelectedTerritoriesOpacity(mockEngine, [1, 2]);
+      service.setSelectedTerritoriesOpacity(mockEngine, [1, 2], [1]);
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-fill',
         'fill-opacity',
-        ['case', ['in', ['get', 'territorio'], ['literal', [1, 2]]], 0.6, 0.15],
+        [
+          'case',
+          ['in', ['get', 'territorio'], ['literal', [1, 2]]],
+          ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 0.6, 0.05],
+          0,
+        ],
       );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-fill',
         'fill-opacity',
-        ['case', ['in', ['get', 'tid'], ['literal', [1, 2]]], 0.6, 0.15],
+        [
+          'case',
+          ['in', ['get', 'tid'], ['literal', [1, 2]]],
+          ['case', ['in', ['get', 'tid'], ['literal', [1]]], 0.6, 0.05],
+          0,
+        ],
+      );
+    });
+
+    it('should zero the line width for non-selected territories on both line layers', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLayers(mockEngine);
+      service.setSelectedTerritoriesOpacity(mockEngine, [1], [1]);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-line',
+        'line-width',
+        ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 1, 0],
+      );
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-dissolved-line',
+        'line-width',
+        ['case', ['in', ['get', 'tid'], ['literal', [1]]], 1, 0],
       );
     });
   });
