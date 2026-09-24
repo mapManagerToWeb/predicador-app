@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { Polygon, Path, LatLng, LatLngBounds } from 'leaflet';
+import { Polygon, Path, LatLngBounds } from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { MapMarkRestorationService } from './map-mark-restoration.service';
+import { MapLadosService } from './map-lados.service';
 import { Toast } from '../../../core/services/toast';
 import { DraftMarksService } from '../../../core/services/map-draft';
 import { TOAST_MESSAGES } from '../utils/map-constants';
@@ -13,7 +14,6 @@ import {
   getSelectedManzanaStyle,
 } from './map-style.service';
 import { getTerritoryProgress } from '../utils/territory-progress';
-import { collectLatLngRings } from './map-rings';
 import type { ModoMarcado } from '../types/map.types';
 import type { Reporte } from '../../../core/models/models';
 
@@ -25,6 +25,7 @@ export class MapSelectionService {
   private readonly restoration = inject(MapMarkRestorationService);
   private readonly toastService = inject(Toast);
   private readonly draftService = inject(DraftMarksService);
+  private readonly lados = inject(MapLadosService);
 
   /** The currently selected manzana polygon (transient UI state, not in state). */
   private selectedPolygon: Polygon | null = null;
@@ -36,20 +37,6 @@ export class MapSelectionService {
     this.state.manzanaSeleccionadaColor.set(color);
     this.state.manzanaSeleccionadaNombre.set(nombreBloque);
     this.state.manzanaSeleccionadaTerritorio.set(territorioNumero);
-
-    // Leaflet 2.0 comparte Polygon/MultiPolygon: collectLatLngRings aplana la
-    // forma [[ring],[ring]] de un MultiPolygon para que el snapping del
-    // marcado parcial disponga de los edges de todas las partes (antes una
-    // manzana multiparte generaba 0 edges).
-    const edges: { from: LatLng; to: LatLng }[] = [];
-    for (const ring of collectLatLngRings(polygon.getLatLngs())) {
-      if (ring.length < 3) continue;
-      for (let i = 0; i < ring.length - 1; i++) {
-        edges.push({ from: ring[i], to: ring[i + 1] });
-      }
-      edges.push({ from: ring[ring.length - 1], to: ring[0] });
-    }
-    this.state.manzanaEdges.set(edges);
 
     polygon.setStyle(getSelectedManzanaStyle());
 
@@ -97,7 +84,6 @@ export class MapSelectionService {
     this.selectedPolygon = null;
     this.state.manzanaSeleccionadaNombre.set('');
     this.state.manzanaSeleccionadaTerritorio.set(null);
-    this.state.manzanaEdges.set([]);
   }
 
   toggleManzana(id: string, nombreBloque: string, layer: Path, color: string, territorioNumero: number): void {
@@ -300,8 +286,9 @@ export class MapSelectionService {
     this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), this.state.territoriosSeleccionados());
   }
 
+  /** Cierra la manzana abierta en modo parcial sin guardar (lo guardado sigue). */
   limpiarParcial(): void {
-    this.rendering.limpiarCapasParciales();
-    this.state.puntosParciales.set([]);
+    this.lados.limpiarEdicion();
+    this.state.edicionLados.set(null);
   }
 }

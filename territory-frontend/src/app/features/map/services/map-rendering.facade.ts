@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Map as LeafletMap, Layer, Marker, Polygon, type PathOptions, type LatLngExpression } from 'leaflet';
+import { Map as LeafletMap, Layer, Marker, type PathOptions } from 'leaflet';
 import { MapEngineService } from './map-engine.service';
 import {
   getBaseTerritoryStyle,
@@ -11,15 +11,13 @@ import { MapTileLayerService } from './map-tile-layer.service';
 import { MapTerritoryLayerService, type ManzanaClickHandler } from './map-territory-layer.service';
 import { MapStyleService } from './map-style.service';
 import { MapCaptureService } from './map-capture.service';
-import { MapPartialDrawService } from './map-partial-draw.service';
+import { MapLadosService } from './map-lados.service';
 import { MapStateService } from './map-state.service';
 import type {
   ManzanaIndex,
   FeatureLayer,
   TerritorioCacheData,
   ManzanaMarcada,
-  SnappedPoint,
-  Edge,
 } from '../types/map.types';
 
 /**
@@ -37,7 +35,7 @@ export class MapRenderingFacade {
   private readonly territories = inject(MapTerritoryLayerService);
   private readonly styles = inject(MapStyleService);
   private readonly capture = inject(MapCaptureService);
-  private readonly partialDraw = inject(MapPartialDrawService);
+  private readonly lados = inject(MapLadosService);
   private readonly state = inject(MapStateService);
   private readonly registry = inject(MapLayerRegistry);
 
@@ -284,41 +282,6 @@ export class MapRenderingFacade {
 
   // ─── Partial draw ────────────────────────────────────────────────
 
-  redibujarParcial(
-    puntos: SnappedPoint[],
-    currentTerritoryColor: string,
-    manzanaEdges: Edge[],
-    onMarkerDrag: (index: number, marker: Marker) => void
-  ): void {
-    this.partialDraw.redibujarParcial(puntos, currentTerritoryColor, manzanaEdges, onMarkerDrag);
-  }
-
-  updatePartialPolygonLatLngs(latlngs: LatLngExpression[], currentTerritoryColor: string): void {
-    this.partialDraw.updatePartialPolygonLatLngs(latlngs, currentTerritoryColor);
-  }
-
-  actualizarParcialEnDrag(
-    puntos: SnappedPoint[],
-    currentTerritoryColor: string,
-    manzanaEdges: Edge[],
-    index: number,
-    marker: Marker
-  ): void {
-    this.partialDraw.actualizarParcialEnDrag(puntos, currentTerritoryColor, manzanaEdges, index, marker);
-  }
-
-  limpiarCapasParciales(): void {
-    this.partialDraw.limpiarCapasParciales();
-  }
-
-  getPoligonoParcial(): Polygon | null {
-    return this.partialDraw.getPoligonoParcial();
-  }
-
-  clearPoligonoParcialRef(): void {
-    this.partialDraw.clearPoligonoParcialRef();
-  }
-
   // ─── Extra layers (delegated to territory-layer) ─────────────────
 
   addExtraLayer(layer: Layer): void {
@@ -356,7 +319,7 @@ export class MapRenderingFacade {
   destroy(): void {
     this.styles.cancelPendingStyleUpdates();
     this.clearExtraLayers();
-    this.partialDraw.destroy();
+    this.lados.limpiarEdicion();
     this.tiles.destroy();
     this.engine.destroy();
   }

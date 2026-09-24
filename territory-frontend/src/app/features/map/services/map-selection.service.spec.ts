@@ -203,7 +203,7 @@ describe('MapSelectionService', () => {
   });
 
   describe('seleccionarManzana', () => {
-    it('tracks the selected manzana and its edges and selects its territory', () => {
+    it('tracks the selected manzana and selects its territory', () => {
       rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
       rendering.getAllTerritoriesLayer.mockReturnValue([
         { territorioPadre: 1, color: '#ff0000', layer: {} },
@@ -217,45 +217,9 @@ describe('MapSelectionService', () => {
       expect(state.manzanaSeleccionadaColor()).toBe('#ff0000');
       expect(state.manzanaSeleccionadaNombre()).toBe('Bloque-m1');
       expect(state.manzanaSeleccionadaTerritorio()).toBe(1);
-      expect(state.manzanaEdges().length).toBe(5);
       expect(polygon.setStyle).toHaveBeenCalledWith(getSelectedManzanaStyle());
       expect(state.territoriosSeleccionados()).toContain(1);
       expect(rendering.setCurrentTerritoryColor).toHaveBeenCalledWith('#ff0000');
-    });
-
-    it('builds edges from ALL parts of a MultiPolygon manzana (regression)', () => {
-      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
-      rendering.getAllTerritoriesLayer.mockReturnValue([
-        { territorioPadre: 1, color: '#ff0000', layer: {} },
-      ]);
-      rendering.getFeatureLayerByTerritorio.mockReturnValue({ color: '#ff0000', layer: {} });
-      rendering.getManzanaCountByTerritorio.mockReturnValue(10);
-      // Leaflet 2.0: un MultiPolygon deja getLatLngs() con forma
-      // [[ring],[ring]]. Antes del fix solo se usaba rings[0] (una parte) y el
-      // snapping del marcado parcial quedaba sin edges de las demás partes.
-      const multi = {
-        setStyle: vi.fn(),
-        getLatLngs: vi.fn(() => [
-          [
-            { lat: 0, lng: 0 },
-            { lat: 1, lng: 0 },
-            { lat: 1, lng: 1 },
-            { lat: 0, lng: 1 },
-            { lat: 0, lng: 0 },
-          ],
-          [
-            { lat: 10, lng: 10 },
-            { lat: 11, lng: 10 },
-            { lat: 11, lng: 11 },
-            { lat: 10, lng: 11 },
-            { lat: 10, lng: 10 },
-          ],
-        ]),
-      };
-
-      service.seleccionarManzana(multi as never, '#ff0000', 'Bloque-m1', 1);
-
-      expect(state.manzanaEdges().length).toBe(10);
     });
   });
 

@@ -1,5 +1,3 @@
-export const DEDUP_THRESHOLD_PX = 2;
-export const MAX_PUNTOS_PARCIAL = 6;
 export const LABEL_MIN_ZOOM = 14;
 export const MAX_TILE_WAIT_MS = typeof navigator !== 'undefined' &&
   /AppleWebKit/.test(navigator.userAgent) &&
@@ -31,11 +29,6 @@ export const STYLE_DEFAULTS = {
     opacity: 1,
     fillOpacity: 0.95,
   },
-  partialPolygon: {
-    weight: 4,
-    fillOpacity: 0.75,
-    dashArray: '8, 8',
-  },
   partialPolygonComplete: {
     weight: 4,
     fillOpacity: 0.85,
@@ -56,11 +49,6 @@ export const STYLE_DEFAULTS = {
     className: 'territory-label',
     iconSize: [0, 0],
     iconAnchor: [0, 0],
-  },
-  partialPoint: {
-    className: 'partial-point',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
   },
 } as const;
 
@@ -93,13 +81,13 @@ export const TOAST_MESSAGES = {
   sendError: 'Error enviando WhatsApp',
   sendRollbackError: 'El reporte no se guardó porque falló el envío por WhatsApp',
   processError: 'Error al procesar el reporte',
-  maxPoints: `Máximo ${MAX_PUNTOS_PARCIAL} puntos`,
-  minPoints: 'Necesitás al menos 2 puntos',
-  partialMarked: 'Zona parcial marcada — tocá para eliminar',
   partialDeleted: 'Zona parcial eliminada',
   noNearbyManzana: 'No se encontró una manzana cerca',
-  selectManzana: (nombre: string) => `Manzana "${nombre}" — tocá para colocar puntos`,
-  partialMode: 'Tocá en cualquier parte del mapa',
+  partialMode: 'Tocá una manzana y después las calles que predicaron',
+  sinLados: 'No se pudieron calcular los lados de esta manzana',
+  ladosMarcados: (marcados: number, total: number) => `Guardado: ${marcados} de ${total} lados`,
+  manzanaCompleta: (nombre: string) => `Manzana ${nombre} completa`,
+  yaCompleta: (nombre: string) => `La manzana ${nombre} ya está completa`,
   completeMode: 'Tocá una manzana para marcarla',
   territoryLock: 'No se puede cambiar de territorio mientras se marca',
   locationDenied: 'Permiso de ubicación denegado — activalo en los ajustes del navegador',

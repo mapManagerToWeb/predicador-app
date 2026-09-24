@@ -93,9 +93,12 @@ describe('MapPage', () => {
   };
   let initialization: { reloadAllTerritories: ReturnType<typeof vi.fn> };
   let partialMark: {
-    deshacerPunto: ReturnType<typeof vi.fn>;
-    finalizarParcial: ReturnType<typeof vi.fn>;
-    cancelarParcial: ReturnType<typeof vi.fn>;
+    confirmarEdicion: ReturnType<typeof vi.fn>;
+    cancelarEdicion: ReturnType<typeof vi.fn>;
+    marcarManzanaCompleta: ReturnType<typeof vi.fn>;
+    abrirManzana: ReturnType<typeof vi.fn>;
+    quitarZonaDeManzana: ReturnType<typeof vi.fn>;
+    eliminarZona: ReturnType<typeof vi.fn>;
   };
   let dataPersistence: {
     guardarEnBaseDeDatos: ReturnType<typeof vi.fn>;
@@ -125,7 +128,14 @@ describe('MapPage', () => {
       setModoMarcado: vi.fn(),
     };
     initialization = { reloadAllTerritories: vi.fn().mockResolvedValue(undefined) };
-    partialMark = { deshacerPunto: vi.fn(), finalizarParcial: vi.fn(), cancelarParcial: vi.fn() };
+    partialMark = {
+      confirmarEdicion: vi.fn(),
+      cancelarEdicion: vi.fn(),
+      marcarManzanaCompleta: vi.fn(),
+      abrirManzana: vi.fn(),
+      quitarZonaDeManzana: vi.fn(),
+      eliminarZona: vi.fn(),
+    };
     toast = { show: vi.fn() };
     dataPersistence = {
       guardarEnBaseDeDatos: vi.fn().mockResolvedValue(undefined),
@@ -222,14 +232,21 @@ describe('MapPage', () => {
       expect(selection.setModoMarcado).toHaveBeenCalledWith('none');
     });
 
-    it('delegates partial drawing actions', () => {
-      component.deshacerPunto();
-      component.finalizarParcial();
-      component.cancelarParcial();
+    it('delega las acciones del marcado por lados', () => {
+      component.confirmarLados();
+      component.cancelarLados();
+      component.marcarManzanaCompleta();
 
-      expect(partialMark.deshacerPunto).toHaveBeenCalled();
-      expect(partialMark.finalizarParcial).toHaveBeenCalled();
-      expect(partialMark.cancelarParcial).toHaveBeenCalled();
+      expect(partialMark.confirmarEdicion).toHaveBeenCalled();
+      expect(partialMark.cancelarEdicion).toHaveBeenCalled();
+      expect(partialMark.marcarManzanaCompleta).toHaveBeenCalled();
+    });
+
+    it('cambiar de modo guarda primero la manzana abierta', () => {
+      component.toggleModoParcial();
+
+      expect(partialMark.confirmarEdicion).toHaveBeenCalled();
+      expect(selection.setModoMarcado).toHaveBeenCalledWith('parcial');
     });
   });
 

@@ -197,11 +197,13 @@ export class MapInitializationService {
 
     for (const num of draft.territoriosSeleccionados) {
       const fl = layers.find(f => f.territorioPadre === num);
+      // actualizarEstadoMarcado: las zonas parciales del borrador vuelven al
+      // estado (no solo al dibujo); si no, se perdían del próximo reporte.
       this.selection.restaurarMarcadoConReportes(
         num,
         [this.reporteDesdeDraft(draft, num)],
         fl?.color,
-        { actualizarEstadoMarcado: false }
+        { actualizarEstadoMarcado: true }
       );
     }
   }
@@ -225,7 +227,10 @@ export class MapInitializationService {
       manzanasMarcadas: manzanas.length,
       tipoSesion: draft.modoMarcado === 'completa' ? 'completa' : 'parcial',
       geometriaParcial: parcial?.geometria ?? null,
-      puntosParciales: parcial ? JSON.stringify(parcial.puntos.map(p => ({ lat: p.lat, lng: p.lng }))) : null,
+      // Borradores nuevos traen el detalle por lados; los anteriores, los puntos del trazo.
+      puntosParciales: parcial
+        ? (parcial.detalle ?? JSON.stringify(parcial.puntos.map(p => ({ lat: p.lat, lng: p.lng }))))
+        : null,
       manzanasIds: manzanas.filter(id => !id.startsWith('parcial-')).join(',') || null,
     };
   }

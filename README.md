@@ -100,7 +100,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 
 - **Mapa interactivo**: Visualización de territorios con Leaflet, capas de OpenStreetMap, CartoDB y ArcGIS satellite
 - **Modo de marcado completo**: Tocar una manzana para marcarla como visitada
-- **Modo de marcado parcial**: Dibujar polígonos personalizados en bordes de manzana (hasta 6 puntos)
+- **Modo de marcado parcial (por lados)**: tocar una manzana y después las calles que se predicaron; se marca una franja a lo largo de esos lados. Con todos los lados la manzana queda completa. Se puede retomar y editar después
 - **Selección de territorios**: Búsqueda con autocompletado, selección múltiple
 - **Gestión de colores**: Colores asignados por territorio para diferenciación visual
 - **Captura de pantalla**: Screenshot automático del mapa para envío por WhatsApp
@@ -389,7 +389,7 @@ pnpm run test:coverage        # Con cobertura V8
 - Core: `profile.ts`, `auth-token.ts`, `auth.service.ts`, `territorio.ts`, `toast.ts`, `csrf-token.ts`, `encargado.ts`, `rum.ts`, `map-draft.service.ts`, `report-cache.service.ts`, `phone.ts`
 - Interceptors: `auth.interceptor.ts`, `error.interceptor.ts`, `csrf.interceptor.ts`
 - Guards: `admin.guard.ts`, `profile.guard.ts`
-- Map: `map.ts`, `map-geometry.ts`, `manzana-spatial-index.ts`, `map-rings.ts`, `map-engine.service.ts`, `map-tile-layer.service.ts`, `map-location.service.ts`, `map-partial-mark.service.ts`, `map-initialization.service.ts`, `map-mark-restoration.service.ts`, `map-layer-registry.service.ts`, `map-canvas-capture.service.ts`, `map-capture.service.ts`, `map-partial-draw.service.ts`, `map-rendering.facade.ts`, `map-report.service.ts`, `map-data-persistence.service.ts`, `map-interaction.service.ts`, `map-territory-layer.service.ts`, `map-state.service.ts`, `map-selection.service.ts`, `map-style.ts`, `whatsapp.ts`, `territory-search.ts`
+- Map: `map.ts`, `map-geometry.ts`, `manzana-spatial-index.ts`, `map-rings.ts`, `map-engine.service.ts`, `map-tile-layer.service.ts`, `map-location.service.ts`, `map-partial-mark.service.ts`, `map-initialization.service.ts`, `map-mark-restoration.service.ts`, `map-layer-registry.service.ts`, `map-canvas-capture.service.ts`, `map-capture.service.ts`, `map-lados.service.ts`, `map-rendering.facade.ts`, `map-report.service.ts`, `map-data-persistence.service.ts`, `map-interaction.service.ts`, `map-territory-layer.service.ts`, `map-state.service.ts`, `map-selection.service.ts`, `map-style.ts`, `whatsapp.ts`, `territory-search.ts`
 - Auth/Admin/Profile/SSR: `login.ts`, `admin.ts`, `profile.ts`, `server.spec.ts`
 
 ### Backend

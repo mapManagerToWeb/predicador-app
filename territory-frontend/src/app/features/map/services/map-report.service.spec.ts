@@ -5,8 +5,7 @@ import { Profile } from '../../../core/services/profile';
 import { Toast } from '../../../core/services/toast';
 import { WhatsAppService } from './whatsapp';
 import { MapCanvasCaptureService } from './map-canvas-capture.service';
-import type { ManzanaMarcada, FeatureLayer, DatosParciales } from '../types/map.types';
-import { makeLatLng } from '../map-geometry';
+import type { ManzanaMarcada, FeatureLayer, ZonaParcial } from '../types/map.types';
 import type { UserProfile } from '../../../core/models/models';
 
 describe('MapReportService', () => {
@@ -83,8 +82,8 @@ describe('MapReportService', () => {
 
   describe('buildRegistros', () => {
     it('builds one registro per selected territory', () => {
-      const marcadas = [makeMarcada('m1', 1), makeMarcada('parcial-1', 1)];
-      const registros = service.buildRegistros(marcadas, [makeTerritoryLayer(1, 2)], [1], new Map());
+      const marcadas = [makeMarcada('m1', 1), makeMarcada('m2', 1)];
+      const registros = service.buildRegistros(marcadas, [makeTerritoryLayer(1, 2)], [1], []);
 
       expect(registros).toHaveLength(1);
       expect(registros[0].territorioNumero).toBe(1);
@@ -94,12 +93,21 @@ describe('MapReportService', () => {
       expect(registros[0].tipoSesion).toBe('completa');
       expect(registros[0].encargadoId).toBe(7);
       expect(registros[0].manzanaId).toBe('m1');
-      expect(registros[0].manzanasIds).toBe('m1');
+      expect(registros[0].manzanasIds).toBe('m1,m2');
+    });
+
+    it('una zona parcial no completa el territorio', () => {
+      const marcadas = [makeMarcada('m1', 1), makeMarcada('parcial-1', 1)];
+      const registros = service.buildRegistros(marcadas, [makeTerritoryLayer(1, 2)], [1], []);
+
+      expect(registros[0].manzanasMarcadas).toBe(2);
+      expect(registros[0].estado).toBe('incomplete');
+      expect(registros[0].tipoSesion).toBe('parcial');
     });
 
     it('ignores territories that were not selected', () => {
       const marcadas = [makeMarcada('m1', 1), makeMarcada('m2', 2)];
-      const registros = service.buildRegistros(marcadas, [], [2], new Map());
+      const registros = service.buildRegistros(marcadas, [], [2], []);
 
       expect(registros).toHaveLength(1);
       expect(registros[0].territorioNumero).toBe(2);
@@ -107,28 +115,34 @@ describe('MapReportService', () => {
 
     it('marks a territory as incomplete when fewer manzanas than total are marked', () => {
       const marcadas = [makeMarcada('m1', 1)];
-      const registros = service.buildRegistros(marcadas, [makeTerritoryLayer(1, 5)], [1], new Map());
+      const registros = service.buildRegistros(marcadas, [makeTerritoryLayer(1, 5)], [1], []);
 
       expect(registros[0].estado).toBe('incomplete');
       expect(registros[0].tipoSesion).toBe('parcial');
     });
 
-    it('includes partial geometry for territories with partial data', () => {
-      const marcadas = [makeMarcada('parcial-1', 1)];
-      const parciales = new Map<number, DatosParciales>([
-        [1, { geometria: '{"type":"Polygon"}', puntos: [{ latlng: makeLatLng(0, 0), edgeIdx: 0, t: 0 }] }],
-      ]);
+    it('incluye TODAS las zonas parciales del territorio con su detalle por lados', () => {
+      const marcadas = [makeMarcada('parcial-1', 1), makeMarcada('parcial-2', 1), makeMarcada('parcial-3', 2)];
+      const cuadrado = { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] };
+      const zonas: ZonaParcial[] = [
+        { id: 'parcial-1', territorio: 1, manzanaId: 'm1', manzanaNombre: '1.a', lados: [0], geometria: cuadrado },
+        { id: 'parcial-2', territorio: 1, manzanaId: 'm2', manzanaNombre: '1.b', lados: [1, 2], geometria: cuadrado },
+        { id: 'parcial-3', territorio: 2, manzanaId: 'm9', manzanaNombre: '2.a', lados: [0], geometria: cuadrado },
+      ];
 
-      const registros = service.buildRegistros(marcadas, [], [1], parciales);
+      const registros = service.buildRegistros(marcadas, [], [1], zonas);
 
-      expect(registros[0].geometriaParcial).toBe('{"type":"Polygon"}');
-      expect(registros[0].puntosParciales).toBe('[{"lat":0,"lng":0}]');
+      expect(JSON.parse(registros[0].geometriaParcial!).type).toBe('MultiPolygon');
+      expect(JSON.parse(registros[0].puntosParciales!)).toMatchObject({
+        v: 2,
+        zonas: [{ m: 'm1', l: [0] }, { m: 'm2', l: [1, 2] }],
+      });
       expect(registros[0].manzanaId).toBeNull();
     });
 
     it('returns an empty list when there is no profile', () => {
       profile = null;
-      expect(service.buildRegistros([makeMarcada('m1', 1)], [], [1], new Map())).toEqual([]);
+      expect(service.buildRegistros([makeMarcada('m1', 1)], [], [1], [])).toEqual([]);
     });
   });
 

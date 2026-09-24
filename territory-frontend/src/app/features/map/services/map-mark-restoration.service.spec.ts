@@ -142,18 +142,50 @@ describe('MapMarkRestorationService', () => {
       expect([...state.manzanasById().keys()].some(k => k.startsWith('parcial-'))).toBe(true);
     });
 
-    it('restores a multipolygon partial geometry from the last report', () => {
+    it('un reporte antiguo con varias zonas (MultiPolygon) las restaura todas, sin manzana', () => {
       rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
-      const geometriaParcial = JSON.stringify({
-        type: 'MultiPolygon',
-        coordinates: [[[[0, 0], [0, 1], [1, 1], [0, 0]]]],
-      });
+      const anillo = [[0, 0], [0, 1], [1, 1], [0, 0]];
+      const geometriaParcial = JSON.stringify({ type: 'MultiPolygon', coordinates: [[anillo], [anillo]] });
 
       service.restaurarConReportes(1, [
         { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: '', manzanaId: null, geometriaParcial } as never,
       ]);
 
-      expect(rendering.addExtraLayer).toHaveBeenCalled();
+      expect(rendering.addExtraLayer).toHaveBeenCalledTimes(2);
+      const zonas = state.zonasDeTerritorio(1);
+      expect(zonas).toHaveLength(2);
+      expect(zonas.every(z => z.manzanaId === null)).toBe(true);
+    });
+
+    it('un reporte por lados vuelve con su manzana y sus lados (se puede seguir editando)', () => {
+      rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
+      const g = { type: 'Polygon', coordinates: [[[0, 0], [0, 1], [1, 1], [0, 0]]] };
+      const reporte = {
+        sessionTime: '2026-08-01T10:00:00Z',
+        manzanasIds: '',
+        manzanaId: null,
+        geometriaParcial: JSON.stringify(g),
+        puntosParciales: JSON.stringify({ v: 2, zonas: [{ m: '12-12.e', n: '12.e', l: [0, 2], g }] }),
+      };
+
+      service.restaurarConReportes(1, [reporte as never]);
+
+      const [zona] = state.zonasDeTerritorio(1);
+      expect(zona).toMatchObject({ manzanaId: '12-12.e', manzanaNombre: '12.e', lados: [0, 2], territorio: 1 });
+      expect(state.manzanasById().get(zona.id)?.nombreBloque).toBe('Parcial: 12.e');
+      expect(registry.get(zona.id)).toBeTruthy();
+    });
+
+    it('solo pintar no duplica zonas que ya están en el estado', () => {
+      rendering.getMap.mockReturnValue({ addLayer: vi.fn() } as never);
+      const geometriaParcial = JSON.stringify({ type: 'Polygon', coordinates: [[[0, 0], [0, 1], [1, 1], [0, 0]]] });
+      const reporte = { sessionTime: '2026-08-01T10:00:00Z', manzanasIds: '', manzanaId: null, geometriaParcial };
+      service.restaurarConReportes(1, [reporte as never]);
+      rendering.addExtraLayer.mockClear();
+
+      service.restaurarConReportes(1, [reporte as never], undefined, { actualizarEstadoMarcado: false });
+
+      expect(rendering.addExtraLayer).not.toHaveBeenCalled();
     });
 
     it('shows an error toast when restoring a report fails', () => {

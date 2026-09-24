@@ -64,10 +64,10 @@
             class="mode-tab partial"
             [class.active]="modoMarcado() === 'parcial'"
             [attr.aria-pressed]="modoMarcado() === 'parcial'"
-            (click)="setModoMarcado('parcial')"
+            (click)="toggleModoParcial()"
           >
-            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            <span class="tab-label">Trazar</span>
+            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 16h16v4H4zM16 4h4v16h-4z"/></svg>
+            <span class="tab-label">Parcial</span>
           </button>
         </div>
 
@@ -85,7 +85,7 @@
           <button
             type="button"
             class="action-btn send"
-            [disabled]="manzanasCount() === 0 || enviando() || modoMarcado() === 'parcial'"
+            [disabled]="manzanasCount() === 0 || enviando() || edicionLados() !== null"
             (click)="guardarYEnviar()"
             aria-label="Guardar y enviar reporte"
           >
@@ -108,43 +108,40 @@
         </div>
       </div>
 
-      <!-- Row 2: partial mode controls -->
+      <!-- Row 2: marcado parcial por lados -->
       @if (modoMarcado() === 'parcial') {
-        <div class="sheet-row partial-controls" role="group" aria-label="Controles de marcado parcial">
-          <span class="partial-hint" aria-live="polite">{{ puntosCount() }}/6</span>
-
-          <button
-            type="button"
-            class="partial-btn undo"
-            [disabled]="puntosCount() === 0"
-            (click)="deshacerPunto()"
-            aria-label="Deshacer último punto"
-          >
-            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
-            <span class="btn-label">Deshacer</span>
-          </button>
-
-          <button
-            type="button"
-            class="partial-btn cancel"
-            (click)="cancelarParcial()"
-            aria-label="Cancelar marcado parcial"
-          >
-            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            <span class="btn-label">Cancelar</span>
-          </button>
-
-          <button
-            type="button"
-            class="partial-btn confirm"
-            [disabled]="!puedeConfirmar()"
-            (click)="finalizarParcial()"
-            aria-label="Confirmar zona parcial"
-          >
-            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            <span class="btn-label">Listo</span>
-          </button>
-        </div>
+        @if (edicionLados(); as ed) {
+          <div class="sheet-row lados-panel" role="group" aria-label="Lados de la manzana">
+            <div class="lados-info" aria-live="polite">
+              <strong>Manzana {{ ed.nombre }}</strong>
+              <span>
+                @if (ed.seleccion.length === 0) {
+                  Tocá las calles que predicaron
+                } @else {
+                  {{ ed.seleccion.length }} de {{ ed.lados.length }} lados
+                }
+              </span>
+            </div>
+            <div class="lados-actions">
+              <button type="button" class="partial-btn" (click)="marcarManzanaCompleta()" aria-label="Marcar toda la manzana">
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h16v16H4z"/></svg>
+                <span class="btn-label">Toda</span>
+              </button>
+              <button type="button" class="partial-btn cancel" (click)="cancelarLados()" aria-label="Cancelar cambios de esta manzana">
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                <span class="btn-label">Cancelar</span>
+              </button>
+              <button type="button" class="partial-btn confirm" (click)="confirmarLados()" aria-label="Guardar los lados elegidos">
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                <span class="btn-label">Listo</span>
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div class="sheet-row lados-panel" aria-live="polite">
+            <p class="lados-hint">Tocá una manzana y después las calles que predicaron. Si hicieron toda la manzana, usá <strong>Marcar</strong>.</p>
+          </div>
+        }
       }
     </div>
     } @placeholder {

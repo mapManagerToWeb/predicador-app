@@ -7,7 +7,7 @@ import { MapTileLayerService } from './map-tile-layer.service';
 import { MapTerritoryLayerService } from './map-territory-layer.service';
 import { MapStyleService } from './map-style.service';
 import { MapCaptureService } from './map-capture.service';
-import { MapPartialDrawService } from './map-partial-draw.service';
+import { MapLadosService } from './map-lados.service';
 import { MapStateService } from './map-state.service';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { getMarkedManzanaStyle } from './map-style.service';
@@ -27,7 +27,7 @@ describe('MapRenderingFacade', () => {
         MapTerritoryLayerService,
         MapStyleService,
         MapCaptureService,
-        MapPartialDrawService,
+        MapLadosService,
         MapStateService,
       ],
     });

@@ -1,7 +1,6 @@
 import type * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
-import { SnappedPoint, Edge } from '../map-geometry';
-export type { SnappedPoint, Edge };
+import type { GeometriaManzana, Lado, ZonaParcialDatos } from '../utils/lados';
 
 export type ModoMarcado = 'none' | 'completa' | 'parcial';
 
@@ -22,9 +21,23 @@ export interface FeatureLayer {
   layer: L.GeoJSON;
 }
 
-export interface DatosParciales {
-  puntos: SnappedPoint[];
-  geometria: string;
+/** Zona parcial marcada en la salida en curso (id `parcial-…`, igual que su ManzanaMarcada). */
+export interface ZonaParcial extends ZonaParcialDatos {
+  id: string;
+  territorio: number;
+}
+
+/** Manzana abierta en modo parcial para elegir qué lados (calles) se predicaron. */
+export interface EdicionLados {
+  manzanaId: string;
+  nombre: string;
+  territorio: number;
+  color: string;
+  geometria: GeometriaManzana;
+  lados: Lado[];
+  seleccion: number[];
+  /** Zona existente de esta manzana que se está editando, si la hay. */
+  zonaId: string | null;
 }
 
 export interface ManzanaIndex {

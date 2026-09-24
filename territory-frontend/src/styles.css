@@ -605,3 +605,26 @@ img {
 :root[data-theme="light"] .leaflet-control-attribution a {
   color: var(--color-primary);
 }
+
+/* ── Marcado parcial por lados: insignias de Leaflet (DivIcon, fuera de los componentes) ──
+   Doble clase: leaflet.css se carga después y su .leaflet-marker-icon { display: block }
+   ganaría a una sola clase. */
+.leaflet-marker-icon.lado-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111827;
+  border: 2px solid #111827;
+  font: 700 14px/1 var(--font-body);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.leaflet-marker-icon.lado-badge.marcado {
+  background: #16a34a;
+  border-color: #ffffff;
+  color: #ffffff;
+  font-size: 16px;
+}

@@ -43,16 +43,6 @@ export function getSelectedManzanaStyle(): PathOptions {
   return { ...STYLE_DEFAULTS.selectedManzana };
 }
 
-export function getPartialPolygonStyle(color: string, dashed: boolean): PathOptions {
-  return {
-    color,
-    fillColor: color,
-    fillOpacity: STYLE_DEFAULTS.partialPolygon.fillOpacity,
-    weight: STYLE_DEFAULTS.partialPolygon.weight,
-    dashArray: dashed ? STYLE_DEFAULTS.partialPolygon.dashArray : undefined,
-  };
-}
-
 export function getPartialPolygonCompleteStyle(color: string): PathOptions {
   return {
     color,

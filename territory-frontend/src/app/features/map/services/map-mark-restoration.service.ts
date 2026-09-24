@@ -1,6 +1,4 @@
 import { Injectable, inject } from '@angular/core';
-import { LatLng, Polygon, type LatLngExpression } from 'leaflet';
-import * as GeoJSON from 'geojson';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
@@ -8,7 +6,9 @@ import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { TOAST_MESSAGES, nextParcialId } from '../utils/map-constants';
 import { elegirUltimoReporte } from '../utils/report-utils';
-import { getMarkedManzanaStyle, getPartialPolygonCompleteStyle } from './map-style.service';
+import { getMarkedManzanaStyle } from './map-style.service';
+import { MapLadosService } from './map-lados.service';
+import { leerZonas } from '../utils/lados';
 import type { Reporte } from '../../../core/models/models';
 
 @Injectable({ providedIn: 'root' })
@@ -18,6 +18,7 @@ export class MapMarkRestorationService {
   private readonly registry = inject(MapLayerRegistry);
   private readonly territorioService = inject(TerritorioService);
   private readonly toastService = inject(Toast);
+  private readonly lados = inject(MapLadosService);
 
   async restaurarDesdeDB(
     territorioNumero: number,
@@ -54,9 +55,7 @@ export class MapMarkRestorationService {
 
       this.aplicarMarcas(territorioNumero, color, ultimo, ids, actualizarEstadoMarcado);
 
-      if (ultimo.geometriaParcial) {
-        this.restaurarGeometriaParcial(ultimo.geometriaParcial, color, territorioNumero, actualizarEstadoMarcado);
-      }
+      this.restaurarZonasParciales(ultimo, color, territorioNumero, actualizarEstadoMarcado);
     } catch {
       this.toastService.show(TOAST_MESSAGES.restoreError);
     }
@@ -76,8 +75,13 @@ export class MapMarkRestorationService {
     }
     if (previosParciales.length === 0) return;
     const newMap = new Map(this.state.manzanasById());
-    for (const p of previosParciales) newMap.delete(p.id);
+    const zonas = new Map(this.state.zonasParciales());
+    for (const p of previosParciales) {
+      newMap.delete(p.id);
+      zonas.delete(p.id);
+    }
     this.state.manzanasById.set(newMap);
+    this.state.zonasParciales.set(zonas);
   }
 
   private aplicarEstiloBase(territorioNumero: number, color: string, ids: string[]): void {
@@ -114,8 +118,13 @@ export class MapMarkRestorationService {
     }
   }
 
-  private restaurarGeometriaParcial(
-    geometriaParcial: string,
+  /**
+   * Dibuja las zonas parciales del reporte. Las del marcado por lados vuelven
+   * con su manzana y sus lados (se pueden seguir editando); las de reportes
+   * antiguos (trazo libre) vuelven como zonas sin manzana.
+   */
+  private restaurarZonasParciales(
+    ultimo: Reporte,
     color: string,
     territorioNumero: number,
     actualizarEstadoMarcado: boolean
@@ -123,31 +132,30 @@ export class MapMarkRestorationService {
     const map = this.rendering.getMap();
     if (!map) return;
 
-    try {
-      const geometry = JSON.parse(geometriaParcial) as GeoJSON.Geometry;
-      let latlngs: LatLngExpression[] = [];
-
-      if (geometry.type === 'Polygon') {
-        latlngs = (geometry as GeoJSON.Polygon).coordinates[0].map(c => new LatLng(c[1], c[0]));
-      } else if (geometry.type === 'MultiPolygon') {
-        latlngs = (geometry as GeoJSON.MultiPolygon).coordinates[0][0].map(c => new LatLng(c[1], c[0]));
-      }
-
-      if (latlngs.length === 0) return;
-
-      const parcialId = nextParcialId();
-      const polygon = new Polygon(latlngs, getPartialPolygonCompleteStyle(color)).addTo(map);
-
-      this.rendering.addExtraLayer(polygon);
-
-      if (actualizarEstadoMarcado) {
-        this.registry.register(parcialId, polygon);
-        const newMap = new Map(this.state.manzanasById());
-        newMap.set(parcialId, { id: parcialId, nombreBloque: 'Zona parcial', color, territorioNumero });
-        this.state.manzanasById.set(newMap);
-      }
-    } catch {
-      /* ignore parse errors */
+    const zonas = leerZonas(ultimo.geometriaParcial, ultimo.puntosParciales);
+    if (zonas.length === 0) return;
+    // Solo pintar (sin actualizar estado) un territorio cuyas zonas ya están en
+    // el estado duplicaría las capas: esas ya están dibujadas y registradas.
+    if (!actualizarEstadoMarcado && this.state.zonasDeTerritorio(territorioNumero).length > 0) return;
+    const marcadas = new Map(this.state.manzanasById());
+    const guardadas = new Map(this.state.zonasParciales());
+    for (const zona of zonas) {
+      const id = nextParcialId();
+      const capa = this.lados.crearCapaZona(zona.geometria, color).addTo(map);
+      this.rendering.addExtraLayer(capa);
+      if (!actualizarEstadoMarcado) continue;
+      this.registry.register(id, capa);
+      marcadas.set(id, {
+        id,
+        nombreBloque: zona.manzanaId ? `Parcial: ${zona.manzanaNombre}` : 'Zona parcial',
+        color,
+        territorioNumero,
+      });
+      guardadas.set(id, { ...zona, id, territorio: territorioNumero });
+    }
+    if (actualizarEstadoMarcado) {
+      this.state.manzanasById.set(marcadas);
+      this.state.zonasParciales.set(guardadas);
     }
   }
 }

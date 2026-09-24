@@ -4,7 +4,6 @@ import {
   getMarkedManzanaStyle,
   getHiddenStyle,
   getSelectedManzanaStyle,
-  getPartialPolygonStyle,
   getPartialPolygonCompleteStyle,
   getCaptureUnmarkedStyle,
   getCaptureIncompleteStyle,
@@ -60,22 +59,6 @@ describe('MapStyleService — pure style functions', () => {
       expect(style.weight).toBe(STYLE_DEFAULTS.selectedManzana.weight);
       expect(style.color).toBe(STYLE_DEFAULTS.selectedManzana.color);
       expect(style.fillOpacity).toBe(STYLE_DEFAULTS.selectedManzana.fillOpacity);
-    });
-  });
-
-  describe('getPartialPolygonStyle', () => {
-    it('should be dashed while drafting', () => {
-      const style = getPartialPolygonStyle('#123456', true);
-      expect(style.fillColor).toBe('#123456');
-      expect(style.color).toBe('#123456');
-      expect(style.fillOpacity).toBe(STYLE_DEFAULTS.partialPolygon.fillOpacity);
-      expect(style.dashArray).toBe(STYLE_DEFAULTS.partialPolygon.dashArray);
-    });
-
-    it('should be solid when enough points exist', () => {
-      const style = getPartialPolygonStyle('#123456', false);
-      expect(style.dashArray).toBeUndefined();
-      expect(style.weight).toBe(STYLE_DEFAULTS.partialPolygon.weight);
     });
   });
 

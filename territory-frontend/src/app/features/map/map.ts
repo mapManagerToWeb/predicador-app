@@ -43,9 +43,7 @@ export class MapPage implements OnDestroy {
   territoriosSeleccionados = this.state.territoriosSeleccionados;
   tieneTerritorio = this.state.tieneTerritorio;
   modoMarcado = this.state.modoMarcado;
-  puntosParciales = this.state.puntosParciales;
-  puntosCount = this.state.puntosCount;
-  puedeConfirmar = this.state.puedeConfirmar;
+  edicionLados = this.state.edicionLados;
   enviando = this.state.enviando;
   isLoading = this.state.isLoading;
   isSatellite = this.state.isSatellite;
@@ -99,11 +97,13 @@ export class MapPage implements OnDestroy {
 
     switch (result.action) {
       case 'remove_partial':
-        if (result.partialId) this.partialMark.eliminarParcial(result.partialId);
+        if (result.partialId) this.partialMark.eliminarZona(result.partialId);
         break;
       case 'toggle_manzana':
         if (result.manzana) {
           const m = result.manzana;
+          // Marcar completa una manzana reemplaza su zona parcial, si tenía.
+          if (!this.state.manzanasById().has(m.id)) this.partialMark.quitarZonaDeManzana(m.id);
           this.selection.toggleManzana(m.id, m.nombreBloque, m.polygon, m.color, m.territorioNumero);
         }
         break;
@@ -112,26 +112,10 @@ export class MapPage implements OnDestroy {
           void this.handleTerritorySelection(result.manzana.territorioNumero);
         }
         break;
-      case 'select_manzana':
-        if (result.manzana) {
-          this.selection.seleccionarManzana(
-            result.manzana.polygon,
-            result.manzana.color,
-            result.manzana.nombreBloque,
-            result.manzana.territorioNumero
-          );
-          this.toastService.show(TOAST_MESSAGES.selectManzana(result.manzana.nombreBloque));
-        } else {
-          this.toastService.show(TOAST_MESSAGES.noNearbyManzana);
-        }
-        break;
-      case 'add_partial_point':
-        if (result.snappedPoint) this.partialMark.agregarPunto(result.snappedPoint);
+      case 'abrir_lados':
+        if (result.manzana) this.partialMark.abrirManzana(result.manzana);
         break;
       case 'none':
-        if (this.state.modoMarcado() === 'parcial' && this.state.puntosCount() >= 6) {
-          this.toastService.show(TOAST_MESSAGES.maxPoints);
-        }
         break;
     }
   }
@@ -166,23 +150,29 @@ export class MapPage implements OnDestroy {
   }
 
   setModoMarcado(modo: ModoMarcado): void {
+    // Cambiar de modo con una manzana abierta guarda lo elegido, no lo pierde.
+    this.partialMark.confirmarEdicion();
     this.selection.setModoMarcado(modo);
+  }
+
+  toggleModoParcial(): void {
+    this.setModoMarcado(this.modoMarcado() === 'parcial' ? 'none' : 'parcial');
   }
 
   toggleModoCompleto(): void {
     this.setModoMarcado(this.modoMarcado() === 'completa' ? 'none' : 'completa');
   }
 
-  deshacerPunto(): void {
-    this.partialMark.deshacerPunto();
+  confirmarLados(): void {
+    this.partialMark.confirmarEdicion();
   }
 
-  finalizarParcial(): void {
-    this.partialMark.finalizarParcial();
+  cancelarLados(): void {
+    this.partialMark.cancelarEdicion();
   }
 
-  cancelarParcial(): void {
-    this.partialMark.cancelarParcial();
+  marcarManzanaCompleta(): void {
+    this.partialMark.marcarManzanaCompleta();
   }
 
   async guardarEnBaseDeDatos(): Promise<void> {

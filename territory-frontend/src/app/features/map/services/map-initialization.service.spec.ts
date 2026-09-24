@@ -256,7 +256,8 @@ describe('MapInitializationService', () => {
     const callPara1 = reportes.mock.calls.find(c => c[0] === 1);
     expect(callPara1).toBeDefined();
     expect(callPara1![1].length).toBe(1);
-    expect(callPara1![3]).toEqual({ actualizarEstadoMarcado: false });
+    // Con actualizarEstadoMarcado las zonas parciales del borrador vuelven al estado.
+    expect(callPara1![3]).toEqual({ actualizarEstadoMarcado: true });
     expect(territorioService.revalidarReportes).not.toHaveBeenCalledWith(expect.arrayContaining([1]));
     expect(state.territoriosSeleccionados()).toEqual([1]);
     expect(state.modoMarcado()).toBe('completa');
