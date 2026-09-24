@@ -1,9 +1,42 @@
 services:
+  # Postgres/PostGIS local de desarrollo. Estrategia adoptada: NO apuntar el
+  # stack local a Neon prod (cold-start de 3-9s por burst + riesgo de tocar
+  # datos de producción). Este contenedor es la DB de dev: Flyway crea el
+  # esquema completo al primer arranque (territory V0-V2, reporting V0-V5).
+  # Para resetearla por completo: docker compose down -v (borra el volumen).
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: db
+    mem_limit: 512m
+    cpus: 1.0
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      - POSTGRES_USER=${DB_USERNAME:-predicador}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-predicador}
+      - POSTGRES_DB=${DB_DATABASE:-predicador}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker-db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-predicador} -d ${DB_DATABASE:-predicador} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   config-server:
     build:
       context: ./backend
       dockerfile: config-server/Dockerfile
     container_name: config-server
+    # Límites de recursos: sin ellos cada JVM pide hasta el 25% de la RAM visible
+    # como heap (ergonomics, ~1 GB por JVM en la VM de Docker Desktop) y
+    # RabbitMQ hasta el 60%; en un host de 8 GB la stack completa puede pedir
+    # >10 GB y forzar swap (los servicios terminan OOM-killed, exit 137). Estos
+    # valores acotan el consumo real (ver también rabbitmq-memory-limit.conf).
+    mem_limit: 512m
+    cpus: 1.0
     expose:
       - "8888"
     environment:
@@ -44,6 +77,8 @@ services:
       context: ./backend
       dockerfile: discovery-server/Dockerfile
     container_name: discovery-server
+    mem_limit: 512m
+    cpus: 1.0
     expose:
       - "8761"
     depends_on:
@@ -61,6 +96,8 @@ services:
       context: ./backend
       dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
+    mem_limit: 768m
+    cpus: 2.0
     ports:
       - "8080:8080"
     expose:
@@ -70,6 +107,10 @@ services:
         condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      # Heap JVM acotado al 70% del mem_limit del contenedor (el resto es para
+      # metaspace/off-heap). Sin esto, cada JVM pide un heap de hasta el 25% de
+      # la RAM visible (~1 GB por JVM en la VM de Docker Desktop).
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0
       - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
       # BCrypt es obligatorio fuera de local; plaintext sólo se usa con perfil local.
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
@@ -99,6 +140,8 @@ services:
       context: ./backend
       dockerfile: territory-service/Dockerfile
     container_name: territory-service
+    mem_limit: 1g
+    cpus: 2.0
     expose:
       - "8081"
       - "8091"
@@ -107,11 +150,17 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      db:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - DB_URL=${DB_URL}
-      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
+      # DB local propia (ver servicio `db`): cada servicio migra su esquema en
+      # una base fresca sin baseline (schema compartido + baseline-version 0
+      # era el diseño para migrar la DB legada de Neon y rompe bases frescas).
+      - DB_URL=jdbc:postgresql://db:5432/predicador
+      - DB_URL_UNPOOLED=jdbc:postgresql://db:5432/predicador
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       # Debe coincidir con el api-gateway y reporting-service: mismo HMAC
@@ -139,6 +188,8 @@ services:
       context: ./backend
       dockerfile: reporting-service/Dockerfile
     container_name: reporting-service
+    mem_limit: 768m
+    cpus: 2.0
     expose:
       - "8082"
       - "8092"
@@ -147,11 +198,16 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      db:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - DB_URL=${DB_URL}
-      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
+      # DB local propia (ver servicio `db`): predicador_reporting la crea el
+      # init del volumen. Sin baseline: en base fresca Flyway corre V0 -> V5.
+      - DB_URL=jdbc:postgresql://db:5432/predicador_reporting
+      - DB_URL_UNPOOLED=jdbc:postgresql://db:5432/predicador_reporting
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
@@ -181,12 +237,17 @@ services:
   rabbitmq:
     image: rabbitmq:4.3.4-management
     container_name: rabbitmq
+    mem_limit: 768m
+    cpus: 1.0
     ports:
       - "5672:5672"
       - "15672:15672"
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
+      # NOTA: el límite de memoria se configura por archivo, NO por env
+      # (RABBITMQ_VM_MEMORY_HIGH_WATERMARK está deprecada en RabbitMQ 4.x y
+      # aborta el arranque). Ver rabbitmq-memory-limit.conf
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 10s
@@ -194,6 +255,7 @@ services:
       retries: 10
       start_period: 30s
     volumes:
+      - ./rabbitmq-memory-limit.conf:/etc/rabbitmq/conf.d/10-memory-limit.conf:ro
       - rabbitmq_data:/var/lib/rabbitmq
 
   # --------------------------------------------------------------------------
@@ -201,6 +263,9 @@ services:
   #   docker-compose --profile observability up -d
   #
   # No arranca por defecto para no gastar RAM en desarrollo cotidiano.
+  # Limitado igual que el resto (mem_limit): en un host de 8 GB el perfil
+  # completo sigue siendo pesado (~2.6 GB de caps adicionales) — úsalo solo
+  # cuando lo necesites.
   # Puertos expuestos:
   #   - Prometheus  :9090
   #   - Grafana     :3000  (admin / admin)
@@ -211,6 +276,8 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.109.0
     container_name: otel-collector
+    mem_limit: 512m
+    cpus: 0.5
     profiles: [observability]
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
@@ -224,6 +291,8 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
     container_name: jaeger
+    mem_limit: 1g
+    cpus: 1.0
     profiles: [observability]
     environment:
       - COLLECTOR_OTLP_ENABLED=true
@@ -234,6 +303,8 @@ services:
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: prometheus
+    mem_limit: 768m
+    cpus: 1.0
     profiles: [observability]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -247,6 +318,8 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     container_name: grafana
+    mem_limit: 768m
+    cpus: 1.0
     profiles: [observability]
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
@@ -266,3 +339,4 @@ volumes:
   prometheus_data:
   grafana_data:
   rabbitmq_data:
+  db-data:

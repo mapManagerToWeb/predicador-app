@@ -55,8 +55,11 @@ spring:
         order_updates: true
   flyway:
     enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
+    # Sin baseline-on-migrate: contra una DB fresca (Postgres local de dev),
+    # Flyway ejecuta V0 -> V5 en orden. baseline-version: 0 saltaba V0 y V1
+    # fallaba contra tablas inexistentes. En Neon prod el historial ya tiene
+    # V0-V5 aplicados, asi que esta config es inerte ahi; validate-on-migrate
+    # sigue verificando checksums en ambos entornos.
     locations: classpath:db/migration
     validate-on-migrate: true
     table: flyway_schema_history_reporting

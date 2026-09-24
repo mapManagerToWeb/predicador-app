@@ -1,0 +1,12 @@
+-- Crea la base de datos propia de reporting-service.
+--
+-- Cada servicio migra en su propia base local (historiales Flyway separados
+-- ya son el diseño del repo). En una base compartida (schema public único) el
+-- segundo servicio veria "public" no vacio y exigiria baseline; y
+-- baseline-version: 0 (disenado para migrar la DB legada de Neon) salta V0 y
+-- rompe bases frescas. Con una base por servicio, Flyway corre V0 -> Vn en
+-- orden sin baseline en cualquier entorno nuevo.
+--
+-- Solo se ejecuta al inicializar el volumen de la DB (primer `up`, o
+-- `docker compose down -v && docker compose up`).
+CREATE DATABASE predicador_reporting;
