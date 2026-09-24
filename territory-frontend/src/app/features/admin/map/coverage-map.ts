@@ -84,7 +84,7 @@ export class CoverageMap {
   }
 
   private async iniciar(): Promise<void> {
-    const { map } = await crearMapa(this.contenedor().nativeElement);
+    const { map } = await crearMapa(this.contenedor().nativeElement, 'mapa', true);
     this.map = map;
     const coleccion = this.manzanas();
     map.addSource('manzanas', { type: 'geojson', data: coleccion });

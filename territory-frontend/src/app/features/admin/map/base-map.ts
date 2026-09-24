@@ -78,6 +78,8 @@ function cargarCss(): Promise<void> {
 export async function crearMapa(
   contenedor: HTMLElement,
   fondo: FondoMapa = 'mapa',
+  /** Mapa dentro de una página con scroll: zoom con Ctrl + rueda para no atrapar el scroll. */
+  cooperativo = false,
 ): Promise<{ maplibre: MapLibre; map: MapLibreMap }> {
   const [maplibre] = await Promise.all([import('maplibre-gl'), cargarCss()]);
   // MapLibre busca su worker junto a su propio módulo (import.meta.url), que
@@ -89,6 +91,8 @@ export async function crearMapa(
     style: estiloBase(fondo, temaOscuro()),
     bounds: ENCUADRE_INICIAL,
     attributionControl: { compact: true },
+    cooperativeGestures: cooperativo,
+    locale: { 'CooperativeGesturesHandler.WindowsHelpText': 'Usá Ctrl + rueda para hacer zoom', 'CooperativeGesturesHandler.MacHelpText': 'Usá ⌘ + rueda para hacer zoom', 'CooperativeGesturesHandler.MobileHelpText': 'Usá dos dedos para mover el mapa' },
     // Guardar el canvas permite exportar la vista como imagen.
     canvasContextAttributes: { preserveDrawingBuffer: true },
   });
