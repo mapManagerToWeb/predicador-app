@@ -57,4 +57,14 @@ class SecurityRulesTest {
                 .filter(r -> r.methods().contains(method) && r.pattern().matcher(path).matches())
                 .findFirst();
     }
+
+    @Test
+    void visorPublico_noExigeSesion_peroElRestoDeReportesSi() {
+        assertTrue(firstMatch(SecurityRules.REPORTING, "GET", "/api/v1/reports/public/estado").isEmpty());
+        assertTrue(firstMatch(SecurityRules.GATEWAY, "GET", "/api/v1/reports/public/estado").isEmpty());
+        assertTrue(firstMatch(SecurityRules.REPORTING, "GET", "/api/v1/reports").isPresent());
+        assertTrue(firstMatch(SecurityRules.REPORTING, "GET", "/api/v1/reports/batch").isPresent());
+        // Un prefijo parecido no se cuela como público.
+        assertTrue(firstMatch(SecurityRules.REPORTING, "GET", "/api/v1/reports/publico").isPresent());
+    }
 }

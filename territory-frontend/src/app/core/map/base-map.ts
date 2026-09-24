@@ -1,5 +1,8 @@
 import type { LngLatBoundsLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
-import type { ManzanasCollection } from '../admin.models';
+import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
+
+/** Cualquier colección de manzanas (Polygon/MultiPolygon); el territorio va en `properties.territorio`. */
+type ColeccionManzanas = FeatureCollection<Polygon | MultiPolygon, { territorio: number }>;
 
 export type FondoMapa = 'mapa' | 'satelite';
 export type MapLibre = typeof import('maplibre-gl');
@@ -103,7 +106,7 @@ export async function crearMapa(
 }
 
 /** Caja que contiene todas las manzanas (o las de un territorio). */
-export function limites(coleccion: ManzanasCollection, territorio?: number): LngLatBoundsLike | null {
+export function limites(coleccion: ColeccionManzanas, territorio?: number): LngLatBoundsLike | null {
   let oeste = Infinity;
   let sur = Infinity;
   let este = -Infinity;
@@ -128,7 +131,7 @@ export function limites(coleccion: ManzanasCollection, territorio?: number): Lng
  * de cada extremo para que un par de manzanas rurales enormes no obliguen a
  * alejar tanto el mapa que la ciudad no se distinga.
  */
-export function limitesPrincipales(coleccion: ManzanasCollection): LngLatBoundsLike | null {
+export function limitesPrincipales(coleccion: ColeccionManzanas): LngLatBoundsLike | null {
   const xs: number[] = [];
   const ys: number[] = [];
   for (const f of coleccion.features) {
@@ -151,7 +154,7 @@ export function limitesPrincipales(coleccion: ManzanasCollection): LngLatBoundsL
 }
 
 /** Punto representativo (centro de la caja) de cada territorio, para rotularlo. */
-export function etiquetasTerritorios(coleccion: ManzanasCollection): GeoJSON.FeatureCollection<GeoJSON.Point> {
+export function etiquetasTerritorios(coleccion: ColeccionManzanas): GeoJSON.FeatureCollection<GeoJSON.Point> {
   const cajas = new Map<number, [number, number, number, number]>();
   for (const f of coleccion.features) {
     const t = f.properties.territorio;

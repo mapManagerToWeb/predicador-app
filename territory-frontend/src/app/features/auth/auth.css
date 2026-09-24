@@ -472,3 +472,22 @@
 :root[data-theme="light"] .btn-primary:hover:not(:disabled) {
   box-shadow: 0 0 16px var(--color-primary-glow);
 }
+
+/* ── Acceso al visor público ── */
+.auth-visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  margin-top: var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  text-decoration: none;
+  border: 1px solid var(--color-border-solid);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.auth-visor:hover { color: var(--color-primary); }

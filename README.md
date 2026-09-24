@@ -112,6 +112,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **SSR**: Server-Side Rendering para SEO y performance inicial
 - **RUM**: Core Web Vitals (LCP, INP, CLS, FCP, TTFB) enviados al backend
 - **Autenticación**: Login por teléfono (+56 Chile) y PIN opcional por encargado, tokens HMAC
+- **Visor público** (`/visor`, sin iniciar sesión, enlace en el login): mapa MapLibre de solo lectura para hermanos que no sacan territorio y hermanas que no dirigen grupo. Muestra qué manzanas y calles se predicaron en la vuelta en curso de cada territorio, si está completado o en curso y cuándo se trabajó por última vez; busca por número y ubica al usuario. No muestra nombres ni teléfonos.
 - **Panel de administración** (`/admin`, pensado para escritorio):
   - **Resumen**: manzanas trabajadas, territorios completados, encargados activos, tiempo por manzana y horas de predicación; cobertura de territorios (al día ≤ 120 días, pendiente, atrasado > 365 días, sin registro) con mapa, territorios en curso, ranking por encargado y mapa de calor día × hora. Filtros por período y encargado; exporta la cobertura a CSV.
   - **Territorios**: editor sobre MapLibre + terra-draw para crear manzanas (con ajuste a los vértices vecinos), editar vértices, redibujar, mover manzanas entre territorios (o crear uno nuevo), cambiar colores, eliminar, importar/exportar GeoJSON y revisar la calidad de los datos (formas inválidas con reparación automática y superposiciones).
@@ -357,6 +358,7 @@ Ver `.env.example` para la lista completa.
 | `GET` | `/api/v1/encargados/buscar` | Autenticado | Buscar encargados |
 | `POST` | `/api/v1/encargados/buscar-crear` | Público (20/min) | Buscar o crear encargado + token |
 | `POST` | `/api/v1/encargados/login` | Público (6/min) | Login por teléfono (+ PIN si tiene) + token |
+| `GET` | `/api/v1/reports/public/estado` | Público | Estado de cada territorio para el visor (sin datos de personas, caché 60 s) |
 | `GET` | `/api/v1/reports/admin` | Admin | Reportes compactos de un rango (`desde`, `hasta`) |
 | `DELETE` | `/api/v1/reports/admin?ids=` | Admin | Borrar reportes |
 | `GET` | `/api/v1/reports/admin/whatsapp` | Admin | Últimos 200 envíos de WhatsApp |

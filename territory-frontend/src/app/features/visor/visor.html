@@ -1,0 +1,85 @@
+<div class="visor">
+  <div #mapa class="mapa" role="application" aria-label="Mapa de territorios"></div>
+
+  <header class="barra">
+    <a class="icono" routerLink="/login" aria-label="Volver al inicio de sesión">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+    </a>
+    <form class="buscar" role="search" (submit)="buscar($event)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+      <input
+        type="search"
+        inputmode="numeric"
+        placeholder="Buscar territorio"
+        aria-label="Número de territorio"
+        [value]="busqueda()"
+        (input)="onBusqueda($event)"
+      />
+    </form>
+    <button type="button" class="icono" (click)="alternarLeyenda()" [attr.aria-expanded]="verLeyenda()" aria-label="Qué significan los colores">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
+    </button>
+  </header>
+
+  <div class="acciones-mapa">
+    <button type="button" class="icono" (click)="alternarFondo()" [attr.aria-label]="fondo() === 'mapa' ? 'Ver satélite' : 'Ver mapa'">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
+    </button>
+    <button type="button" class="icono" (click)="alternarTema()" aria-label="Cambiar tema claro u oscuro">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
+    </button>
+  </div>
+
+  @if (verLeyenda()) {
+    <section class="panel leyenda" aria-label="Leyenda">
+      <h2>Qué muestra el mapa</h2>
+      <p class="linea"><span class="muestra llena"></span> Manzana o calle predicada en la vuelta actual</p>
+      <p class="linea"><span class="muestra clara"></span> Manzana que falta predicar</p>
+      <p class="nota">
+        Cada territorio tiene su color. Toca un territorio para ver cuándo se trabajó.
+        Es solo para consultar: para marcar hay que iniciar sesión.
+      </p>
+      @if (totales().territorios) {
+        <p class="nota">
+          {{ totales().completados }} territorios completados en su última vuelta ·
+          {{ totales().enCurso }} en curso · {{ totales().territorios }} en total
+        </p>
+      }
+      <button type="button" class="boton" (click)="verLeyenda.set(false)">Entendido</button>
+    </section>
+  }
+
+  @if (cargando()) {
+    <div class="aviso" role="status">Cargando territorios…</div>
+  }
+  @if (error()) {
+    <div class="aviso error" role="alert">{{ error() }}</div>
+  }
+
+  @if (ficha(); as r) {
+    <section class="panel ficha" aria-live="polite" [attr.aria-label]="'Territorio ' + r.territorio">
+      <div class="ficha-cabecera">
+        <h2>Territorio {{ r.territorio }}</h2>
+        <button type="button" class="cerrar" (click)="seleccionar(null)" aria-label="Cerrar">✕</button>
+      </div>
+      @switch (r.situacion) {
+        @case ('completado') {
+          <p class="estado completado">Completado</p>
+          <p>Se completó {{ hace(r.ultimoTrabajo!) }} ({{ fecha(r.ultimoTrabajo!) }}).</p>
+        }
+        @case ('en-curso') {
+          <p class="estado en-curso">En curso</p>
+          <p>{{ r.predicadas }} de {{ r.manzanas }} manzanas predicadas. Último trabajo {{ hace(r.ultimoTrabajo!) }} ({{ fecha(r.ultimoTrabajo!) }}).</p>
+          @if (r.ultimoCompletado) {
+            <p class="nota">La vez anterior se completó {{ hace(r.ultimoCompletado) }}.</p>
+          }
+        }
+        @default {
+          <p class="estado">Sin registros</p>
+          <p>Todavía no hay trabajo registrado en este territorio.</p>
+        }
+      }
+      <button type="button" class="boton" (click)="seleccionar(r.territorio)">Ver todo el territorio</button>
+    </section>
+  }
+</div>

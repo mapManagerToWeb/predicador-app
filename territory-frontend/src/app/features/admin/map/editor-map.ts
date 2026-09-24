@@ -8,7 +8,7 @@ import type {
 import type { TerraDraw, TerraDrawMouseEvent, SnappableContext } from 'terra-draw';
 import type { Polygon, Position } from 'geojson';
 import type { ManzanaFeature, ManzanasCollection } from '../admin.models';
-import { cambiarFondo, crearMapa, etiquetasTerritorios, type FondoMapa, limites, limitesPrincipales, temaOscuro } from './base-map';
+import { cambiarFondo, crearMapa, etiquetasTerritorios, type FondoMapa, limites, limitesPrincipales, temaOscuro } from '../../../core/map/base-map';
 
 /** Distancia (px) a la que un vértice nuevo se pega al de una manzana vecina. */
 const TOLERANCIA_SNAP_PX = 10;
