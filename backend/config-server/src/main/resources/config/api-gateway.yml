@@ -101,6 +101,10 @@ resilience4j:
       territoryCB-default:
         timeout-duration: 15s
         cancel-running-future: true
+      territoryCB-tiles:
+        base-config: default
+      territoryCB-tilesjson:
+        base-config: default
       reportingCB:
         timeout-duration: 20s
         cancel-running-future: true
@@ -125,6 +129,12 @@ resilience4j:
       territoryCB-default:
         timeout-duration: 15s
         cancel-running-future: true
+      territoryCB-tiles:
+        timeout-duration: 20s
+        cancel-running-future: true
+      territoryCB-tilesjson:
+        timeout-duration: 20s
+        cancel-running-future: true
       reportingCB:
         timeout-duration: 20s
         cancel-running-future: true
@@ -133,6 +143,12 @@ resilience4j:
         cancel-running-future: true
       rumCB:
         base-config: default
+  bulkhead:
+    instances:
+      territoryCB-tiles:
+        max-concurrent-calls: 100
+      territoryCB-tilesjson:
+        max-concurrent-calls: 100
 
 ---
 # Profile: observability — enables OTLP trace export to collector.

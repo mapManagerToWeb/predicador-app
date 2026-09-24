@@ -44,6 +44,8 @@ public class RouteConfig {
     private static final String TERRITORY_FALLBACK = "forward:/fallback/territory";
     private static final String TERRITORY_SERVICE_URI = "lb://territory-service";
     private static final String TERRITORY_TILES_CB = "territoryCB-tiles";
+    private static final String TERRITORY_TILESJSON_CB = "territoryCB-tilesjson";
+    private static final String TERRITORY_TILE_FALLBACK = "forward:/fallback/tile";
 
     @Value("${app.cors.allowed-origins:}")
     private String allowedOrigins;
@@ -76,16 +78,19 @@ public class RouteConfig {
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
                         .uri(TERRITORY_SERVICE_URI))
-                // Pipeline MVT (F1): alta frecuencia, payload binario. CB sin
-                // fallback (un forward:/fallback/territory devolvería JSON en
-                // un content-type MVT). Retry GET 1 con backoff 100ms–1s
-                // (paridad con el catch-all) + cooldown de recuperación en el
-                // frontend: un 503 transitorio se recupera sin amplificar la
-                // estampida de tiles durante el cold start.
+                // Pipeline MVT (F1): alta frecuencia, payload binario. CB con
+                // fallback binario propio: forward:/fallback/tile devuelve un
+                // MVT vacío gzip (application/vnd.mapbox-vector-tile), no JSON,
+                // para que MapLibre no reciba un AJAXError cuando el cold start
+                // supera el timeout. Retry GET 1 con backoff 100ms–1s (paridad
+                // con el catch-all) + cooldown de recuperación en el frontend:
+                // un 503 transitorio se recupera sin amplificar la estampida de
+                // tiles durante el cold start.
                 .route("territory-tiles", r -> r
                         .path("/api/v1/territories/tiles/{z}/{x}/{y}.pbf")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB))
+                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB)
+                                        .setFallbackUri(TERRITORY_TILE_FALLBACK))
                                 .retry(config -> config
                                         .setRetries(1)
                                         .setMethods(HttpMethod.GET)
@@ -94,7 +99,7 @@ public class RouteConfig {
                 .route("territory-tiles-json", r -> r
                         .path("/api/v1/territories/tiles.json")
                         .filters(f -> f
-                                .circuitBreaker(c -> c.setName(TERRITORY_TILES_CB)))
+                                .circuitBreaker(c -> c.setName(TERRITORY_TILESJSON_CB)))
                         .uri(TERRITORY_SERVICE_URI))
                 .route("territory-service", r -> r
                         .path("/api/v1/territories/**")

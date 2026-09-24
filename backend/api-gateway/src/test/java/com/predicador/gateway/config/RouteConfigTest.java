@@ -22,6 +22,12 @@ import static org.mockito.Mockito.when;
  * behaviour added for tile resilience (F7 parity): the high-frequency MVT
  * route must retry GET once with the catch-all backoff so a transient 503
  * during a backend restart does not leave the map with a blank mosaic.
+ *
+ * <p>Also guards the cold-start hardening: the {@code territory-tiles} route
+ * carries a binary fallback ({@code forward:/fallback/tile}) so open-circuit
+ * responses stay MVT-correct for MapLibre, and {@code territory-tiles-json}
+ * uses its own circuit breaker ({@code territoryCB-tilesjson}) so tile bursts
+ * do not poison version polling.</p>
  */
 class RouteConfigTest {
 
@@ -84,5 +90,48 @@ class RouteConfigTest {
                 .contains("firstBackoff = PT0.1S")
                 .contains("maxBackoff = PT1S")
                 .contains("factor = 2");
+    }
+
+    @Test
+    void territoryTilesRoute_circuitBreakerHasBinaryTileFallback() {
+        Route route = route("territory-tiles");
+        String filters = route.getFilters().toString();
+
+        assertThat(filters)
+                .as("territory-tiles CB must keep its name and gain the binary tile fallback")
+                .contains("territoryCB-tiles")
+                .contains("forward:/fallback/tile");
+    }
+
+    @Test
+    void territoryTilesRoute_stillRetriesWithFallbackInPlace() {
+        Route route = route("territory-tiles");
+        String filters = route.getFilters().toString();
+
+        assertThat(filters)
+                .as("fallback must not replace the retry on the .pbf route")
+                .contains("forward:/fallback/tile")
+                .contains("retries = 1");
+    }
+
+    @Test
+    void territoryTilesJsonRoute_usesDedicatedCircuitBreaker() {
+        Route route = route("territory-tiles-json");
+        String filters = route.getFilters().toString();
+
+        assertThat(filters)
+                .as("tiles-json must use the split CB (territoryCB-tilesjson)")
+                .contains("territoryCB-tilesjson");
+    }
+
+    @Test
+    void territoryTilesJsonRoute_hasNoRetryAndNoFallback() {
+        Route route = route("territory-tiles-json");
+        String filters = route.getFilters().toString();
+
+        assertThat(filters)
+                .as("tiles-json must stay a plain GET without retry or fallback")
+                .doesNotContain("retries = 1")
+                .doesNotContain("forward:/fallback");
     }
 }
