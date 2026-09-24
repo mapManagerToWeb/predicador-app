@@ -45,6 +45,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "{maplibre-gl.css,maplibre-gl-worker.mjs,maplibre-gl-shared.mjs}",
+                "input": "node_modules/maplibre-gl/dist",
+                "output": "vendor"
               }
             ],
             "polyfills": [],

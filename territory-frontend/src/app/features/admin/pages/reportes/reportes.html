@@ -1,0 +1,188 @@
+<header class="adm-head">
+  <div>
+    <h1>Reportes</h1>
+    <p>{{ store.reportes()?.length ?? 0 }} reportes en total.</p>
+  </div>
+  <div class="adm-toolbar">
+    <div class="adm-seg" role="tablist" aria-label="Vista">
+      <button type="button" role="tab" [class.activo]="vista() === 'reportes'" (click)="abrir('reportes')">Reportes</button>
+      <button type="button" role="tab" [class.activo]="vista() === 'registro'" (click)="abrir('registro')">Registro por territorio</button>
+      <button type="button" role="tab" [class.activo]="vista() === 'whatsapp'" (click)="abrir('whatsapp')">Envíos de WhatsApp</button>
+    </div>
+    <button class="adm-btn" type="button" (click)="cargar(true)" [disabled]="cargando()">Actualizar</button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="adm-alert" role="alert">{{ error() }}</div>
+}
+
+@switch (vista()) {
+  @case ('reportes') {
+    @if (cantidadDuplicados() > 0 && !soloDuplicados()) {
+      <div class="adm-alert">
+        <span>Hay <strong>{{ cantidadDuplicados() }}</strong> reporte(s) que parecen dobles envíos (mismo contenido, pocos minutos de diferencia).
+          El resumen ya los ignora; podés borrarlos para limpiar el historial.</span>
+        <button class="adm-btn small" type="button" (click)="marcarDuplicados()">Ver y seleccionar</button>
+      </div>
+    }
+    <section class="adm-card">
+      <div class="filtros">
+        <label class="adm-field"><span>Desde</span>
+          <input type="date" [value]="desde()" (change)="setFiltro('desde', $event)" />
+        </label>
+        <label class="adm-field"><span>Hasta</span>
+          <input type="date" [value]="hasta()" (change)="setFiltro('hasta', $event)" />
+        </label>
+        <label class="adm-field"><span>Territorio</span>
+          <input type="number" min="0" [value]="territorio() ?? ''" (input)="setFiltro('territorio', $event)" />
+        </label>
+        <label class="adm-field"><span>Encargado</span>
+          <select (change)="setFiltro('encargado', $event)">
+            <option value="todos">Todos</option>
+            @for (e of encargados(); track e.clave) {
+              <option [value]="e.clave" [selected]="encargado() === e.clave">{{ e.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label class="adm-field"><span>Estado</span>
+          <select (change)="setFiltro('estado', $event)">
+            <option value="todos" [selected]="estado() === 'todos'">Todos</option>
+            <option value="completos" [selected]="estado() === 'completos'">Completos</option>
+            <option value="parciales" [selected]="estado() === 'parciales'">Parciales</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" [checked]="soloDuplicados()" (change)="setFiltro('duplicados', $event)" />
+          Solo posibles duplicados
+        </label>
+        <button class="adm-btn ghost" type="button" (click)="limpiarFiltros()">Limpiar</button>
+      </div>
+
+      <div class="barra">
+        <span class="adm-muted">{{ filtrados().length }} reporte(s)</span>
+        <div class="adm-toolbar">
+          <button class="adm-btn" type="button" (click)="exportarReportes()">Exportar (CSV)</button>
+          <button class="adm-btn danger" type="button" [disabled]="marcados().size === 0" (click)="eliminarMarcados()">
+            Eliminar {{ marcados().size || '' }} seleccionado(s)
+          </button>
+        </div>
+      </div>
+
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" [checked]="todosMarcados()" (change)="marcarPagina($event)" aria-label="Seleccionar página" /></th>
+              <th>Fecha</th><th>Encargado</th><th class="num">Territorio</th><th>Estado</th>
+              <th class="num">Manzanas</th><th class="num">Duración</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of visibles(); track r.id) {
+              <tr [class.marcado]="marcados().has(r.id)">
+                <td><input type="checkbox" [checked]="marcados().has(r.id)" (change)="marcar(r.id, $event)" [attr.aria-label]="'Seleccionar reporte ' + r.id" /></td>
+                <td>
+                  {{ fmtFechaHora(r.fecha) }}
+                  @if (esDuplicado(r)) { <span class="adm-badge warning">Duplicado</span> }
+                </td>
+                <td>{{ nombreEncargado(r) }}</td>
+                <td class="num">{{ r.territorio }}</td>
+                <td>
+                  @if (completado(r)) { <span class="adm-badge good">Completo</span> } @else { <span class="adm-badge info">Parcial</span> }
+                </td>
+                <td class="num">{{ r.manzanasMarcadas ?? '—' }}<span class="adm-muted"> / {{ r.totalManzanas ?? '—' }}</span></td>
+                <td class="num adm-muted">{{ minutos(r) !== null ? minutos(r) + ' min' : '—' }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay reportes con esos filtros.' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (paginas() > 1) {
+        <nav class="paginas" aria-label="Páginas">
+          <button class="adm-btn small" type="button" [disabled]="pagina() === 0" (click)="pagina.set(pagina() - 1)">Anterior</button>
+          <span class="adm-muted">Página {{ pagina() + 1 }} de {{ paginas() }}</span>
+          <button class="adm-btn small" type="button" [disabled]="pagina() >= paginas() - 1" (click)="pagina.set(pagina() + 1)">Siguiente</button>
+        </nav>
+      }
+    </section>
+  }
+
+  @case ('registro') {
+    <section class="adm-card">
+      <h2>Registro de asignación por territorio</h2>
+      <p class="adm-sub">
+        Equivalente al S-13: cada fila es una vuelta completa a un territorio, desde el primer reporte hasta el que lo
+        completa. Se arma a partir de los reportes de la app.
+      </p>
+      <div class="barra">
+        <label class="adm-field inline"><span>Territorio</span>
+          <input type="number" min="0" placeholder="Todos" [value]="registroTerritorio() ?? ''" (input)="registroTerritorio.set(numero($event))" />
+        </label>
+        <button class="adm-btn" type="button" (click)="exportarRegistro()">Exportar (CSV)</button>
+      </div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr><th class="num">Territorio</th><th>Inicio</th><th>Completado</th><th class="num">Días</th><th>Encargados</th><th class="num">Reportes</th></tr>
+          </thead>
+          <tbody>
+            @for (c of ciclos(); track c.territorio + '-' + c.inicio.getTime()) {
+              <tr>
+                <td class="num"><strong>{{ c.territorio }}</strong></td>
+                <td>{{ fmtFecha(c.inicio) }}</td>
+                <td>@if (c.fin) { {{ fmtFecha(c.fin) }} } @else { <span class="adm-badge info">En curso</span> }</td>
+                <td class="num">{{ c.fin ? diasEntre(c.inicio, c.fin) : '—' }}</td>
+                <td>{{ c.encargados.join(', ') }}</td>
+                <td class="num">{{ c.reportes }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="adm-empty">No hay registros.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  @case ('whatsapp') {
+    <section class="adm-card">
+      <h2>Envíos de WhatsApp</h2>
+      <p class="adm-sub">
+        Los últimos 200 avisos que la app intentó mandar al enviar un reporte.
+        @if (fallidos() > 0) { <span class="adm-badge critical">{{ fallidos() }} fallaron</span> }
+      </p>
+      <div class="barra"><span></span><button class="adm-btn" type="button" (click)="cargarEnvios()">Actualizar</button></div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>Fecha</th><th>Estado</th><th>Detalle</th></tr></thead>
+          <tbody>
+            @for (e of envios() ?? []; track e.id) {
+              <tr>
+                <td>{{ fmtFechaHora(e.fecha) }}</td>
+                <td>
+                  @switch (e.estado) {
+                    @case ('SUCCEEDED') { <span class="adm-badge good">Enviado</span> }
+                    @case ('IN_PROGRESS') { <span class="adm-badge info">En curso</span> }
+                    @default {
+                      @if (e.exito) { <span class="adm-badge good">Enviado</span> } @else { <span class="adm-badge critical">Falló</span> }
+                    }
+                  }
+                </td>
+                <td class="adm-muted detalle">
+                  {{ e.error ?? '' }}
+                  @if (e.statusCode) { (HTTP {{ e.statusCode }}) }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="3" class="adm-empty">{{ envios() === null ? 'Cargando…' : 'No hay envíos registrados.' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+}

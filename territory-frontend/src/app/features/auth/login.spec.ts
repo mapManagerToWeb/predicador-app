@@ -80,7 +80,7 @@ describe('LoginPage', () => {
 
     await component.login();
 
-    expect(encargadoService.loginByPhone).toHaveBeenCalledWith('+56912345678');
+    expect(encargadoService.loginByPhone).toHaveBeenCalledWith('+56912345678', undefined);
     expect(profile.save).toHaveBeenCalledWith({
       name: 'Daniel',
       lastName: 'Uribe',
@@ -119,5 +119,41 @@ describe('LoginPage', () => {
 
     expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('iniciar sesión'), 3000, 'error');
     expect(component.loading()).toBe(false);
+  });
+
+  it('pide el PIN cuando el backend responde pin_requerido y lo envía en el segundo intento', async () => {
+    encargadoService.loginByPhone
+      .mockRejectedValueOnce({ status: 401, error: { code: 'pin_requerido', detail: 'Ingresá tu PIN' } })
+      .mockResolvedValueOnce({ id: 7, nombre: 'Ana', apellido: 'Pérez', avatar: 1, telefono: '56912345678', activo: true });
+    component.telefono.set('912345678');
+
+    await component.login();
+    expect(component.pinRequerido()).toBe(true);
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    component.pin.set('123456');
+    await component.login();
+    expect(encargadoService.loginByPhone).toHaveBeenLastCalledWith('+56912345678', '123456');
+    expect(router.navigate).toHaveBeenCalledWith(['/map']);
+  });
+
+  it('muestra el motivo cuando la cuenta está bloqueada o desactivada', async () => {
+    encargadoService.loginByPhone.mockRejectedValue({
+      status: 423,
+      error: { code: 'pin_bloqueado', detail: 'Demasiados intentos. Probá de nuevo en 15 minuto(s).' },
+    });
+    component.telefono.set('912345678');
+
+    await component.login();
+
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Demasiados intentos'), 6000, 'error');
+  });
+
+  it('cambiar el teléfono vuelve a ocultar el PIN', () => {
+    component.pinRequerido.set(true);
+    component.pin.set('1234');
+    component.onTelefonoInput({ target: { value: '987654321' } } as unknown as Event);
+    expect(component.pinRequerido()).toBe(false);
+    expect(component.pin()).toBe('');
   });
 });

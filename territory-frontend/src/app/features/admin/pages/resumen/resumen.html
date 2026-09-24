@@ -1,0 +1,184 @@
+<header class="adm-head">
+  <div>
+    <h1>Resumen</h1>
+    <p>
+      @if (primerDato(); as inicio) {
+        Hay reportes desde el {{ fmtFecha(inicio) }}. Los datos de cobertura usan todo el historial.
+      } @else {
+        Todavía no hay reportes.
+      }
+    </p>
+  </div>
+  <div class="adm-toolbar">
+    <div class="adm-seg" role="group" aria-label="Período">
+      @for (p of periodos; track p.valor) {
+        <button type="button" [class.activo]="periodo() === p.valor" (click)="setPeriodo(p.valor)">{{ p.nombre }}</button>
+      }
+    </div>
+    <select class="adm-input" aria-label="Encargado" (change)="onEncargado($event)">
+      <option value="todos">Todos los encargados</option>
+      @for (o of opcionesEncargado(); track o.clave) {
+        <option [value]="o.clave" [selected]="encargado() === o.clave">{{ o.nombre }}</option>
+      }
+    </select>
+    <button class="adm-btn" type="button" (click)="cargar(true)" [disabled]="cargando()">Actualizar</button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="adm-alert" role="alert">{{ error() }}</div>
+}
+
+<section class="adm-kpis" [class.recargando]="cargando()" aria-label="Indicadores del período">
+  <div class="adm-kpi">
+    <span>Manzanas trabajadas</span>
+    <strong>{{ fmtNumero(kpi().manzanas) }}</strong>
+    <small>en {{ fmtNumero(kpi().reportes) }} reportes</small>
+  </div>
+  <div class="adm-kpi">
+    <span>Territorios completados</span>
+    <strong>{{ fmtNumero(kpi().territoriosCompletados) }}</strong>
+    <small>{{ fmtNumero(kpi().territoriosTrabajados) }} trabajados en total</small>
+  </div>
+  <div class="adm-kpi">
+    <span>Encargados activos</span>
+    <strong>{{ fmtNumero(kpi().encargadosActivos) }}</strong>
+    <small>enviaron al menos un reporte</small>
+  </div>
+  <div class="adm-kpi">
+    <span>Tiempo por manzana</span>
+    @if (kpi().minutosPorManzana !== null) {
+      <strong>{{ fmtNumero(kpi().minutosPorManzana) }} min</strong>
+      <small>mediana de {{ kpi().salidasMedidas }} salidas medidas</small>
+    } @else {
+      <strong class="adm-muted">—</strong>
+      <small>se mide en los reportes nuevos</small>
+    }
+  </div>
+  <div class="adm-kpi">
+    <span>Horas de predicación</span>
+    @if (kpi().horas !== null) {
+      <strong>{{ fmtNumero(kpi().horas) }} h</strong>
+      <small>en salidas con tiempo medido</small>
+    } @else {
+      <strong class="adm-muted">—</strong>
+      <small>se mide en los reportes nuevos</small>
+    }
+  </div>
+</section>
+
+<div class="adm-grid" [class.recargando]="cargando()">
+  <section class="adm-card">
+    <div class="cov-head">
+      <div>
+        <h2>Cobertura de territorios</h2>
+        <p class="adm-sub">Según la última vez que cada territorio se completó. Clic en el mapa para abrirlo en el editor.</p>
+      </div>
+      <div class="cov-hero">
+        <strong>{{ porcentajeAlDia() }}%</strong>
+        <span>al día ({{ conteo()['al-dia'] }} de {{ cobertura().length }})</span>
+      </div>
+    </div>
+
+    <div class="cov-bar" role="img" [attr.aria-label]="'Distribución de territorios por estado'">
+      @for (e of estados; track e.estado) {
+        @if (conteo()[e.estado] > 0) {
+          <span [style.width.%]="ancho(e.estado)" [style.background]="'var(' + e.variable + ')'"
+                [attr.title]="e.nombre + ': ' + conteo()[e.estado]"></span>
+        }
+      }
+    </div>
+    <ul class="cov-legend">
+      @for (e of estados; track e.estado) {
+        <li>
+          <span class="adm-badge" [class]="'adm-badge ' + e.clase">{{ e.nombre }}</span>
+          <strong>{{ conteo()[e.estado] }}</strong>
+          <span class="adm-muted">{{ e.descripcion }}</span>
+        </li>
+      }
+    </ul>
+
+    <div class="cov-body">
+      @if (store.manzanas(); as manzanas) {
+        <app-coverage-map
+          [manzanas]="manzanas"
+          [colores]="coloresMapa()"
+          [describir]="describirTerritorio"
+          (territorioClick)="irATerritorio($event)"
+        />
+      }
+      <div>
+        <h3>Necesitan atención</h3>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead>
+              <tr><th>Territorio</th><th>Estado</th><th>Completado</th><th>Último trabajo</th></tr>
+            </thead>
+            <tbody>
+              @for (c of atencion(); track c.territorio) {
+                <tr class="clicable" tabindex="0" (click)="irATerritorio(c.territorio)" (keydown.enter)="irATerritorio(c.territorio)">
+                  <td><strong>{{ c.territorio }}</strong> <span class="adm-muted">· {{ c.manzanas }} mz</span></td>
+                  <td>
+                    @for (e of estados; track e.estado) {
+                      @if (e.estado === c.estado) {
+                        <span [class]="'adm-badge ' + e.clase">{{ e.nombre }}</span>
+                      }
+                    }
+                  </td>
+                  <td class="adm-muted">{{ fmtRelativo(c.ultimoCompletado) }}</td>
+                  <td class="adm-muted">{{ c.ultimoTrabajo ? fmtRelativo(c.ultimoTrabajo) : '—' }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="4" class="adm-empty">Todos los territorios están al día.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="adm-actions">
+          <button class="adm-btn" type="button" (click)="exportarCobertura()">Exportar cobertura (CSV)</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="adm-card s8">
+    <h2>{{ tituloActividad() }}</h2>
+    <p class="adm-sub">Pasá el cursor sobre una columna para ver reportes y territorios completados.</p>
+    <app-column-chart [columnas]="actividad()" unidad="manzanas" [alto]="260" [descripcion]="tituloActividad()" />
+  </section>
+
+  <section class="adm-card s4">
+    <h2>En curso</h2>
+    <p class="adm-sub">Territorios empezados que todavía no se completan.</p>
+    <ul class="curso">
+      @for (c of enCurso().slice(0, 5); track c.territorio) {
+        <li>
+          <button type="button" (click)="irATerritorio(c.territorio)">
+            <span><strong>{{ c.territorio }}</strong> <span class="adm-muted">· {{ c.ultimoEncargado }}</span></span>
+            <span class="meter" role="img" [attr.aria-label]="'Avance ' + fmtNumero((c.avance ?? 0) * 100) + '%'">
+              <span [style.width.%]="(c.avance ?? 0) * 100"></span>
+            </span>
+            <span class="adm-muted">{{ fmtNumero((c.avance ?? 0) * 100) }}% · {{ fmtRelativo(c.ultimoTrabajo) }}</span>
+          </button>
+        </li>
+      } @empty {
+        <li class="adm-muted">No hay territorios en curso.</li>
+      }
+    </ul>
+    @if (enCurso().length > 5) {
+      <p class="viz-note">Y {{ enCurso().length - 5 }} más. El registro por territorio (en Reportes) tiene el detalle.</p>
+    }
+  </section>
+
+  <section class="adm-card s6">
+    <h2>Manzanas por encargado</h2>
+    <p class="adm-sub">En el período elegido.</p>
+    <app-bar-list [barras]="rankingEncargados()" unidad="manzanas" />
+  </section>
+
+  <section class="adm-card s6">
+    <h2>Cuándo se predica</h2>
+    <p class="adm-sub">Reportes enviados por día y hora (hora local).</p>
+    <app-heatmap [matriz]="calor()" />
+  </section>
+</div>

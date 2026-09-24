@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -162,7 +163,22 @@ public class ReportService {
         report.setGeometriaParcial(dto.geometriaParcial());
         report.setPuntosParciales(dto.puntosParciales());
         report.setManzanasIds(dto.manzanasIds());
+        report.setInicioSesion(inicioSesionPlausible(dto.inicioSesion(), report.getFecha()));
         return report;
+    }
+
+    /** Máxima duración creíble de una salida; más que eso es un borrador olvidado. */
+    static final Duration MAX_DURACION_SESION = Duration.ofHours(12);
+
+    /**
+     * Descarta inicios imposibles (posteriores al envío, o de un borrador que
+     * quedó abierto días) para que no contaminen el tiempo por manzana.
+     */
+    static Instant inicioSesionPlausible(Instant inicio, Instant fecha) {
+        if (inicio == null || fecha == null) return null;
+        if (inicio.isAfter(fecha.plusSeconds(60))) return null;
+        if (inicio.isBefore(fecha.minus(MAX_DURACION_SESION))) return null;
+        return inicio;
     }
 
     private ReportDto toDto(Report report) {
@@ -181,7 +197,8 @@ public class ReportService {
                 report.getTipoSesion(),
                 report.getGeometriaParcial(),
                 report.getPuntosParciales(),
-                report.getManzanasIds()
+                report.getManzanasIds(),
+                report.getInicioSesion()
         );
     }
 }

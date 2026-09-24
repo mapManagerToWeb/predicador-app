@@ -1,0 +1,187 @@
+<header class="adm-head">
+  <div>
+    <h1>Encargados</h1>
+    <p>
+      {{ totales().activos }} activos · {{ totales().conPin }} con PIN
+      @if (totales().bloqueados) { · {{ totales().bloqueados }} bloqueado(s) }
+    </p>
+  </div>
+  <div class="adm-toolbar">
+    <button class="adm-btn" type="button" (click)="exportar()">Exportar (CSV)</button>
+    <button class="adm-btn primary" type="button" (click)="nuevo()">+ Nuevo encargado</button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="adm-alert" role="alert">{{ error() }}</div>
+}
+
+<section class="acceso adm-card">
+  <div>
+    <h2>Cómo entran los encargados</h2>
+    <p class="adm-sub">
+      Entran con su número de teléfono. Si les generás un PIN, además tienen que escribirlo: sin PIN, cualquiera
+      que sepa el número puede entrar como esa persona. Tras 5 PIN incorrectos la cuenta se bloquea 15 minutos.
+    </p>
+    @if (totales().sinPin > 0) {
+      <p class="aviso"><span class="adm-badge warning">{{ totales().sinPin }} sin PIN</span> Te recomendamos generarles uno.</p>
+    }
+  </div>
+  <div class="registro">
+    <span class="adm-badge" [class.good]="registroAbierto()" [class.serious]="registroAbierto() === false">
+      Registro {{ registroAbierto() ? 'abierto' : registroAbierto() === false ? 'cerrado' : '…' }}
+    </span>
+    <p class="adm-muted">
+      {{ registroAbierto() ? 'Cualquiera puede crear su perfil desde la app.' : 'Solo vos das de alta encargados.' }}
+    </p>
+    <button class="adm-btn" type="button" (click)="alternarRegistro()" [disabled]="registroAbierto() === null">
+      {{ registroAbierto() ? 'Cerrar registro' : 'Abrir registro' }}
+    </button>
+  </div>
+</section>
+
+@if (formulario(); as f) {
+  <section class="adm-card form-card">
+    <h2>{{ f.id === null ? 'Nuevo encargado' : 'Editar encargado' }}</h2>
+    <form class="form" (submit)="$event.preventDefault(); guardar()">
+      <label class="adm-field"><span>Nombre</span>
+        <input type="text" maxlength="60" [value]="f.nombre" (input)="campo('nombre', $event)" required />
+      </label>
+      <label class="adm-field"><span>Apellido</span>
+        <input type="text" maxlength="60" [value]="f.apellido" (input)="campo('apellido', $event)" required />
+      </label>
+      <label class="adm-field"><span>Teléfono (con o sin +56)</span>
+        <input type="tel" maxlength="18" [value]="f.telefono" (input)="campo('telefono', $event)" placeholder="+56 9 1234 5678" required />
+      </label>
+      <label class="check"><input type="checkbox" [checked]="f.activo" (change)="campo('activo', $event)" /> Activo</label>
+      <div class="adm-actions">
+        <button class="adm-btn" type="button" (click)="formulario.set(null)">Cancelar</button>
+        <button class="adm-btn primary" type="submit" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
+      </div>
+    </form>
+  </section>
+}
+
+<div class="cuerpo" [class.con-detalle]="seleccionado()">
+  <section class="adm-card">
+    <p class="pista">Hacé clic en un encargado para ver sus datos y administrar su PIN.</p>
+    <div class="filtros">
+      <input class="adm-input" type="search" placeholder="Buscar por nombre o teléfono…" [value]="busqueda()"
+             (input)="busqueda.set(texto($event))" aria-label="Buscar encargado" />
+      <div class="adm-seg" role="group" aria-label="Estado">
+        <button type="button" [class.activo]="filtroEstado() === 'todos'" (click)="filtroEstado.set('todos')">Todos</button>
+        <button type="button" [class.activo]="filtroEstado() === 'activos'" (click)="filtroEstado.set('activos')">Activos</button>
+        <button type="button" [class.activo]="filtroEstado() === 'inactivos'" (click)="filtroEstado.set('inactivos')">Inactivos</button>
+      </div>
+      <div class="adm-seg" role="group" aria-label="Acceso">
+        <button type="button" [class.activo]="filtroAcceso() === 'todos'" (click)="filtroAcceso.set('todos')">Todo acceso</button>
+        <button type="button" [class.activo]="filtroAcceso() === 'pin'" (click)="filtroAcceso.set('pin')">Con PIN</button>
+        <button type="button" [class.activo]="filtroAcceso() === 'telefono'" (click)="filtroAcceso.set('telefono')">Solo teléfono</button>
+      </div>
+    </div>
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th>Nombre</th><th>Teléfono</th><th>Acceso</th><th>Último acceso</th><th class="num">Reportes</th><th>Último reporte</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of filtrados(); track e.id) {
+            <tr class="fila" [class.sel]="seleccionadoId() === e.id" (click)="seleccionadoId.set(e.id); formulario.set(null)" tabindex="0"
+                (keydown.enter)="seleccionadoId.set(e.id)">
+              <td>
+                <strong>{{ e.nombre }} {{ e.apellido }}</strong>
+                @if (!e.activo) { <span class="adm-badge">Inactivo</span> }
+                @if (duplicados().get(e.id); as motivo) { <span class="adm-badge warning" [title]="motivo">¿Duplicado?</span> }
+              </td>
+              <td class="adm-muted tel">{{ fmtTelefono(e.telefono) }}</td>
+              <td>
+                @switch (acceso(e)) {
+                  @case ('bloqueado') { <span class="adm-badge critical">Bloqueado</span> }
+                  @case ('pin') { <span class="adm-badge good">Teléfono + PIN</span> }
+                  @default { <span class="adm-badge warning">Solo teléfono</span> }
+                }
+              </td>
+              <td class="adm-muted">{{ fmtRelativo(e.ultimoAcceso) }}</td>
+              <td class="num">{{ e.totalReportes }}</td>
+              <td class="adm-muted">{{ e.ultimoReporte ? fmtRelativo(e.ultimoReporte) : '—' }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay encargados con esos filtros.' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  @if (seleccionado(); as e) {
+    <aside class="adm-card detalle" aria-label="Detalle del encargado">
+      <header>
+        <h2>{{ e.nombre }} {{ e.apellido }}</h2>
+        <button class="adm-btn ghost small" type="button" (click)="seleccionadoId.set(null)" aria-label="Cerrar">✕</button>
+      </header>
+      <dl>
+        <dt>Teléfono</dt><dd>{{ fmtTelefono(e.telefono) }}</dd>
+        <dt>Estado</dt><dd>{{ e.activo ? 'Activo' : 'Inactivo' }}</dd>
+        <dt>PIN</dt>
+        <dd>
+          @if (e.tienePin) { Sí, desde {{ fmtFecha(e.pinActualizadoEn) }} } @else { No tiene }
+          @if (e.bloqueadoHasta) { <br /><span class="adm-badge critical">Bloqueado hasta {{ fmtFechaHora(e.bloqueadoHasta) }}</span> }
+        </dd>
+        <dt>Último acceso</dt><dd>{{ fmtFechaHora(e.ultimoAcceso) }}</dd>
+        <dt>Reportes</dt><dd>{{ e.totalReportes }}@if (e.ultimoReporte) { (último {{ fmtFecha(e.ultimoReporte) }}) }</dd>
+        <dt>Alta</dt><dd>{{ fmtFecha(e.creadoEn) }}</dd>
+      </dl>
+      @if (duplicados().get(e.id); as motivo) {
+        <p class="aviso"><span class="adm-badge warning">{{ motivo }}</span> Si es la misma persona, fusionalos.</p>
+      }
+
+      <div class="acciones">
+        <button class="adm-btn primary" type="button" (click)="generarPin(e)">{{ e.tienePin ? 'Nuevo PIN' : 'Crear PIN' }}</button>
+        <button class="adm-btn" type="button" (click)="editar(e)">Editar datos</button>
+        @if (e.bloqueadoHasta) {
+          <button class="adm-btn" type="button" (click)="desbloquear(e)">Desbloquear</button>
+        }
+        @if (e.tienePin) {
+          <button class="adm-btn" type="button" (click)="quitarPin(e)">Quitar PIN</button>
+        }
+        <button class="adm-btn" type="button" (click)="alternarActivo(e)">{{ e.activo ? 'Desactivar' : 'Activar' }}</button>
+      </div>
+
+      <div class="fusion">
+        <h3>Fusionar con otro encargado</h3>
+        <p class="adm-muted">Pasa sus reportes al elegido y borra este registro.</p>
+        <div class="fila-form">
+          <select class="adm-input" aria-label="Encargado destino" (change)="destinoFusion.set(idElegido($event))">
+            <option value="">Elegir…</option>
+            @for (o of lista(); track o.id) {
+              @if (o.id !== e.id) { <option [value]="o.id">{{ o.nombre }} {{ o.apellido }} · {{ fmtTelefono(o.telefono) }}</option> }
+            }
+          </select>
+          <button class="adm-btn" type="button" [disabled]="!destinoFusion()" (click)="fusionar(e)">Fusionar</button>
+        </div>
+      </div>
+
+      <button class="adm-btn danger eliminar" type="button" (click)="eliminar(e)" [disabled]="e.totalReportes > 0"
+              [title]="e.totalReportes > 0 ? 'Tiene reportes: desactivalo o fusionalo' : ''">Eliminar</button>
+    </aside>
+  }
+</div>
+
+@if (pinMostrado(); as p) {
+  <div class="adm-overlay">
+    <div class="adm-dialog" role="dialog" aria-modal="true" aria-label="PIN generado">
+      <h2>PIN de {{ p.encargado.nombre }}</h2>
+      <p>Pasáselo por un medio privado. Por seguridad no se vuelve a mostrar.</p>
+      <div class="pin" aria-live="polite">{{ p.pin }}</div>
+      <div class="adm-actions">
+        <button class="adm-btn" type="button" (click)="copiarPin()">Copiar</button>
+        @if (enlaceWhatsApp(p.encargado, p.pin); as url) {
+          <a class="adm-btn" [href]="url" target="_blank" rel="noopener noreferrer">Enviar por WhatsApp</a>
+        }
+        <button class="adm-btn primary" type="button" (click)="pinMostrado.set(null)">Listo</button>
+      </div>
+    </div>
+  </div>
+}

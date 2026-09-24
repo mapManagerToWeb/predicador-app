@@ -27,6 +27,7 @@ interface ReportDto {
   geometriaParcial?: string | null;
   puntosParciales?: string | null;
   manzanasIds?: string | null;
+  inicioSesion?: string | null;
 }
 
 const BATCH_SIZE = 50;
@@ -265,7 +266,8 @@ export class TerritorioService {
       tipoSesion: r.tipoSesion,
       geometriaParcial: r.geometriaParcial ?? null,
       puntosParciales: r.puntosParciales ?? null,
-      manzanasIds: r.manzanasIds ?? null
+      manzanasIds: r.manzanasIds ?? null,
+      inicioSesion: r.inicioSesion ?? null
     };
   }
 

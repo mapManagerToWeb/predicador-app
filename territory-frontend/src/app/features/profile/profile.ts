@@ -1,7 +1,7 @@
 import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Profile } from '../../core/services/profile';
-import { EncargadoService } from '../../core/services/encargado';
+import { codigoLogin, EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
 import { normalizePhone } from '../../core/utils/phone';
 
@@ -78,7 +78,15 @@ export class ProfilePage implements OnInit {
       });
 
       this.toast.show('Perfil creado exitosamente', 2000, 'success');
-    } catch {
+    } catch (err: unknown) {
+      const { code, detail } = codigoLogin(err);
+      if (code === 'registro_cerrado' || code === 'ya_registrado') {
+        // No es un fallo de red: el servidor rechazó el alta y un perfil local
+        // no podría enviar reportes. Se queda en el formulario con el motivo.
+        this.toast.show(detail ?? 'No se pudo crear el perfil', 6000, 'warning');
+        this.loading.set(false);
+        return;
+      }
       const tel = this.telefono().trim();
       this.profileService.save({
         name: this.name(),

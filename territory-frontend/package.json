@@ -32,8 +32,11 @@
     "compression": "^1.8.1",
     "express": "^5.1.0",
     "leaflet": "1.9.4",
+    "maplibre-gl": "^6.11.1",
     "polygon-clipping": "^0.15.7",
     "rxjs": "~7.8.0",
+    "terra-draw": "^1.35.0",
+    "terra-draw-maplibre-gl-adapter": "^1.4.1",
     "tslib": "^2.3.0",
     "web-vitals": "^6.2.1"
   },

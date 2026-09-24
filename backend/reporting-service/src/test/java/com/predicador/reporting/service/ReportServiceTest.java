@@ -322,4 +322,14 @@ class ReportServiceTest {
     private SessionToken encargado(String subject) {
         return new SessionToken(subject, SessionToken.ROLE_ENCARGADO, 1L, 2L);
     }
+
+    @Test
+    void inicioSesionPlausible_descartaInicioFuturoOBorradorOlvidado() {
+        Instant fecha = Instant.parse("2026-09-20T15:00:00Z");
+        assertEquals(Instant.parse("2026-09-20T13:30:00Z"),
+                ReportService.inicioSesionPlausible(Instant.parse("2026-09-20T13:30:00Z"), fecha));
+        assertNull(ReportService.inicioSesionPlausible(Instant.parse("2026-09-20T15:05:00Z"), fecha));
+        assertNull(ReportService.inicioSesionPlausible(Instant.parse("2026-09-18T15:00:00Z"), fecha));
+        assertNull(ReportService.inicioSesionPlausible(null, fecha));
+    }
 }
