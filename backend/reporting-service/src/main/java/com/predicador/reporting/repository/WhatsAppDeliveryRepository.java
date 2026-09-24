@@ -16,4 +16,7 @@ public interface WhatsAppDeliveryRepository extends JpaRepository<WhatsAppDelive
             + "where d.idempotencyKey = :key and d.status = :status and d.leaseUntil < :now")
     int claimStale(@Param("key") String key, @Param("status") WhatsAppDeliveryStatus status,
                    @Param("now") Instant now, @Param("leaseUntil") Instant leaseUntil);
+
+    /** Últimos envíos, para el panel de administración. */
+    java.util.List<WhatsAppDelivery> findTop200ByOrderByCreatedAtDesc();
 }

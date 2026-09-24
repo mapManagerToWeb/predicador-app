@@ -42,4 +42,21 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
 
     @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin ORDER BY r.fecha DESC")
     Page<Report> findByFechaRange(@Param("inicio") Instant inicio, @Param("fin") Instant fin, Pageable pageable);
+
+    List<Report> findByFechaBetweenOrderByFechaDesc(Instant desde, Instant hasta);
+
+    long countByFechaBetween(Instant desde, Instant hasta);
+
+    long countByEncargadoId(Long encargadoId);
+
+    /** Totales por encargado para el panel: [encargadoId, cantidad, último reporte]. */
+    @Query("SELECT r.encargadoId, count(r), max(r.fecha) FROM Report r WHERE r.encargadoId IS NOT NULL GROUP BY r.encargadoId")
+    List<Object[]> resumenPorEncargado();
+
+    /** Pasa todos los reportes de un encargado a otro (fusión de duplicados). */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Report r SET r.encargadoId = :destino, r.encargadoNombre = :nombre, r.encargadoApellido = :apellido "
+            + "WHERE r.encargadoId = :origen")
+    int reasignarEncargado(@Param("origen") Long origen, @Param("destino") Long destino,
+                           @Param("nombre") String nombre, @Param("apellido") String apellido);
 }

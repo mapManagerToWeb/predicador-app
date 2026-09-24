@@ -1,6 +1,7 @@
 package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.EncargadoDto;
+import com.predicador.reporting.service.EncargadoLoginException;
 import com.predicador.reporting.service.EncargadoService;
 import com.predicador.shared.security.SessionTokenService;
 import com.predicador.shared.security.SessionAuthFilter;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.data.domain.PageImpl;
@@ -25,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -77,7 +80,7 @@ class EncargadoControllerTest {
     void crear_shouldReturn200() throws Exception {
         EncargadoDto saved = createDto(1L, "Daniel", "Uribe");
 
-        when(encargadoService.crear(any(EncargadoDto.class))).thenReturn(saved);
+        when(encargadoService.registrar(any(EncargadoDto.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/v1/encargados")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -142,7 +145,7 @@ class EncargadoControllerTest {
     void login_shouldReturn200_conEnvoltorioLoginResponse() throws Exception {
         EncargadoDto dto = createDto(7L, "Ana", "Perez");
 
-        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
+        when(encargadoService.autenticar(anyString(), isNull())).thenReturn(dto);
         when(tokens.isConfigured()).thenReturn(true);
         when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 
@@ -165,7 +168,7 @@ class EncargadoControllerTest {
     void login_doesNotEmitCsrfCookie() throws Exception {
         EncargadoDto dto = createDto(7L, "Ana", "Perez");
 
-        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
+        when(encargadoService.autenticar(anyString(), isNull())).thenReturn(dto);
         when(tokens.isConfigured()).thenReturn(true);
         when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 
@@ -187,12 +190,40 @@ class EncargadoControllerTest {
 
     @Test
     void login_shouldReturn404_siNoExiste() throws Exception {
-        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.empty());
+        when(encargadoService.autenticar(anyString(), isNull())).thenThrow(new EncargadoLoginException(
+                HttpStatus.NOT_FOUND, EncargadoLoginException.NO_ENCONTRADO, "Encargado no encontrado"));
 
         mockMvc.perform(post("/api/v1/encargados/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"telefono\":\"+54900000000\"}"))
-            .andExpect(status().isNotFound());
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("no_encontrado"));
+    }
+
+    @Test
+    void login_conPin_pasaElPinAlServicio_yExponeCodigoSiFalta() throws Exception {
+        when(encargadoService.autenticar("56911111111", null)).thenThrow(new EncargadoLoginException(
+                HttpStatus.UNAUTHORIZED, EncargadoLoginException.PIN_REQUERIDO, "Ingresá tu PIN"));
+        when(encargadoService.autenticar("56911111111", "123456")).thenReturn(createDto(7L, "Ana", "Perez"));
+
+        mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefono\":\"56911111111\"}"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("pin_requerido"));
+        mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefono\":\"56911111111\",\"pin\":\"123456\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.encargado.id").value(7));
+    }
+
+    @Test
+    void login_pinConLetras_es400() throws Exception {
+        mockMvc.perform(post("/api/v1/encargados/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefono\":\"56911111111\",\"pin\":\"12ab\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -223,7 +254,7 @@ class EncargadoControllerTest {
     void localHttpOverride_omitsSecureAttribute() throws Exception {
         EncargadoController localController = new EncargadoController(encargadoService, tokens, false);
         EncargadoDto dto = createDto(7L, "Ana", "Perez");
-        when(encargadoService.buscarPorTelefono(anyString())).thenReturn(Optional.of(dto));
+        when(encargadoService.autenticar(anyString(), isNull())).thenReturn(dto);
         when(tokens.isConfigured()).thenReturn(true);
         when(tokens.issue(anyString(), anyString())).thenReturn("fake.token");
 

@@ -1,2 +1,9 @@
 /* ── Login-specific ── */
 /* All shared styles in auth.css */
+
+.field-hint {
+  margin: 0;
+  padding-left: 2px;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}

@@ -41,6 +41,8 @@ export interface RegistroReporte {
   geometriaParcial?: string | null;
   puntosParciales?: string | null;
   manzanasIds?: string | null;
+  /** Primera manzana marcada de la salida (ISO-8601), para medir tiempos en el panel. */
+  inicioSesion?: string | null;
 }
 
 export interface TerritorioReporteEnvio {

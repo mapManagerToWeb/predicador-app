@@ -30,10 +30,29 @@
           </div>
         </div>
 
+        @if (pinRequerido()) {
+          <div class="field">
+            <label for="pin">PIN</label>
+            <input
+              id="pin"
+              type="password"
+              inputmode="numeric"
+              maxlength="8"
+              [value]="pin()"
+              (input)="onPinInput($event)"
+              (keyup.enter)="login()"
+              placeholder="Tu PIN de 6 dígitos"
+              [disabled]="loading()"
+              autocomplete="current-password"
+            />
+            <p class="field-hint">Te lo da el administrador. Si lo perdiste, pedile uno nuevo.</p>
+          </div>
+        }
+
         <button
           class="btn-primary"
           (click)="login()"
-          [disabled]="!telefono() || loading()"
+          [disabled]="!telefono() || (pinRequerido() && pin().length < 4) || loading()"
         >
           @if (loading()) {
             <span class="spinner"></span>

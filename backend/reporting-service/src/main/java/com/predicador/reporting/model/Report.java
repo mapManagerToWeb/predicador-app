@@ -53,6 +53,9 @@ public class Report {
     @Column(name = "manzanas_ids", columnDefinition = "TEXT")
     private String manzanasIds;
 
+    @Column(name = "inicio_sesion")
+    private Instant inicioSesion;
+
     @Column(name = "creado_en")
     private Instant creadoEn;
 
@@ -113,4 +116,7 @@ public class Report {
 
     public Instant getCreadoEn() { return creadoEn; }
     public void setCreadoEn(Instant creadoEn) { this.creadoEn = creadoEn; }
+
+    public Instant getInicioSesion() { return inicioSesion; }
+    public void setInicioSesion(Instant inicioSesion) { this.inicioSesion = inicioSesion; }
 }

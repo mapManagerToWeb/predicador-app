@@ -4,6 +4,7 @@ import { Profile } from '../../../core/services/profile';
 import { Toast } from '../../../core/services/toast';
 import { WhatsAppService } from './whatsapp';
 import { MapCanvasCaptureService } from './map-canvas-capture.service';
+import { MapStateService } from './map-state.service';
 import type {
   RegistroReporte,
   Reporte,
@@ -22,6 +23,7 @@ export class MapReportService {
   private toastService = inject(Toast);
   private whatsappService = inject(WhatsAppService);
   private canvasCapture = inject(MapCanvasCaptureService);
+  private state = inject(MapStateService);
 
   buildRegistros(
     marcadas: ManzanaMarcada[],
@@ -36,6 +38,7 @@ export class MapReportService {
     const porTerritorio = this.groupByTerritorio(marcadas, seleccionados);
 
     const registros: RegistroReporte[] = [];
+    const inicioSesion = this.state.inicioSesion();
     for (const [territorioNum, marcadasTerritorio] of porTerritorio) {
       const featureLayer = allTerritoriesLayer.find(f => f.territorioPadre === territorioNum);
       const total = this.countTotalManzanas(featureLayer, marcadasTerritorio.length);
@@ -68,7 +71,8 @@ export class MapReportService {
         tipoSesion: total > 0 && marcadasTerritorio.length >= total ? 'completa' : 'parcial',
         geometriaParcial,
         puntosParciales,
-        manzanasIds
+        manzanasIds,
+        inicioSesion
       });
     }
 

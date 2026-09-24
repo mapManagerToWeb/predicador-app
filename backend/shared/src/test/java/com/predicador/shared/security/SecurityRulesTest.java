@@ -26,4 +26,35 @@ class SecurityRulesTest {
         assertTrue(SecurityRules.REPORTING.stream().anyMatch(r ->
                 r.methods().contains("GET") && r.pattern().matcher("/api/v1/encargados").matches()));
     }
+
+    @Test
+    void admin_paths_requireAdminRole_andWinOverGenericRules() {
+        var gateway = SecurityRules.GATEWAY;
+        var territory = SecurityRules.TERRITORY;
+        var reporting = SecurityRules.REPORTING;
+
+        for (String method : List.of("GET", "POST", "PUT", "DELETE")) {
+            assertEquals(SessionToken.ROLE_ADMIN, firstMatch(gateway, method, "/api/v1/territories/admin/manzanas/7")
+                    .orElseThrow().requiredRole());
+            assertEquals(SessionToken.ROLE_ADMIN, firstMatch(territory, method, "/api/v1/territories/admin/manzanas")
+                    .orElseThrow().requiredRole());
+            assertEquals(SessionToken.ROLE_ADMIN, firstMatch(gateway, method, "/api/v1/reports/admin")
+                    .orElseThrow().requiredRole());
+            assertEquals(SessionToken.ROLE_ADMIN, firstMatch(reporting, method, "/api/v1/reports/admin/12")
+                    .orElseThrow().requiredRole());
+            assertEquals(SessionToken.ROLE_ADMIN, firstMatch(reporting, method, "/api/v1/encargados/admin/3/pin")
+                    .orElseThrow().requiredRole());
+        }
+        // Los endpoints públicos del mapa siguen sin exigir sesión.
+        assertTrue(firstMatch(territory, "GET", "/api/v1/territories/all/geojson").isEmpty());
+        // "admin" como prefijo de otra palabra no debe caer en la regla de admin.
+        assertTrue(firstMatch(territory, "GET", "/api/v1/territories/administracion").isEmpty());
+    }
+
+    /** Misma semántica que {@link TokenValidator#findMatchingRule}: gana la primera regla. */
+    private static java.util.Optional<SecurityRule> firstMatch(List<SecurityRule> rules, String method, String path) {
+        return rules.stream()
+                .filter(r -> r.methods().contains(method) && r.pattern().matcher(path).matches())
+                .findFirst();
+    }
 }

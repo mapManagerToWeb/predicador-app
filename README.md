@@ -111,8 +111,12 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **PWA**: Instalable, funciona offline con Service Worker
 - **SSR**: Server-Side Rendering para SEO y performance inicial
 - **RUM**: Core Web Vitals (LCP, INP, CLS, FCP, TTFB) enviados al backend
-- **Autenticación**: Login por teléfono (+56 Chile), tokens HMAC
-- **Admin Panel**: Gestión de colores de territorios con login admin
+- **Autenticación**: Login por teléfono (+56 Chile) y PIN opcional por encargado, tokens HMAC
+- **Panel de administración** (`/admin`, pensado para escritorio):
+  - **Resumen**: manzanas trabajadas, territorios completados, encargados activos, tiempo por manzana y horas de predicación; cobertura de territorios (al día ≤ 120 días, pendiente, atrasado > 365 días, sin registro) con mapa, territorios en curso, ranking por encargado y mapa de calor día × hora. Filtros por período y encargado; exporta la cobertura a CSV.
+  - **Territorios**: editor sobre MapLibre + terra-draw para crear manzanas (con ajuste a los vértices vecinos), editar vértices, redibujar, mover manzanas entre territorios (o crear uno nuevo), cambiar colores, eliminar, importar/exportar GeoJSON y revisar la calidad de los datos (formas inválidas con reparación automática y superposiciones).
+  - **Encargados**: alta y edición, activar/desactivar, PIN (se muestra una vez, con enlace para mandarlo por WhatsApp), desbloqueo, fusión de duplicados, detección de teléfonos/nombres repetidos y apertura/cierre del auto-registro.
+  - **Reportes**: listado con filtros, detección y borrado de dobles envíos, registro por territorio (equivalente al S-13) y estado de los envíos de WhatsApp; todo exportable a CSV.
 - **Session selector**: Selección de horario (Mañana/Tarde)
 - **Satellite view**: Toggle entre vista normal y satelital
 
@@ -331,6 +335,13 @@ Ver `.env.example` para la lista completa.
 | `GET` | `/api/v1/territories/{n}/geojson` | Público | GeoJSON de un territorio |
 | `GET` | `/api/v1/territories/colors` | Público | Colores asignados |
 | `PUT` | `/api/v1/territories/{n}/color` | Admin | Asignar color |
+| `GET` | `/api/v1/territories/admin/manzanas` | Admin | Todas las manzanas con su id real (GeoJSON) |
+| `POST`/`PUT`/`DELETE` | `/api/v1/territories/admin/manzanas[/{id}]` | Admin | Crear, editar o borrar una manzana |
+| `POST` | `/api/v1/territories/admin/manzanas/{id}/reparar` | Admin | Corregir una geometría inválida |
+| `POST` | `/api/v1/territories/admin/manzanas/reasignar` | Admin | Mover manzanas a otro territorio |
+| `DELETE` | `/api/v1/territories/admin/territorios/{n}` | Admin | Borrar un territorio completo |
+| `POST` | `/api/v1/territories/admin/importar` | Admin | Importar un FeatureCollection (todo o nada) |
+| `GET` | `/api/v1/territories/admin/calidad` | Admin | Geometrías inválidas y superposiciones |
 
 ### Reporting Service
 
@@ -345,7 +356,15 @@ Ver `.env.example` para la lista completa.
 | `PUT` | `/api/v1/encargados/{id}` | Autenticado | Actualizar encargado |
 | `GET` | `/api/v1/encargados/buscar` | Autenticado | Buscar encargados |
 | `POST` | `/api/v1/encargados/buscar-crear` | Público (20/min) | Buscar o crear encargado + token |
-| `POST` | `/api/v1/encargados/login` | Público (6/min) | Login por teléfono + token |
+| `POST` | `/api/v1/encargados/login` | Público (6/min) | Login por teléfono (+ PIN si tiene) + token |
+| `GET` | `/api/v1/reports/admin` | Admin | Reportes compactos de un rango (`desde`, `hasta`) |
+| `DELETE` | `/api/v1/reports/admin?ids=` | Admin | Borrar reportes |
+| `GET` | `/api/v1/reports/admin/whatsapp` | Admin | Últimos 200 envíos de WhatsApp |
+| `GET`/`POST`/`PUT`/`DELETE` | `/api/v1/encargados/admin[/{id}]` | Admin | Gestión de encargados |
+| `POST`/`DELETE` | `/api/v1/encargados/admin/{id}/pin` | Admin | Generar o quitar el PIN |
+| `POST` | `/api/v1/encargados/admin/{id}/desbloquear` | Admin | Quitar el bloqueo por intentos |
+| `POST` | `/api/v1/encargados/admin/{id}/fusionar/{destino}` | Admin | Fusionar un duplicado |
+| `GET`/`PUT` | `/api/v1/encargados/admin/config` | Admin | Registro abierto/cerrado |
 | `POST` | `/api/v1/rum` | Público (30/min) | Ingesta Core Web Vitals |
 
 ## Testing
@@ -444,7 +463,9 @@ docker-compose --profile observability up -d
 - **Tokens HMAC-SHA256**: Formato `base64url(subject|role|iat|exp).base64url(sig)`, TTL configurable (default 12h)
 - **Rate Limiting**: Bucket4j por IP con Caffeine storage
 - **Security Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
-- **BCrypt**: Passwords admin hasheados con comparación timing-safe
+- **BCrypt**: Passwords admin y PIN de encargados hasheados con comparación timing-safe
+- **PIN de encargados**: opcional; 5 intentos fallidos bloquean la cuenta 15 minutos (además del rate limit por IP). Con PIN o cuenta desactivada no se puede entrar "por nombre" desde el auto-registro
+- **Panel de administración**: todo `/api/v1/{territories,reports,encargados}/admin/**` exige rol admin en el gateway y en cada servicio
 - **CORS**: Configurable por variable de entorno
 - **Soft rollout**: `SessionAuthFilter` se desactiva si `SESSION_SECRET` está vacío
 - **Constant-time comparison**: Previene timing attacks en verificación de firmas

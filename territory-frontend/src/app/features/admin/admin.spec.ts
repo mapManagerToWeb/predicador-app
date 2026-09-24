@@ -7,6 +7,9 @@ import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { environment } from '../../../environments/environment';
+import { provideRouter } from '@angular/router';
+import { AdminStore } from './services/admin-store';
+import { AdminUi } from './services/admin-ui';
 
 describe('AdminPage', () => {
   let component: AdminPage;
@@ -19,6 +22,7 @@ describe('AdminPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideRouter([]),
         TerritorioService,
         Toast,
         Profile
@@ -90,20 +94,22 @@ describe('AdminPage', () => {
 
   describe('logout', () => {
     it('should logout and clear admin state and user profile', () => {
-      localStorage.setItem('isAdmin', 'true');
       localStorage.setItem('territory_profile', JSON.stringify({ name: 'Test' }));
-      component.isLoggedIn.set(true);
+      TestBed.inject(AuthTokenService).set('admin');
+      TestBed.inject(AdminStore).encargados.set([]);
+      expect(component.isLoggedIn()).toBeTruthy();
 
       component.logout();
 
       expect(component.isLoggedIn()).toBeFalsy();
       expect(localStorage.getItem('territory_profile')).toBeNull();
+      expect(TestBed.inject(AdminStore).encargados()).toBeNull();
       expect(component.username()).toBe('');
       expect(component.password()).toBe('');
     });
   });
 
-  describe('ngOnInit', () => {
+  describe('sesión', () => {
     it('should not auto-login if only the legacy isAdmin flag is stored', () => {
       localStorage.setItem('isAdmin', 'true');
       component.ngOnInit();
@@ -119,47 +125,45 @@ describe('AdminPage', () => {
     });
   });
 
-  describe('getColor', () => {
-    it('should return color from colores map if available', () => {
-      component.colores.set({ 1: '#ff0000', 2: '#3cb44b' });
+  describe('tema', () => {
+    it('respeta el tema guardado y lo alterna', () => {
+      localStorage.setItem('territory_theme', 'light');
+      component.ngOnInit();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
 
-      expect(component.getColor(1)).toBe('#ff0000');
-      expect(component.getColor(2)).toBe('#3cb44b');
+      component.alternarTema();
+
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(localStorage.getItem('territory_theme')).toBe('dark');
+    });
+  });
+
+  describe('confirmación', () => {
+    it('resuelve la promesa según la respuesta y exige el texto cuando se pide', async () => {
+      const ui = TestBed.inject(AdminUi);
+      const pendiente = ui.confirmar({ titulo: 'Borrar', mensaje: '¿Seguro?', accion: 'Borrar', escribir: '12' });
+      expect(ui.confirmacion()?.escribir).toBe('12');
+
+      component.responder(true);
+
+      await expect(pendiente).resolves.toBe(true);
+      expect(ui.confirmacion()).toBeNull();
     });
 
-    it('should return predefined color if not in map', () => {
-      component.colores.set({});
+    it('una confirmación nueva cancela la anterior', async () => {
+      const ui = TestBed.inject(AdminUi);
+      const primera = ui.confirmar({ titulo: 'A', mensaje: '', accion: 'A' });
+      const segunda = ui.confirmar({ titulo: 'B', mensaje: '', accion: 'B' });
 
-      const color = component.getColor(1);
-      expect(color).toBeTruthy();
-      expect(color.startsWith('#')).toBeTruthy();
-    });
-
-    it('should cycle through predefined colors', () => {
-      component.colores.set({});
-
-      const color1 = component.getColor(1);
-      const color2 = component.getColor(2);
-
-      expect(color1).not.toBe(color2);
+      await expect(primera).resolves.toBe(false);
+      component.responder(false);
+      await expect(segunda).resolves.toBe(false);
     });
   });
 
   describe('goToMap', () => {
     it('should be defined', () => {
       expect(component.goToMap).toBeDefined();
-    });
-  });
-
-  describe('coloresPredefinidos', () => {
-    it('should have 30 predefined colors', () => {
-      expect(component.coloresPredefinidos.length).toBe(30);
-    });
-
-    it('should all be valid hex colors', () => {
-      component.coloresPredefinidos.forEach(color => {
-        expect(color).toMatch(/^#[0-9a-fA-F]{6}$/);
-      });
     });
   });
 });

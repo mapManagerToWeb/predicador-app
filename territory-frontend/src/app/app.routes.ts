@@ -19,6 +19,7 @@ export const routes: Routes = [
   {
     path: 'admin',
     loadComponent: () => import('./features/admin/admin').then(m => m.AdminPage),
+    loadChildren: () => import('./features/admin/admin.routes').then(m => m.ADMIN_ROUTES),
     canActivate: [adminGuard]
   },
   { path: '**', redirectTo: 'login' }

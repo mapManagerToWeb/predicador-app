@@ -1,0 +1,11 @@
+:host { display: block; }
+.filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); margin-bottom: var(--space-4); }
+.filtros .adm-field input[type='number'] { width: 110px; }
+.check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); height: 34px; }
+.barra { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+.adm-field.inline { flex-direction: row; align-items: center; gap: var(--space-2); }
+.adm-field.inline input { width: 110px; }
+tr.marcado td { background: var(--color-primary-soft); }
+td .adm-badge { margin-left: var(--space-1); }
+.paginas { display: flex; justify-content: center; align-items: center; gap: var(--space-3); margin-top: var(--space-4); font-size: var(--text-sm); }
+.detalle { max-width: 520px; }

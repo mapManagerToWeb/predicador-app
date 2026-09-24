@@ -29,6 +29,22 @@ public class Encargado {
     @Column(name = "creado_en")
     private Instant creadoEn;
 
+    /** Hash BCrypt del PIN. {@code null}: el encargado entra solo con su teléfono. */
+    @Column(name = "pin_hash", length = 100)
+    private String pinHash;
+
+    @Column(name = "pin_actualizado_en")
+    private Instant pinActualizadoEn;
+
+    @Column(name = "pin_intentos_fallidos", nullable = false)
+    private int pinIntentosFallidos;
+
+    @Column(name = "pin_bloqueado_hasta")
+    private Instant pinBloqueadoHasta;
+
+    @Column(name = "ultimo_acceso")
+    private Instant ultimoAcceso;
+
     @Column(name = "actualizado_en")
     private Instant actualizadoEn;
 
@@ -72,4 +88,21 @@ public class Encargado {
 
     public Instant getActualizadoEn() { return actualizadoEn; }
     public void setActualizadoEn(Instant actualizadoEn) { this.actualizadoEn = actualizadoEn; }
+
+    public String getPinHash() { return pinHash; }
+    public void setPinHash(String pinHash) { this.pinHash = pinHash; }
+
+    public Instant getPinActualizadoEn() { return pinActualizadoEn; }
+    public void setPinActualizadoEn(Instant pinActualizadoEn) { this.pinActualizadoEn = pinActualizadoEn; }
+
+    public int getPinIntentosFallidos() { return pinIntentosFallidos; }
+    public void setPinIntentosFallidos(int pinIntentosFallidos) { this.pinIntentosFallidos = pinIntentosFallidos; }
+
+    public Instant getPinBloqueadoHasta() { return pinBloqueadoHasta; }
+    public void setPinBloqueadoHasta(Instant pinBloqueadoHasta) { this.pinBloqueadoHasta = pinBloqueadoHasta; }
+
+    public Instant getUltimoAcceso() { return ultimoAcceso; }
+    public void setUltimoAcceso(Instant ultimoAcceso) { this.ultimoAcceso = ultimoAcceso; }
+
+    public boolean tienePin() { return pinHash != null && !pinHash.isBlank(); }
 }

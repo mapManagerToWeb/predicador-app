@@ -45,9 +45,11 @@ export class EncargadoService {
     return this.extract(response);
   }
 
-  async loginByPhone(telefono: string): Promise<EncargadoDto> {
+  /** `pin` solo se envía si el encargado tiene uno (el backend responde `pin_requerido`). */
+  async loginByPhone(telefono: string, pin?: string): Promise<EncargadoDto> {
+    const body = pin ? { telefono, pin } : { telefono };
     const response = await firstValueFrom(
-      this.http.post<LoginResponse | EncargadoDto>(`${this.apiUrl}/login`, { telefono })
+      this.http.post<LoginResponse | EncargadoDto>(`${this.apiUrl}/login`, body)
         .pipe(retryTransient(1, MUTATION_RETRY_DELAY_MS)),
     );
     return this.extract(response);
@@ -74,4 +76,17 @@ export class EncargadoService {
       typeof (x as LoginResponse).encargado === 'object'
     );
   }
+}
+
+/**
+ * Motivo de un rechazo de login/registro (`code` del ProblemDetail):
+ * `pin_requerido`, `pin_incorrecto`, `pin_bloqueado`, `inactivo`,
+ * `registro_cerrado`, `ya_registrado`, `no_encontrado`.
+ */
+export function codigoLogin(error: unknown): { code: string | null; detail: string | null } {
+  const cuerpo = (error as { error?: { code?: unknown; detail?: unknown } } | null)?.error;
+  return {
+    code: typeof cuerpo?.code === 'string' ? cuerpo.code : null,
+    detail: typeof cuerpo?.detail === 'string' ? cuerpo.detail : null,
+  };
 }

@@ -31,11 +31,22 @@ public record ReportDto(
         String tipoSesion,
         String geometriaParcial,
         String puntosParciales,
-        String manzanasIds
+        String manzanasIds,
+        /** Primera manzana marcada de la salida; null en clientes anteriores a V6. */
+        Instant inicioSesion
 ) {
+    public ReportDto(Integer id, String manzanaId, Instant fecha, String encargadoNombre,
+                     String encargadoApellido, String sessionTime, String estado, Long territorioNumero,
+                     Long encargadoId, Integer totalManzanas, Integer manzanasMarcadas, String tipoSesion,
+                     String geometriaParcial, String puntosParciales, String manzanasIds) {
+        this(id, manzanaId, fecha, encargadoNombre, encargadoApellido, sessionTime, estado, territorioNumero,
+                encargadoId, totalManzanas, manzanasMarcadas, tipoSesion, geometriaParcial, puntosParciales,
+                manzanasIds, null);
+    }
+
     public ReportDto(Integer id, String manzanaId, Instant fecha, String encargadoNombre,
                      String encargadoApellido, String sessionTime, String estado, Long territorioNumero) {
         this(id, manzanaId, fecha, encargadoNombre, encargadoApellido, sessionTime, estado, territorioNumero,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 }
