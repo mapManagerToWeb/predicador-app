@@ -8,6 +8,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login').then(m => m.LoginPage)
   },
   {
+    // Visor público: sin sesión y de solo lectura.
+    path: 'visor',
+    loadComponent: () => import('./features/visor/visor').then(m => m.VisorPage)
+  },
+  {
     path: 'profile',
     loadComponent: () => import('./features/profile/profile').then(m => m.ProfilePage)
   },

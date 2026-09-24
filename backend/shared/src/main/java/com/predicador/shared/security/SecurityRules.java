@@ -7,7 +7,11 @@ import com.predicador.shared.security.SessionToken;
 
 public final class SecurityRules {
 
-    private static final String REPORTS_PATH = "^/api/v1/reports(/.*)?$";
+    /**
+     * Reportes: exigen sesión, salvo {@code /api/v1/reports/public/**}, que es
+     * el estado de los territorios para el visor público (sin datos personales).
+     */
+    private static final String REPORTS_PATH = "^/api/v1/reports(?!/public(/|$))(/.*)?$";
 
     /** Métodos cubiertos por las reglas del panel de administración. */
     private static final List<String> ALL_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE");

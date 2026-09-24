@@ -49,6 +49,8 @@ public interface TerritoryRepository extends JpaRepository<ManzanaTerritorio, Lo
             + "'geometry', ST_AsGeoJSON(ST_Force2D(m.geometry))::json, "
             + "'properties', json_build_object("
             + "'id', m.territorio_padre || '-' || COALESCE(m.nombre_bloque, ''), "
+            // Id real: los reportes más nuevos identifican las manzanas por él.
+            + "'mid', m.id, "
             + "'nombre_bloque', COALESCE(m.nombre_bloque, ''), "
             + "'territorio_padre', m.territorio_padre, "
             + "'color', ts.color"

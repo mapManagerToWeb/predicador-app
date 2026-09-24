@@ -15,7 +15,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Toast } from '../../../../core/services/toast';
 import { TERRITORY_COLORS } from '../../../map/utils/territory-colors';
 import type { CalidadDatos, ManzanaFeature, ManzanaGeometry } from '../../admin.models';
-import type { FondoMapa } from '../../map/base-map';
+import type { FondoMapa } from '../../../../core/map/base-map';
 import { EditorMapa } from '../../map/editor-map';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';

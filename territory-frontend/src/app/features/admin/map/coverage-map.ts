@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import type { ManzanasCollection } from '../admin.models';
-import { cambiarFondo, crearMapa, etiquetasTerritorios, limitesPrincipales, temaOscuro } from './base-map';
+import { cambiarFondo, crearMapa, etiquetasTerritorios, limitesPrincipales, temaOscuro } from '../../../core/map/base-map';
 
 /**
  * Mapa de solo lectura que pinta cada manzana con el color asignado a su

@@ -24,7 +24,7 @@ The repository is indexed into the codebase-memory knowledge graph under the pro
 - `territory-frontend/` is a separate Angular 22 SSR/PWA app (note: the directory is `territory-frontend/`, not `predicador-frontend/`).
 - `docker-compose.yml` builds the five backend services **plus a `imresamu/postgis:18-3.6` database and a `rabbitmq:4.3.4-management` broker** (territory and reporting depend on it; WhatsApp async sends flow through it via `publisher`/`listener`). Observability services (`otel-collector`, `jaeger`, `prometheus`, `grafana`) are opt-in via the `observability` profile.
 - **Documentation**: `README.md` is the architecture overview (stack + diagram). `docs/audit/` has the Angular audit; `docs/superpowers/` stores past plans/specs; `openspec/` is the SDD workflow (`changes/` + `changes/archive/` + `specs/`); root `CAPABILITY-MAP.md` and `SPEC-map-*.md` are planning docs for the map geometry/rendering/hit-testing pipeline; `tasks/` holds current plan/todo; `tests/` has load (`api-gateway.js`) and smoke scripts.
-- `backend/shared/` is the cross-service core: `security/` (HMAC tokens, `SessionAuthFilter`, `TokenValidator`, `SessionTokenService`, `SecurityRule(s)`), `exception/` (`GlobalExceptionHandler`, `ResourceNotFoundException`, `ForbiddenOperationException`), and `util/` (`PhoneUtil` — E.164 handling).
+- `backend/shared/` is the cross-service core (`SecurityRules.REPORTS_PATH` excludes `/api/v1/reports/public/**`, the only unauthenticated reports path): `security/` (HMAC tokens, `SessionAuthFilter`, `TokenValidator`, `SessionTokenService`, `SecurityRule(s)`), `exception/` (`GlobalExceptionHandler`, `ResourceNotFoundException`, `ForbiddenOperationException`), and `util/` (`PhoneUtil` — E.164 handling).
 
 ## Verification
 
@@ -79,12 +79,13 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 
 - Feature-based structure under `territory-frontend/src/app/`:
   - `core/` — Cross-cutting singleton services (Profile, TerritorioService, Toast, EncargadoService, ReportCacheService, AuthTokenService, AuthService, CsrfTokenService, RumService), guards (`profileGuard`, `adminGuard`), interceptors (`auth`, `csrf`, `error`), models. There is no `shared/` directory; the toast lives in `core/services/toast.ts`.
-  - `features/` — Standalone lazy-loaded page components (auth/login, map, profile, admin). Feature-exclusive services live inside their feature: `features/map/services/` holds the map engine services plus `whatsapp.ts` (only used by map reporting).
+  - `features/` — Standalone lazy-loaded page components (auth/login, map, profile, admin, visor). Feature-exclusive services live inside their feature: `features/map/services/` holds the map engine services plus `whatsapp.ts` (only used by map reporting).
   - `features/admin/` — desktop admin panel (ADR 0007). `admin.ts` is the shell (own login + sidebar, `ViewEncapsulation.None`: its stylesheet holds the shared `.adm-*` UI kit and `.viz-*` chart styles); child routes in `admin.routes.ts` (`resumen`, `territorios`, `encargados`, `reportes`). `services/admin-api.ts` (all calls send `ngsw-bypass`), `services/admin-store.ts` (shared signals), `services/admin-ui.ts` (confirm dialog), `utils/analytics.ts` (pure analytics, tested), `charts/` (hand-rolled SVG/HTML charts, no chart library), `map/` (MapLibre + terra-draw, loaded on demand).
+  - `features/visor/` — public read-only viewer at `/visor` (ADR 0009), no guard, linked from the login. MapLibre via the shared `core/map/base-map.ts` (also used by the admin maps); pure data shaping in `visor-estado.ts` (tested). Data: `/territories/all/geojson` (now includes `mid`, the numeric manzana id, because reports reference manzanas either as `"T-bloque"` or as numeric ids), `/territories/colors` and the public `GET /reports/public/estado` (no encargado names or phones — keep it that way).
   - **Known layering debt (do not extend)**: `core/services/map-draft.ts` is map-only but lives in core and imports types from `features/map/types/map.types` (inverted core→feature dependency); `features/admin/pages/territorios/territorios.ts` imports `TERRITORY_COLORS` from `features/map/utils/territory-colors` (feature→feature). Planned: move draft storage into the map feature and promote `TERRITORY_COLORS` to `core/models/`.
 - Selector prefixes: Component `app-` (kebab-case), Directive `app` (camelCase).
 - Standalone components (no NgModule).
-- Route guards: `canActivate: [profileGuard]` protects `/map`; `canActivate: [adminGuard]` protects `/admin`; `**` redirects to `/login`.
+- Route guards: `canActivate: [profileGuard]` protects `/map`; `canActivate: [adminGuard]` protects `/admin`; `/visor` is intentionally public; `**` redirects to `/login`.
 - Lazy loading: `loadComponent: () => import('./features/...').then(m => m.PageComponent)`.
 
 ### TypeScript & ESLint Rules
