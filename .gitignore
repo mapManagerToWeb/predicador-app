@@ -76,3 +76,7 @@ backend/reporting-service/src/main/java/com/predicador/reporting/dto/EncargadoBu
 
 # Local linked worktrees
 .worktrees/
+
+# Dumps de la base (contienen datos personales: nombres, teléfonos)
+backups/
+*.dump

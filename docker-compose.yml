@@ -7,10 +7,10 @@ services:
     expose:
       - "8888"
     environment:
-      - DB_URL=${DB_URL}
-      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_URL=${DB_URL:-jdbc:postgresql://postgres:5432/predicador}
+      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL:-jdbc:postgresql://postgres:5432/predicador}}
+      - DB_USERNAME=${DB_USERNAME:-predicador}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set}
       # El config-server materializa placeholders como ${SESSION_SECRET} en
       # los YAML servidos. Pasar el valor aquí es lo que hace que los servicios
       # downstream (gateway, reporting, territory) reciban el secret propagado.
@@ -107,13 +107,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - DB_URL=${DB_URL}
-      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_URL=${DB_URL:-jdbc:postgresql://postgres:5432/predicador}
+      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL:-jdbc:postgresql://postgres:5432/predicador}}
+      - DB_USERNAME=${DB_USERNAME:-predicador}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set}
       # Debe coincidir con el api-gateway y reporting-service: mismo HMAC
       # secret para poder verificar los tokens que emiten los otros servicios.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
@@ -147,13 +149,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - DB_URL=${DB_URL}
-      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL}}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_URL=${DB_URL:-jdbc:postgresql://postgres:5432/predicador}
+      - DB_URL_UNPOOLED=${DB_URL_UNPOOLED:-${DB_URL:-jdbc:postgresql://postgres:5432/predicador}}
+      - DB_USERNAME=${DB_USERNAME:-predicador}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set}
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-asignacion_territorio}
@@ -177,6 +181,32 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  # PostgreSQL + PostGIS propio (reemplaza a Neon). Misma versión mayor que
+  # tenía Neon (PG 18 / PostGIS 3.6) para que el dump restaure sin sorpresas.
+  # Los datos se importan una vez con scripts/db/migrate-from-neon.sh.
+  postgres:
+    image: postgis/postgis:18-3.6
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=predicador
+      - POSTGRES_USER=${DB_USERNAME:-predicador}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set}
+    # Solo en loopback: en la VPS la BD no debe quedar expuesta a internet.
+    # Para administrarla desde fuera usar un túnel SSH (ssh -L 5432:localhost:5432).
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    # Desde PG 18 la imagen guarda los datos en /var/lib/postgresql/18/docker,
+    # por eso el volumen se monta en /var/lib/postgresql (no en .../data).
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:4.3.4-management
@@ -263,6 +293,7 @@ services:
       - prometheus
 
 volumes:
+  postgres_data:
   prometheus_data:
   grafana_data:
   rabbitmq_data:
