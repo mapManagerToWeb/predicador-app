@@ -48,7 +48,7 @@ TERRITORY_TABLES=(app_meta manzana_s2_cover manzanas_territorio territorio_disue
 REPORTING_TABLES=(encargados registro_predicacion whatsapp_delivery_idempotency)
 
 count_table() { # $1=db local, $2=tabla
-  docker compose exec -T db psql -U predicador -d "$1" -tAc "SELECT count(*) FROM $2" 2>/dev/null | tr -d ' '
+  docker compose exec -T db psql -U "${DB_USERNAME:-predicador}" -d "$1" -tAc "SELECT count(*) FROM $2" 2>/dev/null | tr -d ' '
 }
 
 docker compose ps -q db >/dev/null || { echo "Servicio db no está corriendo" >&2; exit 1; }
@@ -66,15 +66,16 @@ seed() { # $1=nombre servicio, $2=db local, resto=tablas
   # sale por el netns del contenedor db (misma IP que el host).
   local pw
   pw=$(docker compose exec -T db sh -c 'printf %s "$POSTGRES_PASSWORD"')
+  local luser="${DB_USERNAME:-predicador}"
   docker run --rm -i --network container:db \
     -e NURL="$NURL" -e PGPASSWORD="$pw" "${DUMP_IMAGE:-postgres:18-alpine}" \
-    /bin/sh -c "pg_dump --data-only --no-owner --no-privileges ${args[*]} \"\$NURL\" | grep -v '^SET transaction_timeout' | psql -v ON_ERROR_STOP=1 -q -h localhost -U predicador -d \"$dbname\"" \
+    /bin/sh -c "pg_dump --data-only --no-owner --no-privileges ${args[*]} \"\$NURL\" | grep -v '^SET transaction_timeout' | psql -v ON_ERROR_STOP=1 -q -h localhost -U \"$luser\" -d \"$dbname\"" \
     || { echo "FALLO seed $svc" >&2; exit 1; }
   for t in "$@"; do echo "  despues: $t = $(count_table "$dbname" "$t")"; done
 }
 
 echo "--- territory prep: app_meta local (sembrada por Flyway V3) se vacia; la de Neon es la coherente con los datos restaurados"
-docker compose exec -T db psql -U predicador -d predicador -c 'DELETE FROM app_meta' >/dev/null
+docker compose exec -T db psql -U "${DB_USERNAME:-predicador}" -d predicador -c 'DELETE FROM app_meta' >/dev/null
 
 seed territory predicador "${TERRITORY_TABLES[@]}"
 seed reporting predicador_reporting "${REPORTING_TABLES[@]}"
