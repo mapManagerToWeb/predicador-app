@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, effect, inject, untracked } from '@angular/core';
-import type { SnappedPoint, Edge } from '../map-geometry';
-import type { ManzanaMarcada, ModoMarcado } from '../types/map.types';
+import type { EdicionLados, ManzanaMarcada, ModoMarcado, ZonaParcial } from '../types/map.types';
+import { serializarZonas } from '../utils/lados';
 import { DraftMarksService, MapDraft } from '../../../core/services/map-draft';
 
 const SATELLITE_KEY = 'territory_satellite';
@@ -21,9 +21,10 @@ export class MapStateService {
   tieneTerritorio = computed(() => this.territoriosSeleccionados().length > 0);
 
   modoMarcado = signal<ModoMarcado>('none');
-  puntosParciales = signal<SnappedPoint[]>([]);
-  puntosCount = computed(() => this.puntosParciales().length);
-  puedeConfirmar = computed(() => this.puntosCount() >= 2);
+  /** Zonas parciales (por lados) de la salida en curso, por id `parcial-…`. */
+  zonasParciales = signal<Map<string, ZonaParcial>>(new Map());
+  /** Manzana abierta en modo parcial para elegir sus lados. */
+  edicionLados = signal<EdicionLados | null>(null);
 
   enviando = signal(false);
   isLoading = signal(false);
@@ -35,7 +36,6 @@ export class MapStateService {
   manzanaSeleccionadaColor = signal('');
   manzanaSeleccionadaNombre = signal('');
   manzanaSeleccionadaTerritorio = signal<number | null>(null);
-  manzanaEdges = signal<Edge[]>([]);
 
   manzanasByTerritorio = computed(() => {
     const map = new Map<number, ManzanaMarcada[]>();
@@ -46,8 +46,6 @@ export class MapStateService {
     }
     return map;
   });
-
-  private _datosParcialesGuardados: Map<number, { puntos: SnappedPoint[]; geometria: string }> = new Map();
 
   /**
    * Cuándo se marcó la primera manzana de la salida en curso (ISO-8601). Se
@@ -60,8 +58,6 @@ export class MapStateService {
   private huboMarcas = false;
 
   private readonly draftService = inject(DraftMarksService);
-  /** Bumped whenever the (non-signal) partial-marks map changes so the draft effect re-runs. */
-  private readonly draftRevision = signal(0);
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -70,7 +66,7 @@ export class MapStateService {
       this.territoriosSeleccionados();
       this.modoMarcado();
       this.predicacion();
-      this.draftRevision();
+      this.zonasParciales();
       this.scheduleDraftSave();
     });
 
@@ -138,16 +134,11 @@ export class MapStateService {
     this.manzanasById().forEach((m, id) => { manzanasById[id] = m; });
 
     const datosParcialesGuardados: MapDraft['datosParcialesGuardados'] = {};
-    for (const [num, parcial] of this._datosParcialesGuardados) {
-      datosParcialesGuardados[num] = {
-        puntos: parcial.puntos.map(p => ({
-          lat: p.latlng.lat,
-          lng: p.latlng.lng,
-          edgeIdx: p.edgeIdx,
-          t: p.t,
-        })),
-        geometria: parcial.geometria,
-      };
+    for (const territorio of new Set([...this.zonasParciales().values()].map(z => z.territorio))) {
+      const { geometriaParcial, puntosParciales } = serializarZonas(this.zonasDeTerritorio(territorio));
+      if (geometriaParcial) {
+        datosParcialesGuardados[territorio] = { puntos: [], geometria: geometriaParcial, detalle: puntosParciales ?? undefined };
+      }
     }
 
     return {
@@ -161,23 +152,8 @@ export class MapStateService {
     };
   }
 
-  get datosParcialesGuardados(): Map<number, { puntos: SnappedPoint[]; geometria: string }> { return this._datosParcialesGuardados; }
-  set datosParcialesGuardados(val: Map<number, { puntos: SnappedPoint[]; geometria: string }>) { this._datosParcialesGuardados = val; }
-
-  getDatosParciales(territorio: number): { puntos: SnappedPoint[]; geometria: string } | null {
-    return this._datosParcialesGuardados.get(territorio) ?? null;
-  }
-  setDatosParciales(territorio: number, val: { puntos: SnappedPoint[]; geometria: string }): void {
-    this._datosParcialesGuardados.set(territorio, val);
-    this.draftRevision.update(v => v + 1);
-  }
-  clearDatosParciales(territorio?: number): void {
-    if (territorio === undefined) {
-      this._datosParcialesGuardados.clear();
-    } else {
-      this._datosParcialesGuardados.delete(territorio);
-    }
-    this.draftRevision.update(v => v + 1);
+  zonasDeTerritorio(territorio: number): ZonaParcial[] {
+    return [...this.zonasParciales().values()].filter(z => z.territorio === territorio);
   }
 
   resetUIState(): void {
@@ -186,15 +162,14 @@ export class MapStateService {
     this.territorioSeleccionado.set(null);
     this.territoriosSeleccionados.set([]);
     this.modoMarcado.set('none');
-    this.puntosParciales.set([]);
+    this.zonasParciales.set(new Map());
+    this.edicionLados.set(null);
     this.enviando.set(false);
     this.isLoading.set(false);
     this.screenshotPreview.set(null);
     this.currentTerritoryColor.set('');
-    this._datosParcialesGuardados = new Map();
     this.manzanaSeleccionadaColor.set('');
     this.manzanaSeleccionadaNombre.set('');
     this.manzanaSeleccionadaTerritorio.set(null);
-    this.manzanaEdges.set([]);
   }
 }

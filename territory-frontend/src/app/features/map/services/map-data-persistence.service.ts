@@ -48,23 +48,23 @@ export class MapDataPersistenceService {
     this.state.enviando.set(true);
 
     let previousMarcadas: Map<string, ManzanaMarcada> | null = null;
-    let previousDatosParciales: typeof this.state.datosParcialesGuardados | null = null;
+    let previousZonas: ReturnType<typeof this.state.zonasParciales> | null = null;
     try {
       const registros = this.reportService.buildRegistros(
         marcadas,
         this.rendering.getAllTerritoriesLayer(),
         this.state.territoriosSeleccionados(),
-        this.state.datosParcialesGuardados
+        [...this.state.zonasParciales().values()]
       );
 
       previousMarcadas = new Map(this.state.manzanasById());
-      previousDatosParciales = new Map(this.state.datosParcialesGuardados);
+      previousZonas = this.state.zonasParciales();
       this.toastService.show(TOAST_MESSAGES.saving);
       const saved = await this.reportService.saveToDatabase(registros);
       // Clear partial data AFTER the HTTP request completes so the debounced
       // draft-save effect does not capture an intermediate state where marks
       // are still present but partial geometry/points have been cleared.
-      this.state.clearDatosParciales();
+      this.state.zonasParciales.set(new Map());
 
       const territoriosGuardados = this.state.territoriosSeleccionados();
       this.persistirEnCacheYLimpiarDraft(saved, territoriosGuardados);
@@ -87,9 +87,9 @@ export class MapDataPersistenceService {
         return;
       }
 
-      if (previousMarcadas && previousDatosParciales) {
+      if (previousMarcadas && previousZonas) {
         this.state.manzanasById.set(previousMarcadas);
-        this.state.datosParcialesGuardados = previousDatosParciales;
+        this.state.zonasParciales.set(previousZonas);
       }
       this.toastService.show(
         this.esReportingNoDisponible(error)
@@ -162,7 +162,7 @@ export class MapDataPersistenceService {
         this.state.manzanasMarcadaList(),
         this.rendering.getAllTerritoriesLayer(),
         this.state.territoriosSeleccionados(),
-        this.state.datosParcialesGuardados
+        [...this.state.zonasParciales().values()]
       );
       guardados = await this.reportService.saveToDatabase(registros);
 
@@ -187,7 +187,7 @@ export class MapDataPersistenceService {
         TOAST_MESSAGES.sendSuccessSubtitle
       );
 
-      this.state.clearDatosParciales();
+      this.state.zonasParciales.set(new Map());
       this.state.territoriosSeleccionados.set([]);
       this.state.territorioSeleccionado.set(null);
       this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());
@@ -208,7 +208,7 @@ export class MapDataPersistenceService {
       } else if (envioConfirmado) {
         // Guardado y enviado OK; falló un paso posterior (restauración).
         this.toastService.show(TOAST_MESSAGES.saveSuccess);
-        this.state.clearDatosParciales();
+        this.state.zonasParciales.set(new Map());
         this.state.territoriosSeleccionados.set([]);
         this.state.territorioSeleccionado.set(null);
         this.rendering.restaurarVistaConMarcas(this.state.manzanasMarcadaList());

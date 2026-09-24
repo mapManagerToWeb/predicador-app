@@ -390,19 +390,44 @@
 }
 
 /* ── Partial Controls ── */
-.partial-controls {
+/* ── Marcado parcial por lados ── */
+.lados-panel {
   padding-top: var(--space-3);
   border-top: 1px solid var(--glass-border);
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-.partial-hint {
-  font-family: var(--font-mono);
+.lados-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 100%;
   font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
+  color: var(--ink-muted);
+}
+
+.lados-info strong {
   color: var(--ink);
-  white-space: nowrap;
-  min-width: 32px;
-  text-align: center;
+  font-size: var(--text-base);
+}
+
+.lados-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 100%;
+}
+
+.lados-actions .partial-btn {
+  flex: 1;
+  height: 44px;
+  font-size: var(--text-sm);
+}
+
+.lados-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  line-height: 1.4;
 }
 
 .partial-btn {
@@ -429,29 +454,6 @@
   width: 13px;
   height: 13px;
   fill: currentColor;
-}
-
-.partial-btn.undo {
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  border-color: var(--color-primary-glow);
-}
-
-.partial-btn.undo:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.25);
-}
-
-.partial-btn.undo:active:not(:disabled) {
-  background: var(--color-primary);
-  color: #FFFFFF;
-  border-color: var(--color-primary);
-  transform: scale(0.97);
-}
-
-.partial-btn.undo:disabled {
-  opacity: 0.2;
-  cursor: not-allowed;
 }
 
 .partial-btn.cancel {
@@ -586,18 +588,6 @@
     width: 100%;
     min-width: 0;
     min-height: 44px;
-  }
-
-  .partial-controls {
-    gap: var(--space-2);
-    padding-top: var(--space-3);
-    flex-wrap: wrap;
-  }
-
-  .partial-hint {
-    flex-basis: 100%;
-    text-align: left;
-    padding-left: var(--space-1);
   }
 
   .partial-btn {

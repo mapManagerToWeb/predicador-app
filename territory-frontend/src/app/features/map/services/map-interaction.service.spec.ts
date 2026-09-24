@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Polygon, Marker, LeafletMouseEvent, GeoJSON as LeafletGeoJSON } from 'leaflet';
+import { Polygon, LeafletMouseEvent, GeoJSON as LeafletGeoJSON } from 'leaflet';
 import { MapInteractionService } from './map-interaction.service';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
@@ -235,9 +235,8 @@ describe('MapInteractionService', () => {
     });
   });
 
-  describe('modo parcial', () => {
-    it('removes an existing partial polygon when clicking inside it', () => {
-      state.modoMarcado.set('parcial');
+  describe('modo parcial (por lados)', () => {
+    function zonaAntigua(): void {
       const parcial = new Polygon([
         [
           { lat: -1, lng: -1 },
@@ -248,15 +247,32 @@ describe('MapInteractionService', () => {
       ]);
       registry.register('parcial-123', parcial);
       state.manzanasById.set(new Map([['parcial-123', { id: 'parcial-123', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 5 }]]));
-      rendering.queryManzanasAt.mockReturnValue([]);
+    }
+
+    it('abre la manzana tocada para elegir sus lados', () => {
+      state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
+      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
-      expect(result.action).toBe('remove_partial');
-      expect(result.partialId).toBe('parcial-123');
+      expect(result.action).toBe('abrir_lados');
+      expect(result.manzana?.id).toBe('m1');
     });
 
-    it('never unmarks an already-marked manzana while marking parcial', () => {
+    it('tocar en la calle, cerca de la manzana, también la abre', () => {
+      state.modoMarcado.set('parcial');
+      state.territoriosSeleccionados.set([5]);
+      rendering.queryManzanasAt.mockReturnValue([]);
+      rendering.queryManzanasNear.mockReturnValue([fakeManzana('m1')]);
+
+      const result = service.handleMapClick(clickAt(2.5, 0));
+
+      expect(result.action).toBe('abrir_lados');
+      expect(result.manzana?.id).toBe('m1');
+    });
+
+    it('una manzana ya completa no se abre (avisa)', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
       rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
@@ -265,24 +281,10 @@ describe('MapInteractionService', () => {
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
       expect(result.action).toBe('none');
-      expect(result.manzana).toBeUndefined();
-      expect(toast.show).not.toHaveBeenCalled();
-    });
-
-    it('does NOT toggle an already-marked manzana of a foreign territory (lock + toast)', () => {
-      state.modoMarcado.set('parcial');
-      state.territoriosSeleccionados.set([5]);
-      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m9', 9)]);
-      state.manzanasById.set(new Map([['m9', { id: 'm9', nombreBloque: 'Bloque-m9', color: '#ff0000', territorioNumero: 9 }]]));
-
-      const result = service.handleMapClick(clickAt(0.5, 0.5));
-
-      expect(result.action).toBe('none');
-      expect(result.manzana).toBeUndefined();
       expect(toast.show).toHaveBeenCalled();
     });
 
-    it('locks and toasts on an unmarked foreign-territory manzana click', () => {
+    it('bloquea manzanas de territorios no seleccionados', () => {
       state.modoMarcado.set('parcial');
       state.territoriosSeleccionados.set([5]);
       rendering.queryManzanasAt.mockReturnValue([fakeManzana('m9', 9)]);
@@ -293,100 +295,30 @@ describe('MapInteractionService', () => {
       expect(toast.show).toHaveBeenCalled();
     });
 
-    it('ignores click on unselected territory (no select_manzana)', () => {
-      state.modoMarcado.set('parcial');
-      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
-
-      const result = service.handleMapClick(clickAt(0.5, 0.5));
-
-      expect(result.action).toBe('none');
-    });
-
-    it('returns none when no manzana is selected and none is near', () => {
+    it('sin manzanas cerca no hace nada', () => {
       state.modoMarcado.set('parcial');
       rendering.queryManzanasAt.mockReturnValue([]);
 
       expect(service.handleMapClick(clickAt(50, 50)).action).toBe('none');
     });
 
-    it('selects the manzana to partially mark when clicking it in parcial mode', () => {
+    it('una zona antigua (trazo libre, sin manzana) se quita tocándola', () => {
       state.modoMarcado.set('parcial');
-      state.territoriosSeleccionados.set([5]);
-      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
-
-      const result = service.handleMapClick(clickAt(0.5, 0.5));
-
-      expect(result.action).toBe('select_manzana');
-      expect(result.manzana?.id).toBe('m1');
-    });
-
-    it('selects the nearest manzana when clicking near but outside it', () => {
-      state.modoMarcado.set('parcial');
-      state.territoriosSeleccionados.set([5]);
-      // El punto (2.5, 0) cae fuera del bbox de m1: la celda exacta no lo ve,
-      // pero la ventana de celdas vecinas sí lo encuentra.
+      zonaAntigua();
       rendering.queryManzanasAt.mockReturnValue([]);
-      rendering.queryManzanasNear.mockReturnValue([fakeManzana('m1')]);
-
-      const result = service.handleMapClick(clickAt(2.5, 0));
-
-      expect(result.action).toBe('select_manzana');
-      expect(result.manzana?.id).toBe('m1');
-    });
-
-    it('snaps a dragged marker onto the selected manzana contour', () => {
-      state.modoMarcado.set('parcial');
-      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
-      const marker = { getLatLng: () => ({ lat: 0.5, lng: 0 }) };
-
-      const result = service.handleMarkerDrag(marker as Marker, 0);
-
-      expect(result[0].edgeIdx).toBe(0);
-    });
-
-    it('adds a snapped point on the edge of the selected manzana', () => {
-      state.modoMarcado.set('parcial');
-      state.territoriosSeleccionados.set([5]);
-      state.manzanaSeleccionadaTerritorio.set(5);
-      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
-      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
-
-      const result = service.handleMapClick(clickAt(0.5, 0));
-
-      expect(result.action).toBe('add_partial_point');
-      expect(result.snappedPoint?.edgeIdx).toBe(0);
-    });
-
-    it('ignores a click that does not snap onto the manzana edges', () => {
-      state.modoMarcado.set('parcial');
-      state.territoriosSeleccionados.set([5]);
-      state.manzanaSeleccionadaTerritorio.set(5);
-      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
-      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
 
       const result = service.handleMapClick(clickAt(0.5, 0.5));
 
-      expect(result.action).toBe('none');
+      expect(result.action).toBe('remove_partial');
+      expect(result.partialId).toBe('parcial-123');
     });
 
-    it('does not add points beyond the max partial points', () => {
-      state.modoMarcado.set('parcial');
-      state.territoriosSeleccionados.set([5]);
-      state.manzanaSeleccionadaTerritorio.set(5);
-      state.manzanaEdges.set([{ from: { lat: 0, lng: 0 }, to: { lat: 1, lng: 0 } }]);
-      state.puntosParciales.set([
-        { latlng: { lat: 0, lng: 0 }, edgeIdx: 0, t: 0 },
-        { latlng: { lat: 0.2, lng: 0 }, edgeIdx: 0, t: 0.2 },
-        { latlng: { lat: 0.4, lng: 0 }, edgeIdx: 0, t: 0.4 },
-        { latlng: { lat: 0.6, lng: 0 }, edgeIdx: 0, t: 0.6 },
-        { latlng: { lat: 0.8, lng: 0 }, edgeIdx: 0, t: 0.8 },
-        { latlng: { lat: 1, lng: 0 }, edgeIdx: 0, t: 1 },
-      ]);
-      rendering.queryManzanasAt.mockReturnValue([fakeManzana('m1')]);
+    it('fuera del modo parcial, tocar una zona no la borra', () => {
+      state.modoMarcado.set('completa');
+      zonaAntigua();
+      rendering.queryManzanasAt.mockReturnValue([]);
 
-      const result = service.handleMapClick(clickAt(0.3, 0));
-
-      expect(result.action).toBe('none');
+      expect(service.handleMapClick(clickAt(0.5, 0.5)).action).toBe('none');
     });
   });
 });

@@ -11,8 +11,11 @@ export interface DraftPoint {
 }
 
 export interface DraftTerritorioParcial {
+  /** Solo en borradores del trazo por puntos (anterior al marcado por lados). */
   puntos: DraftPoint[];
   geometria: string;
+  /** Detalle de las zonas por lados (mismo formato que `puntosParciales` del reporte). */
+  detalle?: string;
 }
 
 export interface MapDraft {

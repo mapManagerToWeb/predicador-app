@@ -488,8 +488,16 @@ describe('MapDataPersistenceService', () => {
     expect(state.manzanasById().size).toBe(0);
   });
 
-  it('buildRegistros receives datosParciales BEFORE they are cleared', async () => {
-    // Set up partial marks in the state
+  const zonaDePrueba = {
+    id: 'parcial-1-0',
+    territorio: 1,
+    manzanaId: 'm1',
+    manzanaNombre: '1.a',
+    lados: [0],
+    geometria: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+  };
+
+  function conZonaParcial(): void {
     state.manzanasById.set(
       new Map([
         [
@@ -498,69 +506,34 @@ describe('MapDataPersistenceService', () => {
         ],
       ]),
     );
-    const parciales = new Map<number, { puntos: unknown[]; geometria: string }>([
-      [
-        1,
-        {
-          puntos: [{ latlng: { lat: 0, lng: 0 }, edgeIdx: 0, t: 0 }],
-          geometria: '{"type":"Polygon"}',
-        },
-      ],
-    ]);
-    state.datosParcialesGuardados = parciales;
+    state.zonasParciales.set(new Map([['parcial-1-0', zonaDePrueba]]));
+  }
 
-    // Capture what buildRegistros receives — datosParciales must NOT be empty.
-    // Nota: snapshot con copia en el momento de la llamada; clearDatosParciales()
-    // vacía el Map in-place, así que mirar la referencia original tras el await
-    // mostraría un Map ya limpiado (aliasing por referencia, no un bug real).
-    let receivedParciales: typeof parciales | null = null;
-    report.buildRegistros.mockImplementation((_m, _l, _s, dp) => {
-      receivedParciales = new Map(dp as typeof parciales);
+  it('buildRegistros recibe las zonas parciales ANTES de limpiarlas', async () => {
+    conZonaParcial();
+    let recibidas: unknown[] | null = null;
+    report.buildRegistros.mockImplementation((_m, _l, _s, zonas) => {
+      recibidas = [...(zonas as unknown[])];
       return [{ territorioNumero: 1, encargadoNombre: 'A', encargadoApellido: 'B' }];
     });
 
     await service.guardarEnBaseDeDatos();
 
-    expect(receivedParciales).not.toBeNull();
-    expect(receivedParciales!.size).toBe(1);
-    expect(receivedParciales!.get(1)).toBeDefined();
+    expect(recibidas).toEqual([zonaDePrueba]);
   });
 
-  it('clears datosParciales AFTER the HTTP request completes, not before', async () => {
-    state.manzanasById.set(
-      new Map([
-        [
-          'parcial-1-0',
-          { id: 'parcial-1-0', nombreBloque: 'Parcial', color: '#22c55e', territorioNumero: 1 },
-        ],
-      ]),
-    );
-    const parciales = new Map<number, { puntos: unknown[]; geometria: string }>([
-      [
-        1,
-        {
-          puntos: [{ latlng: { lat: 0, lng: 0 }, edgeIdx: 0, t: 0 }],
-          geometria: '{"type":"Polygon"}',
-        },
-      ],
-    ]);
-    state.datosParcialesGuardados = parciales;
-
-    let datosParcialesClearedDuringAwait = false;
+  it('limpia las zonas parciales DESPUÉS de que termina el guardado, no antes', async () => {
+    conZonaParcial();
+    let limpiadasDuranteElGuardado = false;
     report.saveToDatabase.mockImplementation(async () => {
-      // At this point, the HTTP request is in flight.
-      // datosParciales should NOT have been cleared yet.
-      if (state.datosParcialesGuardados.size === 0) {
-        datosParcialesClearedDuringAwait = true;
-      }
+      if (state.zonasParciales().size === 0) limpiadasDuranteElGuardado = true;
       return [{ id: 1 }];
     });
 
     await service.guardarEnBaseDeDatos();
 
-    expect(datosParcialesClearedDuringAwait).toBe(false);
-    // After the request completes, datosParciales should be cleared.
-    expect(state.datosParcialesGuardados.size).toBe(0);
+    expect(limpiadasDuranteElGuardado).toBe(false);
+    expect(state.zonasParciales().size).toBe(0);
   });
 
   function reporteShape(territorio: number) {

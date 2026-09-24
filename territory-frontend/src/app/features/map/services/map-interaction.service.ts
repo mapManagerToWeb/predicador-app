@@ -1,19 +1,18 @@
 import { Injectable, inject } from '@angular/core';
-import { LatLng, Polygon, type LeafletMouseEvent, type Marker } from 'leaflet';
+import { LatLng, Polygon, type LeafletMouseEvent } from 'leaflet';
 import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapLayerRegistry } from './map-layer-registry.service';
 import { Toast } from '../../../core/services/toast';
-import { MAX_PUNTOS_PARCIAL, TOAST_MESSAGES } from '../utils/map-constants';
-import type { SnappedPoint, ManzanaIndex } from '../types/map.types';
-import { snapToContour, pointInPolygon, projectOnSegment } from '../map-geometry';
+import { TOAST_MESSAGES } from '../utils/map-constants';
+import type { ManzanaIndex } from '../types/map.types';
+import { pointInPolygon, projectOnSegment } from '../map-geometry';
 import { collectLatLngRings } from './map-rings';
 
 export interface MapClickResult {
-  action: 'none' | 'select_manzana' | 'toggle_manzana' | 'add_partial_point' | 'remove_partial' | 'select_territory';
+  action: 'none' | 'toggle_manzana' | 'abrir_lados' | 'remove_partial' | 'select_territory';
   manzana?: ManzanaIndex;
   partialId?: string;
-  snappedPoint?: SnappedPoint;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -25,11 +24,6 @@ export class MapInteractionService {
 
   handleMapClick(e: LeafletMouseEvent): MapClickResult {
     const modo = this.state.modoMarcado();
-
-    const hitParcial = this.findParcialAtPoint(e.latlng);
-    if (hitParcial) {
-      return { action: 'remove_partial', partialId: hitParcial.id };
-    }
 
     if (modo === 'none') return this.handleClickModoNone(e);
     if (modo === 'completa') return this.handleClickModoCompleta(e);
@@ -62,59 +56,38 @@ export class MapInteractionService {
     return { action: 'toggle_manzana', manzana: hit };
   }
 
+  /**
+   * Modo parcial: tocar una manzana (o cerca de ella, en la calle) la abre
+   * para elegir sus lados. Las zonas antiguas de trazo libre, que no tienen
+   * manzana, se quitan tocándolas.
+   */
   private handleClickModoParcial(e: LeafletMouseEvent): MapClickResult {
     const hit = this.findManzanaInside(e.latlng);
-    if (hit) {
-      // Territorio no seleccionado: bloquear ANTES de cualquier toggle/select
-      if (!this.state.territoriosSeleccionados().includes(hit.territorioNumero)) {
-        this.toastService.show(TOAST_MESSAGES.territoryLock);
-        return { action: 'none' };
-      }
-      // En modo marcado parcial solo se marca, nunca se desmarca.
-      if (this.state.manzanasById().has(hit.id)) {
-        return { action: 'none' };
-      }
+    if (!hit) {
+      const antigua = this.findParcialAtPoint(e.latlng);
+      if (antigua) return { action: 'remove_partial', partialId: antigua.id };
     }
 
-    if (!this.state.manzanaSeleccionadaTerritorio()) {
-      const nearest = hit ?? this.findNearestManzana(e.latlng);
-      if (nearest) {
-        return { action: 'select_manzana', manzana: nearest };
-      }
+    const manzana = hit ?? this.findNearestManzana(e.latlng);
+    if (!manzana) {
+      this.toastService.show(TOAST_MESSAGES.noNearbyManzana);
       return { action: 'none' };
     }
-
-    // Restringir el marcado parcial SOLO a la manzana seleccionada
-    const map = this.rendering.getMap();
-    if (!map) return { action: 'none' };
-
-    const snapped = snapToContour(e.latlng, this.state.manzanaEdges(), map);
-
-    // Si el punto no está en los bordes de la manzana seleccionada y tampoco está dentro, ignorar
-    if (snapped.edgeIdx === -1) {
+    if (!this.state.territoriosSeleccionados().includes(manzana.territorioNumero)) {
+      this.toastService.show(TOAST_MESSAGES.territoryLock);
       return { action: 'none' };
     }
-
-    if (this.state.puntosCount() >= MAX_PUNTOS_PARCIAL) {
+    if (this.state.manzanasById().has(manzana.id)) {
+      this.toastService.show(TOAST_MESSAGES.yaCompleta(manzana.nombreBloque));
       return { action: 'none' };
     }
-
-    return { action: 'add_partial_point', snappedPoint: snapped };
-  }
-
-  handleMarkerDrag(marker: Marker, index: number): SnappedPoint[] {
-    const map = this.rendering.getMap();
-    if (!map) return this.state.puntosParciales();
-
-    const actualizados = [...this.state.puntosParciales()];
-    const snapped = snapToContour(marker.getLatLng(), this.state.manzanaEdges(), map);
-    actualizados[index] = snapped;
-    return actualizados;
+    return { action: 'abrir_lados', manzana };
   }
 
   private findParcialAtPoint(latlng: LatLng): { id: string } | null {
     for (const m of this.state.manzanasById().values()) {
       if (!m.id.startsWith('parcial-')) continue;
+      if (this.state.zonasParciales().get(m.id)?.manzanaId) continue;
       const layer = this.registry.get(m.id);
       if (!(layer instanceof Polygon)) continue;
       // Leaflet 2.0 comparte Polygon/MultiPolygon: un MultiPolygon deja

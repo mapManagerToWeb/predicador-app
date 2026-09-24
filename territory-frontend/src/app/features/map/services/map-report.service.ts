@@ -12,7 +12,8 @@ import type {
   TerritorioReporteEnvio,
   TerritoriosEnvio
 } from '../../../core/models/models';
-import type { ManzanaMarcada, FeatureLayer, DatosParciales } from '../types/map.types';
+import type { ManzanaMarcada, FeatureLayer, ZonaParcial } from '../types/map.types';
+import { serializarZonas } from '../utils/lados';
 
 
 
@@ -29,7 +30,7 @@ export class MapReportService {
     marcadas: ManzanaMarcada[],
     allTerritoriesLayer: FeatureLayer[],
     territoriosSeleccionados: number[],
-    datosParcialesPorTerritorio: Map<number, DatosParciales>
+    zonasParciales: ZonaParcial[]
   ): RegistroReporte[] {
     const perfil = this.profileService.currentUser();
     if (!perfil) return [];
@@ -47,16 +48,12 @@ export class MapReportService {
       const manzanaId = nonPartial.length > 0 ? nonPartial[0].id : null;
       const manzanasIds = nonPartial.map(m => m.id).join(',');
 
-      // Buscar los datos parciales ESPECÍFICOS del territorio (no compartidos entre todos).
-      const parcialTerritorio = datosParcialesPorTerritorio.get(territorioNum);
-      let geometriaParcial: string | null = null;
-      let puntosParciales: string | null = null;
-      if (parcialTerritorio) {
-        geometriaParcial = parcialTerritorio.geometria;
-        puntosParciales = JSON.stringify(
-          parcialTerritorio.puntos.map(p => ({ lat: p.latlng.lat, lng: p.latlng.lng }))
-        );
-      }
+      // Todas las zonas parciales del territorio (antes se guardaba solo la última).
+      const { geometriaParcial, puntosParciales } = serializarZonas(
+        zonasParciales.filter(z => z.territorio === territorioNum)
+      );
+      // Completo solo con manzanas enteras: una zona parcial no completa la manzana.
+      const completo = total > 0 && nonPartial.length >= total;
 
       registros.push({
         territorioNumero: territorioNum,
@@ -65,10 +62,10 @@ export class MapReportService {
         encargadoNombre: perfil.name,
         encargadoApellido: perfil.lastName,
         sessionTime: new Date().toISOString(),
-        estado: total > 0 && marcadasTerritorio.length >= total ? 'completed' : 'incomplete',
+        estado: completo ? 'completed' : 'incomplete',
         totalManzanas: total,
         manzanasMarcadas: marcadasTerritorio.length,
-        tipoSesion: total > 0 && marcadasTerritorio.length >= total ? 'completa' : 'parcial',
+        tipoSesion: completo ? 'completa' : 'parcial',
         geometriaParcial,
         puntosParciales,
         manzanasIds,
