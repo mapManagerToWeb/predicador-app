@@ -28,7 +28,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
            │                                    │
            ▼                                    ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                     PostgreSQL (Neon) + PostGIS               │
+│              PostgreSQL 18 + PostGIS 3.6 (contenedor)         │
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -246,9 +246,16 @@ mvn clean verify
 npx sonar-scanner
 ```
 
-## Base de datos (Neon + PostGIS) e importación de territorios
+## Base de datos (PostgreSQL + PostGIS) e importación de territorios
 
-La base de datos es PostgreSQL + PostGIS (Neon en producción). Los territorios
+La base de datos es PostgreSQL 18 + PostGIS 3.6 en el contenedor `postgres` de
+`docker-compose.yml` (antes Neon; ver `docs/adr/0006`). La copia desde Neon es
+automática: con `NEON_URL` definido en `.env` (connection string directa, sin
+`-pooler`), el servicio `db-import` la hace en el primer `docker compose up` si
+la base está vacía, y en los siguientes no hace nada. Para reimportar desde cero:
+`docker compose down && docker volume rm predicador-app_postgres_data`.
+
+Los territorios
 se importan **externamente** en la tabla `manzanas_territorio`: cada manzana
 guarda su geometría como tipo PostGIS `geometry(GeometryZ, 4326)` (la columna
 `geometry`). No hay un seed automático en el repo; los shapes se cargaron una vez
@@ -278,10 +285,10 @@ Ver `.env.example` para la lista completa.
 
 | Variable | Descripción | Default |
 |---|---|---|
-| `DB_URL` | JDBC URL de PostgreSQL (pooled, con `-pooler` para Neon) | `jdbc:postgresql://localhost:5432/predicador` |
+| `DB_URL` | JDBC URL de PostgreSQL | `jdbc:postgresql://postgres:5432/predicador` (compose) |
 | `DB_URL_UNPOOLED` | JDBC URL directa (sin `-pooler`) para Flyway/backups | `jdbc:postgresql://localhost:5432/predicador` |
-| `DB_USERNAME` | Usuario de BD | `postgres` |
-| `DB_PASSWORD` | Contraseña de BD | — |
+| `DB_USERNAME` | Usuario de BD | `predicador` |
+| `DB_PASSWORD` | Contraseña de BD (obligatoria en compose) | — |
 | `ADMIN_USERNAME` | Usuario admin | `admin` |
 | `ADMIN_PASSWORD` | Contraseña admin (fallback plano) | `admin` |
 | `ADMIN_PASSWORD_BCRYPT` | Contraseña admin (BCrypt, preferido) | — |
