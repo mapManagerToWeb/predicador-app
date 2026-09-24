@@ -71,6 +71,13 @@ export interface MapEngine {
     sourceLayer: string,
     id?: string | number,
   ): void;
+
+  /**
+   * Renders the current visible map state to a JPEG base64 string (without
+   * the `data:` prefix), or null when capture is impossible. The screenshot
+   * is attached to WhatsApp sends for territories with incomplete marks.
+   */
+  captureCanvas(): Promise<string | null>;
 }
 
 export interface MapEngineOptions {

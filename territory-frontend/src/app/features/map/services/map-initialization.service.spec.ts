@@ -149,4 +149,47 @@ describe('MapInitializationService', () => {
 
     expect(territorioService.revalidarReportes).toHaveBeenCalledWith([57]);
   });
+
+  it('seeds per-territory partial geometry from the draft before restoring marks', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 56, color: '#ff0000' },
+    ] as never);
+    rendering.getTerritoryDataCache.mockReturnValue(new Map());
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map());
+    territorioService.revalidarReportes.mockResolvedValue(new Map());
+    const polygonJson = JSON.stringify({
+      type: 'Polygon',
+      coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+    });
+    TestBed.inject(DraftMarksService).guardar({
+      manzanasById: {
+        'parcial-1': { id: 'parcial-1', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 56 },
+      },
+      territoriosSeleccionados: [56],
+      territorioSeleccionado: 56,
+      datosParcialesGuardados: {
+        56: {
+          puntos: [{ lat: -37.4, lng: -73.25, edgeIdx: 0, t: 0.5 }],
+          geometria: polygonJson,
+        },
+      },
+      modoMarcado: 'none',
+      predicacion: 'tarde',
+      savedAt: Date.now(),
+    });
+
+    await service.initialize(document.createElement('div'), vi.fn());
+
+    // The overlay synthesis reads these records, so they must exist before
+    // the per-territory restore runs (bug fix "modo parcial").
+    expect(state.getDatosParciales(56)?.puntos).toEqual([
+      { latlng: { lat: -37.4, lng: -73.25 }, edgeIdx: 0, t: 0.5 },
+    ]);
+    expect(state.getDatosParciales(56)?.geometria).toBe(polygonJson);
+    // The draft's editable parcial mark is kept — the restore must not paint
+    // a duplicate zone.
+    expect(state.manzanasById().get('parcial-1')).toBeDefined();
+    // Draft territories are skipped by the background revalidation.
+    expect(territorioService.revalidarReportes).not.toHaveBeenCalled();
+  });
 });

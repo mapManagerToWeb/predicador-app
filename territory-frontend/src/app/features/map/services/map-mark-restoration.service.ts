@@ -7,6 +7,7 @@ import { TOAST_MESSAGES, nextParcialId } from '../utils/map-constants';
 import { elegirUltimoReporte } from '../utils/report-utils';
 import type { Reporte } from '../../../core/models/models';
 import type { ManzanaMarcada } from '../types/map.types';
+import type { SnappedPoint } from '../map-geometry';
 
 @Injectable({ providedIn: 'root' })
 export class MapMarkRestorationService {
@@ -51,15 +52,24 @@ export class MapMarkRestorationService {
         this.state.setRestoredMarksForTerritorio(territorioNumero, []);
 
         this.aplicarMarcas(territorioNumero, color, manzanaId, ids, true);
-
-        if (ultimo.geometriaParcial) {
-          this.restaurarGeometriaParcial(ultimo.geometriaParcial, color, territorioNumero, true);
-        }
       } else {
         // Display-only restore (load time / background revalidation). Always
         // called — even without a report — so a territory whose report was
         // deleted server-side stops rendering its cached marks.
         this.aplicarMarcas(territorioNumero, color, manzanaId, ids, false);
+      }
+
+      // A previously reported partial zone repaints from its SAVED geometry
+      // in BOTH modes — the restored mark needs the stored polygon and the
+      // marked overlay paints it directly (bug fix "modo parcial").
+      if (ultimo?.geometriaParcial) {
+        this.restaurarGeometriaParcial(
+          ultimo.geometriaParcial,
+          ultimo.puntosParciales,
+          color,
+          territorioNumero,
+          actualizarEstadoMarcado,
+        );
       }
 
       // Re-apply completion opacity + marked overlay with the restored marks.
@@ -126,17 +136,94 @@ export class MapMarkRestorationService {
     }
   }
 
+  /**
+   * Repaints a previously reported (or draft-saved) partial zone from its
+   * SAVED geometry in BOTH modes (bug fix "modo parcial").
+   *
+   * <p>The saved {@code geometriaParcial} is stored in the state's
+   * per-territory partial records — the save payload and the marked
+   * overlay's synthesized partial feature both read it — and the
+   * `parcial-` mark is made visible:
+   * <ul>
+   *   <li>editable restore: a fresh `parcial-` mark joins {@code manzanasById}
+   *       (the draft restore path already carries editable partial marks, so
+   *       those are kept instead of adding a duplicate),</li>
+   *   <li>display-only restore: the mark is painted through
+   *       {@link MapStateService.restoredMarksById} — {@code manzanasById}
+   *       stays the save/send payload by design.</li>
+   * </ul></p>
+   */
   private restaurarGeometriaParcial(
-    _geometriaParcial: string,
-    _color: string,
-    _territorioNumero: number,
+    geometriaParcial: string,
+    puntosParciales: string | null | undefined,
+    color: string,
+    territorioNumero: number,
     actualizarEstadoMarcado: boolean
   ): void {
-    if (!actualizarEstadoMarcado) return;
-    // In MapLibre mode, partial geometry is restored via the edit overlay
+    this.state.setDatosParciales(territorioNumero, {
+      puntos: parsePuntosParciales(puntosParciales),
+      geometria: geometriaParcial,
+    });
+
+    // An editable `parcial-` mark (draft restore) already renders the zone —
+    // adding a second mark in either map would paint a duplicate polygon.
+    if (this.yaTieneParcialEditable(territorioNumero)) return;
+
+    if (actualizarEstadoMarcado) {
+      const parcialId = nextParcialId();
+      const newMap = new Map(this.state.manzanasById());
+      newMap.set(parcialId, {
+        id: parcialId,
+        nombreBloque: 'Zona parcial',
+        color,
+        territorioNumero,
+      });
+      this.state.manzanasById.set(newMap);
+      return;
+    }
+
+    // Display-only: paint through the restored marks, keeping the ones the
+    // territory already had (aplicarMarcas just replaced them with the real
+    // manzana marks — do not drop them for the partial zone).
+    const restored = Array.from(this.state.restoredMarksById().values())
+      .filter(m => m.territorioNumero === territorioNumero);
     const parcialId = nextParcialId();
-    const newMap = new Map(this.state.manzanasById());
-    newMap.set(parcialId, { id: parcialId, nombreBloque: 'Zona parcial', color: '', territorioNumero: _territorioNumero });
-    this.state.manzanasById.set(newMap);
+    this.state.setRestoredMarksForTerritorio(territorioNumero, [
+      ...restored,
+      { id: parcialId, nombreBloque: 'Zona parcial', color, territorioNumero },
+    ]);
   }
+
+  private yaTieneParcialEditable(territorioNumero: number): boolean {
+    return (this.state.manzanasByTerritorio().get(territorioNumero) ?? [])
+      .some(m => m.id.startsWith('parcial-'));
+  }
+}
+
+/**
+ * Parses the report's {@code puntosParciales} JSON (`[{lat,lng}, ...]`) into
+ * {@link SnappedPoint}s. Invalid entries are dropped; a malformed payload
+ * yields an empty list (the geometry string remains the source of truth for
+ * repainting, so bad points must never break the restore).
+ */
+function parsePuntosParciales(raw: string | null | undefined): SnappedPoint[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const points: SnappedPoint[] = [];
+  for (const item of parsed) {
+    if (typeof item !== 'object' || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const lat = o['lat'];
+    const lng = o['lng'];
+    if (typeof lat !== 'number' || typeof lng !== 'number') continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    points.push({ latlng: { lat, lng }, edgeIdx: -1, t: 0 });
+  }
+  return points;
 }

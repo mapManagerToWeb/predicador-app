@@ -21,11 +21,11 @@ import { MapLocationService } from './services/map-location.service';
 import { MapMarkedOverlayService } from './services/map-marked-overlay.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
+import { MapCanvasCaptureService } from './services/map-canvas-capture.service';
 import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
 import type { ModoMarcado } from './types/map.types';
 import type { MapEngine } from './services/map-engine.interface';
 import type { LatLng } from './map-geometry';
-import { snapToContour } from './map-geometry';
 import { createMapLibreProjectionAdapter } from './services/map-libre-projection-adapter';
 
 @Component({
@@ -48,6 +48,7 @@ export class MapPage implements OnDestroy {
   private readonly labelLayer = inject(MapLabelLayerService);
   private readonly markedOverlay = inject(MapMarkedOverlayService);
   private readonly tileVersion = inject(TileVersionService);
+  private readonly canvasCapture = inject(MapCanvasCaptureService);
   private readonly toastService = inject(Toast);
 
   /** Active MapLibre engine instance. */
@@ -97,6 +98,9 @@ export class MapPage implements OnDestroy {
     });
 
     this.maplibreEngine.set(engine);
+    // Screenshot capture reads the engine's canvas — attach it as soon as
+    // the engine exists so a WhatsApp send during load still captures.
+    this.canvasCapture.setEngine(engine);
 
     // Initialize vector tile layers (fill, line)
     this.vectorTile.initLayers(engine);
@@ -268,11 +272,12 @@ export class MapPage implements OnDestroy {
       const featureColor = (feature.properties?.['color'] as string) ?? this.state.currentTerritoryColor();
       void this.partialMark.iniciarDibujo(manzanaId, nombreBloque, featureColor, territorioNumero, engine);
     } else {
-      // Subsequent taps: snap to the active manzana contour and add a
-      // partial-draw point (max 6, with live preview).
+      // Subsequent taps: every tap snaps to the NEAREST UNMARKED manzana of
+      // the active territory (auto-fill by nearest point) and adds a
+      // partial-draw point (max 6, live contour-traced preview).
       const adapter = createMapLibreProjectionAdapter(engine);
-      const snapped = snapToContour(latlng, this.state.manzanaEdges(), adapter);
-      this.partialMark.agregarPunto(snapped);
+      const { snapped, edges } = this.partialMark.snapToNearestManzana(latlng, adapter);
+      this.partialMark.agregarPunto(snapped, edges);
     }
   }
 
@@ -465,6 +470,7 @@ export class MapPage implements OnDestroy {
       }
       mlEngine.destroy();
       this.maplibreEngine.set(null);
+      this.canvasCapture.setEngine(null);
     }
   }
 }

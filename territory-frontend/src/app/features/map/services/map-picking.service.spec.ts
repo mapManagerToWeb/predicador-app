@@ -9,6 +9,7 @@ function createMockEngine(): MapEngine {
     queryRenderedFeatures: vi.fn().mockReturnValue([]),
     setFeatureState: vi.fn(),
     removeFeatureState: vi.fn(),
+    captureCanvas: vi.fn().mockResolvedValue(null),
     init: vi.fn(),
     addSource: vi.fn(),
     addGeoJsonSource: vi.fn(),

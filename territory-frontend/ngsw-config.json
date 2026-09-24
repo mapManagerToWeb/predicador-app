@@ -31,6 +31,16 @@
   ],
   "dataGroups": [
     {
+      "name": "territory-tiles",
+      "urls": ["/api/v1/territories/tiles/**"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "2m",
+        "timeout": "8s"
+      }
+    },
+    {
       "name": "territory-geo",
       "urls": ["/api/v1/territories/**"],
       "cacheConfig": {

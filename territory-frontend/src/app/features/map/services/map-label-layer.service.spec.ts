@@ -255,5 +255,6 @@ function createMockMapEngine(): MapEngine {
     destroy: vi.fn(),
     setFeatureState: vi.fn(),
     removeFeatureState: vi.fn(),
+    captureCanvas: vi.fn().mockResolvedValue(null),
   };
 }

@@ -30,6 +30,15 @@ const fakeMapInstance = {
   removeFeatureState: vi.fn(),
   project: vi.fn().mockReturnValue({ x: 100, y: 200 }),
   isStyleLoaded: vi.fn().mockReturnValue(true),
+  getCanvas: vi.fn(),
+  getLayer: vi.fn().mockReturnValue(undefined),
+  getStyle: vi.fn().mockReturnValue({
+    version: 8,
+    sources: {},
+    layers: [{ id: 'territory-fill' }],
+  }),
+  once: vi.fn(),
+  triggerRepaint: vi.fn(),
 };
 
 vi.mock('maplibre-gl', () => ({
@@ -408,5 +417,365 @@ describe('MaplibreEngineService', () => {
   it('project returns zero when map is not initialized', () => {
     const result = service.project([-73.345, -37.4779]);
     expect(result).toEqual({ x: 0, y: 0 });
+  });
+
+  it('creates the map with preserveDrawingBuffer so toDataURL returns the rendered frame', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    // MapLibre v6 has no runtime toggle for the drawing buffer — the flag
+    // must be set at Map construction or the WhatsApp screenshot comes out
+    // blank (bug fix "screenshot WhatsApp").
+    const MapCtor = (await import('maplibre-gl')).Map as ReturnType<typeof vi.fn>;
+    const options = MapCtor.mock.calls[0][0] as Record<string, unknown>;
+    expect(options['canvasContextAttributes']).toEqual({
+      preserveDrawingBuffer: true,
+      contextType: 'webgl2',
+    });
+  });
+
+  it('captureCanvas returns JPEG base64 without the data: prefix', async () => {
+    const container = document.createElement('div');
+    await service.init(container, {
+      center: [-73.345, -37.4779],
+      zoom: 15,
+      tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+    });
+
+    const toDataURL = vi.fn().mockReturnValue('data:image/jpeg;base64,QUJD');
+    fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+
+    const result = await service.captureCanvas();
+
+    expect(result).toBe('QUJD');
+    expect(toDataURL).toHaveBeenCalledWith('image/jpeg', 0.85);
+  });
+
+  it('falls back to hiding the basemap, adding the white background at the BOTTOM', async () => {
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    try {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      // First toDataURL throws SecurityError (tainted canvas); the fallback
+      // hides the basemap, repaints and captures again.
+      const toDataURL = vi.fn();
+      toDataURL.mockImplementationOnce(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      toDataURL.mockReturnValue('data:image/jpeg;base64,TEFDRQ==');
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementation((id: string) =>
+        id === 'basemap-layer' || id === 'territory-fill' ? {} : undefined,
+      );
+      // Style state mirrors the real app after init: the first layer is the
+      // vector territory fill, which must stay VISIBLE above the background.
+      fakeMapInstance.getStyle.mockReturnValue({
+        version: 8,
+        sources: {},
+        layers: [{ id: 'territory-fill' }],
+      });
+
+      const result = await service.captureCanvas();
+
+      expect(result).toBe('TEFDRQ==');
+      expect(fakeMapInstance.removeLayer).toHaveBeenCalledWith('basemap-layer');
+      expect(fakeMapInstance.removeLayer).toHaveBeenCalledWith('capture-background');
+      // calls[0] is the init-time basemap; calls[1] is the capture swap.
+      // REGRESSION ASSERTION: the white background must be inserted BEFORE the
+      // first style layer (bottom placement) — without beforeId it lands ON
+      // TOP of the vector layers and the JPEG comes out all-white.
+      expect(fakeMapInstance.addLayer.mock.calls[1]).toEqual([
+        {
+          id: 'capture-background',
+          type: 'background',
+          paint: { 'background-color': '#ffffff' },
+        },
+        'territory-fill',
+      ]);
+      // Basemap restored below the territory fills, exactly where it was.
+      expect(fakeMapInstance.addLayer.mock.calls[2]).toEqual([
+        { id: 'basemap-layer', type: 'raster', source: 'basemap' },
+        'territory-fill',
+      ]);
+      // Waits for the map's `idle` event before reading the canvas, with a
+      // rAF + timeout fallback (deterministic frame wait).
+      expect(fakeMapInstance.once).toHaveBeenCalledWith(
+        'idle',
+        expect.any(Function),
+      );
+      // One repaint for the background swap, one for the restore.
+      expect(fakeMapInstance.triggerRepaint).toHaveBeenCalledTimes(2);
+      expect(toDataURL).toHaveBeenCalledWith('image/jpeg', 0.85);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('captureCanvas returns null when no map exists', async () => {
+    expect(await service.captureCanvas()).toBeNull();
+  });
+
+  it('fallback keeps the payload when there is no basemap to hide', async () => {
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    try {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      // Canvas is tainted once, then the retry succeeds; there is no
+      // basemap layer to swap, so the payload must survive untouched
+      // (a prior `return` inside `finally` discarded it).
+      const toDataURL = vi.fn();
+      toDataURL.mockImplementationOnce(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      toDataURL.mockReturnValue('data:image/jpeg;base64,TEFDRQ==');
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockReturnValue(undefined);
+
+      const result = await service.captureCanvas();
+
+      expect(result).toBe('TEFDRQ==');
+      expect(fakeMapInstance.removeLayer).not.toHaveBeenCalled();
+      // Only the init-time basemap: the fallback must not swap layers
+      // when there is no basemap to hide.
+      expect(fakeMapInstance.addLayer).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('re-entrancy: a second concurrent capture reuses the in-flight one (no double layer swap)', async () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+    try {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      const toDataURL = vi.fn();
+      toDataURL.mockImplementationOnce(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      toDataURL.mockReturnValue('data:image/jpeg;base64,TEFDRQ==');
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementation((id: string) =>
+        id === 'basemap-layer' ? {} : undefined,
+      );
+
+      const first = service.captureCanvas();
+      const second = service.captureCanvas();
+
+      // Same in-flight promise — no interleaved layer mutations.
+      expect(second).toBe(first);
+      // Only ONE swap happened despite two rapid calls: basemap removed, and
+      // the white background added once (still pending on the frame wait).
+      expect(fakeMapInstance.removeLayer).toHaveBeenCalledTimes(1);
+      expect(fakeMapInstance.removeLayer).toHaveBeenCalledWith('basemap-layer');
+      const backgroundAdds = fakeMapInstance.addLayer.mock.calls.filter(
+        (call: [{ id?: string }, unknown?]) => call[0]?.id === 'capture-background',
+      );
+      expect(backgroundAdds).toHaveLength(1);
+
+      // Let the frame wait settle, then both callers get the same payload.
+      rafCallbacks.splice(0).forEach(cb => cb(0));
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(firstResult).toBe('TEFDRQ==');
+      expect(secondResult).toBe('TEFDRQ==');
+      // Restore still happened exactly once for the shared capture.
+      expect(fakeMapInstance.removeLayer).toHaveBeenCalledWith('capture-background');
+      expect(backgroundAdds).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns null when the JPEG payload is empty or blank after the data: prefix', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      const toDataURL = vi.fn()
+        .mockReturnValueOnce('data:image/jpeg;base64,')
+        .mockReturnValueOnce('data:image/jpeg;base64,   ')
+        .mockReturnValue('data:image/jpeg;base64,QUJD');
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+
+      expect(await service.captureCanvas()).toBeNull();
+      expect(await service.captureCanvas()).toBeNull();
+      expect(await service.captureCanvas()).toBe('QUJD');
+      // Observability: the empty payload surfaced as a warning, not silence.
+      expect(
+        warn.mock.calls.some(call =>
+          String(call[0]).includes('[map] captura'),
+        ),
+      ).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('warns when the capture falls back to hiding the basemap', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    try {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      const toDataURL = vi.fn();
+      toDataURL.mockImplementationOnce(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      toDataURL.mockReturnValue('data:image/jpeg;base64,TEFDRQ==');
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementation((id: string) =>
+        id === 'basemap-layer' ? {} : undefined,
+      );
+
+      const result = await service.captureCanvas();
+
+      expect(result).toBe('TEFDRQ==');
+      expect(
+        warn.mock.calls.some(call =>
+          String(call[0]).includes('[map] captura'),
+        ),
+      ).toBe(true);
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('resolves null (never rejects) when the basemap restore throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    try {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      // Capture itself fails (every toDataURL attempt throws)…
+      const toDataURL = vi.fn(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementation((id: string) =>
+        id === 'basemap-layer' ? {} : undefined,
+      );
+      // …and the restore re-add throws on top of that.
+      fakeMapInstance.addLayer.mockImplementation(
+        (layer: { id?: string; type?: string }) => {
+          if (layer?.id === 'basemap-layer') {
+            throw new Error('restore re-add failed');
+          }
+        },
+      );
+
+      // The promise must RESOLVE null — a throw during restore must not
+      // reject it and overturn the null-on-failure contract.
+      const result = await service.captureCanvas();
+      expect(result).toBeNull();
+      expect(
+        warn.mock.calls.some(call =>
+          String(call[0]).includes('error restaurando el basemap'),
+        ),
+      ).toBe(true);
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('resolves null and restores the basemap in finally when the swap itself throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    try {
+      // Drop the `addLayer` implementation leaked by the previous
+      // restore-throws test (vi.clearAllMocks does not remove
+      // mockImplementation) so `init` can re-add the basemap layer.
+      fakeMapInstance.addLayer.mockReset();
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      // Tainted canvas triggers the basemap-hiding fallback…
+      const toDataURL = vi.fn(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementation((id: string) =>
+        id === 'basemap-layer' || id === 'territory-fill' ? {} : undefined,
+      );
+      // …and the swap itself throws once (the basemap is never removed in
+      // this run, but the failure must not reject the capture promise).
+      fakeMapInstance.removeLayer.mockImplementationOnce(() => {
+        throw new Error('swap failed');
+      });
+
+      // The promise must RESOLVE null — a throw during the swap must not
+      // reject it and overturn the null-on-failure contract.
+      const result = await service.captureCanvas();
+      expect(result).toBeNull();
+
+      // The finally restore must still run: the basemap layer is re-added
+      // below the territory fills even though the swap never completed.
+      // (calls[0] is the init-time basemap without a beforeId; the restore
+      // is the call that carries the 'territory-fill' beforeId.)
+      expect(fakeMapInstance.addLayer).toHaveBeenCalledWith(
+        { id: 'basemap-layer', type: 'raster', source: 'basemap' },
+        'territory-fill',
+      );
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });

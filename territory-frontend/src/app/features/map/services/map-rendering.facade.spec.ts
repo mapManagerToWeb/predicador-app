@@ -448,6 +448,121 @@ describe('MapRenderingFacade', () => {
       ];
       expect(features).toHaveLength(2);
     });
+
+    it('synthesizes a partial zone from its saved geometry with the mark color', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.manzanasById.set(
+        new Map([
+          ['parcial-X', { id: 'parcial-X', nombreBloque: '', color: '#ff0000', territorioNumero: 56 }],
+        ]),
+      );
+      state.setDatosParciales(56, {
+        puntos: [],
+        geometria: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 0],
+            ],
+          ],
+        }),
+      });
+
+      s.refreshOverlayMarks();
+
+      const [, features] = markedOverlay.updateOverlay.mock.calls[0] as [
+        unknown,
+        Array<{ properties: Record<string, unknown>; geometry: { type?: string } }>,
+      ];
+      expect(features).toHaveLength(1);
+      expect(features[0].properties['color']).toBe('#ff0000');
+      // A partial zone is never "complete" — it cannot grey out on zoom.
+      expect(features[0].properties['completo']).toBe(false);
+      expect(features[0].geometry.type).toBe('Polygon');
+    });
+
+    it('chains to the current territory color when the partial mark has none', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.currentTerritoryColor.set('#00ff00');
+      state.manzanasById.set(
+        new Map([
+          ['parcial-X', { id: 'parcial-X', nombreBloque: '', color: '', territorioNumero: 56 }],
+        ]),
+      );
+      state.setDatosParciales(56, {
+        puntos: [],
+        geometria: '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}',
+      });
+
+      s.refreshOverlayMarks();
+
+      const [, features] = markedOverlay.updateOverlay.mock.calls[0] as [
+        unknown,
+        Array<{ properties: Record<string, unknown> }>,
+      ];
+      expect(features[0].properties['color']).toBe('#00ff00');
+    });
+
+    it('renders the green fallback when no color source is set', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.manzanasById.set(
+        new Map([
+          ['parcial-X', { id: 'parcial-X', nombreBloque: '', color: '', territorioNumero: 56 }],
+        ]),
+      );
+      state.setDatosParciales(56, {
+        puntos: [],
+        geometria: '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}',
+      });
+
+      s.refreshOverlayMarks();
+
+      const [, features] = markedOverlay.updateOverlay.mock.calls[0] as [
+        unknown,
+        Array<{ properties: Record<string, unknown> }>,
+      ];
+      expect(features[0].properties['color']).toBe('#22c55e');
+    });
+
+    it('skips partial marks without saved geometry', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.manzanasById.set(
+        new Map([
+          ['parcial-X', { id: 'parcial-X', nombreBloque: '', color: '#ff0000', territorioNumero: 56 }],
+        ]),
+      );
+
+      s.refreshOverlayMarks();
+
+      expect(markedOverlay.updateOverlay).toHaveBeenCalledWith(fakeEngine, []);
+    });
+
+    it('skips partial marks whose saved geometry is malformed', () => {
+      const s = serviceWithMetadata();
+      facade.attachEngine(fakeEngine as never);
+      markedOverlay.isInitialized.mockReturnValue(true);
+      state.manzanasById.set(
+        new Map([
+          ['parcial-X', { id: 'parcial-X', nombreBloque: '', color: '#ff0000', territorioNumero: 56 }],
+        ]),
+      );
+      state.setDatosParciales(56, { puntos: [], geometria: 'not-json' });
+
+      s.refreshOverlayMarks();
+
+      expect(markedOverlay.updateOverlay).toHaveBeenCalledWith(fakeEngine, []);
+    });
   });
 
   describe('initMarkedOverlay', () => {

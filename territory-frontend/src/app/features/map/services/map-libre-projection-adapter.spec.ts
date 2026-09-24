@@ -29,6 +29,7 @@ function createMockEngineWithProject(
     destroy: vi.fn(),
     setFeatureState: vi.fn(),
     removeFeatureState: vi.fn(),
+    captureCanvas: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -57,6 +58,7 @@ function createMockEngineWithoutProject(): MapEngine {
     destroy: vi.fn(),
     setFeatureState: vi.fn(),
     removeFeatureState: vi.fn(),
+    captureCanvas: vi.fn().mockResolvedValue(null),
   };
 }
 

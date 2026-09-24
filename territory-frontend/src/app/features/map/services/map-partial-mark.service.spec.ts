@@ -9,6 +9,7 @@ import { MapStateService } from './map-state.service';
 import { MapRenderingFacade } from './map-rendering.facade';
 import { MapSelectionService } from './map-selection.service';
 import { MapEditOverlayService } from './map-edit-overlay.service';
+import { createMapLibreProjectionAdapter } from './map-libre-projection-adapter';
 import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import type { MapEngine } from './map-engine.interface';
@@ -20,6 +21,12 @@ const engine = {
   removeLayer: vi.fn(),
   removeSource: vi.fn(),
   addLayer: vi.fn(),
+  captureCanvas: vi.fn(),
+  // Deterministic fake projection: x = lng*1000, y = -lat*1000 (1 lng/lat
+  // degree == 1000 px), so pixel distances are trivial to reason about.
+  project: vi.fn(([lng, lat]: [number, number]) => ({ x: lng * 1000, y: lat * -1000 })),
+  getZoom: vi.fn(() => 14),
+  getCenter: vi.fn(() => ({ lng: -73.25, lat: -37.45 })),
 } as unknown as MapEngine;
 
 const TERRITORY_GEOJSON: GeoJSON.FeatureCollection = {
@@ -62,6 +69,49 @@ const TERRITORY_GEOJSON: GeoJSON.FeatureCollection = {
   ],
 };
 
+// Two manzanas of territory 56 side by side vertically: 56.a north
+// (lat -37.4..-37.3), 56.b south (lat -37.6..-37.5). Splitting the
+// [-37.5,-37.4] band would put 56.b's top edge at the same latitude as
+// 56.a's bottom edge, making the nearest-edge tie ambiguous in the snap
+// tests — with the current latitudes every candidate distance is distinct.
+const TWO_MANZANA_GEOJSON: GeoJSON.FeatureCollection = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [-73.3, -37.4],
+            [-73.2, -37.4],
+            [-73.2, -37.3],
+            [-73.3, -37.3],
+            [-73.3, -37.4],
+          ],
+        ],
+      },
+      properties: { id: '56-56.a', nombre_bloque: '56.a', territorio_padre: 56 },
+    },
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [-73.3, -37.6],
+            [-73.2, -37.6],
+            [-73.2, -37.5],
+            [-73.3, -37.5],
+            [-73.3, -37.6],
+          ],
+        ],
+      },
+      properties: { id: '56-56.b', nombre_bloque: '56.b', territorio_padre: 56 },
+    },
+  ],
+};
+
 describe('MapPartialMarkService', () => {
   let service: MapPartialMarkService;
   let state: MapStateService;
@@ -69,6 +119,7 @@ describe('MapPartialMarkService', () => {
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getCurrentTerritoryColor: ReturnType<typeof vi.fn>;
     refreshMarksVisual: ReturnType<typeof vi.fn>;
+    getGeoJsonFeaturesByTerritorio: ReturnType<typeof vi.fn>;
   };
   let selection: {
     selectManzanaById: ReturnType<typeof vi.fn>;
@@ -90,6 +141,7 @@ describe('MapPartialMarkService', () => {
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getCurrentTerritoryColor: vi.fn().mockReturnValue('#22c55e'),
       refreshMarksVisual: vi.fn(),
+      getGeoJsonFeaturesByTerritorio: vi.fn().mockReturnValue([]),
     };
     selection = {
       selectManzanaById: vi.fn(),
@@ -268,6 +320,118 @@ describe('MapPartialMarkService', () => {
       ]);
       expect(overlay.updatePartialPreview).toHaveBeenCalledWith(fc, engine);
     });
+
+    it('auto-fills the polygon along the real manzana contour when the points share a manzana', async () => {
+      await service.iniciarDibujo('554', '56.a', '#ff0000', 56, engine);
+      overlay.updatePartialPreview.mockClear();
+      // All three points snap to the SAME manzana → the preview traces the
+      // real contour between them (edge0 t0.5 → edge2 t0.5 → edge1 t0.5).
+      const edges = featureToEdges(TERRITORY_GEOJSON.features[0]);
+      service.agregarPunto({ latlng: { lat: -37.4, lng: -73.25 }, edgeIdx: 0, t: 0.5 }, edges);
+      service.agregarPunto({ latlng: { lat: -37.3, lng: -73.25 }, edgeIdx: 2, t: 0.5 }, edges);
+      service.agregarPunto({ latlng: { lat: -37.35, lng: -73.2 }, edgeIdx: 1, t: 0.5 }, edges);
+
+      const ring = (state.partialDrawGeoJson()?.features[0].geometry as GeoJSON.Polygon)
+        .coordinates[0];
+      // Real contour: a closed 8-entry ring walking the manzana edges and
+      // the contiguity points — not a bare triangle.
+      expect(ring).toHaveLength(8);
+      expect(ring[0][0]).toBeCloseTo(-73.25, 9);
+      expect(ring[0][1]).toBeCloseTo(-37.4, 9);
+      expect(ring[ring.length - 1][0]).toBeCloseTo(ring[0][0], 9);
+      expect(ring[ring.length - 1][1]).toBeCloseTo(ring[0][1], 9);
+      // The manzana's right edge and its north-west corner are traversed.
+      expect(ring.some(c => c[0] === -73.2 && c[1] === -37.4)).toBe(true);
+      expect(ring.some(c => c[0] === -73.2 && c[1] === -37.3)).toBe(true);
+      expect(overlay.updatePartialPreview).toHaveBeenCalled();
+    });
+  });
+
+  describe('snapToNearestManzana', () => {
+    const adapter = createMapLibreProjectionAdapter(engine);
+
+    function withTwoManzanas(): void {
+      state.editGeoJson.set(TWO_MANZANA_GEOJSON);
+      state.territoriosSeleccionados.set([56]);
+    }
+
+    it('snaps to the nearest UNMARKED manzana of the active territory (auto-fill)', () => {
+      withTwoManzanas();
+
+      const { snapped, edges } = service.snapToNearestManzana(
+        { lat: -37.55, lng: -73.25 },
+        adapter,
+      );
+
+      // 56.b (south manzana) is closest: all its edges are 50px away; the
+      // first edge (bottom, t=0.5) wins the tie, pinning 56.b unambiguously.
+      expect(snapped.edgeIdx).toBe(0);
+      expect(snapped.t).toBeCloseTo(0.5, 9);
+      expect(snapped.latlng.lat).toBeCloseTo(-37.6, 9);
+      expect(snapped.latlng.lng).toBeCloseTo(-73.25, 9);
+      expect(edges).toHaveLength(4);
+    });
+
+    it('skips marked manzanas so a partial zone cannot overlap an existing mark', () => {
+      withTwoManzanas();
+      state.manzanasById.set(
+        new Map([
+          ['56-56.b', { id: '56-56.b', nombreBloque: '', color: '#ff0000', territorioNumero: 56 }],
+        ]),
+      );
+
+      const { snapped } = service.snapToNearestManzana({ lat: -37.55, lng: -73.25 }, adapter);
+
+      // 56.b is excluded (marked); 56.a is ~158px away, beyond the 100px
+      // threshold → free-form fallback point.
+      expect(snapped.edgeIdx).toBe(-1);
+      expect(snapped.latlng.lat).toBe(-37.55);
+      expect(snapped.latlng.lng).toBe(-73.25);
+    });
+
+    it('excludes fid-keyed marks by bridging them through the facades /all/geojson metadata', () => {
+      withTwoManzanas();
+      // The per-territory snapshot identifies manzanas by id ("56-56.b"),
+      // while marks store the MVT fid (5542). The /all/geojson metadata
+      // carries BOTH — the bridge maps 5542 → "56-56.b".
+      rendering.getGeoJsonFeaturesByTerritorio.mockReturnValue([
+        {
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: [] },
+          properties: { id: '56-56.a', fid: 5541, territorio_padre: 56 },
+        },
+        {
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: [] },
+          properties: { id: '56-56.b', fid: 5542, territorio_padre: 56 },
+        },
+      ] as unknown as GeoJSON.Feature[]);
+      state.manzanasById.set(
+        new Map([
+          ['5542', { id: '5542', nombreBloque: '', color: '#ff0000', territorioNumero: 56 }],
+        ]),
+      );
+
+      const { snapped } = service.snapToNearestManzana({ lat: -37.55, lng: -73.25 }, adapter);
+
+      // 56.b (fid 5542) is excluded through the fid → "56-56.b" bridge; the
+      // nearest remaining candidate, 56.a, is beyond the 100px threshold →
+      // free-form fallback point.
+      expect(snapped.edgeIdx).toBe(-1);
+      expect(snapped.latlng.lat).toBe(-37.55);
+      expect(snapped.latlng.lng).toBe(-73.25);
+    });
+
+    it('falls back to a free point when the tap is beyond the snap threshold', () => {
+      withTwoManzanas();
+
+      const { snapped } = service.snapToNearestManzana({ lat: -37.7, lng: -73.5 }, adapter);
+
+      // ~223px from every edge of both manzanas → free point.
+      expect(snapped.edgeIdx).toBe(-1);
+      expect(snapped.latlng.lat).toBe(-37.7);
+      expect(snapped.latlng.lng).toBe(-73.5);
+    });
   });
 
   describe('deshacerPunto', () => {
@@ -343,6 +507,20 @@ describe('MapPartialMarkService', () => {
       expect(marks[0].color).toBe('#ff0000');
       expect(marks[0].territorioNumero).toBe(56);
       expect(state.getDatosParciales(56)?.puntos).toHaveLength(3);
+      // The REAL traced polygon is persisted (pendingPoints are free points
+      // with no manzana edges → straight segments) — bug fix "modo parcial".
+      const parcialGuardado = state.getDatosParciales(56);
+      expect(JSON.parse(parcialGuardado!.geometria)).toEqual({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [0, 0],
+          ],
+        ],
+      });
       expect(state.puntosParciales()).toEqual([]);
       expect(state.modoMarcado()).toBe('none');
       expect(rendering.refreshMarksVisual).toHaveBeenCalled();

@@ -150,5 +150,108 @@ describe('MapMarkRestorationService', () => {
       // The display-only copy is gone, so toggling the mark off cannot resurrect it.
       expect(state.restoredMarksById().size).toBe(0);
     });
+
+    it('repaints a reported partial zone from its saved geometry (display mode)', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      service.restaurarConReportes(
+        1,
+        [{
+          sessionTime: '2026-08-01T10:00:00Z',
+          manzanasIds: 'm1',
+          manzanaId: null,
+          geometriaParcial: '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}',
+          puntosParciales: '[{"lat":0,"lng":0}]',
+        } as never],
+        undefined,
+        { actualizarEstadoMarcado: false }
+      );
+
+      // The saved geometry + points are recorded so the marked overlay can
+      // synthesize the real polygon (bug fix "modo parcial").
+      expect(state.getDatosParciales(1)?.puntos).toEqual([
+        { latlng: { lat: 0, lng: 0 }, edgeIdx: -1, t: 0 },
+      ]);
+      expect(state.getDatosParciales(1)?.geometria).toContain('"type":"Polygon"');
+      // Both the reported manzana and the partial zone are painted…
+      expect(state.manzanasVisiblesList().map(m => m.id)).toEqual(
+        expect.arrayContaining(['m1', expect.stringMatching(/^parcial-/)])
+      );
+      // …but display-only: the save/send payload stays untouched.
+      expect(state.manzanasById().size).toBe(0);
+    });
+
+    it('adds an editable partial mark when the territory is selected (editable mode)', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      service.restaurarConReportes(
+        1,
+        [{
+          sessionTime: '2026-08-01T10:00:00Z',
+          manzanasIds: 'm1',
+          manzanaId: null,
+          geometriaParcial: '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}',
+          puntosParciales: '[{"lat":0,"lng":0}]',
+        } as never],
+        undefined,
+        { actualizarEstadoMarcado: true }
+      );
+
+      expect(state.manzanasMarcadaList().map(m => m.id)).toEqual(
+        expect.arrayContaining(['m1', expect.stringMatching(/^parcial-/)])
+      );
+      expect(state.getDatosParciales(1)?.puntos).toHaveLength(1);
+      // The display-only copy is gone — no duplicate paints.
+      expect(state.restoredMarksById().size).toBe(0);
+    });
+
+    it('does not duplicate the partial zone when a draft already painted an editable parcial mark', () => {
+      rendering.getManzanaIndex.mockReturnValue([fakeManzana('m1', 1)]);
+      // The draft restore path painted the editable parcial mark already; the
+      // display path must keep it instead of painting a second polygon.
+      state.manzanasById.set(
+        new Map([
+          ['parcial-7', { id: 'parcial-7', nombreBloque: 'Zona parcial', color: '#ff0000', territorioNumero: 1 }],
+        ])
+      );
+
+      service.restaurarConReportes(
+        1,
+        [{
+          sessionTime: '2026-08-01T10:00:00Z',
+          manzanasIds: 'm1',
+          manzanaId: null,
+          geometriaParcial: '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}',
+          puntosParciales: '[{"lat":0,"lng":0}]',
+        } as never],
+        undefined,
+        { actualizarEstadoMarcado: false }
+      );
+
+      const parciales = state.manzanasVisiblesList().filter(m => m.id.startsWith('parcial-'));
+      expect(parciales.map(m => m.id)).toEqual(['parcial-7']);
+      // The geometry is still recorded for the overlay synthesis.
+      expect(state.getDatosParciales(1)?.puntos).toEqual([
+        { latlng: { lat: 0, lng: 0 }, edgeIdx: -1, t: 0 },
+      ]);
+    });
+
+    it('tolerates malformed points but still stores the geometry', () => {
+      service.restaurarConReportes(
+        1,
+        [{
+          sessionTime: '2026-08-01T10:00:00Z',
+          manzanasIds: 'm1',
+          manzanaId: null,
+          geometriaParcial: '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}',
+          puntosParciales: 'not-json',
+        } as never],
+        undefined,
+        { actualizarEstadoMarcado: false }
+      );
+
+      // Bad points never block the repaint: the geometry string is the
+      // source of truth; the point list degrades to empty.
+      expect(state.getDatosParciales(1)?.puntos).toEqual([]);
+      expect(state.getDatosParciales(1)?.geometria).toContain('"type":"Polygon"');
+    });
   });
 });

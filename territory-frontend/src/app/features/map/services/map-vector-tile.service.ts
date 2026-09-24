@@ -31,14 +31,27 @@ const DEFAULT_FILL_OPACITY = 0.6;
 /** Fallback color when tile feature lacks a `color` property. */
 const FALLBACK_COLOR = '#94a3b8';
 
-/** Opacity for an INCOMPLETE territory (not fully marked) — Leaflet parity. */
-const INCOMPLETE_FILL_OPACITY = 0.05;
+/**
+ * Opacity for an INCOMPLETE territory (not fully marked).
+ *
+ * <p>Raised from the Leaflet-parity 0.05 to 0.45 (bug fix "colores grises
+ * al hacer zoom"): 124/129 territories in real data are incomplete, so an
+ * almost-invisible fill made the whole map look gray on top of the OSM
+ * basemap. The complete/incomplete distinction now rides on the stroke
+ * width (see {@link COMPLETED_LINE_WIDTH}) instead of hiding incomplete
+ * fills.</p>
+ */
+const INCOMPLETE_FILL_OPACITY = 0.45;
 
 /** Opacity for territories OUTSIDE the active selection (hidden) — Leaflet parity. */
 const HIDDEN_FILL_OPACITY = 0;
 
 /** Line width for territories OUTSIDE the active selection (hidden). */
 const HIDDEN_LINE_WIDTH = 0;
+
+/** Line width for a COMPLETED territory boundary — thicker than the base so
+ * the completion distinction stays legible at the raised fill opacities. */
+const COMPLETED_LINE_WIDTH = 3;
 
 /** Base line width for territory boundaries — Leaflet `polygon.weight: 2`. */
 const DEFAULT_LINE_WIDTH = 2;
@@ -57,7 +70,9 @@ const DEFAULT_LINE_WIDTH = 2;
  * - Data-driven `fill-color` from the tile `color` property (no feature-state
  *   highlight — amber was removed for Leaflet parity)
  * - Data-driven `fill-opacity` by completeness: COMPLETED territories render
- *   at 0.6, incomplete at 0.05 (Leaflet parity); with an active selection,
+ *   at 0.6, incomplete at 0.45 (bug fix: incomplete was 0.05 and washed out
+ *   on the gray basemap); the completion distinction is reinforced by the
+ *   stroke width (3px completed vs 2px incomplete). With an active selection,
  *   non-selected territories are hidden (opacity 0, line 0)</p>
  */
 @Injectable({ providedIn: 'root' })
@@ -172,23 +187,32 @@ export class MapVectorTileService {
 
   /**
    * Reset the fill-opacity to the base completion-driven expression on BOTH
-   * fill layers and restore the base line width on both line layers.
+   * fill layers and restore the base completion-driven line width on both
+   * line layers.
    *
    * @param engine    The active MapEngine.
    * @param completed Territory numbers whose manzanas are ALL marked.
    */
   resetFillOpacity(engine: MapEngine, completed: number[] = []): void {
     this.setCompletionOpacity(engine, completed);
-    engine.setPaintProperty(LINE_LAYER_ID, 'line-width', DEFAULT_LINE_WIDTH);
-    engine.setPaintProperty(LINE_DISSOLVED_LAYER_ID, 'line-width', DEFAULT_LINE_WIDTH);
+    engine.setPaintProperty(
+      LINE_LAYER_ID,
+      'line-width',
+      this.completionLineWidthExpression('territorio', completed),
+    );
+    engine.setPaintProperty(
+      LINE_DISSOLVED_LAYER_ID,
+      'line-width',
+      this.completionLineWidthExpression('tid', completed),
+    );
   }
 
   /**
    * Hide every territory that is NOT in the `selected` list (opacity 0 +
    * line width 0 — Leaflet {@code hiddenPolygon} parity) and render the
-   * selected ones by completeness: completed → 0.6, incomplete → 0.05.
-   * Applied to BOTH fill layers and BOTH line layers (manzana keys on
-   * `territorio`, dissolved keys on `tid`).
+   * selected ones by completeness: completed → 0.6 / 3px stroke, incomplete
+   * → 0.45 / 2px stroke. Applied to BOTH fill layers and BOTH line layers
+   * (manzana keys on `territorio`, dissolved keys on `tid`).
    *
    * @param engine    The active MapEngine.
    * @param selected  The territory numbers to keep visible.
@@ -201,7 +225,10 @@ export class MapVectorTileService {
         HIDDEN_FILL_OPACITY,
       ];
     const lineExpression = (key: string) =>
-      ['case', ['in', ['get', key], ['literal', selected]], DEFAULT_LINE_WIDTH, HIDDEN_LINE_WIDTH];
+      ['case', ['in', ['get', key], ['literal', selected]],
+        this.completionLineWidthExpression(key, completed),
+        HIDDEN_LINE_WIDTH,
+      ];
 
     engine.setPaintProperty(FILL_LAYER_ID, 'fill-opacity', fillExpression('territorio'));
     engine.setPaintProperty(FILL_DISSOLVED_LAYER_ID, 'fill-opacity', fillExpression('tid'));
@@ -274,7 +301,8 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_MANZANA,
       paint: {
-        'line-width': DEFAULT_LINE_WIDTH,
+        // Completion-driven width: 3px completed, 2px incomplete.
+        'line-width': this.completionLineWidthExpression('territorio', []),
         'line-color': fillColor,
       },
     };
@@ -301,7 +329,8 @@ export class MapVectorTileService {
       source: TERRITORY_SOURCE_ID,
       'source-layer': SOURCE_LAYER_TERRITORIO,
       paint: {
-        'line-width': DEFAULT_LINE_WIDTH,
+        // Completion-driven width: 3px completed, 2px incomplete.
+        'line-width': this.completionLineWidthExpression('tid', []),
         'line-color': fillColor,
       },
     };
@@ -311,7 +340,8 @@ export class MapVectorTileService {
   /**
    * Build the base completion-driven opacity expression: territories in the
    * `completed` literal list render at `DEFAULT_FILL_OPACITY` (0.6),
-   * everyone else at `INCOMPLETE_FILL_OPACITY` (0.05) — Leaflet parity.
+   * everyone else at `INCOMPLETE_FILL_OPACITY` (0.45) — the incomplete fill
+   * stays clearly visible (bug fix "colores grises al hacer zoom").
    */
   private completionOpacityExpression(key: string, completed: number[]): unknown[] {
     return [
@@ -319,6 +349,21 @@ export class MapVectorTileService {
       ['in', ['get', key], ['literal', completed]],
       DEFAULT_FILL_OPACITY,
       INCOMPLETE_FILL_OPACITY,
+    ];
+  }
+
+  /**
+   * Build the completion-driven line-width expression: territories in the
+   * `completed` literal list render at `COMPLETED_LINE_WIDTH` (3),
+   * everyone else at `DEFAULT_LINE_WIDTH` (2). The stroke carries the
+   * complete/incomplete distinction now that both fills are visible.
+   */
+  private completionLineWidthExpression(key: string, completed: number[]): unknown[] {
+    return [
+      'case',
+      ['in', ['get', key], ['literal', completed]],
+      COMPLETED_LINE_WIDTH,
+      DEFAULT_LINE_WIDTH,
     ];
   }
 

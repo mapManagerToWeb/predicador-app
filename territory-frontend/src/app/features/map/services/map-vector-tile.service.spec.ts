@@ -89,12 +89,12 @@ describe('MapVectorTileService', () => {
       ][];
       const manzanaFill = layerCalls.find(call => call[0].id === 'territory-fill');
       expect(manzanaFill?.[0].paint['fill-opacity']).toEqual(
-        ['case', ['in', ['get', 'territorio'], ['literal', []]], 0.6, 0.05],
+        ['case', ['in', ['get', 'territorio'], ['literal', []]], 0.6, 0.45],
       );
 
       const dissolvedFill = layerCalls.find(call => call[0].id === 'territory-dissolved-fill');
       expect(dissolvedFill?.[0].paint['fill-opacity']).toEqual(
-        ['case', ['in', ['get', 'tid'], ['literal', []]], 0.6, 0.05],
+        ['case', ['in', ['get', 'tid'], ['literal', []]], 0.6, 0.45],
       );
     });
   });
@@ -152,42 +152,46 @@ describe('MapVectorTileService', () => {
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-fill',
         'fill-opacity',
-        ['case', ['in', ['get', 'territorio'], ['literal', [1, 2]]], 0.6, 0.05],
+        ['case', ['in', ['get', 'territorio'], ['literal', [1, 2]]], 0.6, 0.45],
       );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-fill',
         'fill-opacity',
-        ['case', ['in', ['get', 'tid'], ['literal', [1, 2]]], 0.6, 0.05],
+        ['case', ['in', ['get', 'tid'], ['literal', [1, 2]]], 0.6, 0.45],
       );
     });
 
-    it('should restore the base 2px line width on both line layers', () => {
+    it('should restore the completion-driven line width on both line layers', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
       service.resetFillOpacity(mockEngine, []);
-      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith('territory-line', 'line-width', 2);
+      expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
+        'territory-line',
+        'line-width',
+        ['case', ['in', ['get', 'territorio'], ['literal', []]], 3, 2],
+      );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-line',
         'line-width',
-        2,
+        ['case', ['in', ['get', 'tid'], ['literal', []]], 3, 2],
       );
     });
   });
 
   describe('setCompletionOpacity', () => {
-    it('should apply 0.6 for completed territories and 0.05 otherwise on both fill layers', () => {
+    it('should apply 0.6 for completed territories and 0.45 otherwise on both fill layers', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
       service.setCompletionOpacity(mockEngine, [3]);
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-fill',
         'fill-opacity',
-        ['case', ['in', ['get', 'territorio'], ['literal', [3]]], 0.6, 0.05],
+        ['case', ['in', ['get', 'territorio'], ['literal', [3]]], 0.6, 0.45],
       );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-fill',
         'fill-opacity',
-        ['case', ['in', ['get', 'tid'], ['literal', [3]]], 0.6, 0.05],
+        ['case', ['in', ['get', 'tid'], ['literal', [3]]], 0.6, 0.45],
       );
     });
   });
@@ -203,7 +207,7 @@ describe('MapVectorTileService', () => {
         [
           'case',
           ['in', ['get', 'territorio'], ['literal', [1, 2]]],
-          ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 0.6, 0.05],
+          ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 0.6, 0.45],
           0,
         ],
       );
@@ -213,25 +217,35 @@ describe('MapVectorTileService', () => {
         [
           'case',
           ['in', ['get', 'tid'], ['literal', [1, 2]]],
-          ['case', ['in', ['get', 'tid'], ['literal', [1]]], 0.6, 0.05],
+          ['case', ['in', ['get', 'tid'], ['literal', [1]]], 0.6, 0.45],
           0,
         ],
       );
     });
 
-    it('should zero the line width for non-selected territories on both line layers', () => {
+    it('should drive line width by completeness and zero it for non-selected territories', () => {
       const mockEngine = createMockMapEngine();
       service.initLayers(mockEngine);
       service.setSelectedTerritoriesOpacity(mockEngine, [1], [1]);
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-line',
         'line-width',
-        ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 2, 0],
+        [
+          'case',
+          ['in', ['get', 'territorio'], ['literal', [1]]],
+          ['case', ['in', ['get', 'territorio'], ['literal', [1]]], 3, 2],
+          0,
+        ],
       );
       expect(mockEngine.setPaintProperty).toHaveBeenCalledWith(
         'territory-dissolved-line',
         'line-width',
-        ['case', ['in', ['get', 'tid'], ['literal', [1]]], 2, 0],
+        [
+          'case',
+          ['in', ['get', 'tid'], ['literal', [1]]],
+          ['case', ['in', ['get', 'tid'], ['literal', [1]]], 3, 2],
+          0,
+        ],
       );
     });
   });
@@ -296,5 +310,6 @@ function createMockMapEngine(): MapEngine {
     destroy: vi.fn(),
     setFeatureState: vi.fn(),
     removeFeatureState: vi.fn(),
+    captureCanvas: vi.fn().mockResolvedValue(null),
   };
 }

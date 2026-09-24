@@ -83,6 +83,7 @@ function createMockMapLibreEngine(): MapEngine & {
         }
       }
     }),
+    captureCanvas: vi.fn().mockResolvedValue(null),
   };
 
   return engine;

@@ -17,5 +17,7 @@ export function getColorForTerritorio(territorioNum: number, backendColor: strin
 }
 
 export function getTerritoryFillOpacity(isComplete: boolean): number {
-  return isComplete ? 0.6 : 0.05;
+  // Incomplete stays clearly visible (0.45) — bug fix "colores grises al
+  // hacer zoom": the completion distinction rides on the stroke width.
+  return isComplete ? 0.6 : 0.45;
 }

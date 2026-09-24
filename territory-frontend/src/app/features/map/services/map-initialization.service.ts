@@ -184,6 +184,23 @@ export class MapInitializationService {
     this.state.modoMarcado.set(draft.modoMarcado);
     this.state.predicacion.set(draft.predicacion);
 
+    // Partial zones saved in the draft must repaint from their stored
+    // geometry even when the report path below cannot supply one (legacy
+    // drafts): seed the per-territory partial records first so the marked
+    // overlay's synthesized partial features resolve before the restore.
+    for (const [num, parcial] of Object.entries(draft.datosParcialesGuardados)) {
+      const territorioNumero = Number(num);
+      if (!Number.isFinite(territorioNumero)) continue;
+      this.state.setDatosParciales(territorioNumero, {
+        puntos: parcial.puntos.map(p => ({
+          latlng: { lat: p.lat, lng: p.lng },
+          edgeIdx: p.edgeIdx,
+          t: p.t,
+        })),
+        geometria: parcial.geometria,
+      });
+    }
+
     for (const num of draft.territoriosSeleccionados) {
       const fl = layers.find(f => f.territorioPadre === num);
       this.selection.restaurarMarcadoConReportes(

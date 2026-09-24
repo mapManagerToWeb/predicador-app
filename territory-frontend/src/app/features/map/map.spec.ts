@@ -69,7 +69,7 @@ describe('getTerritoryFillOpacity', () => {
   });
 
   it('should return low opacity for incomplete territories', () => {
-    expect(getTerritoryFillOpacity(false)).toBe(0.05);
+    expect(getTerritoryFillOpacity(false)).toBe(0.45);
   });
 });
 
@@ -373,5 +373,6 @@ function createMockMapEngine(): MapEngine {
     destroy: vi.fn(),
     setFeatureState: vi.fn(),
     removeFeatureState: vi.fn(),
+    captureCanvas: vi.fn().mockResolvedValue(null),
   };
 }

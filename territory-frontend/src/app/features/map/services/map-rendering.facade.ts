@@ -11,6 +11,36 @@ import type * as GeoJSON from 'geojson';
 /** Bounding box expressed as [west, south, east, north] in lng/lat. */
 export type GeojsonBounds = [number, number, number, number];
 
+/** Fallback color for a partial-zone feature with no resolvable color. */
+const PARTIAL_FALLBACK_COLOR = '#22c55e';
+
+/**
+ * Parses a saved partial-zone geometry (JSON string) into a GeoJSON
+ * geometry. Only Polygon and LineString shapes are meaningful for the
+ * marked overlay — anything else (or malformed JSON) yields null.
+ */
+function parseSavedGeometry(raw: string): GeoJSON.Geometry | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const geometry = parsed as Record<string, unknown>;
+  const type = geometry['type'];
+  const coords = geometry['coordinates'];
+  if (type === 'Polygon') {
+    if (!Array.isArray(coords) || coords.length === 0) return null;
+    return { type: 'Polygon', coordinates: coords as GeoJSON.Position[][] };
+  }
+  if (type === 'LineString') {
+    if (!Array.isArray(coords) || coords.length === 0) return null;
+    return { type: 'LineString', coordinates: coords as GeoJSON.Position[] };
+  }
+  return null;
+}
+
 /**
  * Per-territory metadata derived once from the `/all/geojson` snapshot
  * (the source of truth also used by the deployed Leaflet app):
@@ -428,6 +458,11 @@ export class MapRenderingFacade {
    * display-only ones restored from the backend. Marks are matched against the
    * `/all/geojson` snapshot by fid / "{t}-{b}" id / bloque; matched features
    * carry the mark color and a `completo` flag.
+   *
+   * <p>Bug fix "modo parcial": `parcial-` marks have no manzana feature to
+   * match — their zone is synthesized directly from the SAVED geometry
+   * ({@link MapStateService.getDatosParciales}), so a restored partial zone
+   * repaints its real polygon instead of disappearing.</p>
    */
   refreshOverlayMarks(): void {
     if (!this.engine || !this.markedOverlay.isInitialized()) return;
@@ -444,6 +479,22 @@ export class MapRenderingFacade {
 
     for (const mark of marks) {
       if (seleccionados.size > 0 && !seleccionados.has(mark.territorioNumero)) continue;
+
+      if (mark.id.startsWith('parcial-')) {
+        const saved = this.state.getDatosParciales(mark.territorioNumero);
+        const geometry = saved ? parseSavedGeometry(saved.geometria) : null;
+        if (!geometry) continue;
+        features.push({
+          type: 'Feature',
+          geometry,
+          properties: {
+            color: this.partialMarkColor(mark),
+            completo: false,
+          },
+        });
+        continue;
+      }
+
       const matched = matchMarkedFeature(mark, this.getGeoJsonFeaturesByTerritorio(mark.territorioNumero));
       if (!matched) continue;
       features.push({
@@ -457,6 +508,21 @@ export class MapRenderingFacade {
     }
 
     this.markedOverlay.updateOverlay(this.engine, features);
+  }
+
+  /**
+   * Color of a partial-zone mark: the mark's own color when set, otherwise
+   * the territory layer color, the current territory color, and finally the
+   * overlay's fallback green (restored marks carry the resolved territory
+   * color, so the first hop covers the normal paths).
+   */
+  private partialMarkColor(mark: ManzanaMarcada): string {
+    return (
+      mark.color ||
+      this.getFeatureLayerByTerritorio(mark.territorioNumero)?.color ||
+      this.getCurrentTerritoryColor() ||
+      PARTIAL_FALLBACK_COLOR
+    );
   }
 
   /**
