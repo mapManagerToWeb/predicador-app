@@ -1,6 +1,6 @@
 # Repository Instructions
 
-> Last verified: 2026-09-14. Whenever a fact here disagrees with the code, the code wins — fix this file.
+> Last verified: 2026-09-24. Whenever a fact here disagrees with the code, the code wins — fix this file.
 
 ## Codebase Memory (Knowledge Graph)
 
@@ -80,7 +80,8 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 - Feature-based structure under `territory-frontend/src/app/`:
   - `core/` — Cross-cutting singleton services (Profile, TerritorioService, Toast, EncargadoService, ReportCacheService, AuthTokenService, AuthService, CsrfTokenService, RumService), guards (`profileGuard`, `adminGuard`), interceptors (`auth`, `csrf`, `error`), models. There is no `shared/` directory; the toast lives in `core/services/toast.ts`.
   - `features/` — Standalone lazy-loaded page components (auth/login, map, profile, admin). Feature-exclusive services live inside their feature: `features/map/services/` holds the map engine services plus `whatsapp.ts` (only used by map reporting).
-  - **Known layering debt (do not extend)**: `core/services/map-draft.ts` is map-only but lives in core and imports types from `features/map/types/map.types` (inverted core→feature dependency); `features/admin/admin.ts` imports `TERRITORY_COLORS` from `features/map/utils/territory-colors` (feature→feature). Planned: move draft storage into the map feature and promote `TERRITORY_COLORS` to `core/models/`.
+  - `features/admin/` — desktop admin panel (ADR 0007). `admin.ts` is the shell (own login + sidebar, `ViewEncapsulation.None`: its stylesheet holds the shared `.adm-*` UI kit and `.viz-*` chart styles); child routes in `admin.routes.ts` (`resumen`, `territorios`, `encargados`, `reportes`). `services/admin-api.ts` (all calls send `ngsw-bypass`), `services/admin-store.ts` (shared signals), `services/admin-ui.ts` (confirm dialog), `utils/analytics.ts` (pure analytics, tested), `charts/` (hand-rolled SVG/HTML charts, no chart library), `map/` (MapLibre + terra-draw, loaded on demand).
+  - **Known layering debt (do not extend)**: `core/services/map-draft.ts` is map-only but lives in core and imports types from `features/map/types/map.types` (inverted core→feature dependency); `features/admin/pages/territorios/territorios.ts` imports `TERRITORY_COLORS` from `features/map/utils/territory-colors` (feature→feature). Planned: move draft storage into the map feature and promote `TERRITORY_COLORS` to `core/models/`.
 - Selector prefixes: Component `app-` (kebab-case), Directive `app` (camelCase).
 - Standalone components (no NgModule).
 - Route guards: `canActivate: [profileGuard]` protects `/map`; `canActivate: [adminGuard]` protects `/admin`; `**` redirects to `/login`.
@@ -110,6 +111,10 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 
 ### Common Gotchas
 
+- **MapLibre in the admin panel**: `maplibre-gl` 6 resolves its worker from `import.meta.url`, which breaks after bundling. `angular.json` copies `maplibre-gl.css`, `maplibre-gl-worker.mjs` and `maplibre-gl-shared.mjs` to `/vendor/`, and `features/admin/map/base-map.ts` calls `setWorkerUrl('vendor/maplibre-gl-worker.mjs')` and injects the CSS on demand. CARTO basemaps now return an "API KEY REQUIRED" watermark; the admin uses OSM tiles dimmed in dark mode.
+- **Angular template identifiers must be ASCII** (no `ñ`): the template lexer rejects them.
+- **Global touch sizing**: `styles.css` sets `min-height: 44px` on `button`/`input`/`select`; the admin panel resets it under `.adm`.
+
 - **SSR Differences:** `window` / `document` don't exist in server context; wrap DOM access in platform/browser guards or use `afterNextRender()`.
 - **Map UI split:** The map feature is split into multiple single-responsibility services under `features/map/services/` (engine, tile layer, territory layer, selection, partial draw, capture, style, state, interaction, rendering facade, data persistence, initialization, location, mark restoration, report, whatsapp, spatial index, etc.). Put new map behavior in one of these services, not in `MapPage`.
 - **Map perf (status 2026-09-14):** `map-engine.service.ts` uses Leaflet 1.9's standard `Canvas` renderer (`padding: 0.3`) — pan moves the canvas with a GPU transform and paths repaint only on `moveend` (no per-frame redraw; the `ContinuousCanvas` hack is gone). Hit-testing is **not** linear: `map-interaction.service.ts` uses `queryManzanasAt` (O(1) on average) and `queryManzanasNear` (3×3 cell window) through `map-rendering.facade.ts` → `map-territory-layer.service.ts`, which instantiates `manzana-spatial-index.ts` (uniform grid, cell 0.002° ≈ 200 m). Remaining known debt: `map-territory-layer.service.ts` computes turf `simplify`(highQuality)+`union` on the main thread per session (result cached in `sessionStorage`).
@@ -125,6 +130,6 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 
 - Frontend production builds include SSR and the service worker; browser-only APIs must remain guarded for SSR execution.
 - Flyway migrations live with the database-owning backend services; schema changes must be represented by a new migration rather than editing an applied migration.
-- `territory-service` and `reporting-service` share one Postgres DB (the `postgres` container) but both run Flyway at startup with **separate history tables** (`flyway_schema_history_territory` / `flyway_schema_history_reporting`), `ddl-auto: none`. Territory migrations: `V0`–`V2` in the repo (the database also has a territory `V3__add_s2_dissolved_and_meta` applied from unpushed MapLibre work — Flyway ignores it as a future migration); reporting: `V0`–`V5` (incl. WhatsApp delivery leases, latest-report index, geometry column conversion). A new migration in either service DOES run at startup.
+- `territory-service` and `reporting-service` share one Postgres DB (the `postgres` container) but both run Flyway at startup with **separate history tables** (`flyway_schema_history_territory` / `flyway_schema_history_reporting`), `ddl-auto: none`. Territory migrations: `V0`–`V2` in the repo (the database also has a territory `V3__add_s2_dissolved_and_meta` applied from unpushed MapLibre work — Flyway ignores it as a future migration); reporting: `V0`–`V6` (incl. WhatsApp delivery leases, latest-report index, geometry column conversion; V6 = admin panel: `registro_predicacion.inicio_sesion`, encargado PIN/lockout/last-access columns, `app_config`). **Do not add territory migrations until the V3 file is in the repo**: with V3 applied but missing locally, Flyway validation fails on startup. A new migration in either service DOES run at startup.
 - Do not use generated/build output (`target/`, `dist/`, `coverage/`, `.scannerwork/`) as source files; these are ignored artifacts.
 - **Frontend uses pnpm exclusively**: `package.json` pins `packageManager: pnpm@9.15.0` (via Corepack), `angular.json` sets `cli.packageManager: "pnpm"`, CI runs `pnpm install --frozen-lockfile` (pnpm 9 has no `pnpm ci`), and `pnpm-lock.yaml` is the only committed lockfile (`package-lock.json` is removed). Always use `pnpm` (never npm) for frontend installs and scripts.
