@@ -64,6 +64,7 @@
 
 <div class="cuerpo" [class.con-detalle]="seleccionado()">
   <section class="adm-card">
+    <p class="pista">Hacé clic en un encargado para ver sus datos y administrar su PIN.</p>
     <div class="filtros">
       <input class="adm-input" type="search" placeholder="Buscar por nombre o teléfono…" [value]="busqueda()"
              (input)="busqueda.set(texto($event))" aria-label="Buscar encargado" />
@@ -94,7 +95,7 @@
                 @if (!e.activo) { <span class="adm-badge">Inactivo</span> }
                 @if (duplicados().get(e.id); as motivo) { <span class="adm-badge warning" [title]="motivo">¿Duplicado?</span> }
               </td>
-              <td class="adm-muted">{{ fmtTelefono(e.telefono) }}</td>
+              <td class="adm-muted tel">{{ fmtTelefono(e.telefono) }}</td>
               <td>
                 @switch (acceso(e)) {
                   @case ('bloqueado') { <span class="adm-badge critical">Bloqueado</span> }
@@ -129,7 +130,7 @@
           @if (e.bloqueadoHasta) { <br /><span class="adm-badge critical">Bloqueado hasta {{ fmtFechaHora(e.bloqueadoHasta) }}</span> }
         </dd>
         <dt>Último acceso</dt><dd>{{ fmtFechaHora(e.ultimoAcceso) }}</dd>
-        <dt>Reportes</dt><dd>{{ e.totalReportes }} (último {{ fmtFecha(e.ultimoReporte) }})</dd>
+        <dt>Reportes</dt><dd>{{ e.totalReportes }}@if (e.ultimoReporte) { (último {{ fmtFecha(e.ultimoReporte) }}) }</dd>
         <dt>Alta</dt><dd>{{ fmtFecha(e.creadoEn) }}</dd>
       </dl>
       @if (duplicados().get(e.id); as motivo) {

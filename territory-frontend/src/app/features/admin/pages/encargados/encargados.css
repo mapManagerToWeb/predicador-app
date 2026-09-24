@@ -9,10 +9,14 @@
 .form .adm-actions { grid-column: 1 / -1; margin-top: 0; }
 .check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
 .cuerpo { display: grid; grid-template-columns: 1fr; gap: var(--space-4); align-items: start; }
-.cuerpo.con-detalle { grid-template-columns: 1fr 340px; }
+.cuerpo.con-detalle { grid-template-columns: minmax(0, 1fr) 340px; }
+/* Las tarjetas del kit ocupan 12 columnas en .adm-grid; acá van lado a lado. */
+.cuerpo > .adm-card { grid-column: auto; }
+.pista { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--ink-muted); }
 .filtros { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
 .filtros .adm-input { flex: 1; min-width: 200px; }
 .fila { cursor: pointer; }
+.tel { white-space: nowrap; }
 .fila.sel td { background: var(--color-primary-soft); }
 .fila td .adm-badge { margin-left: var(--space-1); }
 .detalle { position: sticky; top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
