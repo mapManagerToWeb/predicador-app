@@ -51,6 +51,12 @@ jobs:
           DB_PASSWORD: test
           TESTCONTAINERS_RYUK_DISABLED: "true"
           DOCKER_HOST: unix:///var/run/docker.sock
+          # Editor de manzanas (TerritoryAdminIntegrationTest): la validación y
+          # las transformaciones de geometría viven en PostGIS, así que el test
+          # corre contra el servicio de arriba. La base debe llamarse *_test.
+          TERRITORY_IT_DB_URL: jdbc:postgresql://localhost:5432/predicador_test
+          TERRITORY_IT_DB_USERNAME: predicador
+          TERRITORY_IT_DB_PASSWORD: test
         run: mvn verify -Pcoverage -B
 
       - name: Upload JaCoCo reports

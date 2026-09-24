@@ -57,7 +57,7 @@ public class EncargadoController {
 
     @PostMapping
     public ResponseEntity<EncargadoDto> crear(@Valid @RequestBody EncargadoDto dto) {
-        return ResponseEntity.ok(encargadoService.crear(dto));
+        return ResponseEntity.ok(encargadoService.registrar(dto));
     }
 
     @PutMapping("/{id}")
@@ -95,19 +95,14 @@ public class EncargadoController {
         return ResponseEntity.badRequest().body(problem);
     }
 
+    /**
+     * Login por teléfono (+ PIN si el administrador le asignó uno). Los
+     * rechazos salen como {@code ProblemDetail} con {@code code}
+     * ({@link com.predicador.reporting.service.EncargadoLoginException}).
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody EncargadoLoginRequest body) {
-        String telefono = body.telefono();
-        var result = encargadoService.buscarPorTelefono(telefono);
-        if (result.isPresent()) {
-            return withSessionCookie(withToken(result.get()));
-        }
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.NOT_FOUND, "Encargado no encontrado con el teléfono proporcionado");
-        problem.setTitle("Encargado no encontrado");
-        problem.setType(URI.create("https://api.predicador.com/errors/not-found"));
-        problem.setProperty("resource", "Encargado");
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
+        return withSessionCookie(withToken(encargadoService.autenticar(body.telefono(), body.pin())));
     }
 
     @GetMapping("/session")

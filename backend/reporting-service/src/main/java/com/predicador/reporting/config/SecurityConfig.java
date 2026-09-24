@@ -38,4 +38,10 @@ public class SecurityConfig {
         reg.addUrlPatterns("/api/v1/*");
         return reg;
     }
+
+    /** Hash de los PIN de encargados (BCrypt, costo 10 como el password admin del gateway). */
+    @Bean
+    public org.springframework.security.crypto.password.PasswordEncoder pinEncoder() {
+        return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(10);
+    }
 }
