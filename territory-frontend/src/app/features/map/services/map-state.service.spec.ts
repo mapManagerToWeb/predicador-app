@@ -26,6 +26,34 @@ describe('MapStateService', () => {
     expect(service.enviando()).toBe(false);
   });
 
+  describe('inicioSesion (tiempo de la salida para el panel)', () => {
+    const marca = (id: string) => ({ id, nombreBloque: id, color: '#fff', territorioNumero: 1 });
+
+    it('se fija con la primera manzana marcada y no cambia con las siguientes', () => {
+      localStorage.removeItem('map_inicio_sesion');
+      expect(service.inicioSesion()).toBeNull();
+
+      service.manzanasById.set(new Map([['a', marca('a')]]));
+      TestBed.tick();
+      const inicio = service.inicioSesion();
+      expect(inicio).not.toBeNull();
+      expect(localStorage.getItem('map_inicio_sesion')).toBe(inicio);
+
+      service.manzanasById.set(new Map([['a', marca('a')], ['b', marca('b')]]));
+      TestBed.tick();
+      expect(service.inicioSesion()).toBe(inicio);
+    });
+
+    it('se borra cuando la salida se envía (sin marcas)', () => {
+      service.manzanasById.set(new Map([['a', marca('a')]]));
+      TestBed.tick();
+      service.manzanasById.set(new Map());
+      TestBed.tick();
+      expect(service.inicioSesion()).toBeNull();
+      expect(localStorage.getItem('map_inicio_sesion')).toBeNull();
+    });
+  });
+
   it('derives manzanasCount from manzanasById', () => {
     service.manzanasById.set(new Map([['a', { id: 'a', nombreBloque: 'A', color: '#fff', territorioNumero: 1 }]]));
     expect(service.manzanasCount()).toBe(1);

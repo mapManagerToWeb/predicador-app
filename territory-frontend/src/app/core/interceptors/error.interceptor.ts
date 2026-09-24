@@ -31,6 +31,13 @@ const AUTH_URL_PATTERNS = [...LOGIN_URL_PATTERNS, '/encargados/session'];
  */
 const SELF_HANDLED_PATTERNS = ['/reports/send', '/reports?'];
 
+/**
+ * Endpoints del panel de administración (`/territories/admin`,
+ * `/reports/admin`, `/encargados/admin`): cada página muestra el `detail`
+ * del ProblemDetail, más útil que un toast genérico.
+ */
+const ADMIN_URL_PATTERN = /\/(territories|reports|encargados)\/admin(\/|\?|$)/;
+
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(Toast);
   const authToken = inject(AuthTokenService);
@@ -40,7 +47,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const path = req.url.split('?')[0];
   const isLoginRequest = LOGIN_URL_PATTERNS.some(p => path === p || path.endsWith(p));
   const isAuthRequest = AUTH_URL_PATTERNS.some(p => path === p || path.endsWith(p));
-  const isSelfHandled = SELF_HANDLED_PATTERNS.some(p => req.url.includes(p));
+  const isAdminRequest = ADMIN_URL_PATTERN.test(req.url);
+  const isSelfHandled = isAdminRequest || SELF_HANDLED_PATTERNS.some(p => req.url.includes(p));
 
   return next(req).pipe(
     catchError(error => {
@@ -61,7 +69,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           localStorage.removeItem('isAdmin');
         }
         toastService.show('Sesión expirada. Iniciá sesión nuevamente.', 4000, 'warning');
-        void router.navigate(['/login']);
+        // Desde el panel se vuelve a su propio login, no al de encargados.
+        void router.navigate([isAdminRequest ? '/admin' : '/login']);
         return throwError(() => error);
       }
 

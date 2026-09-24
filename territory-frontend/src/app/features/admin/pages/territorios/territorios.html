@@ -1,0 +1,218 @@
+<div class="editor">
+  <div class="mapa-wrap">
+    <div #mapa class="mapa"></div>
+    <div class="mapa-controles">
+      <div class="adm-seg" role="group" aria-label="Fondo del mapa">
+        <button type="button" [class.activo]="fondo() === 'mapa'" (click)="setFondo('mapa')">Mapa</button>
+        <button type="button" [class.activo]="fondo() === 'satelite'" (click)="setFondo('satelite')">Satélite</button>
+      </div>
+    </div>
+    @if (modo() === 'dibujar' || modo() === 'redibujar') {
+      <div class="mapa-ayuda" role="status">
+        @if (!dibujoListo()) {
+          Hacé clic en cada esquina de la manzana. Para cerrar, clic en el primer punto. Los vértices se pegan
+          a los de las manzanas vecinas. <kbd>Esc</kbd> cancela.
+        } @else {
+          Podés arrastrar los vértices para ajustar. Después completá los datos y guardá.
+        }
+      </div>
+    } @else if (modo() === 'vertices') {
+      <div class="mapa-ayuda" role="status">
+        Arrastrá los vértices. Para agregar uno, arrastrá el punto del medio de un lado. Para borrarlo, clic derecho sobre él.
+      </div>
+    } @else {
+      <div class="mapa-ayuda sutil">Clic: seleccionar manzana · Shift + clic: seleccionar varias</div>
+    }
+    @if (cargando()) {
+      <div class="mapa-estado">Cargando mapa…</div>
+    }
+    @if (errorMapa()) {
+      <div class="mapa-estado error" role="alert">{{ errorMapa() }}</div>
+    }
+  </div>
+
+  <aside class="panel" aria-label="Editor de territorios">
+    @if (modo() !== 'ver') {
+      <!-- Dibujo / edición de forma -->
+      <header class="panel-head">
+        <h1>
+          @switch (modo()) {
+            @case ('dibujar') { Nueva manzana }
+            @case ('redibujar') { Redibujar forma }
+            @default { Editar vértices }
+          }
+        </h1>
+      </header>
+      <form class="form" (submit)="$event.preventDefault(); guardar()">
+        <label class="adm-field">
+          <span>Territorio</span>
+          <input type="number" min="0" [value]="formTerritorio() ?? ''" (input)="onTerritorioForm($event)" />
+        </label>
+        <label class="adm-field">
+          <span>Nombre de la manzana</span>
+          <input type="text" maxlength="60" [value]="formNombre()" (input)="formNombre.set(texto($event))" />
+        </label>
+        @if (modo() === 'dibujar' && formTerritorio() !== null && !store.manzanasPorTerritorio().has(formTerritorio()!)) {
+          <p class="nota">El territorio {{ formTerritorio() }} es nuevo: se crea con esta manzana.</p>
+        }
+        <div class="adm-actions">
+          <button class="adm-btn" type="button" (click)="cancelarDibujo()">Cancelar</button>
+          <button class="adm-btn primary" type="submit" [disabled]="guardando() || !dibujoListo()">
+            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    } @else if (manzana(); as m) {
+      <!-- Una manzana seleccionada -->
+      <header class="panel-head">
+        <button class="adm-btn ghost small" type="button" (click)="deseleccionar()">← Territorio {{ m.properties.territorio }}</button>
+        <h1>Manzana {{ m.properties.nombre }}</h1>
+        <p class="adm-muted">
+          {{ fmtArea(m.properties.areaM2) }} · id {{ m.id }}
+          @if (m.geometry.type === 'MultiPolygon') { · {{ m.geometry.coordinates.length }} partes }
+        </p>
+      </header>
+      @if (!m.properties.valida) {
+        <div class="adm-alert">
+          <span>La forma tiene bordes que se cruzan y puede verse mal en el mapa.</span>
+          <button class="adm-btn small" type="button" (click)="reparar()">Reparar</button>
+        </div>
+      }
+      <form class="form" (submit)="$event.preventDefault(); guardar()">
+        <label class="adm-field">
+          <span>Territorio</span>
+          <input type="number" min="0" [value]="formTerritorio() ?? ''" (input)="formTerritorio.set(numero($event))" />
+        </label>
+        <label class="adm-field">
+          <span>Nombre</span>
+          <input type="text" maxlength="60" [value]="formNombre()" (input)="formNombre.set(texto($event))" />
+        </label>
+        <div class="adm-actions">
+          <button class="adm-btn primary" type="submit" [disabled]="guardando()">Guardar cambios</button>
+        </div>
+      </form>
+      <div class="grupo">
+        <h2>Forma</h2>
+        <div class="botones">
+          <button class="adm-btn" type="button" (click)="editarVertices()" [disabled]="m.geometry.type !== 'Polygon'"
+                  [title]="m.geometry.type !== 'Polygon' ? 'Tiene varias partes: usá Redibujar' : ''">Editar vértices</button>
+          <button class="adm-btn" type="button" (click)="redibujar()">Redibujar</button>
+        </div>
+      </div>
+      <div class="grupo peligro">
+        <button class="adm-btn danger" type="button" (click)="eliminarManzana()">Eliminar manzana</button>
+      </div>
+    } @else if (territorio() !== null) {
+      <!-- Territorio seleccionado -->
+      @let t = territorio()!;
+      <header class="panel-head">
+        <button class="adm-btn ghost small" type="button" (click)="elegirTerritorio(null)">← Todos los territorios</button>
+        <h1><span class="swatch" [style.background]="color(t)"></span> Territorio {{ t }}</h1>
+        <p class="adm-muted">{{ manzanasDelTerritorio().length }} manzanas</p>
+      </header>
+
+      <div class="grupo">
+        <h2>Color</h2>
+        <div class="paleta">
+          @for (c of paleta; track c) {
+            <button type="button" class="color" [style.background]="c" [class.elegido]="color(t).toLowerCase() === c.toLowerCase()"
+                    [attr.aria-label]="'Color ' + c" (click)="cambiarColor(c)"></button>
+          }
+          <label class="color otro" title="Otro color">
+            <input type="color" [value]="color(t)" (change)="cambiarColor(texto($event))" aria-label="Elegir otro color" />
+          </label>
+        </div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-head">
+          <h2>Manzanas</h2>
+          <button class="adm-btn small" type="button" (click)="nuevaManzana()">+ Agregar</button>
+        </div>
+        <ul class="lista">
+          @for (f of manzanasDelTerritorio(); track f.id) {
+            <li [class.sel]="seleccion().has(f.properties.id)">
+              <input type="checkbox" [checked]="seleccion().has(f.properties.id)" (change)="alternarEnSeleccion(f.properties.id, $event)"
+                     [attr.aria-label]="'Seleccionar ' + f.properties.nombre" />
+              <button type="button" class="lista-item" (click)="seleccionarManzana(f)">
+                <span>{{ f.properties.nombre }}</span>
+                <span class="adm-muted">{{ fmtArea(f.properties.areaM2) }}</span>
+                @if (!f.properties.valida) { <span class="adm-badge critical">Inválida</span> }
+              </button>
+            </li>
+          }
+        </ul>
+      </div>
+
+      @if (seleccion().size > 0) {
+        <div class="grupo">
+          <h2>Mover {{ seleccion().size }} seleccionada(s)</h2>
+          <div class="mover">
+            <input class="adm-input" type="number" min="0" placeholder="Territorio destino"
+                   [value]="destinoMover() ?? ''" (input)="destinoMover.set(numero($event))" aria-label="Territorio destino" />
+            <button class="adm-btn primary" type="button" (click)="moverSeleccion()" [disabled]="destinoMover() === null">Mover</button>
+          </div>
+          <p class="nota">Si el número no existe, se crea un territorio nuevo con esas manzanas.</p>
+        </div>
+      }
+
+      <div class="grupo peligro">
+        <button class="adm-btn danger" type="button" (click)="eliminarTerritorio()">Eliminar territorio</button>
+      </div>
+    } @else {
+      <!-- Todos los territorios -->
+      <header class="panel-head">
+        <h1>Territorios</h1>
+        <p class="adm-muted">{{ store.territorios().length }} territorios · {{ store.manzanas()?.features?.length ?? 0 }} manzanas</p>
+      </header>
+      <div class="botones">
+        <button class="adm-btn primary" type="button" (click)="nuevaManzana()">+ Nueva manzana</button>
+        <button class="adm-btn" type="button" (click)="elegirArchivo()">Importar</button>
+        <button class="adm-btn" type="button" (click)="exportar()">Exportar</button>
+        <input #archivo type="file" accept=".geojson,.json,application/geo+json,application/json" hidden (change)="importar($event)" />
+      </div>
+
+      @if (seleccion().size > 1) {
+        <div class="grupo">
+          <h2>{{ seleccion().size }} manzanas seleccionadas</h2>
+          <div class="mover">
+            <input class="adm-input" type="number" min="0" placeholder="Territorio destino"
+                   [value]="destinoMover() ?? ''" (input)="destinoMover.set(numero($event))" aria-label="Territorio destino" />
+            <button class="adm-btn primary" type="button" (click)="moverSeleccion()" [disabled]="destinoMover() === null">Mover</button>
+          </div>
+        </div>
+      }
+
+      @if (problemas() > 0) {
+        <details class="grupo calidad">
+          <summary><span class="adm-badge serious">{{ problemas() }} para revisar</span> Calidad de los datos</summary>
+          @for (id of calidad()?.invalidas ?? []; track id) {
+            <button type="button" class="lista-item" (click)="irAManzana(id)">
+              <span>{{ nombreDe(id) }}</span><span class="adm-muted">forma inválida</span>
+            </button>
+          }
+          @for (s of calidad()?.solapes ?? []; track s.a + '-' + s.b) {
+            <button type="button" class="lista-item" (click)="irAManzana(s.a)">
+              <span>{{ nombreDe(s.a) }} ↔ {{ nombreDe(s.b) }}</span><span class="adm-muted">{{ fmtArea(s.areaM2) }} superpuestos</span>
+            </button>
+          }
+        </details>
+      }
+
+      <input class="adm-input buscar" type="search" placeholder="Buscar territorio…" [value]="busqueda()"
+             (input)="busqueda.set(texto($event))" aria-label="Buscar territorio" />
+      <ul class="lista territorios">
+        @for (item of listaTerritorios(); track item.numero) {
+          <li>
+            <button type="button" class="lista-item" (click)="elegirTerritorio(item.numero)">
+              <span><span class="swatch" [style.background]="item.color"></span> Territorio {{ item.numero }}</span>
+              <span class="adm-muted">{{ item.manzanas }} mz</span>
+            </button>
+          </li>
+        } @empty {
+          <li class="adm-muted">Sin resultados</li>
+        }
+      </ul>
+    }
+  </aside>
+</div>

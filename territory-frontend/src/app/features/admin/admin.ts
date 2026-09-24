@@ -1,44 +1,67 @@
-import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
-import { Router } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { TerritorioService } from '../../core/services/territorio';
-import { Toast } from '../../core/services/toast';
-import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
-import { TERRITORY_COLORS } from '../map/utils/territory-colors';
+import { Profile } from '../../core/services/profile';
 import { environment } from '../../../environments/environment';
+import { AdminStore } from './services/admin-store';
+import { AdminUi } from './services/admin-ui';
 
+const CLAVE_TEMA = 'territory_theme';
+
+interface Seccion {
+  ruta: string;
+  titulo: string;
+  /** Path SVG (24×24, trazo) del ícono. */
+  icono: string;
+}
+
+/**
+ * Shell del panel de administración: login propio y, con sesión de admin,
+ * navegación lateral + la página activa. Pensado para escritorio.
+ *
+ * <p>Usa {@link ViewEncapsulation.None}: su hoja define los componentes
+ * visuales compartidos por todas las páginas del panel (tarjetas, tablas,
+ * botones, formularios), siempre bajo el prefijo {@code .adm}.</p>
+ */
 @Component({
   selector: 'app-admin',
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
   templateUrl: './admin.html',
-  styleUrl: './admin.css'
+  styleUrl: './admin.css',
 })
 export class AdminPage implements OnInit {
-  private territorioService = inject(TerritorioService);
-  private toastService = inject(Toast);
-  private router = inject(Router);
-  private http = inject(HttpClient);
-  private profileService = inject(Profile);
-  private authToken = inject(AuthTokenService);
+  private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly profileService = inject(Profile);
+  private readonly authToken = inject(AuthTokenService);
+  private readonly store = inject(AdminStore);
+  protected readonly ui = inject(AdminUi);
 
-  isLoggedIn = signal(false);
-  username = signal('');
-  password = signal('');
-  loginError = signal(false);
-  logging = signal(false);
+  readonly isLoggedIn = this.authToken.isAdmin;
+  readonly username = signal('');
+  readonly password = signal('');
+  readonly loginError = signal(false);
+  readonly logging = signal(false);
+  readonly oscuro = signal(true);
+  readonly textoConfirmacion = signal('');
 
-  numerosTerritorios = signal<number[]>([]);
-  colores = signal<Record<number, string>>({});
-  coloresPredefinidos = TERRITORY_COLORS;
-  guardando = signal(false);
+  readonly secciones: Seccion[] = [
+    { ruta: 'resumen', titulo: 'Resumen', icono: 'M3 3v18h18M7 15l4-4 3 3 5-6' },
+    { ruta: 'territorios', titulo: 'Territorios', icono: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14' },
+    {
+      ruta: 'encargados',
+      titulo: 'Encargados',
+      icono: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+    },
+    { ruta: 'reportes', titulo: 'Reportes', icono: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6M8 13h8M8 17h5' },
+  ];
 
   ngOnInit(): void {
-    if (this.authToken.isAdmin()) {
-      this.isLoggedIn.set(true);
-      void this.cargarDatos();
-    }
+    this.aplicarTema(this.temaInicial());
   }
 
   onUsernameInput(event: Event): void {
@@ -54,15 +77,14 @@ export class AdminPage implements OnInit {
     this.logging.set(true);
     try {
       const response = await firstValueFrom(
-        this.http.post<{ success: boolean; token?: string }>(`${environment.apiUrl}/auth/login`, {
+        this.http.post<{ success: boolean }>(`${environment.apiUrl}/auth/login`, {
           username: this.username(),
-          password: this.password()
-        })
+          password: this.password(),
+        }),
       );
       if (response.success) {
         this.authToken.set('admin');
-        this.isLoggedIn.set(true);
-        void this.cargarDatos();
+        this.password.set('');
       } else {
         this.loginError.set(true);
       }
@@ -76,41 +98,54 @@ export class AdminPage implements OnInit {
   logout(): void {
     this.authToken.logout();
     this.profileService.clear();
-    this.isLoggedIn.set(false);
+    this.store.limpiar();
     this.username.set('');
     this.password.set('');
-    void this.router.navigate(['/login']);
-  }
-
-  async cargarDatos(): Promise<void> {
-    try {
-      const numeros = await this.territorioService.getNumerosTerritorios();
-      this.numerosTerritorios.set(numeros);
-
-      const coloresMap = await this.territorioService.getColores();
-      this.colores.set(coloresMap);
-    } catch {
-      this.toastService.show('Error al cargar territorios');
-    }
-  }
-
-  getColor(numero: number): string {
-    return this.colores()[numero] || TERRITORY_COLORS[(numero - 1) % TERRITORY_COLORS.length];
-  }
-
-  async cambiarColor(numero: number, color: string): Promise<void> {
-    const nuevosColores = { ...this.colores(), [numero]: color };
-    this.colores.set(nuevosColores);
-
-    try {
-      await this.territorioService.asignarColor(numero, color);
-      this.toastService.show(`Color del territorio ${numero} actualizado`);
-    } catch {
-      this.toastService.show('Error al guardar color');
-    }
+    void this.router.navigate(['/admin']);
   }
 
   goToMap(): void {
     void this.router.navigate(['/map']);
+  }
+
+  alternarTema(): void {
+    this.aplicarTema(!this.oscuro());
+    try {
+      localStorage.setItem(CLAVE_TEMA, this.oscuro() ? 'dark' : 'light');
+    } catch {
+      // Sin almacenamiento (modo privado) el tema vale solo para esta sesión.
+    }
+  }
+
+  responder(ok: boolean): void {
+    this.textoConfirmacion.set('');
+    this.ui.responder(ok);
+  }
+
+  /** Clic fuera del diálogo = cancelar. */
+  cerrarSiFondo(event: MouseEvent): void {
+    if (event.target === event.currentTarget) this.responder(false);
+  }
+
+  onTextoConfirmacion(event: Event): void {
+    this.textoConfirmacion.set((event.target as HTMLInputElement).value);
+  }
+
+  /** Preferencia guardada (compartida con el mapa); si no hay, la del sistema. */
+  private temaInicial(): boolean {
+    try {
+      const guardado = localStorage.getItem(CLAVE_TEMA);
+      if (guardado) return guardado === 'dark';
+    } catch {
+      // Ignorado: se usa la preferencia del sistema.
+    }
+    return typeof matchMedia === 'undefined' || matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  private aplicarTema(oscuro: boolean): void {
+    this.oscuro.set(oscuro);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', oscuro ? 'dark' : 'light');
+    }
   }
 }
