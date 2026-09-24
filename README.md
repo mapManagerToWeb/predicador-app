@@ -249,12 +249,11 @@ npx sonar-scanner
 ## Base de datos (PostgreSQL + PostGIS) e importación de territorios
 
 La base de datos es PostgreSQL 18 + PostGIS 3.6 en el contenedor `postgres` de
-`docker-compose.yml` (antes Neon; ver `docs/adr/0006`). Para copiar los datos
-desde Neon una sola vez:
-
-```bash
-NEON_URL='postgresql://...neon.tech/neondb?sslmode=require' ./scripts/db/migrate-from-neon.sh
-```
+`docker-compose.yml` (antes Neon; ver `docs/adr/0006`). La copia desde Neon es
+automática: con `NEON_URL` definido en `.env` (connection string directa, sin
+`-pooler`), el servicio `db-import` la hace en el primer `docker compose up` si
+la base está vacía, y en los siguientes no hace nada. Para reimportar desde cero:
+`docker compose down && docker volume rm predicador-app_postgres_data`.
 
 Los territorios
 se importan **externamente** en la tabla `manzanas_territorio`: cada manzana

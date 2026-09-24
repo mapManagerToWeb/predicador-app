@@ -18,10 +18,13 @@ encargados).
   PostGIS 3.6), with a named volume `postgres_data` mounted at
   `/var/lib/postgresql` (PG 18 image layout). The port is bound to
   `127.0.0.1` only; remote administration goes through an SSH tunnel.
-- `territory-service` and `reporting-service` wait for `postgres` to be
-  healthy. `DB_URL`/`DB_USERNAME` default to the container; only
+- `territory-service` and `reporting-service` wait for `db-import` (which
+  waits for a healthy `postgres`). `DB_URL`/`DB_USERNAME` default to the container; only
   `DB_PASSWORD` must be set in `.env`.
-- Data is copied once with `scripts/db/migrate-from-neon.sh`: `pg_dump` 18
+- Data is copied automatically by the one-shot `db-import` compose service
+  (`scripts/db/import-from-neon.sh`), which territory and reporting wait for
+  (`service_completed_successfully`). It only acts when the database is empty
+  and `NEON_URL` is set, restores in a single transaction, and uses `pg_dump` 18
   (custom format, `--no-owner --no-privileges`) excluding the Neon-only
   `pg_session_jwt` extension (which owns the `auth` schema) and the `pgrst`
   schema. Everything else is copied as-is, including `neon_auth` (Neon Auth

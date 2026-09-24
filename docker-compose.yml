@@ -107,8 +107,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
+      db-import:
+        condition: service_completed_successfully
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
@@ -149,8 +149,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
+      db-import:
+        condition: service_completed_successfully
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
@@ -184,7 +184,7 @@ services:
 
   # PostgreSQL + PostGIS propio (reemplaza a Neon). Misma versión mayor que
   # tenía Neon (PG 18 / PostGIS 3.6) para que el dump restaure sin sorpresas.
-  # Los datos se importan una vez con scripts/db/migrate-from-neon.sh.
+  # Los datos de Neon los importa automáticamente el servicio db-import.
   postgres:
     image: postgis/postgis:18-3.6
     container_name: postgres
@@ -207,6 +207,26 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     restart: unless-stopped
+
+  # Tarea de una sola vez: si la base está vacía y NEON_URL está definido en
+  # .env, copia Neon completo al contenedor postgres. Si ya hay datos no hace
+  # nada, así que es seguro dejarlo en cada `up`. territory y reporting esperan
+  # a que termine bien; si falla, no arrancan (nunca corren sobre una base a medias).
+  db-import:
+    image: postgis/postgis:18-3.6
+    container_name: db-import
+    entrypoint: ["/scripts/import-from-neon.sh"]
+    environment:
+      - NEON_URL=${NEON_URL:-}
+      - DB_USERNAME=${DB_USERNAME:-predicador}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set}
+    volumes:
+      - ./scripts/db/import-from-neon.sh:/scripts/import-from-neon.sh:ro,z
+      - ./backups:/backups:z
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   rabbitmq:
     image: rabbitmq:4.3.4-management
