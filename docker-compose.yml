@@ -186,7 +186,7 @@ services:
   # tenía Neon (PG 18 / PostGIS 3.6) para que el dump restaure sin sorpresas.
   # Los datos de Neon los importa automáticamente el servicio db-import.
   postgres:
-    image: postgis/postgis:18-3.6
+    image: imresamu/postgis:18-3.6
     container_name: postgres
     environment:
       - POSTGRES_DB=predicador
@@ -213,7 +213,7 @@ services:
   # nada, así que es seguro dejarlo en cada `up`. territory y reporting esperan
   # a que termine bien; si falla, no arrancan (nunca corren sobre una base a medias).
   db-import:
-    image: postgis/postgis:18-3.6
+    image: imresamu/postgis:18-3.6
     container_name: db-import
     entrypoint: ["/scripts/import-from-neon.sh"]
     environment:

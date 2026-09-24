@@ -14,7 +14,7 @@ encargados).
 ## Decision
 
 - Add a `postgres` service to `docker-compose.yml` using
-  `postgis/postgis:18-3.6`, the same major versions Neon ran (PostgreSQL 18.6,
+  `imresamu/postgis:18-3.6`, the same major versions Neon ran (PostgreSQL 18.6,
   PostGIS 3.6), with a named volume `postgres_data` mounted at
   `/var/lib/postgresql` (PG 18 image layout). The port is bound to
   `127.0.0.1` only; remote administration goes through an SSH tunnel.
