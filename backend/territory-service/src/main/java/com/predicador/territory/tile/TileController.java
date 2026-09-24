@@ -1,16 +1,24 @@
 package com.predicador.territory.tile;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.HandlerMapping;
 
+import java.net.URI;
 import java.time.Duration;
 
 /**
@@ -42,6 +50,13 @@ public class TileController {
 
     private static final CacheControl PRIVATE_5M =
             CacheControl.maxAge(Duration.ofSeconds(300)).cachePrivate();
+
+    /** Tile de error MVT: sin almacenamiento en caché (no-store). A
+     *  propósito NO lleva ETag ni frescura (refetch-to-heal): el cliente
+     *  reintenta y el tile se auto-repara cuando sube {@code data_version}. */
+    private static final CacheControl NO_STORE = CacheControl.noStore();
+
+    private static final Logger log = LoggerFactory.getLogger(TileController.class);
 
     private final TileService tileService;
     private final TileJsonService tileJsonService;
@@ -97,5 +112,57 @@ public class TileController {
         }
         long n = 1L << z;
         return x >= 0 && x < n && y >= 0 && y < n;
+    }
+
+    /**
+     * Fallback de errores del pipeline de tiles (fix: 500 sin cuerpo en
+     * producción). Si la petición quiere un tile MVT, se devuelve un tile
+     * vacío VÁLIDO (200) en vez de dejar que el {@code GlobalExceptionHandler}
+     * escriba un ProblemDetail JSON con Content-Type MVT — sin converter para
+     * {@code ProblemDetail} contra esos media types se lanza
+     * {@code HttpMessageNotWritableException} y la respuesta queda vacía.
+     * El tile de error se sirve con {@code Cache-Control: no-store} y
+     * {@code Vary: Accept-Encoding}: a propósito NO lleva ETag ni frescura
+     * (refetch-to-heal) — el cliente reintenta y el tile se auto-repara
+     * cuando sube {@code data_version}.
+     * El resto de rutas (tiles.json) sigue devolviendo un ProblemDetail 500
+     * con el mismo shape que {@code GlobalExceptionHandler.handleGeneral}.
+     */
+    @ExceptionHandler(Exception.class)
+    public Object handleRenderError(Exception ex, HttpServletRequest request,
+                                    HttpServletResponse response) {
+        if (isMvtRequest(request, response)) {
+            log.error("Error generando tile MVT {}; se devuelve tile vacío válido",
+                    ex.getMessage(), ex);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(MVT_MEDIA_TYPE))
+                    .header(HttpHeaders.CONTENT_ENCODING, "gzip")
+                    .header(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING)
+                    .cacheControl(NO_STORE)
+                    .body(TileService.EMPTY_MVT_GZIPPED);
+        }
+        log.error("Error en endpoint TileJSON; se devuelve ProblemDetail 500", ex);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");
+        problem.setTitle("Error del servidor");
+        problem.setType(URI.create("https://api.predicador.com/errors/internal"));
+        return problem;
+    }
+
+    private boolean isMvtRequest(HttpServletRequest request, HttpServletResponse response) {
+        String contentType = response.getContentType();
+        if (contentType != null && !contentType.isBlank()) {
+            return contentType.startsWith(MVT_MEDIA_TYPE)
+                    || contentType.startsWith(X_PROTOBUF_MEDIA_TYPE);
+        }
+        // Spring 7.0.9 (Boot 4.1.1): el atributo PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE
+        // se limpia en RequestMappingInfoHandlerMapping.getHandlerInternal
+        // (clearMediaTypesAttribute) justo después del handler lookup — no
+        // llega al @ExceptionHandler. El patrón BEST_MATCHING_PATTERN (fijado
+        // por extractMatchDetails durante el matching) SÍ sobrevive y
+        // distingue la ruta del tile MVT (.pbf) de tiles.json.
+        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        String patternText = pattern instanceof String s ? s : request.getRequestURI();
+        return patternText.endsWith(".pbf");
     }
 }

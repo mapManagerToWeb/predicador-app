@@ -53,7 +53,9 @@ public class S2BackfillService implements ApplicationRunner {
     private final TransactionTemplate tx;
     private final S2CoverService s2Cover;
     private final GeometryFactory geometryFactory = new GeometryFactory();
-    private final WKBReader wkbReader;
+    /** @see TileService#wkbReader — WKBReader no es thread-safe; uno por hilo. */
+    private final ThreadLocal<WKBReader> wkbReader =
+            ThreadLocal.withInitial(() -> new WKBReader(geometryFactory));
     private final Counter processed;
 
     public S2BackfillService(JdbcTemplate jdbc, PlatformTransactionManager txManager,
@@ -61,7 +63,6 @@ public class S2BackfillService implements ApplicationRunner {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.s2Cover = s2Cover;
-        this.wkbReader = new WKBReader(geometryFactory);
         this.processed = Counter.builder("territory.tile.backfill.processed")
                 .description("Manzanas con cover S2 insertadas por el backfill")
                 .register(registry);
@@ -138,7 +139,7 @@ public class S2BackfillService implements ApplicationRunner {
         long skipped = 0;
         for (BatchRow row : batch) {
             try {
-                Geometry geom = wkbReader.read(row.geom());
+                Geometry geom = wkbReader.get().read(row.geom());
                 if (geom == null || geom.isEmpty()) {
                     skipped++;
                     continue;

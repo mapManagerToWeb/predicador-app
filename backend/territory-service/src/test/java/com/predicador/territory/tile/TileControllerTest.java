@@ -3,6 +3,7 @@ package com.predicador.territory.tile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import io.github.sebasbaumh.mapbox.vectortile.VectorTile;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -13,7 +14,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import static com.predicador.territory.tile.TestGzip.gunzip;
 import static com.predicador.territory.tile.TestGzip.gzip;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -133,6 +136,85 @@ class TileControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(tileService);
+    }
+
+    // ---- Error del servicio: tile MVT vacío válido (fix 500/StackOverflow) --
+    // Producción: una excepción durante el render tiraba el tile entero y el
+    // GlobalExceptionHandler intentaba escribir un ProblemDetail JSON con
+    // Content-Type MVT → HttpMessageNotWritableException → 500 sin cuerpo.
+    // Fix local al controlador: devolver un tile MVT vacío válido (gzip) y
+    // dejar el ProblemDetail JSON solo para tiles.json.
+
+    @Test
+    void tile_serviceError_returnsValidEmptyMvtTile() throws Exception {
+        when(tileService.render(Z, X, Y))
+                .thenThrow(new IllegalStateException("boom interno del render"));
+
+        mockMvc.perform(get("/api/v1/territories/tiles/14/4976/9809.pbf")
+                        .accept(MVT_MEDIA))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MVT_MEDIA))
+                .andExpect(header().string(HttpHeaders.CONTENT_ENCODING, "gzip"))
+                .andExpect(result -> {
+                    byte[] body = result.getResponse().getContentAsByteArray();
+                    VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(body));
+                    assertThat(tile.getLayersCount()).isZero();
+                });
+    }
+
+    @Test
+    void tile_malformedIntegerSegment_returnsValidEmptyMvtTile() throws Exception {
+        // "abc" no cabe en @PathVariable int y: MethodArgumentTypeMismatch
+        // durante la resolución del argumento → cae en handleRenderError
+        // SIN llegar al servicio (el tile se devuelve vacío, no 500).
+        mockMvc.perform(get("/api/v1/territories/tiles/14/4976/abc.pbf")
+                        .accept(MVT_MEDIA))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MVT_MEDIA))
+                .andExpect(header().string(HttpHeaders.CONTENT_ENCODING, "gzip"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL,
+                        org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING))
+                .andExpect(result -> {
+                    byte[] body = result.getResponse().getContentAsByteArray();
+                    VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(body));
+                    assertThat(tile.getLayersCount()).isZero();
+                });
+        verifyNoInteractions(tileService);
+    }
+
+    @Test
+    void tile_serviceError_acceptXProtobuf_returnsValidEmptyMvtTile() throws Exception {
+        when(tileService.render(Z, X, Y))
+                .thenThrow(new IllegalStateException("boom"));
+
+        mockMvc.perform(get("/api/v1/territories/tiles/14/4976/9809.pbf")
+                        .accept(X_PROTOBUF_MEDIA))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MVT_MEDIA))
+                .andExpect(header().string(HttpHeaders.CONTENT_ENCODING, "gzip"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL,
+                        org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING))
+                .andExpect(result -> {
+                    byte[] body = result.getResponse().getContentAsByteArray();
+                    VectorTile.Tile tile = VectorTile.Tile.parseFrom(gunzip(body));
+                    assertThat(tile.getLayersCount()).isZero();
+                });
+    }
+
+    @Test
+    void tileJson_serviceError_returnsJsonProblemDetail() throws Exception {
+        when(tileJsonService.tileJson())
+                .thenThrow(new IllegalStateException("boom interno del tilejson"));
+
+        mockMvc.perform(get("/api/v1/territories/tiles.json"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.title").value("Error del servidor"))
+                .andExpect(jsonPath("$.detail").value("Error interno del servidor"))
+                .andExpect(jsonPath("$.type").value("https://api.predicador.com/errors/internal"));
     }
 
     // ---- tiles.json (TileJSON) ------------------------------------------

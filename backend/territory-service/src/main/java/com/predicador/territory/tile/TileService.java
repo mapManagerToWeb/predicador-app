@@ -13,6 +13,7 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -70,7 +71,18 @@ public class TileService {
     private final TerritoryColorResolver colorResolver;
     private final TileProperties props;
     private final GeometryFactory geometryFactory = new GeometryFactory();
-    private final WKBReader wkbReader;
+    /**
+     * {@link WKBReader} NO es thread-safe (javadoc oficial de JTS: "This
+     * class is not thread-safe; each thread should create its own
+     * instance"). Mantiene estado mutable de instancia (stream de lectura
+     * {@code dis}, buffer {@code ordValues}, {@code inputDimension},
+     * {@code maxNumFieldValue}) que se pisa si dos hilos del servidor
+     * parsean a la vez — geometrías válidas omitidas de forma
+     * no determinista ("WKB inválido" sobre bytes correctos). Un reader
+     * por hilo elimina la carrera sin coste de asignación por fila.
+     */
+    private final ThreadLocal<WKBReader> wkbReader =
+            ThreadLocal.withInitial(() -> new WKBReader(geometryFactory));
     private final Cache<TileKey, TileEntry> cache;
 
     private final Timer renderTimer;
@@ -89,7 +101,6 @@ public class TileService {
         this.versions = versions;
         this.colorResolver = colorResolver;
         this.props = props;
-        this.wkbReader = new WKBReader(geometryFactory);
         this.cache = Caffeine.newBuilder()
                 .maximumSize(props.cacheMaxSize())
                 .expireAfterWrite(props.cacheTtl())
@@ -211,7 +222,7 @@ public class TileService {
                 tileSize.record(gzipped.length);
                 return new TileEntry(new TileKey(z, x, y, version).etag(), gzipped);
             }
-            byte[] gzipped = gzipUnchecked(VectorTile.Tile.newBuilder().build().toByteArray());
+            byte[] gzipped = EMPTY_MVT_GZIPPED;
             tileSize.record(gzipped.length);
             return new TileEntry(new TileKey(z, x, y, version).etag(), gzipped);
         } finally {
@@ -245,6 +256,12 @@ public class TileService {
                 if (geom == null || geom.isEmpty()) {
                     continue;
                 }
+                if (hasNonFiniteCoordinate(geom)) {
+                    skippedGeometries.increment();
+                    log.warn("Tile {}/{}/{}: manzana {} omitida (geometría inválida): coordenada no finita (NaN/Infinito)",
+                            z, x, y, row.getId());
+                    continue;
+                }
                 Geometry simplified = TopologyPreservingSimplifier.simplify(geom, tolerance);
                 Geometry tileGeom = JtsAdapter.createTileGeom(
                         simplified, tileEnv, clipEnv, geometryFactory, layerParams, null);
@@ -258,6 +275,15 @@ public class TileService {
                         "color", resolveColor(row.getTerritorioPadre(), row.getColor())));
                 JtsAdapter.addFeatures(layer, tileGeom, layerProps, converter);
                 count++;
+            } catch (StackOverflowError ex) {
+                // Catching StackOverflowError es intencional: defensa por fila.
+                // El SOE de la simplificación JTS no indica un hilo agotado —
+                // surge en frames aislados al simplificar un vértice corrupto;
+                // tras el unwind la pila del hilo queda intacta y el loop puede
+                // seguir con las filas sanas.
+                skippedGeometries.increment();
+                log.warn("Tile {}/{}/{}: manzana {} omitida (StackOverflowError en simplificación): {}",
+                        z, x, y, row.getId(), ex.getMessage());
             } catch (Exception ex) {
                 skippedGeometries.increment();
                 log.warn("Tile {}/{}/{}: manzana {} omitida (geometría inválida): {}",
@@ -279,6 +305,12 @@ public class TileService {
                 if (geom == null || geom.isEmpty()) {
                     continue;
                 }
+                if (hasNonFiniteCoordinate(geom)) {
+                    skippedGeometries.increment();
+                    log.warn("Tile {}/{}/{}: territorio disuelto {} omitido (geometría inválida): coordenada no finita (NaN/Infinito)",
+                            z, x, y, row.getTerritorioPadre());
+                    continue;
+                }
                 Geometry simplified = TopologyPreservingSimplifier.simplify(geom, tolerance);
                 Geometry tileGeom = JtsAdapter.createTileGeom(
                         simplified, tileEnv, clipEnv, geometryFactory, layerParams, null);
@@ -292,6 +324,12 @@ public class TileService {
                         "total", row.getTotalManzanas()));
                 JtsAdapter.addFeatures(layer, tileGeom, layerProps, converter);
                 count++;
+            } catch (StackOverflowError ex) {
+                // Ver comentario en encodeManzanas: catching StackOverflowError
+                // es intencional — defensa por fila contra vértices corruptos.
+                skippedGeometries.increment();
+                log.warn("Tile {}/{}/{}: territorio disuelto {} omitido (StackOverflowError en simplificación): {}",
+                        z, x, y, row.getTerritorioPadre(), ex.getMessage());
             } catch (Exception ex) {
                 skippedGeometries.increment();
                 log.warn("Tile {}/{}/{}: territorio disuelto {} omitido (geometría inválida): {}",
@@ -306,12 +344,30 @@ public class TileService {
             return null;
         }
         try {
-            return wkbReader.read(wkb);
+            return wkbReader.get().read(wkb);
         } catch (ParseException ex) {
             // Unchecked: el caller (encodeManzanas/encodeDisueltos) captura
             // Exception y cuenta la geometría como omitida.
             throw new IllegalArgumentException("WKB inválido de manzana/territorio", ex);
         }
+    }
+
+    /**
+     * True si la geometría contiene alguna coordenada NaN/Infinito. El WKB de
+     * PostGIS puede traer vértices corruptos; simplificarlos con JTS puede
+     * desbordar la pila ({@link StackOverflowError}, no capturable como
+     * {@link Exception}) y tumbar el tile completo — verificar antes de
+     * simplificar permite omitir solo la fila envenenada.
+     *
+     * <p>Solo se inspeccionan X/Y: la Z de una geometría 2D es NaN por diseño.</p>
+     */
+    private static boolean hasNonFiniteCoordinate(Geometry geom) {
+        for (Coordinate c : geom.getCoordinates()) {
+            if (!Double.isFinite(c.x) || !Double.isFinite(c.y)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Comprime el PBF con gzip (siempre, sin negociar Accept-Encoding). */
@@ -335,5 +391,20 @@ public class TileService {
         } catch (IOException ex) {
             throw new IllegalStateException("No se pudo comprimir el tile MVT con gzip", ex);
         }
+    }
+
+    /**
+     * Tile MVT vacío (0 capas) ya comprimido en gzip. Mismo contenido para
+     * cualquier (z,x,y): lo usa el controlador cuando el render falla, para
+     * devolver un 200 válido y cacheable en vez de un 500 sin cuerpo.
+     *
+     * <p>El ETag que lo acompaña (generado por el controlador con la versión
+     * de datos) es lo que cambia entre versiones; el cliente revalida y el
+     * tile se auto-repara cuando sube {@code data_version}.</p>
+     */
+    static final byte[] EMPTY_MVT_GZIPPED = emptyMvtGzipped();
+
+    private static byte[] emptyMvtGzipped() {
+        return gzipUnchecked(VectorTile.Tile.newBuilder().build().toByteArray());
     }
 }
