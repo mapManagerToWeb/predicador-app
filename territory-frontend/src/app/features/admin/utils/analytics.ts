@@ -27,6 +27,15 @@ export function completado(r: ReporteAdmin): boolean {
   return r.estado === 'completed';
 }
 
+/**
+ * Reporte de un encargado desde el mapa. Las correcciones y los reinicios los
+ * escribe el administrador: cambian el estado del territorio pero no cuentan
+ * como trabajo (ranking, tiempos, actividad).
+ */
+export function esSalida(r: ReporteAdmin): boolean {
+  return !r.origen || r.origen === 'salida';
+}
+
 export function nombreEncargado(r: Pick<ReporteAdmin, 'encargadoNombre' | 'encargadoApellido'>): string {
   return `${r.encargadoNombre ?? ''} ${r.encargadoApellido ?? ''}`.trim() || 'Sin nombre';
 }
@@ -293,19 +302,22 @@ export function cobertura(
     .sort((a, b) => a - b)
     .map(territorio => {
       const lista = (porTerritorio.get(territorio) ?? []).sort((a, b) => ms(a.fecha) - ms(b.fecha));
+      // El estado lo da el último reporte (también una corrección o un reinicio);
+      // el trabajo y quién lo hizo, la última salida.
       const ultimo = lista.at(-1) ?? null;
+      const ultimaSalida = lista.filter(esSalida).at(-1) ?? null;
       const completos = lista.filter(completado);
       const ultimoCompleto = completos.at(-1) ?? null;
       const ultimoCompletado = ultimoCompleto ? new Date(ultimoCompleto.fecha) : null;
       const dias = ultimoCompletado ? diasEntre(ultimoCompletado, hoy) : null;
-      const enCurso = !!ultimo && !completado(ultimo);
+      const enCurso = !!ultimo && !completado(ultimo) && ultimo.origen !== 'reinicio';
       const total = ultimo?.totalManzanas ?? manzanasPorTerritorio.get(territorio) ?? 0;
       return {
         territorio,
         manzanas: manzanasPorTerritorio.get(territorio) ?? ultimo?.totalManzanas ?? 0,
-        ultimoTrabajo: ultimo ? new Date(ultimo.fecha) : null,
+        ultimoTrabajo: ultimaSalida ? new Date(ultimaSalida.fecha) : null,
         ultimoCompletado,
-        ultimoEncargado: ultimo ? nombreEncargado(ultimo) : null,
+        ultimoEncargado: ultimaSalida ? nombreEncargado(ultimaSalida) : null,
         diasDesdeCompletado: dias,
         vecesCompletado: completos.length,
         estado: estadoPorDias(dias),
@@ -334,6 +346,15 @@ export function registroTerritorios(reportes: ReporteAdmin[]): Ciclo[] {
   const ciclos: Ciclo[] = [];
   let actual: Ciclo | null = null;
   for (const r of ordenados) {
+    if (r.origen === 'reinicio') {
+      // Reinicio de ciclo: la vuelta en curso queda sin completar.
+      if (actual?.territorio === r.territorio) actual = null;
+      continue;
+    }
+    if (!esSalida(r)) {
+      if (actual?.territorio === r.territorio && actual.fin === null && completado(r)) actual.fin = new Date(r.fecha);
+      continue;
+    }
     if (!actual || actual.territorio !== r.territorio || actual.fin !== null) {
       actual = { territorio: r.territorio, inicio: new Date(r.fecha), fin: null, encargados: [], reportes: 0 };
       ciclos.push(actual);

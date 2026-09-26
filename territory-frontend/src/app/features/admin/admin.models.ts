@@ -53,6 +53,53 @@ export interface ReporteAdmin {
   manzanasMarcadas: number | null;
   manzanasIds: string | null;
   tieneParcial: boolean;
+  /** salida (encargado desde el mapa), correccion o reinicio (administrador). Falta en respuestas viejas. */
+  origen?: 'salida' | 'correccion' | 'reinicio' | string;
+  nota?: string | null;
+}
+
+/** Ciclo de territorios (GET /reports/admin/ciclos); `resumen` es JSON al cerrarse. */
+export interface CicloAdmin {
+  id: number;
+  inicio: string;
+  fin: string | null;
+  nota: string | null;
+  resumen: string | null;
+}
+
+/** Estado de un territorio al cerrar un ciclo (elemento del JSON `resumen`). */
+export interface ResumenTerritorioCiclo {
+  territorio: number;
+  estado: string | null;
+  manzanasMarcadas: number | null;
+  totalManzanas: number | null;
+  completado: string[];
+  primeraSalida: string | null;
+  ultimaSalida: string | null;
+  encargados: string[];
+}
+
+/** Estado actual de un territorio (GET /reports/admin/estado/{n}). */
+export interface EstadoTerritorioAdmin {
+  territorio: number;
+  fecha: string | null;
+  estado: string | null;
+  origen: string | null;
+  encargado: string | null;
+  manzanasIds: string | null;
+  geometriaParcial: string | null;
+  puntosParciales: string | null;
+  totalManzanas: number | null;
+}
+
+export interface CorreccionRequest {
+  territorio: number;
+  manzanasIds: string;
+  geometriaParcial: string | null;
+  puntosParciales: string | null;
+  totalManzanas: number;
+  manzanasMarcadas: number;
+  nota: string | null;
 }
 
 export interface EncargadoAdmin {

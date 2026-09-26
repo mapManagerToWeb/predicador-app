@@ -120,6 +120,7 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
   - **Territorios**: editor sobre MapLibre + terra-draw para crear manzanas (con ajuste a los vértices vecinos), editar vértices, redibujar, mover manzanas entre territorios (o crear uno nuevo), cambiar colores, eliminar, importar/exportar GeoJSON y revisar la calidad de los datos (formas inválidas con reparación automática y superposiciones).
   - **Encargados**: alta y edición, activar/desactivar, PIN (se muestra una vez, con enlace para mandarlo por WhatsApp), desbloqueo, fusión de duplicados, detección de teléfonos/nombres repetidos y apertura/cierre del auto-registro.
   - **Reportes**: listado con filtros, detección y borrado de dobles envíos, registro por territorio (equivalente al S-13) y estado de los envíos de WhatsApp; todo exportable a CSV.
+  - **S-13 y ciclos** (ADR 0011): descarga del **S-13-S** (Registro de asignación de territorio) en Word con el formato oficial, por año de servicio, armado a partir de los reportes; tiempo promedio que tarda cada territorio en completarse; **cerrar el ciclo y reiniciar todos los territorios** guardando un informe del ciclo (se puede ver y descargar después); y **corregir un territorio** (desmarcar una manzana o una calle marcada por error). Nada borra reportes: cierres y correcciones quedan como registros del administrador.
 - **Turno** Mañana/Tarde, elegido según la hora
 - **Satellite view**: Toggle entre vista normal y satelital
 
@@ -364,6 +365,10 @@ Ver `.env.example` para la lista completa.
 | `GET` | `/api/v1/reports/admin` | Admin | Reportes compactos de un rango (`desde`, `hasta`) |
 | `DELETE` | `/api/v1/reports/admin?ids=` | Admin | Borrar reportes |
 | `GET` | `/api/v1/reports/admin/whatsapp` | Admin | Últimos 200 envíos de WhatsApp |
+| `GET` | `/api/v1/reports/admin/ciclos` | Admin | Ciclos de territorios (con el resumen de los cerrados) |
+| `POST` | `/api/v1/reports/admin/ciclos/cerrar` | Admin | Cerrar el ciclo y reiniciar todos los territorios (`{nota}`) |
+| `GET` | `/api/v1/reports/admin/estado/{n}` | Admin | Estado actual (último reporte) de un territorio |
+| `POST` | `/api/v1/reports/admin/correccion` | Admin | Corregir el estado actual de un territorio |
 | `GET`/`POST`/`PUT`/`DELETE` | `/api/v1/encargados/admin[/{id}]` | Admin | Gestión de encargados |
 | `POST`/`DELETE` | `/api/v1/encargados/admin/{id}/pin` | Admin | Generar o quitar el PIN |
 | `POST` | `/api/v1/encargados/admin/{id}/desbloquear` | Admin | Quitar el bloqueo por intentos |

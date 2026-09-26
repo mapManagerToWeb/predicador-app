@@ -88,7 +88,9 @@ export class ResumenPage {
   private readonly ahora = signal(new Date());
 
   /** Historial completo sin dobles envíos. */
-  private readonly todos = computed(() => deduplicar(this.store.reportes() ?? []));
+  private readonly todos = computed(() => deduplicar(this.store.salidas()));
+  /** Con correcciones y reinicios: dan el estado actual de cada territorio. */
+  private readonly registros = computed(() => deduplicar(this.store.reportes() ?? []));
   protected readonly primerDato = computed(() => {
     const fechas = this.todos().map(r => new Date(r.fecha).getTime());
     return fechas.length ? new Date(Math.min(...fechas)) : null;
@@ -154,7 +156,7 @@ export class ResumenPage {
   protected readonly calor = computed(() => mapaDeCalor(this.enPeriodo()));
 
   protected readonly cobertura = computed(() =>
-    cobertura(this.todos(), this.store.manzanasPorTerritorio(), this.ahora()).filter(c =>
+    cobertura(this.registros(), this.store.manzanasPorTerritorio(), this.ahora()).filter(c =>
       this.store.manzanasPorTerritorio().has(c.territorio),
     ),
   );

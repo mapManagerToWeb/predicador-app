@@ -1,0 +1,295 @@
+<header class="adm-head">
+  <div>
+    <h1>S-13 y ciclos</h1>
+    <p>Registro de asignación de territorio, vueltas completas a todos los territorios y correcciones.</p>
+  </div>
+  <div class="adm-toolbar">
+    <div class="adm-seg" role="tablist" aria-label="Vista">
+      <button type="button" role="tab" [class.activo]="vista() === 's13'" (click)="abrir('s13')">S-13</button>
+      <button type="button" role="tab" [class.activo]="vista() === 'ciclo'" (click)="abrir('ciclo')">Ciclo actual</button>
+      <button type="button" role="tab" [class.activo]="vista() === 'corregir'" (click)="abrir('corregir')">Corregir un territorio</button>
+      <button type="button" role="tab" [class.activo]="vista() === 'historial'" (click)="abrir('historial')">Ciclos anteriores</button>
+    </div>
+    <button class="adm-btn" type="button" (click)="cargar(true)" [disabled]="cargando()">Actualizar</button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="adm-alert" role="alert">{{ error() }}</div>
+}
+
+@switch (vista()) {
+  @case ('s13') {
+    <section class="adm-card">
+      <div class="titulo-fila">
+        <div>
+          <h2>Registro de asignación de territorio (S-13)</h2>
+          <p class="adm-sub">
+            Se arma solo con los reportes: una asignación empieza con el primer reporte de un encargado en el territorio;
+            si otro lo continúa empieza otra (la anterior queda sin fecha de completado, como en el papel), y termina con el
+            reporte que lo completa.
+          </p>
+        </div>
+      </div>
+      <div class="barra">
+        <label class="adm-field inline"><span>Año de servicio</span>
+          <select (change)="elegirAnio($event)">
+            @for (a of anios(); track a) {
+              <option [value]="a" [selected]="a === anio()">{{ a }} (sep {{ a - 1 }} – ago {{ a }})</option>
+            }
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" [checked]="soloConDatos()" (change)="soloConDatos.set(!soloConDatos())" />
+          Ocultar territorios sin asignaciones
+        </label>
+        <button class="adm-btn primary" type="button" (click)="descargarS13()" [disabled]="cargando()">Descargar S-13 (Word)</button>
+      </div>
+      <p class="adm-muted chico">{{ paginas().length }} página(s) de 20 territorios, igual que el formulario impreso.</p>
+
+      <div class="adm-table-wrap">
+        <table class="adm-table s13">
+          <thead>
+            <tr>
+              <th class="num">Terr.</th>
+              <th>Última vez completado</th>
+              @for (i of [1, 2, 3, 4]; track i) {
+                <th>Asignado a · asignó · completó</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of filas(); track f.territorio + '-' + f.pagina) {
+              <tr>
+                <td class="num"><strong>{{ f.territorio }}</strong>@if (f.pagina > 1) { <span class="adm-muted"> (p. {{ f.pagina }})</span> }</td>
+                <td>{{ f.ultimaCompletada ? fmtFecha(f.ultimaCompletada) : '' }}</td>
+                @for (a of f.asignaciones; track $index) {
+                  <td class="asig">
+                    @if (a) {
+                      <span class="nombre">{{ a.encargado }}</span>
+                      <span class="fechas">{{ fechaDm(a.asignado) }} → @if (a.completado) { <strong>{{ fechaDm(a.completado) }}</strong> } @else { <span class="adm-muted">—</span> }</span>
+                    }
+                  </td>
+                }
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay asignaciones en este año de servicio.' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="adm-card">
+      <h2>¿Cuánto tarda cada territorio en completarse?</h2>
+      <p class="adm-sub">
+        Días desde la primera asignación de cada vuelta hasta que se completó, en el año de servicio elegido.
+        @if (promedioGeneral() !== null) { Promedio general: <strong>{{ promedioGeneral() }} días</strong>. }
+      </p>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th class="num">Territorio</th><th class="num">Vueltas completadas</th><th class="num">Promedio (días)</th><th>Última vez</th></tr></thead>
+          <tbody>
+            @for (t of tiempos(); track t.territorio) {
+              <tr>
+                <td class="num"><strong>{{ t.territorio }}</strong></td>
+                <td class="num">{{ t.vueltas }}</td>
+                <td class="num">{{ t.promedioDias ?? '—' }}</td>
+                <td>{{ fmtFecha(t.ultimaCompletada) }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="adm-empty">Ningún territorio se completó en este año de servicio.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  @case ('ciclo') {
+    <section class="adm-card">
+      <h2>Ciclo en curso</h2>
+      @if (cicloActual(); as c) {
+        <p class="adm-sub">Empezó el {{ fmtFecha(c.inicio) }} (hace {{ duracion(c) }} días).</p>
+        @if (avance(); as a) {
+          <div class="kpis">
+            <div class="kpi"><span class="valor">{{ a.completados }} / {{ a.total }}</span><span>territorios completados</span></div>
+            <div class="kpi"><span class="valor">{{ a.enCurso }}</span><span>en curso</span></div>
+            <div class="kpi"><span class="valor">{{ a.total - a.completados - a.enCurso }}</span><span>sin empezar</span></div>
+          </div>
+          <div class="barra-avance" role="progressbar" [attr.aria-valuenow]="a.completados" [attr.aria-valuemax]="a.total">
+            <span [style.width.%]="a.total ? (a.completados * 100) / a.total : 0"></span>
+          </div>
+          @if (a.pendientes.length) {
+            <p class="adm-muted">Faltan: {{ a.pendientes.join(', ') }}</p>
+          } @else {
+            <p><strong>¡Se completaron todos los territorios!</strong> Ya puedes cerrar el ciclo.</p>
+          }
+        }
+        <div class="barra">
+          <button class="adm-btn" type="button" (click)="descargarS13Ciclo(c)">Descargar S-13 de este ciclo (Word)</button>
+        </div>
+      } @else {
+        <p class="adm-sub">{{ cargando() ? 'Cargando…' : 'No hay un ciclo abierto.' }}</p>
+      }
+    </section>
+
+    <section class="adm-card peligro-zona">
+      <h2>Reiniciar todos los territorios</h2>
+      <p class="adm-sub">
+        Cuando se completan todos los territorios se vuelve a empezar. Al cerrar el ciclo se guarda un informe con el
+        estado de cada territorio (cuándo se trabajó, cuándo se completó y quiénes) y todos quedan sin marcas en el mapa.
+        <strong>No se borra ningún reporte.</strong>
+      </p>
+      <label class="adm-field"><span>Nota para el informe (opcional)</span>
+        <input type="text" maxlength="500" placeholder="Ej.: fin de la campaña, visita del superintendente…" [value]="notaCierre()" (input)="notaCierre.set($any($event.target).value)" />
+      </label>
+      <div class="barra">
+        <button class="adm-btn danger" type="button" (click)="cerrarCiclo()" [disabled]="cerrando() || !cicloActual()">
+          {{ cerrando() ? 'Cerrando…' : 'Cerrar ciclo y reiniciar territorios' }}
+        </button>
+      </div>
+    </section>
+  }
+
+  @case ('corregir') {
+    <section class="adm-card">
+      <h2>Corregir el estado de un territorio</h2>
+      <p class="adm-sub">
+        Si un hermano marcó por error una manzana o una calle, quítala acá. La corrección queda registrada (quién y por qué)
+        y no borra ningún reporte. Clic en una manzana: si está marcada entera se desmarca; si tiene calles marcadas, se quitan;
+        si no tenía nada, se marca entera.
+      </p>
+      <div class="barra">
+        <label class="adm-field inline"><span>Territorio</span>
+          <select (change)="elegirTerritorio($event)">
+            <option value="">Elegir…</option>
+            @for (t of store.territorios(); track t) {
+              <option [value]="t" [selected]="t === territorioSel()">Territorio {{ t }}</option>
+            }
+          </select>
+        </label>
+        @if (estadoRemoto(); as e) {
+          <span class="adm-muted">
+            Último reporte: {{ fmtFechaHora(e.fecha) }} · {{ e.encargado || '—' }}
+            @if (e.origen === 'correccion') { <span class="adm-badge info">corrección</span> }
+            @if (e.origen === 'reinicio') { <span class="adm-badge info">reinicio de ciclo</span> }
+          </span>
+        } @else if (territorioSel() !== null && !cargandoTerritorio()) {
+          <span class="adm-muted">Nunca se trabajó.</span>
+        }
+      </div>
+    </section>
+
+    @if (territorioSel() !== null) {
+      <div class="corregir">
+        <section class="adm-card mapa">
+          <app-correccion-map
+            [manzanas]="manzanasSel()"
+            [estado]="edicion()"
+            [color]="colorSel()"
+            (manzanaClick)="alternar($event)"
+            (zonaClick)="quitarZona($event)"
+          />
+        </section>
+        <section class="adm-card lista">
+          <h3>Manzanas</h3>
+          <ul class="manzanas">
+            @for (m of manzanasSel(); track m.properties.id) {
+              <li>
+                <span class="nombre">{{ m.properties.nombre }}</span>
+                @switch (situacion(edicion(), m)) {
+                  @case ('entera') { <span class="adm-badge good">Entera</span> }
+                  @case ('calles') { <span class="adm-badge info">Por calles</span> }
+                  @default { <span class="adm-muted">Sin marcar</span> }
+                }
+                <button class="adm-btn small ghost" type="button" (click)="alternar(m)">
+                  @switch (situacion(edicion(), m)) {
+                    @case ('entera') { Desmarcar }
+                    @case ('calles') { Quitar calles }
+                    @default { Marcar entera }
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+          @if (zonasAntiguas().length) {
+            <h3>Zonas marcadas con la versión anterior</h3>
+            <ul class="manzanas">
+              @for (z of zonasAntiguas(); track z.i) {
+                <li><span class="nombre">Zona {{ $index + 1 }}</span><button class="adm-btn small ghost" type="button" (click)="quitarZona(z.i)">Quitar</button></li>
+              }
+            </ul>
+          }
+          <label class="adm-field"><span>Motivo (queda en el historial)</span>
+            <input type="text" maxlength="500" placeholder="Ej.: la 5.b se marcó por error" [value]="notaCorreccion()" (input)="notaCorreccion.set($any($event.target).value)" />
+          </label>
+          <div class="acciones">
+            <button class="adm-btn ghost" type="button" (click)="vaciarTerritorio()">Reiniciar este territorio</button>
+            <button class="adm-btn ghost" type="button" (click)="deshacer()" [disabled]="!hayCambios()">Deshacer</button>
+            <button class="adm-btn primary" type="button" (click)="guardarCorreccion()" [disabled]="!hayCambios() || guardando()">
+              {{ guardando() ? 'Guardando…' : 'Guardar corrección' }}
+            </button>
+          </div>
+        </section>
+      </div>
+    }
+  }
+
+  @case ('historial') {
+    <section class="adm-card">
+      <h2>Ciclos anteriores</h2>
+      <p class="adm-sub">Cada vez que se reinician los territorios queda guardado el informe del ciclo.</p>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th class="num">Territorios completados</th><th>Nota</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (c of cerrados(); track c.id) {
+              <tr>
+                <td>{{ fmtFecha(c.inicio) }}</td>
+                <td>{{ fmtFecha(c.fin) }}</td>
+                <td class="num">{{ duracion(c) }}</td>
+                <td class="num">{{ completadosEn(c) }} / {{ resumen(c).length }}</td>
+                <td class="adm-muted">{{ c.nota ?? '' }}</td>
+                <td class="acciones-fila">
+                  <button class="adm-btn small ghost" type="button" (click)="abierto.set(abierto() === c.id ? null : c.id)">
+                    {{ abierto() === c.id ? 'Ocultar' : 'Ver informe' }}
+                  </button>
+                  <button class="adm-btn small ghost" type="button" (click)="descargarS13Ciclo(c)">S-13 (Word)</button>
+                  <button class="adm-btn small ghost" type="button" (click)="descargarInforme(c)">Informe (CSV)</button>
+                </td>
+              </tr>
+              @if (abierto() === c.id) {
+                <tr class="detalle">
+                  <td colspan="6">
+                    <table class="adm-table interna">
+                      <thead>
+                        <tr><th class="num">Terr.</th><th>Estado al cerrar</th><th class="num">Veces completado</th><th>Se completó</th><th>Primera / última salida</th><th>Encargados</th></tr>
+                      </thead>
+                      <tbody>
+                        @for (t of resumen(c); track t.territorio) {
+                          <tr>
+                            <td class="num"><strong>{{ t.territorio }}</strong></td>
+                            <td>{{ estadoTexto(t) }}</td>
+                            <td class="num">{{ t.completado.length }}</td>
+                            <td>{{ fechasCompletado(t) }}</td>
+                            <td>{{ fmtFecha(t.primeraSalida) }} / {{ fmtFecha(t.ultimaSalida) }}</td>
+                            <td>{{ t.encargados.join(', ') }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              }
+            } @empty {
+              <tr><td colspan="6" class="adm-empty">Todavía no se cerró ningún ciclo.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+}

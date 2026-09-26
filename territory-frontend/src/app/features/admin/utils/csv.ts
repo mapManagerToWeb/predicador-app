@@ -19,9 +19,9 @@ function escapar(celda: Celda): string {
 }
 
 /** Descarga un archivo generado en el navegador. */
-export function descargar(nombre: string, contenido: string, tipo = 'text/csv;charset=utf-8'): void {
+export function descargar(nombre: string, contenido: string | Uint8Array, tipo = 'text/csv;charset=utf-8'): void {
   if (typeof document === 'undefined') return;
-  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+  const url = URL.createObjectURL(new Blob([contenido as BlobPart], { type: tipo }));
   const a = document.createElement('a');
   a.href = url;
   a.download = nombre;

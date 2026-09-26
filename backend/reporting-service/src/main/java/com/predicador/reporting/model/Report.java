@@ -59,6 +59,22 @@ public class Report {
     @Column(name = "creado_en")
     private Instant creadoEn;
 
+    /** {@link #ORIGEN_SALIDA}, {@link #ORIGEN_CORRECCION} o {@link #ORIGEN_REINICIO}. */
+    @Column(name = "origen", nullable = false)
+    private String origen = ORIGEN_SALIDA;
+
+    @Column(name = "nota", columnDefinition = "TEXT")
+    private String nota;
+
+    /** Reporte de un encargado desde el mapa. */
+    public static final String ORIGEN_SALIDA = "salida";
+    /** El administrador corrigió el estado actual del territorio. */
+    public static final String ORIGEN_CORRECCION = "correccion";
+    /** Cierre de ciclo: el territorio vuelve a empezar. */
+    public static final String ORIGEN_REINICIO = "reinicio";
+    /** Estado de un reporte de reinicio (ni completo ni en curso). */
+    public static final String ESTADO_REINICIADO = "reiniciado";
+
     public Report() {
         // No-arg constructor requerido por JPA.
     }
@@ -67,6 +83,7 @@ public class Report {
     protected void onCreate() {
         if (creadoEn == null) creadoEn = Instant.now();
         if (fecha == null) fecha = Instant.now();
+        if (origen == null) origen = ORIGEN_SALIDA;
     }
 
     public Integer getId() { return id; }
@@ -119,4 +136,10 @@ public class Report {
 
     public Instant getInicioSesion() { return inicioSesion; }
     public void setInicioSesion(Instant inicioSesion) { this.inicioSesion = inicioSesion; }
+
+    public String getOrigen() { return origen; }
+    public void setOrigen(String origen) { this.origen = origen; }
+
+    public String getNota() { return nota; }
+    public void setNota(String nota) { this.nota = nota; }
 }

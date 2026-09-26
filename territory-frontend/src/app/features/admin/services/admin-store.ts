@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import type { EncargadoAdmin, ManzanasCollection, ReporteAdmin } from '../admin.models';
 import { AdminApi } from './admin-api';
+import { esSalida } from '../utils/analytics';
 
 /** Historial que carga el panel: suficiente para la cobertura y el registro por territorio. */
 const ANIOS_DE_HISTORIAL = 10;
@@ -27,6 +28,9 @@ export class AdminStore {
     }
     return conteo;
   });
+
+  /** Solo el trabajo de los encargados (sin correcciones ni reinicios del administrador). */
+  readonly salidas = computed(() => (this.reportes() ?? []).filter(esSalida));
 
   readonly territorios = computed(() => [...this.manzanasPorTerritorio().keys()].sort((a, b) => a - b));
 

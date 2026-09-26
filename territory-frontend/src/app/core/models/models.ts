@@ -6,7 +6,8 @@ export interface UserProfile {
   encargadoId?: number;
 }
 
-export type EstadoReporte = 'completed' | 'incomplete';
+/** 'reiniciado': reporte de reinicio al cerrar un ciclo desde el panel (ADR 0011). */
+export type EstadoReporte = 'completed' | 'incomplete' | 'reiniciado';
 export type TipoSesion = 'completa' | 'parcial';
 
 export interface Reporte {

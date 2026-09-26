@@ -23,5 +23,10 @@ export const ADMIN_ROUTES: Routes = [
     title: 'Reportes · Administración',
     loadComponent: () => import('./pages/reportes/reportes').then(m => m.ReportesPage),
   },
+  {
+    path: 's13',
+    title: 'S-13 y ciclos · Administración',
+    loadComponent: () => import('./pages/s13/s13').then(m => m.S13Page),
+  },
   { path: '**', redirectTo: 'resumen' },
 ];

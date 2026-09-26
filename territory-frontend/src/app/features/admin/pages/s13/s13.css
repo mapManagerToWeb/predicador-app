@@ -1,0 +1,135 @@
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+
+.chico {
+  font-size: var(--text-sm);
+}
+
+.s13 .asig {
+  min-width: 150px;
+  vertical-align: top;
+}
+
+.s13 .nombre {
+  display: block;
+  font-weight: 600;
+}
+
+.s13 .fechas {
+  font-size: var(--text-sm);
+}
+
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.kpi .valor {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.barra-avance {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.barra-avance span {
+  display: block;
+  height: 100%;
+  background: var(--color-success);
+}
+
+.peligro-zona {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+}
+
+.corregir {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.corregir > .adm-card {
+  grid-column: auto;
+}
+
+.manzanas {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.manzanas li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.manzanas .nombre {
+  flex: 1;
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.acciones-fila {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.detalle > td {
+  background: var(--surface-2);
+}
+
+.interna {
+  margin: 0;
+}
+
+@media (max-width: 1000px) {
+  .corregir {
+    grid-template-columns: 1fr;
+  }
+}
+
+.s13 td.num {
+  white-space: nowrap;
+}

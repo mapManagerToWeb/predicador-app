@@ -86,7 +86,11 @@
                   {{ fmtFechaHora(r.fecha) }}
                   @if (esDuplicado(r)) { <span class="adm-badge warning">Duplicado</span> }
                 </td>
-                <td>{{ nombreEncargado(r) }}</td>
+                <td>
+                  {{ nombreEncargado(r) }}
+                  @if (r.origen === 'correccion') { <span class="adm-badge info" [attr.title]="r.nota ?? ''">corrección</span> }
+                  @if (r.origen === 'reinicio') { <span class="adm-badge info" [attr.title]="r.nota ?? ''">reinicio de ciclo</span> }
+                </td>
                 <td class="num">{{ r.territorio }}</td>
                 <td>
                   @if (completado(r)) { <span class="adm-badge good">Completo</span> } @else { <span class="adm-badge info">Parcial</span> }

@@ -76,7 +76,11 @@
         }
         @default {
           <p class="estado">Sin registros</p>
-          <p>Todavía no hay trabajo registrado en este territorio.</p>
+          @if (r.ultimoCompletado) {
+            <p>Empezó una vuelta nueva. La vez anterior se completó {{ hace(r.ultimoCompletado) }} ({{ fecha(r.ultimoCompletado) }}).</p>
+          } @else {
+            <p>Todavía no hay trabajo registrado en este territorio.</p>
+          }
         }
       }
       <button type="button" class="boton" (click)="seleccionar(r.territorio)">Ver todo el territorio</button>
