@@ -9,9 +9,6 @@ import { retry, throwError, timer, type Observable } from 'rxjs';
  */
 export const TRANSIENT_STATUSES = new Set([502, 503, 504]);
 
-/** Backoff base para GETs de revalidación en segundo plano (rápidos). */
-export const REVALIDATION_RETRY_DELAY_MS = 1000;
-
 /** Backoff base para operaciones de mutación (login, guardado, compensación). */
 export const MUTATION_RETRY_DELAY_MS = 1500;
 

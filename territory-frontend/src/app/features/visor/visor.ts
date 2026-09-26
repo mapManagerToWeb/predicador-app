@@ -105,7 +105,7 @@ export class VisorPage {
       const { manzanas, zonas } = await datos;
       this.manzanas = manzanas;
       this.agregarCapas(map, manzanas, zonas);
-      const caja = limitesPrincipales(manzanas);
+      const caja = limitesPrincipales(manzanas, 0.12);
       if (caja) map.fitBounds(caja, { padding: 24, duration: 0 });
     } catch {
       this.error.set('No se pudieron cargar los territorios. Revisa la conexión y vuelve a intentar.');

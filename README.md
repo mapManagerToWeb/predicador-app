@@ -73,14 +73,14 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 | Lenguaje | TypeScript 6 |
 | SSR | Angular SSR (Express 5) |
 | PWA | Service Worker (ngsw) |
-| Mapas | Leaflet 1.9 |
+| Mapas | MapLibre GL 6 (WebGL) en los tres mapas: encargados, visor y panel |
 | Estado | Angular Signals |
 | Testing | Vitest 4 + jsdom |
 | Coverage | V8 |
 | Linting | ESLint + Prettier |
 | Build | Angular CLI (Vite) |
-| Geometria | polygon-clipping, @turf/simplify, @turf/union, @turf/helpers |
-| Screenshots | Captura propia a canvas offscreen (`MapCanvasCaptureService` — dibuja tiles + vectores Leaflet; reemplaza html-to-image, roto en iOS WebKit) |
+| Geometria | polygon-clipping + funciones propias (`core/map/geometria.ts`, `features/map/utils/lados.ts`) |
+| Screenshots | Canvas de MapLibre (`preserveDrawingBuffer`) con solo los territorios del reporte |
 | RUM | web-vitals |
 
 ### Infraestructura
@@ -98,14 +98,16 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 
 ### Frontend
 
-- **Mapa interactivo**: Visualización de territorios con Leaflet, capas de OpenStreetMap, CartoDB y ArcGIS satellite
-- **Modo de marcado completo**: Tocar una manzana para marcarla como visitada
-- **Modo de marcado parcial (por lados)**: tocar una manzana y después las calles que se predicaron; se marca una franja a lo largo de esos lados. Con todos los lados la manzana queda completa. Se puede retomar y editar después
-- **Selección de territorios**: Búsqueda con autocompletado, selección múltiple
+- **Mapa de marcado** (MapLibre, ADR 0010): el primer toque abre el territorio; en un territorio abierto **un toque marca la manzana y otro toque la desmarca**. Tocar otro territorio pregunta si agregarlo a la salida. Fondos OpenStreetMap y satelital (ArcGIS)
+- **Marcado por calles**: modo «Por calles»: tocar una manzana y después las calles que se predicaron; se marca una franja a lo largo de esas calles. Con todas, la manzana queda completa. Se puede retomar y editar después
+- **Nada se pierde sin preguntar**: cerrar un territorio con marcas sin enviar, cerrar sesión y enviar piden confirmación; «Enviar» muestra un resumen y solo se habilita si hay cambios respecto del último reporte. Un territorio que se completó empieza una vuelta nueva
+- **Tutorial**: recorrido guiado la primera vez; se vuelve a ver con el botón «?»
+- **Mi ubicación** como en Google Maps: si se mueve el mapa deja de seguir (el punto azul sigue actualizándose) y el botón vuelve a centrar
+- **Búsqueda de territorios**: por número, con sugerencias; «71, 72» abre los dos
 - **Gestión de colores**: Colores asignados por territorio para diferenciación visual
 - **Captura de pantalla**: Screenshot automático del mapa para envío por WhatsApp
 - **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada, dirigido al teléfono del encargado logueado. Un territorio único marcado como **completo** se envía **sin captura** (imagen predeterminada), anunciando su cierre; los territorios incompletos/parciales se envían **con captura**. En un reporte multi-territorio, los territorios ya completados se excluyen del mensaje y de la imagen. Cada territorio se lista como `*terminado*` o `*incompleto*`
-- **Guardado local**: Marcado persistido en base de datos, restauración al recargar
+- **Borrador**: lo marcado sin enviar se guarda en el teléfono y vuelve al recargar o reabrir la app; sin conexión el mapa usa la última copia de los territorios
 - **Notificaciones responsivas**: Toast notifications adaptables con soporte para multilínea en pantallas móviles y modo claro/oscuro
 - **Modo oscuro**: Soporte completo de temas claro/oscuro
 - **PWA**: Instalable, funciona offline con Service Worker
@@ -118,10 +120,10 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
   - **Territorios**: editor sobre MapLibre + terra-draw para crear manzanas (con ajuste a los vértices vecinos), editar vértices, redibujar, mover manzanas entre territorios (o crear uno nuevo), cambiar colores, eliminar, importar/exportar GeoJSON y revisar la calidad de los datos (formas inválidas con reparación automática y superposiciones).
   - **Encargados**: alta y edición, activar/desactivar, PIN (se muestra una vez, con enlace para mandarlo por WhatsApp), desbloqueo, fusión de duplicados, detección de teléfonos/nombres repetidos y apertura/cierre del auto-registro.
   - **Reportes**: listado con filtros, detección y borrado de dobles envíos, registro por territorio (equivalente al S-13) y estado de los envíos de WhatsApp; todo exportable a CSV.
-- **Session selector**: Selección de horario (Mañana/Tarde)
+- **Turno** Mañana/Tarde, elegido según la hora
 - **Satellite view**: Toggle entre vista normal y satelital
 
-**Rendimiento del mapa (2026-09-14):** el renderer es el `Canvas` estándar de Leaflet 1.9.4 — durante el pan el canvas se mueve con transform GPU y los vectores se repintan solo en `moveend` (sin repintado por frame). El hit-testing de manzanas usa un grid espacial uniforme (celda 0.002° ≈ 200 m): un tap consulta solo la celda del punto (O(1) promedio) y el "nearest" mira una ventana 3×3 de celdas. La geometría procesada de los territorios (simplify + union) se calcula una vez por sesión y se cachea en `sessionStorage`.
+**Rendimiento del mapa (ADR 0010):** los tres mapas usan MapLibre (WebGL). Marcar una manzana solo cambia su `feature-state` (no se vuelve a subir la geometría); los números de territorio van dentro de una manzana propia y MapLibre oculta los que se superponen. La vista general sale de una sola petición (`/reports/public/estado`).
 
 ### Backend
 
@@ -385,11 +387,12 @@ pnpm run test:coverage        # Con cobertura V8
 # Lines: 30% | Statements: 30% | Functions: 30% | Branches: 20%
 ```
 
-**Archivos de test (44 spec files):**
-- Core: `profile.ts`, `auth-token.ts`, `auth.service.ts`, `territorio.ts`, `toast.ts`, `csrf-token.ts`, `encargado.ts`, `rum.ts`, `map-draft.service.ts`, `report-cache.service.ts`, `phone.ts`
+**Archivos de test (principales):**
+- Core: `profile.ts`, `auth-token.ts`, `auth.service.ts`, `territorio.ts`, `toast.ts`, `csrf-token.ts`, `encargado.ts`, `rum.ts`, `map-draft.service.ts`, `report-cache.service.ts`, `phone.ts`, `core/map/geometria.ts`
 - Interceptors: `auth.interceptor.ts`, `error.interceptor.ts`, `csrf.interceptor.ts`
 - Guards: `admin.guard.ts`, `profile.guard.ts`
-- Map: `map.ts`, `map-geometry.ts`, `manzana-spatial-index.ts`, `map-rings.ts`, `map-engine.service.ts`, `map-tile-layer.service.ts`, `map-location.service.ts`, `map-partial-mark.service.ts`, `map-initialization.service.ts`, `map-mark-restoration.service.ts`, `map-layer-registry.service.ts`, `map-canvas-capture.service.ts`, `map-capture.service.ts`, `map-lados.service.ts`, `map-rendering.facade.ts`, `map-report.service.ts`, `map-data-persistence.service.ts`, `map-interaction.service.ts`, `map-territory-layer.service.ts`, `map-state.service.ts`, `map-selection.service.ts`, `map-style.ts`, `whatsapp.ts`, `territory-search.ts`
+- Map: `map.ts`, `mapa.store.ts`, `ubicacion.ts`, `tutorial.ts`, `utils/salida.ts`, `utils/lados.ts`, `utils/borrador.ts`, `whatsapp.ts`
+- Visor: `visor.ts`, `visor-estado.ts`
 - Auth/Admin/Profile/SSR: `login.ts`, `admin.ts`, `profile.ts`, `server.spec.ts`
 
 ### Backend

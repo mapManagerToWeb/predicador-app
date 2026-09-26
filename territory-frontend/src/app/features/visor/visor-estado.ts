@@ -1,16 +1,7 @@
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
+import { estaEnLista, idsDeLista, type EstadoTerritorioPublico } from '../../core/map/estado-publico';
 
-/** Estado público de un territorio (GET /reports/public/estado). Fechas ISO-8601. */
-export interface EstadoTerritorioPublico {
-  territorio: number;
-  ultimoTrabajo: string | null;
-  ultimoCompletado: string | null;
-  estado: string | null;
-  manzanasMarcadas: number | null;
-  totalManzanas: number | null;
-  manzanasIds: string | null;
-  geometriaParcial: string | null;
-}
+export type { EstadoTerritorioPublico };
 
 /** Propiedades del GeoJSON público de manzanas (GET /territories/all/geojson). */
 export interface PropsManzanaPublica {
@@ -35,18 +26,10 @@ export interface ResumenTerritorio {
 type GeometriaManzana = Polygon | MultiPolygon;
 export type ManzanaVisor = Feature<GeometriaManzana, { territorio: number; nombre: string; color: string; predicada: boolean }>;
 
-/**
- * Los reportes identifican las manzanas de dos formas según la versión de la
- * app: "12-12.e" (territorio-nombre) o el id numérico de la base.
- */
+/** Ids de manzana marcados en el último reporte de cada territorio. */
 export function idsMarcados(estados: EstadoTerritorioPublico[]): Set<string> {
   const ids = new Set<string>();
-  for (const e of estados) {
-    for (const id of (e.manzanasIds ?? '').split(',')) {
-      const limpio = id.trim();
-      if (limpio) ids.add(limpio);
-    }
-  }
+  for (const e of estados) for (const id of idsDeLista(e.manzanasIds)) ids.add(id);
   return ids;
 }
 
@@ -70,7 +53,7 @@ export function manzanasDelVisor(
         territorio: f.properties.territorio_padre,
         nombre: f.properties.nombre_bloque,
         color: colores[f.properties.territorio_padre] ?? f.properties.color ?? '#888888',
-        predicada: marcados.has(f.properties.id) || (f.properties.mid !== undefined && marcados.has(String(f.properties.mid))),
+        predicada: estaEnLista(marcados, f.properties.id, f.properties.mid),
       },
     })),
   };

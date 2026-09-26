@@ -1,0 +1,92 @@
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  font-family: var(--font-body);
+}
+
+.fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* Recorte: una sombra enorme oscurece todo menos lo resaltado. */
+.foco {
+  position: absolute;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  outline: 3px solid #facc15;
+  transition: all 0.25s ease;
+  pointer-events: none;
+}
+
+.tarjeta {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 20px;
+  border-radius: 18px;
+  background: var(--surface-1);
+  color: var(--ink);
+  box-shadow: var(--elev-3);
+}
+
+.tarjeta.arriba {
+  bottom: auto;
+  top: max(24px, env(safe-area-inset-top));
+}
+
+.tarjeta.centrada {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.progreso {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+h2 {
+  margin: 4px 0 8px;
+  font-size: 22px;
+}
+
+.texto {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.botones {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.botones button {
+  flex: 1;
+  height: 52px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.principal {
+  border: 0;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.secundario {
+  border: 1px solid var(--color-border-solid);
+  background: var(--surface-2);
+  color: var(--ink);
+}
