@@ -107,7 +107,8 @@ export function resumenTerritorios(
     if (!e?.ultimoTrabajo) continue;
     r.ultimoTrabajo = new Date(e.ultimoTrabajo);
     r.ultimoCompletado = e.ultimoCompletado ? new Date(e.ultimoCompletado) : null;
-    r.situacion = e.estado === 'completed' ? 'completado' : 'en-curso';
+    // Reinicio de ciclo: vuelve a empezar, sin trabajo todavía (se conserva cuándo se completó).
+    r.situacion = e.estado === 'completed' ? 'completado' : e.estado === 'reiniciado' ? 'sin-registro' : 'en-curso';
   }
   return resumen;
 }

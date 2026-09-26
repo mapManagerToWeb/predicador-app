@@ -19,5 +19,8 @@ public record ReporteAdminDto(
         Integer totalManzanas,
         Integer manzanasMarcadas,
         String manzanasIds,
-        boolean tieneParcial
+        boolean tieneParcial,
+        /** salida (encargado), correccion o reinicio (administrador). */
+        String origen,
+        String nota
 ) {}

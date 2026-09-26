@@ -3,6 +3,9 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import type {
+  CicloAdmin,
+  CorreccionRequest,
+  EstadoTerritorioAdmin,
   CalidadDatos,
   EncargadoAdmin,
   EncargadoRequest,
@@ -108,6 +111,25 @@ export class AdminApi {
 
   enviosWhatsApp(): Promise<EnvioWhatsApp[]> {
     return this.get<EnvioWhatsApp[]>(`${this.reportes}/whatsapp`);
+  }
+
+  // ── Ciclos y correcciones ──
+
+  ciclos(): Promise<CicloAdmin[]> {
+    return this.get<CicloAdmin[]>(`${this.reportes}/ciclos`);
+  }
+
+  cerrarCiclo(nota: string | null): Promise<CicloAdmin> {
+    return this.send(this.http.post<CicloAdmin>(`${this.reportes}/ciclos/cerrar`, { nota }, { headers: SIN_SW }));
+  }
+
+  /** Estado actual de un territorio; null si nunca se trabajó (204). */
+  async estadoTerritorio(numero: number): Promise<EstadoTerritorioAdmin | null> {
+    return (await this.get<EstadoTerritorioAdmin | null>(`${this.reportes}/estado/${numero}`)) ?? null;
+  }
+
+  corregir(req: CorreccionRequest): Promise<{ id: number }> {
+    return this.send(this.http.post<{ id: number }>(`${this.reportes}/correccion`, req, { headers: SIN_SW }));
   }
 
   // ── Encargados y credenciales ──

@@ -52,7 +52,8 @@ export const BASE_VACIA: BaseTerritorio = { marcadas: [], zonas: [], fecha: null
 
 /** Qué quedó predicado según el último reporte del territorio. */
 export function baseDesdeReporte(ultimo: Reporte | null, manzanas: Manzana[]): BaseTerritorio {
-  if (!ultimo) return BASE_VACIA;
+  // Sin reportes, o reiniciado al cerrar un ciclo desde el panel (ADR 0011): empieza vacío.
+  if (!ultimo || ultimo.estado === 'reiniciado') return BASE_VACIA;
   const fecha = ultimo.sessionTime || ultimo.fecha || null;
   if (ultimo.estado === 'completed') return { ...BASE_VACIA, fecha, vueltaNueva: true };
 

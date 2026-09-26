@@ -55,6 +55,12 @@ describe('salida', () => {
       expect(base.marcadas).toEqual(['5-5.a', '5-5.c']);
     });
 
+    it('un territorio reiniciado al cerrar un ciclo empieza vacío', () => {
+      expect(baseDesdeReporte(reporte({ estado: 'reiniciado', manzanasIds: '' }), MANZANAS)).toEqual({
+        marcadas: [], zonas: [], fecha: null, vueltaNueva: false,
+      });
+    });
+
     it('un territorio completado empieza una vuelta nueva sin marcas', () => {
       const base = baseDesdeReporte(reporte({ estado: 'completed', manzanasIds: '5-5.a,5-5.b,5-5.c' }), MANZANAS);
       expect(base.marcadas).toEqual([]);
