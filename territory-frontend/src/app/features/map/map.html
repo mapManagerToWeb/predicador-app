@@ -1,170 +1,190 @@
-<div class="map-page">
-  <div class="map-container" id="map"></div>
+<div class="mapa-pagina">
+  <div #mapa class="mapa" role="application" aria-label="Mapa de territorios"></div>
 
-  @if (isLoading()) {
-    <div class="loading-overlay" role="status" aria-live="polite">
-      <div class="loading-spinner" aria-hidden="true"></div>
-      <span class="loading-text">Cargando territorios...</span>
+  @if (store.cargando()) {
+    <div class="cargando" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <span>Cargando territorios…</span>
+    </div>
+  } @else if (store.errorCarga()) {
+    <div class="cargando" role="alert">
+      <span>No se pudieron cargar los territorios.</span>
+      <button type="button" class="boton primario" (click)="reintentar()">Reintentar</button>
     </div>
   }
 
-  <div class="top-bar">
-    <app-territory-search (territorySelected)="onTerritorioSeleccionado($event)" />
+  <!-- Barra superior: buscador, ayuda y salir -->
+  <header class="barra">
+    <form class="buscar" role="search" (submit)="buscar($event)" data-tutorial="buscar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+      <input
+        type="search"
+        inputmode="numeric"
+        enterkeyhint="search"
+        placeholder="Buscar territorio"
+        aria-label="Número de territorio"
+        autocomplete="off"
+        [value]="busqueda()"
+        (input)="alEscribir($event)"
+        (focus)="verSugerencias.set(busqueda().length > 0)"
+        (blur)="ocultarSugerencias()"
+      />
+    </form>
+    <button type="button" class="icono" (click)="abrirTutorial()" aria-label="Cómo se usa" data-tutorial="ayuda">
+      <span class="signo" aria-hidden="true">?</span>
+    </button>
+    <button type="button" class="icono" (click)="salir()" aria-label="Cerrar sesión">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+    </button>
+
+    @if (verSugerencias() && sugerencias().length) {
+      <ul class="sugerencias" role="listbox" aria-label="Territorios">
+        @for (n of sugerencias(); track n) {
+          <li>
+            <button type="button" role="option" aria-selected="false" (mousedown)="$event.preventDefault()" (click)="elegir(n)">Territorio {{ n }}</button>
+          </li>
+        }
+      </ul>
+    }
+  </header>
+
+  <!-- Botones sobre el mapa -->
+  <div class="lateral">
+    <button
+      type="button"
+      class="icono grande"
+      [class.activo]="ubicacion() === 'siguiendo'"
+      [class.fondo]="ubicacion() === 'fondo'"
+      [disabled]="ubicacion() === 'buscando'"
+      (click)="alternarUbicacion()"
+      [attr.aria-label]="ubicacion() === 'siguiendo' ? 'Dejar de seguir mi ubicación' : 'Mi ubicación'"
+      [attr.aria-pressed]="ubicacion() === 'siguiendo'"
+      data-tutorial="ubicacion"
+    >
+      @if (ubicacion() === 'buscando') {
+        <span class="spinner chico" aria-hidden="true"></span>
+      } @else {
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="2.5" class="relleno" /></svg>
+      }
+    </button>
+    <button type="button" class="icono" (click)="alternarFondo()" [attr.aria-label]="fondo() === 'mapa' ? 'Ver satélite' : 'Ver mapa'" [attr.aria-pressed]="fondo() === 'satelite'">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
+    </button>
+    <button type="button" class="icono" (click)="alternarTema()" [attr.aria-label]="oscuro() ? 'Tema claro' : 'Tema oscuro'">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
+    </button>
   </div>
 
-  <button
-    type="button"
-    class="map-toggle-location"
-    [class.active]="locationStatus() === 'following'"
-    [disabled]="locationStatus() === 'locating'"
-    (click)="toggleUbicacion()"
-    [attr.aria-label]="
-      locationStatus() === 'following' ? 'Dejar de seguir mi ubicación' : 'Mi ubicación'
-    "
-    [attr.aria-pressed]="locationStatus() === 'following'"
-  >
-    @if (locationStatus() === 'locating') {
-      <span class="btn-spinner" aria-hidden="true"></span>
-    } @else {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
-      </svg>
-    }
-  </button>
-
-  @if (tieneTerritorio()) {
-    @defer (on viewport) {
-      <div class="clipboard-sheet">
-      <!-- Territory header -->
-      <div class="sheet-header" aria-live="polite">
-        @if (territoriosSeleccionados().length > 1) {
-          <span class="sheet-territory-number">{{ territoriosSeleccionados().length }} terr.</span>
-          <span class="sheet-manzanas-count">{{ manzanasCount() }} marcadas</span>
-        } @else {
-          <span class="sheet-territory-number">{{ territorioSeleccionado() }}</span>
-          <span class="sheet-manzanas-count">{{ manzanasCount() }}/{{ totalManzanas() }}</span>
-        }
-      </div>
-
-      <!-- Row 1: mode + actions -->
-      <div class="sheet-row">
-        <div class="mode-group" role="group" aria-label="Modo de marcado">
-          <button
-            type="button"
-            class="mode-tab complete"
-            [class.active]="modoMarcado() === 'completa'"
-            [attr.aria-pressed]="modoMarcado() === 'completa'"
-            (click)="toggleModoCompleto()"
-          >
-            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            <span class="tab-label">Marcar</span>
-          </button>
-          <button
-            type="button"
-            class="mode-tab partial"
-            [class.active]="modoMarcado() === 'parcial'"
-            [attr.aria-pressed]="modoMarcado() === 'parcial'"
-            (click)="toggleModoParcial()"
-          >
-            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 16h16v4H4zM16 4h4v16h-4z"/></svg>
-            <span class="tab-label">Parcial</span>
-          </button>
+  <!-- Panel inferior -->
+  @if (!store.cargando() && !store.errorCarga()) {
+    <section class="panel" aria-live="polite" data-tutorial="panel">
+      @if (store.abiertos().length === 0) {
+        <p class="indicacion">
+          <strong>Busca tu territorio</strong> arriba o tócalo en el mapa para empezar.
+        </p>
+      } @else {
+        <div class="territorios">
+          @for (r of store.resumenes(); track r.numero) {
+            <div class="territorio" [style.--color]="r.color">
+              <div class="territorio-texto">
+                <span class="territorio-nombre">Territorio {{ r.numero }}</span>
+                <span class="territorio-cuenta">
+                  {{ r.enteras }} de {{ r.total }} manzanas@if (r.porCalles) { · {{ r.porCalles }} por calles}
+                  @if (r.completo) { <strong class="completo">¡Completo!</strong> }
+                </span>
+                @if (r.base; as base) {
+                  @if (base.vueltaNueva) {
+                    <span class="territorio-nota">Se completó el {{ fechaCorta(base.fecha) }}: empiezas una vuelta nueva.</span>
+                  } @else if (base.fecha) {
+                    <span class="territorio-nota">Último reporte {{ hace(base.fecha) }}</span>
+                  }
+                }
+              </div>
+              <button type="button" class="cerrar" (click)="store.cerrar(r.numero)" [attr.aria-label]="'Cerrar territorio ' + r.numero">✕</button>
+            </div>
+          }
+          @if (store.cargandoTerritorio() !== null) {
+            <div class="territorio cargando-territorio"><span class="spinner chico" aria-hidden="true"></span> Cargando el territorio {{ store.cargandoTerritorio() }}…</div>
+          }
         </div>
 
-        <div class="sheet-actions">
-          <label class="visually-hidden" for="predicacion-select">Momento del día</label>
-          <select
-            id="predicacion-select"
-            class="predicacion-select"
-            [value]="predicacion()"
-            (change)="onPredicacionChange($event)"
-          >
-            <option value="tarde">Tarde</option>
-            <option value="mañana">Mañana</option>
-          </select>
-          <button
-            type="button"
-            class="action-btn send"
-            [disabled]="manzanasCount() === 0 || enviando() || edicionLados() !== null"
-            (click)="guardarYEnviar()"
-            aria-label="Guardar y enviar reporte"
-          >
-            @if (enviando()) {
-              <div class="btn-spinner" aria-hidden="true"></div>
+        @if (store.edicion(); as ed) {
+          <div class="calles" role="group" aria-label="Calles de la manzana">
+            <p class="calles-texto">
+              <strong>Manzana {{ ed.nombre }}</strong>
+              @if (ed.seleccion.length === 0) {
+                Toca en el mapa las calles que predicaron.
+              } @else {
+                {{ ed.seleccion.length }} de {{ ed.lados.length }} calles marcadas.
+              }
+            </p>
+            <div class="calles-botones">
+              <button type="button" class="boton" (click)="store.todaLaManzana()">Toda la manzana</button>
+              <button type="button" class="boton" (click)="store.cancelarLados()">Cancelar</button>
+              <button type="button" class="boton primario" (click)="store.guardarLados()">Listo</button>
+            </div>
+          </div>
+        } @else {
+          <div class="modos" role="radiogroup" aria-label="Cómo marcar" data-tutorial="modos">
+            <button type="button" role="radio" class="modo" [class.activo]="store.modo() === 'manzana'" [attr.aria-checked]="store.modo() === 'manzana'" (click)="cambiarModo('manzana')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" class="relleno" /></svg>
+              Manzana entera
+            </button>
+            <button type="button" role="radio" class="modo" [class.activo]="store.modo() === 'calles'" [attr.aria-checked]="store.modo() === 'calles'" (click)="cambiarModo('calles')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 17h16M17 4v16" class="grueso" /></svg>
+              Por calles
+            </button>
+          </div>
+          <p class="indicacion chica">
+            @if (store.modo() === 'manzana') {
+              Toca una manzana para marcarla. Tócala otra vez para desmarcarla.
             } @else {
-              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-              <span class="btn-label">Enviar</span>
+              Toca una manzana y después las calles que predicaron.
+            }
+          </p>
+        }
+
+        <div class="enviar-fila">
+          <div class="turno" role="radiogroup" aria-label="Turno" data-tutorial="turno">
+            <button type="button" role="radio" [class.activo]="store.predicacion() === 'mañana'" [attr.aria-checked]="store.predicacion() === 'mañana'" (click)="cambiarTurno('mañana')">Mañana</button>
+            <button type="button" role="radio" [class.activo]="store.predicacion() === 'tarde'" [attr.aria-checked]="store.predicacion() === 'tarde'" (click)="cambiarTurno('tarde')">Tarde</button>
+          </div>
+          <button type="button" class="boton enviar" [disabled]="!store.hayCambios() || store.enviando()" (click)="store.pedirEnvio()" data-tutorial="enviar">
+            @if (store.enviando()) {
+              <span class="spinner chico" aria-hidden="true"></span> Enviando…
+            } @else {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" class="relleno" /></svg>
+              Enviar
             }
           </button>
-          <button
-            type="button"
-            class="action-btn clear"
-            (click)="limpiarTodo()"
-            [attr.aria-label]="modoMarcado() !== 'none' ? 'Cancelar marcado' : 'Limpiar todas las marcas'"
-          >
-            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            <span class="btn-label">{{ modoMarcado() !== 'none' ? 'Cancelar' : 'Limpiar' }}</span>
-          </button>
         </div>
-      </div>
-
-      <!-- Row 2: marcado parcial por lados -->
-      @if (modoMarcado() === 'parcial') {
-        @if (edicionLados(); as ed) {
-          <div class="sheet-row lados-panel" role="group" aria-label="Lados de la manzana">
-            <div class="lados-info" aria-live="polite">
-              <strong>Manzana {{ ed.nombre }}</strong>
-              <span>
-                @if (ed.seleccion.length === 0) {
-                  Tocá las calles que predicaron
-                } @else {
-                  {{ ed.seleccion.length }} de {{ ed.lados.length }} lados
-                }
-              </span>
-            </div>
-            <div class="lados-actions">
-              <button type="button" class="partial-btn" (click)="marcarManzanaCompleta()" aria-label="Marcar toda la manzana">
-                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h16v16H4z"/></svg>
-                <span class="btn-label">Toda</span>
-              </button>
-              <button type="button" class="partial-btn cancel" (click)="cancelarLados()" aria-label="Cancelar cambios de esta manzana">
-                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                <span class="btn-label">Cancelar</span>
-              </button>
-              <button type="button" class="partial-btn confirm" (click)="confirmarLados()" aria-label="Guardar los lados elegidos">
-                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                <span class="btn-label">Listo</span>
-              </button>
-            </div>
-          </div>
-        } @else {
-          <div class="sheet-row lados-panel" aria-live="polite">
-            <p class="lados-hint">Tocá una manzana y después las calles que predicaron. Si hicieron toda la manzana, usá <strong>Marcar</strong>.</p>
-          </div>
-        }
       }
-    </div>
-    } @placeholder {
-      <div class="clipboard-sheet-placeholder">Cargando controles...</div>
-    }
+    </section>
   }
 
-  <button
-    type="button"
-    class="map-toggle-satellite"
-    [class.active]="isSatellite()"
-    (click)="toggleSatellite()"
-    [attr.aria-label]="isSatellite() ? 'Vista normal' : 'Vista satélite'"
-    [attr.aria-pressed]="isSatellite()"
-  >
-    @if (isSatellite()) {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/>
-      </svg>
-    } @else {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
-      </svg>
-    }
-  </button>
+  <!-- Preguntas: nada se borra ni se envía sin confirmar -->
+  @if (store.pregunta(); as p) {
+    <div class="velo" (click)="store.responder(false)" aria-hidden="true"></div>
+    <div class="dialogo" role="alertdialog" aria-modal="true" aria-labelledby="dialogo-titulo">
+      <h2 id="dialogo-titulo">{{ p.titulo }}</h2>
+      @if (p.texto) {
+        <p>{{ p.texto }}</p>
+      }
+      @if (p.detalle?.length) {
+        <ul>
+          @for (linea of p.detalle; track linea) {
+            <li>{{ linea }}</li>
+          }
+        </ul>
+      }
+      <div class="dialogo-botones">
+        <button type="button" class="boton" (click)="store.responder(false)">{{ p.no }}</button>
+        <button type="button" class="boton" [class.primario]="!p.peligro" [class.peligro]="p.peligro" (click)="store.responder(true)">{{ p.si }}</button>
+      </div>
+    </div>
+  }
+
+  @if (verTutorial()) {
+    <app-tutorial (cerrar)="cerrarTutorial()" />
+  }
 </div>

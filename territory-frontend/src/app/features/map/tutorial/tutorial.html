@@ -1,0 +1,21 @@
+<div class="tutorial" role="dialog" aria-modal="true" aria-labelledby="tutorial-titulo">
+  @if (caja(); as c) {
+    <div class="foco" [style.top.px]="c.top" [style.left.px]="c.left" [style.width.px]="c.width" [style.height.px]="c.height"></div>
+  } @else {
+    <div class="fondo"></div>
+  }
+
+  <div class="tarjeta" [class.arriba]="tarjetaArriba()" [class.centrada]="!caja()">
+    <p class="progreso">Paso {{ indice() + 1 }} de {{ pasos.length }}</p>
+    <h2 id="tutorial-titulo">{{ paso().titulo }}</h2>
+    <p class="texto">{{ paso().texto }}</p>
+    <div class="botones">
+      @if (indice() > 0) {
+        <button type="button" class="secundario" (click)="anterior()">Anterior</button>
+      } @else {
+        <button type="button" class="secundario" (click)="cerrar.emit()">Saltar</button>
+      }
+      <button type="button" class="principal" (click)="siguiente()">{{ ultimo() ? 'Entendido' : 'Siguiente' }}</button>
+    </div>
+  </div>
+</div>

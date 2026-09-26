@@ -1,215 +1,231 @@
 import {
-  Component,
-  OnDestroy,
-  inject,
   afterNextRender,
   ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
 } from '@angular/core';
-import { type LeafletMouseEvent } from 'leaflet';
+import { Router } from '@angular/router';
+import { limitesPrincipales, etiquetasTerritorios, type FondoMapa } from '../../core/map/base-map';
+import { Profile } from '../../core/services/profile';
+import { AuthTokenService } from '../../core/services/auth-token';
 import { Toast } from '../../core/services/toast';
-import { TerritorySearch } from './territory-search/territory-search';
-import { MapStateService } from './services/map-state.service';
-import { MapRenderingFacade } from './services/map-rendering.facade';
-import { MapInteractionService } from './services/map-interaction.service';
-import { MapSelectionService } from './services/map-selection.service';
-import { MapInitializationService } from './services/map-initialization.service';
-import { MapLocationService } from './services/map-location.service';
-import { MapPartialMarkService } from './services/map-partial-mark.service';
-import { MapDataPersistenceService } from './services/map-data-persistence.service';
-import { MAP_DEFAULTS, TOAST_MESSAGES } from './utils/map-constants';
-import type { ModoMarcado } from './types/map.types';
+import { MapaStore } from './mapa.store';
+import { MapaVista, type EstadoUbicacion } from './mapa-vista';
+import { Tutorial } from './tutorial/tutorial';
+import type { ModoMarcado } from './mapa.types';
 
+const CLAVE_TEMA = 'territory_theme';
+const CLAVE_FONDO = 'territory_satellite';
+const CLAVE_TUTORIAL = 'mapa.tutorial.visto';
+
+function leer(clave: string): string | null {
+  try {
+    return localStorage.getItem(clave);
+  } catch {
+    return null;
+  }
+}
+
+function escribir(clave: string, valor: string): void {
+  try {
+    localStorage.setItem(clave, valor);
+  } catch {
+    // Sin almacenamiento la preferencia vale solo para esta visita.
+  }
+}
+
+/**
+ * Mapa de marcado de los encargados (MapLibre). La página solo arma la
+ * pantalla: las reglas están en {@link MapaStore} y el dibujo en {@link MapaVista}.
+ */
 @Component({
   selector: 'app-map',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TerritorySearch],
+  imports: [Tutorial],
+  providers: [MapaStore],
   templateUrl: './map.html',
   styleUrl: './map.css',
 })
-export class MapPage implements OnDestroy {
-  private readonly state = inject(MapStateService);
-  private readonly rendering = inject(MapRenderingFacade);
-  private readonly interaction = inject(MapInteractionService);
-  private readonly selection = inject(MapSelectionService);
-  private readonly initialization = inject(MapInitializationService);
-  private readonly partialMark = inject(MapPartialMarkService);
-  private readonly dataPersistence = inject(MapDataPersistenceService);
-  private readonly location = inject(MapLocationService);
-  private readonly toastService = inject(Toast);
+export class MapPage {
+  protected readonly store = inject(MapaStore);
+  private readonly router = inject(Router);
+  private readonly perfil = inject(Profile);
+  private readonly authToken = inject(AuthTokenService);
+  private readonly toast = inject(Toast);
+  private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
+  private vista: MapaVista | null = null;
 
-  manzanasCount = this.state.manzanasCount;
-  totalManzanas = this.state.totalManzanas;
-  territorioSeleccionado = this.state.territorioSeleccionado;
-  territoriosSeleccionados = this.state.territoriosSeleccionados;
-  tieneTerritorio = this.state.tieneTerritorio;
-  modoMarcado = this.state.modoMarcado;
-  edicionLados = this.state.edicionLados;
-  enviando = this.state.enviando;
-  isLoading = this.state.isLoading;
-  isSatellite = this.state.isSatellite;
-  predicacion = this.state.predicacion;
-  screenshotPreview = this.state.screenshotPreview;
-  locationStatus = this.location.status;
+  protected readonly busqueda = signal('');
+  protected readonly verSugerencias = signal(false);
+  protected readonly ubicacion = signal<EstadoUbicacion>('apagada');
+  protected readonly fondo = signal<FondoMapa>(leer(CLAVE_FONDO) === 'true' ? 'satelite' : 'mapa');
+  protected readonly oscuro = signal(leer(CLAVE_TEMA) === 'dark');
+  protected readonly verTutorial = signal(false);
+
+  protected readonly sugerencias = computed(() => {
+    const texto = this.busqueda().trim();
+    if (!texto) return [];
+    const ultimo = texto.split(/[,\s]+/).pop() ?? '';
+    return this.store
+      .numeros()
+      .filter(n => String(n).startsWith(ultimo))
+      .slice(0, 8);
+  });
 
   constructor() {
-    afterNextRender(() => this.initMap());
+    const destroyRef = inject(DestroyRef);
+    effect(() => {
+      const estado = this.store.estadoVista();
+      this.vista?.mostrar(estado);
+    });
+    afterNextRender(() => {
+      this.aplicarTema();
+      void this.iniciar();
+    });
+    destroyRef.onDestroy(() => this.vista?.destruir());
   }
 
-  private initMap(): void {
-    const el = document.getElementById('map');
-    if (!el) return;
-
-    void this.initialization.initialize(el, (e: LeafletMouseEvent) => this.onMapClick(e));
-  }
-
-
-  async onTerritorioSeleccionado(numeros: number[]): Promise<void> {
-    // Bloquear cambio de territorio mientras un modo de marcado está activo
-    if (numeros.length > 0 && this.modoMarcado() !== 'none') {
-      this.toastService.show(TOAST_MESSAGES.territoryLock);
-      return;
-    }
-
-    // Si se recibe un array vacío, limpiar selección y restaurar visibilidad
-    if (numeros.length === 0) {
-      this.selection.limpiarMarcas();
-      this.rendering.restaurarVisibilidadPoligonos(this.state.manzanasMarcadaList(), []);
-      return;
-    }
-
-    const numsAConsiderar = this.selection.prepareTerritorioSeleccionado(numeros);
-
-    // Parallel DB restoration — avoids sequential awaits for multi-territory selection
-    await Promise.all(
-      numsAConsiderar.map(numero => {
-        const featureLayer = this.rendering.getFeatureLayerByTerritorio(numero);
-        if (!featureLayer) return Promise.resolve();
-        return this.selection.restaurarMarcadoDesdeDB(numero, featureLayer.color, { actualizarEstadoMarcado: true });
-      })
+  private async iniciar(): Promise<void> {
+    if (!(await this.store.cargar())) return;
+    const manzanas = this.store.manzanas();
+    const coleccion = {
+      type: 'FeatureCollection' as const,
+      features: manzanas.map(m => ({ type: 'Feature' as const, geometry: m.geometria, properties: { territorio: m.territorio } })),
+    };
+    this.vista = await MapaVista.crear(
+      this.contenedor().nativeElement,
+      manzanas.map(m => ({ id: m.id, territorio: m.territorio, color: this.store.colorDe(m.territorio), geometria: m.geometria })),
+      etiquetasTerritorios(coleccion),
+      this.fondo(),
+      {
+        alTocar: t => this.store.tocar(t),
+        alTocarLado: i => this.store.tocarLado(i),
+        alCambiarUbicacion: (e, error) => {
+          this.ubicacion.set(e);
+          if (error === 'denegada') this.toast.show('Permiso de ubicación denegado: actívalo en los ajustes del navegador', 5000, 'warning');
+          else if (error) this.toast.show('No se pudo obtener tu ubicación', 3000, 'warning');
+        },
+      },
     );
-
-    // Ocultar territorios no seleccionados tras la selección
-    this.rendering.ocultarPoligonosNoSeleccionados(this.state.territoriosSeleccionados());
-  }
-
-  private onMapClick(e: LeafletMouseEvent): void {
-    const result = this.interaction.handleMapClick(e);
-
-    switch (result.action) {
-      case 'remove_partial':
-        if (result.partialId) this.partialMark.eliminarZona(result.partialId);
-        break;
-      case 'toggle_manzana':
-        if (result.manzana) {
-          const m = result.manzana;
-          // Marcar completa una manzana reemplaza su zona parcial, si tenía.
-          if (!this.state.manzanasById().has(m.id)) this.partialMark.quitarZonaDeManzana(m.id);
-          this.selection.toggleManzana(m.id, m.nombreBloque, m.polygon, m.color, m.territorioNumero);
-        }
-        break;
-      case 'select_territory':
-        if (result.manzana) {
-          void this.handleTerritorySelection(result.manzana.territorioNumero);
-        }
-        break;
-      case 'abrir_lados':
-        if (result.manzana) this.partialMark.abrirManzana(result.manzana);
-        break;
-      case 'none':
-        break;
+    this.store.conectar(this.vista);
+    this.vista.mostrar(this.store.estadoVista());
+    const abiertos = this.store.abiertos();
+    if (abiertos.length) this.vista.encuadrar(abiertos, false);
+    else {
+      const caja = limitesPrincipales(coleccion, 0.12);
+      if (caja) this.vista.encuadrarTodo(caja);
     }
+    if (!leer(CLAVE_TUTORIAL)) this.verTutorial.set(true);
   }
 
-  private async handleTerritorySelection(territorioNumero: number): Promise<void> {
-    const current = this.state.territoriosSeleccionados();
-    let numeros: number[];
-
-    if (current.includes(territorioNumero)) {
-      numeros = current.filter(n => n !== territorioNumero);
-    } else if (current.length > 0) {
-      numeros = [...current, territorioNumero];
-    } else {
-      numeros = [territorioNumero];
-    }
-
-    await this.onTerritorioSeleccionado(numeros);
+  protected reintentar(): void {
+    void this.iniciar();
   }
 
+  // ── Buscador ──
 
-  toggleSatellite(): void {
-    this.rendering.toggleSatellite();
-    this.state.isSatellite.set(this.rendering.isSatellite());
+  protected alEscribir(event: Event): void {
+    const valor = (event.target as HTMLInputElement).value.replace(/[^\d,\s]/g, '');
+    this.busqueda.set(valor);
+    this.verSugerencias.set(valor.length > 0);
   }
 
-  toggleUbicacion(): void {
-    this.location.toggle();
+  protected async buscar(event?: Event): Promise<void> {
+    event?.preventDefault();
+    const texto = this.busqueda();
+    this.verSugerencias.set(false);
+    (document.activeElement as HTMLElement | null)?.blur();
+    await this.store.buscar(texto);
+    this.busqueda.set('');
   }
 
-  onPredicacionChange(event: Event): void {
-    this.state.predicacion.set((event.target as HTMLSelectElement).value);
+  protected async elegir(numero: number): Promise<void> {
+    const partes = this.busqueda().split(/[,\s]+/).filter(Boolean);
+    partes[partes.length - 1] = String(numero);
+    this.busqueda.set(partes.join(', '));
+    await this.buscar();
   }
 
-  setModoMarcado(modo: ModoMarcado): void {
-    // Cambiar de modo con una manzana abierta guarda lo elegido, no lo pierde.
-    this.partialMark.confirmarEdicion();
-    this.selection.setModoMarcado(modo);
+  protected ocultarSugerencias(): void {
+    setTimeout(() => this.verSugerencias.set(false), 150);
   }
 
-  toggleModoParcial(): void {
-    this.setModoMarcado(this.modoMarcado() === 'parcial' ? 'none' : 'parcial');
+  // ── Panel ──
+
+  protected cambiarModo(modo: ModoMarcado): void {
+    this.store.cambiarModo(modo);
   }
 
-  toggleModoCompleto(): void {
-    this.setModoMarcado(this.modoMarcado() === 'completa' ? 'none' : 'completa');
+  protected cambiarTurno(turno: 'mañana' | 'tarde'): void {
+    this.store.predicacion.set(turno);
   }
 
-  confirmarLados(): void {
-    this.partialMark.confirmarEdicion();
+  protected hace(fecha: string | null): string {
+    if (!fecha) return '';
+    const dias = Math.round((Date.now() - new Date(fecha).getTime()) / 86_400_000);
+    if (dias <= 0) return 'hoy';
+    if (dias === 1) return 'ayer';
+    if (dias < 45) return `hace ${dias} días`;
+    return `hace ${Math.round(dias / 30.4)} meses`;
   }
 
-  cancelarLados(): void {
-    this.partialMark.cancelarEdicion();
+  protected fechaCorta(fecha: string | null): string {
+    return fecha ? new Date(fecha).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' }) : '';
   }
 
-  marcarManzanaCompleta(): void {
-    this.partialMark.marcarManzanaCompleta();
+  // ── Botones del mapa ──
+
+  protected alternarUbicacion(): void {
+    this.vista?.alternarUbicacion();
   }
 
-  async guardarEnBaseDeDatos(): Promise<void> {
-    await this.dataPersistence.guardarEnBaseDeDatos();
+  protected alternarFondo(): void {
+    const fondo: FondoMapa = this.fondo() === 'mapa' ? 'satelite' : 'mapa';
+    this.fondo.set(fondo);
+    escribir(CLAVE_FONDO, String(fondo === 'satelite'));
+    this.vista?.cambiarFondo(fondo);
   }
 
-  prepararCaptura(): Promise<void> {
-    return this.dataPersistence.prepararCaptura();
+  protected alternarTema(): void {
+    this.oscuro.set(!this.oscuro());
+    escribir(CLAVE_TEMA, this.oscuro() ? 'dark' : 'light');
+    this.aplicarTema();
   }
 
-  restaurarMapaPostCaptura(): void {
-    this.dataPersistence.restaurarMapaPostCaptura();
+  private aplicarTema(): void {
+    document.documentElement.setAttribute('data-theme', this.oscuro() ? 'dark' : 'light');
   }
 
-  limpiarMarcas(): void {
-    this.selection.limpiarMarcas();
+  protected abrirTutorial(): void {
+    this.verTutorial.set(true);
   }
 
-  async guardarYEnviar(): Promise<void> {
-    await this.dataPersistence.guardarYEnviar();
+  protected cerrarTutorial(): void {
+    this.verTutorial.set(false);
+    escribir(CLAVE_TUTORIAL, '1');
   }
 
-  limpiarTodo(): void {
-    const hasData = this.state.manzanasById().size > 0 || this.state.territoriosSeleccionados().length > 0;
-    this.limpiarMarcas();
-
-    // Volver a la vista de territorios (mapa inicial sin selección).
-    this.rendering.getMap()?.setView(MAP_DEFAULTS.initialView, MAP_DEFAULTS.initialZoom);
-
-    if (hasData) {
-      void this.initialization.reloadAllTerritories();
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.location.destroy();
-    this.rendering.cancelPendingStyleUpdates();
-    this.rendering.destroy();
+  protected salir(): void {
+    const salirYa = () => {
+      this.perfil.clear();
+      this.authToken.logout();
+      void this.router.navigate(['/login']);
+    };
+    this.store.pregunta.set({
+      titulo: '¿Cerrar sesión?',
+      texto: this.store.hayCambios()
+        ? 'Tienes marcas sin enviar: se pierden si cierras la sesión.'
+        : 'Para volver a entrar vas a necesitar tu número de teléfono.',
+      si: 'Cerrar sesión',
+      no: 'Cancelar',
+      peligro: this.store.hayCambios(),
+      alConfirmar: salirYa,
+    });
   }
 }

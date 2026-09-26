@@ -1,5 +1,6 @@
 import type { LngLatBoundsLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
+import { puntoDeRotulo, type Poligonal } from './geometria';
 
 /** Cualquier colección de manzanas (Polygon/MultiPolygon); el territorio va en `properties.territorio`. */
 type ColeccionManzanas = FeatureCollection<Polygon | MultiPolygon, { territorio: number }>;
@@ -7,7 +8,7 @@ type ColeccionManzanas = FeatureCollection<Polygon | MultiPolygon, { territorio:
 export type FondoMapa = 'mapa' | 'satelite';
 export type MapLibre = typeof import('maplibre-gl');
 
-/** Encuadre inicial si todavía no hay manzanas cargadas (Lebu). */
+/** Encuadre inicial si todavía no hay manzanas cargadas (Curanilahue). */
 const ENCUADRE_INICIAL: LngLatBoundsLike = [
   [-73.45, -37.61],
   [-73.24, -37.38],
@@ -127,11 +128,11 @@ export function limites(coleccion: ColeccionManzanas, territorio?: number): LngL
 }
 
 /**
- * Encuadre de la zona donde están casi todas las manzanas: descarta el 3 %
- * de cada extremo para que un par de manzanas rurales enormes no obliguen a
- * alejar tanto el mapa que la ciudad no se distinga.
+ * Encuadre de la zona donde están casi todas las manzanas: descarta una parte
+ * de cada extremo (3 % por defecto) para que las manzanas rurales, largas y
+ * alejadas, no obliguen a alejar tanto el mapa que la ciudad no se distinga.
  */
-export function limitesPrincipales(coleccion: ColeccionManzanas): LngLatBoundsLike | null {
+export function limitesPrincipales(coleccion: ColeccionManzanas, recorte = 0.03): LngLatBoundsLike | null {
   const xs: number[] = [];
   const ys: number[] = [];
   for (const f of coleccion.features) {
@@ -144,7 +145,7 @@ export function limitesPrincipales(coleccion: ColeccionManzanas): LngLatBoundsLi
   xs.sort((a, b) => a - b);
   ys.sort((a, b) => a - b);
   const q = (v: number[], p: number) => v[Math.min(v.length - 1, Math.max(0, Math.round(p * (v.length - 1))))];
-  const [oeste, este, sur, norte] = [q(xs, 0.03), q(xs, 0.97), q(ys, 0.03), q(ys, 0.97)];
+  const [oeste, este, sur, norte] = [q(xs, recorte), q(xs, 1 - recorte), q(ys, recorte), q(ys, 1 - recorte)];
   const mx = (este - oeste) * 0.1;
   const my = (norte - sur) * 0.1;
   return [
@@ -153,29 +154,29 @@ export function limitesPrincipales(coleccion: ColeccionManzanas): LngLatBoundsLi
   ];
 }
 
-/** Punto representativo (centro de la caja) de cada territorio, para rotularlo. */
-export function etiquetasTerritorios(coleccion: ColeccionManzanas): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  const cajas = new Map<number, [number, number, number, number]>();
+/**
+ * Punto de rótulo de cada territorio, siempre dentro de una de sus manzanas
+ * (ver {@link puntoDeRotulo}): el centro de la caja caía en territorios
+ * vecinos cuando uno rodea a otro.
+ */
+export function etiquetasTerritorios(
+  coleccion: ColeccionManzanas,
+): GeoJSON.FeatureCollection<GeoJSON.Point, { territorio: number; etiqueta: string }> {
+  const porTerritorio = new Map<number, Poligonal[]>();
   for (const f of coleccion.features) {
-    const t = f.properties.territorio;
-    const caja = cajas.get(t) ?? [Infinity, Infinity, -Infinity, -Infinity];
-    const anillos = f.geometry.type === 'Polygon' ? f.geometry.coordinates : f.geometry.coordinates.flat();
-    for (const anillo of anillos) {
-      for (const [x, y] of anillo) {
-        caja[0] = Math.min(caja[0], x);
-        caja[1] = Math.min(caja[1], y);
-        caja[2] = Math.max(caja[2], x);
-        caja[3] = Math.max(caja[3], y);
-      }
-    }
-    cajas.set(t, caja);
+    const lista = porTerritorio.get(f.properties.territorio) ?? [];
+    lista.push(f.geometry);
+    porTerritorio.set(f.properties.territorio, lista);
   }
-  return {
-    type: 'FeatureCollection',
-    features: [...cajas].map(([t, c]) => ({
+  const features: GeoJSON.Feature<GeoJSON.Point, { territorio: number; etiqueta: string }>[] = [];
+  for (const [t, geometrias] of porTerritorio) {
+    const punto = puntoDeRotulo(geometrias);
+    if (!punto) continue;
+    features.push({
       type: 'Feature',
       properties: { territorio: t, etiqueta: String(t) },
-      geometry: { type: 'Point', coordinates: [(c[0] + c[2]) / 2, (c[1] + c[3]) / 2] },
-    })),
-  };
+      geometry: { type: 'Point', coordinates: punto },
+    });
+  }
+  return { type: 'FeatureCollection', features };
 }

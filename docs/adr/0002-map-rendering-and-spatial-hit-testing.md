@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0010 (the field map moved to MapLibre; Leaflet was removed).
 
 ## Context
 
