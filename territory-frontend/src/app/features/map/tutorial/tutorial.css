@@ -90,3 +90,85 @@ h2 {
   background: var(--surface-2);
   color: var(--ink);
 }
+
+/* ── Pasos para hacer: la pantalla sigue usable ── */
+.tutorial.practica {
+  pointer-events: none;
+}
+
+.tutorial.practica .tarjeta {
+  pointer-events: auto;
+}
+
+.tarjeta.compacta {
+  top: max(10px, env(safe-area-inset-top));
+  bottom: auto;
+  padding: 14px 16px;
+  border: 3px solid #facc15;
+}
+
+.tarjeta.compacta h2 {
+  font-size: 20px;
+  margin: 2px 0 4px;
+}
+
+.tarjeta.compacta .texto {
+  font-size: 17px;
+}
+
+.tarjeta.compacta .botones {
+  margin-top: 10px;
+}
+
+.tarjeta.compacta .botones button {
+  height: 46px;
+  font-size: 16px;
+}
+
+.bien {
+  color: var(--color-success);
+}
+
+/* Señala el botón a tocar sin taparlo. */
+.aro {
+  position: absolute;
+  border-radius: 14px;
+  outline: 4px solid #facc15;
+  box-shadow: 0 0 0 8px rgba(250, 204, 21, 0.35);
+  pointer-events: none;
+  animation: aro 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes aro {
+  from { box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.5); }
+  to { box-shadow: 0 0 0 12px rgba(250, 204, 21, 0.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aro { animation: none; }
+}
+
+.cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.salir {
+  flex: none;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-solid);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tarjeta.compacta .botones:empty {
+  display: none;
+}

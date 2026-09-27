@@ -9,6 +9,7 @@ import type {
 import type { Feature, FeatureCollection, LineString, Point, Position } from 'geojson';
 import { cambiarFondo, crearMapa, temaOscuro, type FondoMapa, type MapLibre } from '../../core/map/base-map';
 import { franjaDeLados, type GeometriaManzana } from './utils/lados';
+import { puntoInterior } from '../../core/map/geometria';
 import type { EdicionLados } from './mapa.types';
 import { UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from './ubicacion';
 
@@ -76,6 +77,13 @@ export class MapaVista {
   private anterior = new Map<number, Record<string, boolean>>();
   private abiertosAntes = new Set<number>();
   private insignias: Marker[] = [];
+  private pulso: Marker | null = null;
+  /**
+   * Lo que tapan la barra de arriba y el panel de abajo (px). La página mide
+   * el panel real: con varios territorios abiertos crece, y encuadrar con un
+   * margen fijo dejaba territorios debajo del panel, imposibles de tocar.
+   */
+  private margen = { arriba: 90, abajo: 300 };
   private ubicacion: UbicacionMapa | null = null;
   private fondo: FondoMapa = 'mapa';
   private observadorTema: MutationObserver | null = null;
@@ -114,6 +122,7 @@ export class MapaVista {
   }
 
   destruir(): void {
+    this.pulso?.remove();
     this.observadorTema?.disconnect();
     this.ubicacion?.apagar();
     this.quitarInsignias();
@@ -286,17 +295,53 @@ export class MapaVista {
     return Number.isFinite(o) ? [[o, s], [e, n]] : null;
   }
 
-  /** Encuadra los territorios dejando libre la barra de arriba y el panel de abajo. */
+  ajustarMargenes(m: { arriba?: number; abajo?: number }): void {
+    this.margen = { ...this.margen, ...m };
+  }
+
+  /** Relleno para fitBounds que deja libre lo tapado, sin pasarse si la pantalla es chica. */
+  private relleno(lados: number): { top: number; bottom: number; left: number; right: number } {
+    const alto = this.map.getContainer().clientHeight;
+    const arriba = Math.round(this.margen.arriba + 12);
+    // Siempre queda al menos un 25 % del alto para el mapa.
+    const abajo = Math.round(Math.max(24, Math.min(this.margen.abajo + 12, alto * 0.75 - arriba)));
+    return { top: arriba, bottom: abajo, left: lados, right: lados };
+  }
+
+  /** Encuadra los territorios en lo que queda visible entre la barra y el panel. */
   encuadrar(territorios: number[], animar = true): void {
     const caja = this.limites(territorios);
     if (!caja) return;
     this.ubicacion?.dejarDeSeguir();
-    const alto = this.map.getContainer().clientHeight;
-    this.map.fitBounds(caja, {
-      padding: { top: 90, left: 24, right: 24, bottom: Math.min(300, alto * 0.38) },
-      maxZoom: 17.5,
-      duration: animar ? 600 : 0,
-    });
+    this.map.fitBounds(caja, { padding: this.relleno(24), maxZoom: 17.5, duration: animar ? 600 : 0 });
+  }
+
+  encuadrarManzana(id: string): void {
+    const i = this.indice.get(id);
+    if (i === undefined) return;
+    this.ubicacion?.dejarDeSeguir();
+    this.map.fitBounds(this.cajaDe(this.manzanas[i].geometria), { padding: this.relleno(48), maxZoom: 18.5, duration: 600 });
+  }
+
+  centro(): [number, number] {
+    const c = this.map.getCenter();
+    return [c.lng, c.lat];
+  }
+
+  /** Aro que late sobre la manzana a tocar en la práctica del tutorial (null lo quita). */
+  resaltarManzana(id: string | null): void {
+    this.pulso?.remove();
+    this.pulso = null;
+    const i = id === null ? undefined : this.indice.get(id);
+    if (i === undefined) return;
+    const el = document.createElement('div');
+    el.className = 'pulso-practica';
+    el.setAttribute('aria-hidden', 'true');
+    // MapLibre ubica el marcador con `transform`: la animación va en un hijo.
+    el.appendChild(document.createElement('span'));
+    this.pulso = new this.maplibre.Marker({ element: el })
+      .setLngLat(puntoInterior(this.manzanas[i].geometria) as [number, number])
+      .addTo(this.map);
   }
 
   encuadrarTodo(caja: LngLatBoundsLike): void {
@@ -347,13 +392,7 @@ export class MapaVista {
 
     if (encuadrar) {
       this.ubicacion?.dejarDeSeguir();
-      const caja = this.cajaDe(ed.geometria);
-      const alto = this.map.getContainer().clientHeight;
-      this.map.fitBounds(caja, {
-        padding: { top: Math.min(110, alto * 0.15), left: 44, right: 44, bottom: Math.min(360, alto * 0.46) },
-        maxZoom: 19,
-        duration: 500,
-      });
+      this.map.fitBounds(this.cajaDe(ed.geometria), { padding: this.relleno(44), maxZoom: 19, duration: 500 });
     }
   }
 

@@ -1,21 +1,45 @@
-<div class="tutorial" role="dialog" aria-modal="true" aria-labelledby="tutorial-titulo">
-  @if (caja(); as c) {
+<div class="tutorial" [class.practica]="paraHacer()" role="dialog" [attr.aria-modal]="!paraHacer()" aria-labelledby="tutorial-titulo">
+  @if (paraHacer()) {
+    <!-- Paso para hacer: el mapa y el panel siguen usables; solo se señala dónde tocar. -->
+    @if (caja(); as c) {
+      <div class="aro" [style.top.px]="c.top" [style.left.px]="c.left" [style.width.px]="c.width" [style.height.px]="c.height"></div>
+    }
+  } @else if (caja(); as c) {
     <div class="foco" [style.top.px]="c.top" [style.left.px]="c.left" [style.width.px]="c.width" [style.height.px]="c.height"></div>
   } @else {
     <div class="fondo"></div>
   }
 
-  <div class="tarjeta" [class.arriba]="tarjetaArriba()" [class.centrada]="!caja()">
-    <p class="progreso">Paso {{ indice() + 1 }} de {{ pasos.length }}</p>
-    <h2 id="tutorial-titulo">{{ paso().titulo }}</h2>
-    <p class="texto">{{ paso().texto }}</p>
+  <div #tarjeta class="tarjeta" [class.arriba]="tarjetaArriba()" [class.centrada]="!caja() && !paraHacer()" [class.compacta]="paraHacer()" aria-live="polite">
+    @if (paraHacer()) {
+      <div class="cabecera">
+        <p class="progreso">Práctica · paso {{ progreso().actual }} de {{ progreso().total }}</p>
+        <button type="button" class="salir" (click)="cerrar.emit()">Salir</button>
+      </div>
+    } @else {
+      <p class="progreso">Paso {{ indice() + 1 }} de {{ pasos.length }}</p>
+    }
+    @if (logrado() && paso().bien) {
+      <h2 id="tutorial-titulo" class="bien">✓ {{ paso().bien }}</h2>
+    } @else {
+      <h2 id="tutorial-titulo">{{ paso().titulo }}</h2>
+      <p class="texto">{{ paso().texto }}</p>
+    }
     <div class="botones">
-      @if (indice() > 0) {
-        <button type="button" class="secundario" (click)="anterior()">Anterior</button>
+      @if (paraHacer()) {
+        @if (ayuda() && !logrado()) {
+          <button type="button" class="principal" (click)="hacerPorMi()">Hazlo por mí</button>
+        }
       } @else {
-        <button type="button" class="secundario" (click)="cerrar.emit()">Saltar</button>
+        @if (indice() > 0 && !ultimo()) {
+          <button type="button" class="secundario" (click)="anterior()">Anterior</button>
+        } @else if (!ultimo()) {
+          <button type="button" class="secundario" (click)="cerrar.emit()">Saltar</button>
+        }
+        <button type="button" class="principal" (click)="siguiente()">
+          {{ ultimo() ? 'Entendido' : indice() === 0 ? 'Empezar' : 'Siguiente' }}
+        </button>
       }
-      <button type="button" class="principal" (click)="siguiente()">{{ ultimo() ? 'Entendido' : 'Siguiente' }}</button>
     </div>
   </div>
 </div>

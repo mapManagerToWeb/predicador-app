@@ -59,6 +59,7 @@ export class MapPage {
   private readonly authToken = inject(AuthTokenService);
   private readonly toast = inject(Toast);
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
   private vista: MapaVista | null = null;
 
   protected readonly busqueda = signal('');
@@ -88,7 +89,20 @@ export class MapPage {
       this.aplicarTema();
       void this.iniciar();
     });
-    destroyRef.onDestroy(() => this.vista?.destruir());
+    // El mapa encuadra en lo que el panel deja libre: con varios territorios
+    // abiertos el panel crece, y con un margen fijo quedaban manzanas debajo.
+    let observador: ResizeObserver | null = null;
+    effect(() => {
+      const panel = this.panel()?.nativeElement;
+      observador?.disconnect();
+      if (!panel || typeof ResizeObserver === 'undefined') return;
+      observador = new ResizeObserver(() => this.medirPanel(panel));
+      observador.observe(panel);
+    });
+    destroyRef.onDestroy(() => {
+      observador?.disconnect();
+      this.vista?.destruir();
+    });
   }
 
   private async iniciar(): Promise<void> {
@@ -114,6 +128,8 @@ export class MapPage {
       },
     );
     this.store.conectar(this.vista);
+    const panel = this.panel()?.nativeElement;
+    if (panel) this.medirPanel(panel);
     this.vista.mostrar(this.store.estadoVista());
     const abiertos = this.store.abiertos();
     if (abiertos.length) this.vista.encuadrar(abiertos, false);
@@ -122,6 +138,11 @@ export class MapPage {
       if (caja) this.vista.encuadrarTodo(caja);
     }
     if (!leer(CLAVE_TUTORIAL)) this.verTutorial.set(true);
+  }
+
+  private medirPanel(panel: HTMLElement): void {
+    const contenedor = this.contenedor().nativeElement.getBoundingClientRect();
+    this.vista?.ajustarMargenes({ abajo: Math.max(0, contenedor.bottom - panel.getBoundingClientRect().top) });
   }
 
   protected reintentar(): void {

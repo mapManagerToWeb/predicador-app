@@ -77,22 +77,26 @@
 
   <!-- Panel inferior -->
   @if (!store.cargando() && !store.errorCarga()) {
-    <section class="panel" aria-live="polite" data-tutorial="panel">
+    <section #panel class="panel" aria-live="polite" data-tutorial="panel">
       @if (store.abiertos().length === 0) {
         <p class="indicacion">
           <strong>Busca tu territorio</strong> arriba o tócalo en el mapa para empezar.
         </p>
       } @else {
-        <div class="territorios">
+        @if (store.resumenes().length === 1) {
+          <!-- Un territorio: tarjeta con el detalle. -->
           @for (r of store.resumenes(); track r.numero) {
             <div class="territorio" [style.--color]="r.color">
               <div class="territorio-texto">
-                <span class="territorio-nombre">Territorio {{ r.numero }}</span>
-                <span class="territorio-cuenta">
-                  {{ r.enteras }} de {{ r.total }} manzanas@if (r.porCalles) { · {{ r.porCalles }} por calles}
-                  @if (r.completo) { <strong class="completo">¡Completo!</strong> }
+                <span class="territorio-linea">
+                  <span class="territorio-nombre">{{ store.practica() ? 'Práctica' : 'Territorio' }} {{ r.numero }}</span>
+                  <span class="territorio-cuenta">
+                    {{ r.enteras }} de {{ r.total }} manzanas@if (r.porCalles) { · {{ r.porCalles }} por calles}
+                  </span>
                 </span>
-                @if (r.base; as base) {
+                @if (r.completo) {
+                  <strong class="completo">¡Territorio completo!</strong>
+                } @else if (!store.practica() && r.base; as base) {
                   @if (base.vueltaNueva) {
                     <span class="territorio-nota">Se completó el {{ fechaCorta(base.fecha) }}: empiezas una vuelta nueva.</span>
                   } @else if (base.fecha) {
@@ -103,10 +107,23 @@
               <button type="button" class="cerrar" (click)="store.cerrar(r.numero)" [attr.aria-label]="'Cerrar territorio ' + r.numero">✕</button>
             </div>
           }
-          @if (store.cargandoTerritorio() !== null) {
-            <div class="territorio cargando-territorio"><span class="spinner chico" aria-hidden="true"></span> Cargando el territorio {{ store.cargandoTerritorio() }}…</div>
-          }
-        </div>
+        } @else {
+          <!-- Varios territorios: una fila de fichas, para que el panel no tape el mapa. -->
+          <div class="fichas" role="list" aria-label="Territorios abiertos">
+            @for (r of store.resumenes(); track r.numero) {
+              <div class="ficha" role="listitem" [style.--color]="r.color" [class.completa]="r.completo">
+                <button type="button" class="ficha-ir" (click)="store.abrir(r.numero)" [attr.aria-label]="'Ver el territorio ' + r.numero + ': ' + r.enteras + ' de ' + r.total + ' manzanas' + (r.porCalles ? ' y ' + r.porCalles + ' por calles' : '')">
+                  <strong>{{ r.numero }}</strong>
+                  <span>{{ r.enteras }}/{{ r.total }}</span>
+                </button>
+                <button type="button" class="ficha-cerrar" (click)="store.cerrar(r.numero)" [attr.aria-label]="'Cerrar territorio ' + r.numero">✕</button>
+              </div>
+            }
+          </div>
+        }
+        @if (store.cargandoTerritorio() !== null) {
+          <p class="cargando-territorio"><span class="spinner chico" aria-hidden="true"></span> Cargando el territorio {{ store.cargandoTerritorio() }}…</p>
+        }
 
         @if (store.edicion(); as ed) {
           <div class="calles" role="group" aria-label="Calles de la manzana">
@@ -121,27 +138,30 @@
             <div class="calles-botones">
               <button type="button" class="boton" (click)="store.todaLaManzana()">Toda la manzana</button>
               <button type="button" class="boton" (click)="store.cancelarLados()">Cancelar</button>
-              <button type="button" class="boton primario" (click)="store.guardarLados()">Listo</button>
+              <button type="button" class="boton primario" (click)="store.guardarLados()" data-tutorial="calles-listo">Listo</button>
             </div>
           </div>
         } @else {
           <div class="modos" role="radiogroup" aria-label="Cómo marcar" data-tutorial="modos">
             <button type="button" role="radio" class="modo" [class.activo]="store.modo() === 'manzana'" [attr.aria-checked]="store.modo() === 'manzana'" (click)="cambiarModo('manzana')">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" class="relleno" /></svg>
-              Manzana entera
+              <span>Manzana <span class="largo">entera</span></span>
             </button>
-            <button type="button" role="radio" class="modo" [class.activo]="store.modo() === 'calles'" [attr.aria-checked]="store.modo() === 'calles'" (click)="cambiarModo('calles')">
+            <button type="button" role="radio" class="modo" [class.activo]="store.modo() === 'calles'" [attr.aria-checked]="store.modo() === 'calles'" data-tutorial="modo-calles" (click)="cambiarModo('calles')">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 17h16M17 4v16" class="grueso" /></svg>
               Por calles
             </button>
           </div>
-          <p class="indicacion chica">
-            @if (store.modo() === 'manzana') {
-              Toca una manzana para marcarla. Tócala otra vez para desmarcarla.
-            } @else {
-              Toca una manzana y después las calles que predicaron.
-            }
-          </p>
+          <!-- La indicación se muestra hasta el primer cambio: después ya se sabe y el mapa necesita el espacio. -->
+          @if (!store.hayCambios() && !store.practica()) {
+            <p class="indicacion chica">
+              @if (store.modo() === 'manzana') {
+                Toca una manzana para marcarla. Tócala otra vez para desmarcarla.
+              } @else {
+                Toca una manzana y después las calles que predicaron.
+              }
+            </p>
+          }
         }
 
         <div class="enviar-fila">

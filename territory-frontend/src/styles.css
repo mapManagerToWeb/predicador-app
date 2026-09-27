@@ -458,3 +458,31 @@ img {
   color: #ffffff;
   font-size: 18px;
 }
+
+/* ── Práctica del tutorial: aro que late sobre la manzana a tocar (Marker de MapLibre;
+   el marcador se ubica con transform, así que la animación va en el hijo) ── */
+.maplibregl-marker.pulso-practica {
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+}
+
+.maplibregl-marker.pulso-practica > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 4px solid #facc15;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.55);
+  animation: pulso-practica 1.2s ease-out infinite;
+}
+
+@keyframes pulso-practica {
+  0% { transform: scale(0.55); opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0.15; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .maplibregl-marker.pulso-practica > span { animation: none; }
+}

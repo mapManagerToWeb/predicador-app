@@ -157,3 +157,27 @@ export function puntoDeRotulo(manzanas: Poligonal[]): Position | null {
   }
   return mejor;
 }
+
+/** Perímetro (m) del contorno exterior del polígono más grande. */
+export function perimetro(g: Poligonal): number {
+  let total = 0;
+  for (const p of poligonos(g)) {
+    const anillo = p[0] ?? [];
+    if (!anillo.length) continue;
+    const kx = escalaX(anillo[0][1]);
+    for (let i = 0; i < anillo.length - 1; i++) {
+      total += Math.hypot((anillo[i + 1][0] - anillo[i][0]) * kx, (anillo[i + 1][1] - anillo[i][1]) * M_POR_GRADO_LAT);
+    }
+  }
+  return total;
+}
+
+/**
+ * Qué tan "cómoda de tocar" es una manzana: grande y compacta (no una franja
+ * larga y angosta). Es el área multiplicada por la compacidad 4πA/P².
+ */
+export function comodidadDeToque(g: Poligonal): number {
+  const a = area(g);
+  const p = perimetro(g);
+  return p > 0 ? (a * (4 * Math.PI * a)) / (p * p) : 0;
+}
