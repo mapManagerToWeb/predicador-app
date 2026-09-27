@@ -97,8 +97,24 @@ export function zonaDe(t: TerritorioSalida, manzanaId: string): ZonaParcialDatos
 }
 
 /** Un toque en modo "manzana entera": la marca, o la desmarca si ya estaba. */
+/**
+ * La manzana vino entera en el último reporte enviado. Lo ya reportado no lo
+ * puede deshacer el encargado (solo agregar); si fue un error, lo corrige el
+ * administrador desde el panel (queda registrado quién y por qué).
+ */
+export function enteraEnLaBase(t: TerritorioSalida, manzanaId: string): boolean {
+  return t.base?.marcadas.includes(manzanaId) ?? false;
+}
+
+/** Calles de la manzana que ya vinieron en el último reporte (no se pueden quitar). */
+export function ladosDeLaBase(t: TerritorioSalida, manzanaId: string, totalLados: number): number[] {
+  if (enteraEnLaBase(t, manzanaId)) return Array.from({ length: totalLados }, (_, i) => i);
+  return t.base?.zonas.find(z => z.manzanaId === manzanaId)?.lados.filter(i => i < totalLados) ?? [];
+}
+
 export function alternarManzana(t: TerritorioSalida, manzana: Manzana): TerritorioSalida {
   if (estaMarcada(t, manzana.id)) {
+    if (enteraEnLaBase(t, manzana.id)) return t;
     return { ...t, marcadas: t.marcadas.filter(id => id !== manzana.id) };
   }
   // Marcarla entera reemplaza lo que tuviera marcado por calles.
@@ -115,6 +131,9 @@ export function guardarLados(
   seleccion: number[],
   totalLados: number,
 ): TerritorioSalida {
+  if (enteraEnLaBase(t, manzana.id)) return t;
+  // Las calles del último reporte quedan siempre (solo se pueden agregar otras).
+  seleccion = [...new Set([...seleccion, ...ladosDeLaBase(t, manzana.id, totalLados)])];
   const sinManzana = { ...t, marcadas: t.marcadas.filter(id => id !== manzana.id), zonas: sinZonasDe(t.zonas, manzana) };
   if (seleccion.length === 0) return sinManzana;
   if (seleccion.length >= totalLados) return alternarManzana(sinManzana, manzana);

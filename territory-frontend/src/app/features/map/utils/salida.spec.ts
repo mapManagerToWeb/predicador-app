@@ -9,6 +9,8 @@ import {
   hayCambios,
   ladosElegidos,
   registroDe,
+  enteraEnLaBase,
+  ladosDeLaBase,
   resumir,
   turnoPorHora,
   type Manzana,
@@ -122,9 +124,27 @@ describe('salida', () => {
       expect(hayCambios(alternarManzana(alternarManzana(t, B), B))).toBe(false);
     });
 
-    it('desmarcar algo del último reporte también es un cambio (una corrección)', () => {
+    it('lo que vino en el último reporte no se puede desmarcar (lo corrige el administrador)', () => {
       const t = abrirTerritorio(5, baseDesdeReporte(reporte({ manzanasIds: '5-5.a' }), MANZANAS));
-      expect(hayCambios(alternarManzana(t, A))).toBe(true);
+      expect(enteraEnLaBase(t, A.id)).toBe(true);
+      expect(alternarManzana(t, A)).toBe(t);
+      expect(guardarLados(t, A, [0], 4)).toBe(t);
+      // Lo marcado en esta salida sí se puede desmarcar.
+      const conB = alternarManzana(t, B);
+      expect(alternarManzana(conB, B).marcadas).toEqual(['5-5.a']);
+    });
+
+    it('las calles del último reporte quedan; solo se pueden agregar otras', () => {
+      const lados = calcularLados(B.geometria).length;
+      const conZona = guardarLados(abrirTerritorio(5, null), B, [0], lados);
+      const { geometriaParcial, puntosParciales } = serializarZonas(conZona.zonas);
+      const t = abrirTerritorio(5, baseDesdeReporte(reporte({ manzanasIds: '', geometriaParcial, puntosParciales }), MANZANAS));
+      expect(ladosDeLaBase(t, B.id, lados)).toEqual([0]);
+      // Intentar dejarla sin la calle 0 la conserva; agregar la 1 suma.
+      expect(guardarLados(t, B, [], lados).zonas[0].lados).toEqual([0]);
+      expect(guardarLados(t, B, [1], lados).zonas[0].lados).toEqual([0, 1]);
+      // Completarla entera sí se puede.
+      expect(alternarManzana(t, B).marcadas).toEqual(['5-5.b']);
     });
   });
 

@@ -376,9 +376,13 @@ export class MapaVista {
     for (const l of ed.lados) {
       const el = document.createElement('button');
       el.type = 'button';
-      el.className = `lado-badge${elegidos.has(l.indice) ? ' marcado' : ''}`;
+      const bloqueado = ed.bloqueados.includes(l.indice);
+      el.className = `lado-badge${elegidos.has(l.indice) ? ' marcado' : ''}${bloqueado ? ' bloqueado' : ''}`;
       el.textContent = elegidos.has(l.indice) ? '✓' : String(l.indice + 1);
-      el.setAttribute('aria-label', `Calle ${l.indice + 1}${elegidos.has(l.indice) ? ', predicada' : ''}`);
+      el.setAttribute(
+        'aria-label',
+        `Calle ${l.indice + 1}${bloqueado ? ', ya reportada' : elegidos.has(l.indice) ? ', predicada' : ''}`,
+      );
       // Que el toque no llegue al mapa (abriría otra manzana).
       for (const tipo of ['mousedown', 'touchstart', 'pointerdown', 'dblclick']) {
         el.addEventListener(tipo, ev => ev.stopPropagation());
