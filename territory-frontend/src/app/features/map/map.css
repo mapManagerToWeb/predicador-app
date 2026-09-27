@@ -244,14 +244,6 @@ svg .grueso {
   color: var(--ink-muted);
 }
 
-.territorios {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 30vh;
-  overflow-y: auto;
-}
-
 .territorio {
   display: flex;
   align-items: center;
@@ -269,6 +261,14 @@ svg .grueso {
   flex-direction: column;
 }
 
+.territorio-linea {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .territorio-nombre {
   font-size: 19px;
   font-weight: 700;
@@ -276,10 +276,12 @@ svg .grueso {
 
 .territorio-cuenta {
   font-size: 16px;
+  white-space: nowrap;
 }
 
 .completo {
   color: var(--color-success);
+  font-size: 15px;
 }
 
 .territorio-nota {
@@ -288,8 +290,64 @@ svg .grueso {
 }
 
 .cargando-territorio {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  margin: 0;
   font-size: 15px;
+  color: var(--ink-muted);
+}
+
+/* Varios territorios: fichas compactas; si no caben en una fila pasan a la
+   siguiente (una ficha escondida al costado no la encuentra cualquiera). */
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 112px;
+  overflow-y: auto;
+}
+
+.ficha {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border-left: 6px solid var(--color, var(--color-primary));
+  overflow: hidden;
+}
+
+.ficha.completa {
+  box-shadow: inset 0 0 0 2px var(--color-success);
+}
+
+.ficha-ir,
+.ficha-cerrar {
+  min-height: 48px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ficha-ir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 0 9px;
+  font-size: 16px;
+}
+
+.ficha-ir strong {
+  font-size: 19px;
+}
+
+.ficha-cerrar {
+  width: 36px;
+  font-size: 16px;
   color: var(--ink-muted);
 }
 
@@ -480,4 +538,36 @@ svg .grueso {
 
 :host-context([data-theme='dark']) ::ng-deep .maplibregl-ctrl-icon {
   filter: invert(1);
+}
+
+/* Teléfonos angostos (iPhone SE y similares): todo más compacto para que el mapa se vea. */
+@media (max-width: 380px) {
+  .panel {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .modo .largo {
+    display: none;
+  }
+
+  .modo,
+  .turno button {
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .boton.enviar {
+    height: 50px;
+  }
+
+  .indicacion.chica {
+    font-size: 14px;
+  }
+}
+
+@media (max-height: 640px) {
+  .territorio-nota {
+    display: none;
+  }
 }

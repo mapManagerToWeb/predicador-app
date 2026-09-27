@@ -220,4 +220,48 @@ describe('MapaStore', () => {
     expect(store.abiertos()).toEqual([5, 6]);
     expect(aviso).toHaveBeenCalledWith('No existe el territorio 99', 3000, 'warning');
   });
+
+  describe('práctica del tutorial', () => {
+    it('sugiere un territorio cercano al centro del mapa y su manzana más cómoda de tocar', async () => {
+      await cargar(store);
+      (vista as unknown as { centro: () => [number, number] }).centro = () => [-73.3295, -37.4995];
+      expect(store.sugerirPractica()).toEqual({ territorio: 6, manzana: '6-6.a' });
+    });
+
+    it('nada de la práctica se guarda ni se envía, y después vuelve lo que el encargado tenía', async () => {
+      vi.useFakeTimers();
+      try {
+        await cargar(store);
+        await store.abrir(5);
+        store.tocar({ manzana: '5-5.b', cercana: null });
+        await vi.advanceTimersByTimeAsync(400);
+        const borradorAntes = localStorage.getItem('territory_map_draft');
+        const inicio = store.inicioSesion();
+
+        store.iniciarPractica(6);
+        expect(store.practica()).toBe(true);
+        expect(store.abiertos()).toEqual([6]);
+        store.tocar({ manzana: '6-6.a', cercana: null });
+        expect(store.resumenes()[0]).toMatchObject({ numero: 6, enteras: 1 });
+        await vi.advanceTimersByTimeAsync(400);
+        expect(localStorage.getItem('territory_map_draft')).toBe(borradorAntes);
+
+        const aviso = vi.spyOn(TestBed.inject(Toast), 'show');
+        store.pedirEnvio();
+        expect(store.pregunta()).toBeNull();
+        expect(aviso).toHaveBeenCalledWith('Es una práctica: no se envía nada', 2500);
+        store.tocar({ manzana: '5-5.a', cercana: null });
+        expect(store.pregunta()).toBeNull();
+
+        store.terminarPractica();
+        expect(store.practica()).toBe(false);
+        expect(store.abiertos()).toEqual([5]);
+        expect(store.resumenes()[0]).toMatchObject({ numero: 5, enteras: 2, cambios: true });
+        expect(store.inicioSesion()).toBe(inicio);
+        expect(territorios.crearReportes).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

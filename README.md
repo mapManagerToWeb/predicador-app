@@ -101,7 +101,8 @@ PWA para gestión de territorios y reportes de predicación de los Testigos de J
 - **Mapa de marcado** (MapLibre, ADR 0010): el primer toque abre el territorio; en un territorio abierto **un toque marca la manzana y otro toque la desmarca**. Tocar otro territorio pregunta si agregarlo a la salida. Fondos OpenStreetMap y satelital (ArcGIS)
 - **Marcado por calles**: modo «Por calles»: tocar una manzana y después las calles que se predicaron; se marca una franja a lo largo de esas calles. Con todas, la manzana queda completa. Se puede retomar y editar después
 - **Nada se pierde sin preguntar**: cerrar un territorio con marcas sin enviar, cerrar sesión y enviar piden confirmación; «Enviar» muestra un resumen y solo se habilita si hay cambios respecto del último reporte. Un territorio que se completó empieza una vuelta nueva
-- **Tutorial**: recorrido guiado la primera vez; se vuelve a ver con el botón «?»
+- **Tutorial con práctica**: la primera vez (y con el botón «?») enseña a usar la app practicando de verdad en un territorio de ejemplo: marcar y desmarcar una manzana, marcar por calles, guardar. Solo avanza cuando la persona lo hace (un aro amarillo muestra dónde tocar; a los 20 s ofrece «Hazlo por mí»). Nada de la práctica se guarda ni se envía
+- **Panel compacto**: con varios territorios abiertos se muestran como fichas de una línea, y el mapa encuadra siempre en el espacio que deja libre el panel (probado en pantallas de 320×568)
 - **Mi ubicación** como en Google Maps: si se mueve el mapa deja de seguir (el punto azul sigue actualizándose) y el botón vuelve a centrar
 - **Búsqueda de territorios**: por número, con sugerencias; «71, 72» abre los dos
 - **Gestión de colores**: Colores asignados por territorio para diferenciación visual

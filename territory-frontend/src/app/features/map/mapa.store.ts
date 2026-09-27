@@ -14,6 +14,7 @@ import { WhatsAppService } from './services/whatsapp';
 import { elegirUltimoReporte } from './utils/report-utils';
 import { getColorForTerritorio } from './utils/territory-colors';
 import { calcularLados, leerZonas, type GeometriaManzana } from './utils/lados';
+import { comodidadDeToque } from '../../core/map/geometria';
 import { leerBorrador, serializarBorrador } from './utils/borrador';
 import {
   abrirTerritorio,
@@ -41,6 +42,14 @@ export interface VistaMapa {
   encuadrar(territorios: number[], animar?: boolean): void;
   mostrarLados(ed: EdicionLados | null, encuadrar?: boolean): void;
   capturar(territorios: number[]): Promise<string | null>;
+  /** Práctica del tutorial: un aro que late sobre la manzana a tocar (null lo quita). */
+  resaltarManzana?(id: string | null): void;
+  /** Acerca el mapa a una manzana (la práctica la muestra grande, fácil de tocar). */
+  encuadrarManzana?(id: string): void;
+  /** Centro del mapa [lng, lat], para elegir un territorio de práctica cercano. */
+  centro?(): [number, number];
+  /** Lo que tapan la tarjeta del tutorial (arriba) y el panel (abajo), en px. */
+  ajustarMargenes?(m: { arriba?: number; abajo?: number }): void;
 }
 
 interface PropsManzanaApi {
@@ -99,6 +108,19 @@ export class MapaStore {
   readonly inicioSesion = signal<string | null>(null);
   readonly enviando = signal(false);
   readonly pregunta = signal<Pregunta | null>(null);
+  /**
+   * Práctica del tutorial: un territorio de ejemplo sin marcas. Lo que se hace
+   * no se guarda en el borrador ni se envía, y al terminar todo vuelve a como
+   * estaba (incluidos los territorios que el encargado tenía abiertos).
+   */
+  readonly practica = signal(false);
+  private antesDePracticar: {
+    abiertos: number[];
+    salida: Map<number, TerritorioSalida>;
+    modo: ModoMarcado;
+    predicacion: 'mañana' | 'tarde';
+    inicioSesion: string | null;
+  } | null = null;
 
   readonly resumenes = computed<ResumenAbierto[]>(() => {
     const salida = this.salida();
@@ -161,8 +183,9 @@ export class MapaStore {
         predicacion: this.predicacion(),
         inicioSesion: this.inicioSesion(),
       };
+      const enPractica = this.practica();
       untracked(() => {
-        if (!this.restaurado) return;
+        if (!this.restaurado || enPractica) return;
         if (this.temporizadorBorrador) clearTimeout(this.temporizadorBorrador);
         this.temporizadorBorrador = setTimeout(() => {
           if (datos.territorios.length === 0) this.borrador.clear();
@@ -331,6 +354,7 @@ export class MapaStore {
 
   /** Abre un territorio para marcar (o lo encuadra si ya estaba abierto). */
   async abrir(numero: number): Promise<void> {
+    if (this.avisarPractica()) return;
     if (!this.manzanasPorTerritorio.has(numero)) {
       this.toast.show(`No existe el territorio ${numero}`, 3000, 'warning');
       return;
@@ -360,6 +384,7 @@ export class MapaStore {
 
   /** Cierra un territorio; si tiene algo sin enviar, pregunta antes. */
   cerrar(numero: number): void {
+    if (this.avisarPractica()) return;
     const t = this.salida().get(numero);
     if (t && hayCambios(t)) {
       this.pregunta.set({
@@ -400,6 +425,84 @@ export class MapaStore {
     });
   }
 
+  // ── Práctica del tutorial ──
+
+  private avisarPractica(): boolean {
+    if (this.practica()) this.toast.show('Estás en la práctica: sigue los pasos del tutorial', 2500);
+    return this.practica();
+  }
+
+  /**
+   * Territorio y manzana para practicar: el territorio de la manzana más
+   * cercana al centro del mapa (uno que el encargado reconoce) y, dentro de
+   * él, la manzana grande y compacta más fácil de tocar (no una franja larga).
+   */
+  sugerirPractica(): { territorio: number; manzana: string } | null {
+    const centro = this.vista?.centro?.();
+    let cercana: Manzana | undefined;
+    let mejor = Infinity;
+    for (const m of this.manzanasPorId.values()) {
+      if (!centro) {
+        cercana = m;
+        break;
+      }
+      const [x, y] = primerPunto(m.geometria);
+      const d = (x - centro[0]) ** 2 + (y - centro[1]) ** 2;
+      if (d < mejor) {
+        mejor = d;
+        cercana = m;
+      }
+    }
+    if (!cercana) return null;
+    const delTerritorio = this.manzanasPorTerritorio.get(cercana.territorio) ?? [cercana];
+    const comoda = delTerritorio.reduce((a, b) => (comodidadDeToque(b.geometria) > comodidadDeToque(a.geometria) ? b : a));
+    return { territorio: cercana.territorio, manzana: comoda.id };
+  }
+
+  iniciarPractica(territorio: number): void {
+    if (this.practica() || !this.manzanasPorTerritorio.has(territorio)) return;
+    if (this.edicion()) this.cerrarLados();
+    this.pregunta.set(null);
+    this.antesDePracticar = {
+      abiertos: this.abiertos(),
+      salida: this.salida(),
+      modo: this.modo(),
+      predicacion: this.predicacion(),
+      inicioSesion: this.inicioSesion(),
+    };
+    this.practica.set(true);
+    this.abiertos.set([territorio]);
+    this.salida.set(new Map([[territorio, abrirTerritorio(territorio, BASE_VACIA)]]));
+    this.modo.set('manzana');
+  }
+
+  terminarPractica(): void {
+    if (!this.practica()) return;
+    this.cerrarLados();
+    this.vista?.resaltarManzana?.(null);
+    const antes = this.antesDePracticar!;
+    this.abiertos.set(antes.abiertos);
+    this.salida.set(antes.salida);
+    this.modo.set(antes.modo);
+    this.predicacion.set(antes.predicacion);
+    this.inicioSesion.set(antes.inicioSesion);
+    this.antesDePracticar = null;
+    this.practica.set(false);
+    if (antes.abiertos.length) this.vista?.encuadrar(antes.abiertos);
+  }
+
+  resaltarManzana(id: string | null): void {
+    this.vista?.resaltarManzana?.(id);
+  }
+
+  encuadrarManzana(id: string): void {
+    this.vista?.encuadrarManzana?.(id);
+  }
+
+  ajustarMargenes(m: { arriba?: number; abajo?: number }): void {
+    this.vista?.ajustarMargenes?.(m);
+  }
+
   // ── Marcado ──
 
   /** Qué hacer con un toque en el mapa (ver la descripción de la clase). */
@@ -415,7 +518,7 @@ export class MapaStore {
       return;
     }
     if (!this.abiertos().includes(m.territorio)) {
-      this.proponerAgregar(m.territorio);
+      if (!this.avisarPractica()) this.proponerAgregar(m.territorio);
       return;
     }
     if (this.cargandoTerritorio() === m.territorio || !this.salida().has(m.territorio)) return;
@@ -504,7 +607,7 @@ export class MapaStore {
       const t = s.get(numero);
       return t ? new Map(s).set(numero, cambio(t)) : s;
     });
-    if (!this.inicioSesion() && this.hayCambios()) this.inicioSesion.set(new Date().toISOString());
+    if (!this.practica() && !this.inicioSesion() && this.hayCambios()) this.inicioSesion.set(new Date().toISOString());
   }
 
   // ── Envío ──
@@ -512,6 +615,10 @@ export class MapaStore {
   /** Muestra el resumen y pide confirmar antes de enviar. */
   pedirEnvio(): void {
     if (this.enviando()) return;
+    if (this.practica()) {
+      this.toast.show('Es una práctica: no se envía nada', 2500);
+      return;
+    }
     if (this.edicion()) this.guardarLados(false);
     const conCambios = this.resumenes().filter(r => r.cambios);
     if (conCambios.length === 0) {
@@ -623,4 +730,8 @@ export class MapaStore {
     for (const r of registros) this.quitar(r.territorioNumero);
     this.inicioSesion.set(null);
   }
+}
+
+function primerPunto(g: GeometriaManzana): number[] {
+  return g.type === 'Polygon' ? g.coordinates[0][0] : g.coordinates[0][0][0];
 }
