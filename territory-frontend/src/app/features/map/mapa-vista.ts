@@ -83,7 +83,12 @@ export class MapaVista {
    * el panel real: con varios territorios abiertos crece, y encuadrar con un
    * margen fijo dejaba territorios debajo del panel, imposibles de tocar.
    */
-  private margen = { arriba: 90, abajo: 300 };
+  private margen = { arriba: 90, abajo: 300, derecha: 0 };
+  /**
+   * El último encuadre, para repetirlo si justo después el panel crece (p. ej.
+   * aparece la nota del territorio al terminar de cargarlo) y tapa lo encuadrado.
+   */
+  private ultimoEncuadre: { repetir: () => void; hora: number } | null = null;
   private ubicacion: UbicacionMapa | null = null;
   private fondo: FondoMapa = 'mapa';
   private observadorTema: MutationObserver | null = null;
@@ -116,6 +121,8 @@ export class MapaVista {
     vista.agregarCapas(etiquetas);
     vista.agregarUbicacion();
     map.on('click', e => vista.alHacerClick(e));
+    // Si el usuario mueve el mapa, ya no se repite el último encuadre.
+    map.on('dragstart', () => (vista.ultimoEncuadre = null));
     vista.observadorTema = new MutationObserver(() => cambiarFondo(map, vista.fondo, temaOscuro()));
     vista.observadorTema.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return vista;
@@ -295,32 +302,42 @@ export class MapaVista {
     return Number.isFinite(o) ? [[o, s], [e, n]] : null;
   }
 
-  ajustarMargenes(m: { arriba?: number; abajo?: number }): void {
-    this.margen = { ...this.margen, ...m };
+  ajustarMargenes(m: { arriba?: number; abajo?: number; derecha?: number }): void {
+    const antes = this.margen;
+    this.margen = { ...antes, ...m };
+    const tapaMas =
+      this.margen.abajo - antes.abajo > 24 || this.margen.derecha - antes.derecha > 24 || this.margen.arriba - antes.arriba > 24;
+    const e = this.ultimoEncuadre;
+    if (tapaMas && e && Date.now() - e.hora < 2000) e.repetir();
+  }
+
+  private encuadrarCaja(caja: LngLatBoundsLike, lados: number, maxZoom: number, duracion: number): void {
+    this.ubicacion?.dejarDeSeguir();
+    this.map.fitBounds(caja, { padding: this.relleno(lados), maxZoom, duration: duracion });
+    this.ultimoEncuadre = { repetir: () => this.map.fitBounds(caja, { padding: this.relleno(lados), maxZoom, duration: 300 }), hora: Date.now() };
   }
 
   /** Relleno para fitBounds que deja libre lo tapado, sin pasarse si la pantalla es chica. */
   private relleno(lados: number): { top: number; bottom: number; left: number; right: number } {
-    const alto = this.map.getContainer().clientHeight;
+    const { clientHeight: alto, clientWidth: ancho } = this.map.getContainer();
     const arriba = Math.round(this.margen.arriba + 12);
-    // Siempre queda al menos un 25 % del alto para el mapa.
+    // Siempre queda al menos un 25 % del alto (y del ancho) para el mapa.
     const abajo = Math.round(Math.max(24, Math.min(this.margen.abajo + 12, alto * 0.75 - arriba)));
-    return { top: arriba, bottom: abajo, left: lados, right: lados };
+    const derecha = Math.round(Math.max(lados, Math.min(this.margen.derecha + lados, ancho * 0.75 - lados)));
+    return { top: arriba, bottom: abajo, left: lados, right: derecha };
   }
 
   /** Encuadra los territorios en lo que queda visible entre la barra y el panel. */
   encuadrar(territorios: number[], animar = true): void {
     const caja = this.limites(territorios);
     if (!caja) return;
-    this.ubicacion?.dejarDeSeguir();
-    this.map.fitBounds(caja, { padding: this.relleno(24), maxZoom: 17.5, duration: animar ? 600 : 0 });
+    this.encuadrarCaja(caja, 24, 17.5, animar ? 600 : 0);
   }
 
   encuadrarManzana(id: string): void {
     const i = this.indice.get(id);
     if (i === undefined) return;
-    this.ubicacion?.dejarDeSeguir();
-    this.map.fitBounds(this.cajaDe(this.manzanas[i].geometria), { padding: this.relleno(48), maxZoom: 18.5, duration: 600 });
+    this.encuadrarCaja(this.cajaDe(this.manzanas[i].geometria), 48, 18.5, 600);
   }
 
   centro(): [number, number] {
@@ -395,8 +412,7 @@ export class MapaVista {
     }
 
     if (encuadrar) {
-      this.ubicacion?.dejarDeSeguir();
-      this.map.fitBounds(this.cajaDe(ed.geometria), { padding: this.relleno(44), maxZoom: 19, duration: 500 });
+      this.encuadrarCaja(this.cajaDe(ed.geometria), 44, 19, 500);
     }
   }
 

@@ -96,7 +96,7 @@ export async function crearMapa(
     bounds: ENCUADRE_INICIAL,
     attributionControl: { compact: true },
     cooperativeGestures: cooperativo,
-    locale: { 'CooperativeGesturesHandler.WindowsHelpText': 'Usá Ctrl + rueda para hacer zoom', 'CooperativeGesturesHandler.MacHelpText': 'Usá ⌘ + rueda para hacer zoom', 'CooperativeGesturesHandler.MobileHelpText': 'Usá dos dedos para mover el mapa' },
+    locale: { 'CooperativeGesturesHandler.WindowsHelpText': 'Usa Ctrl + rueda para hacer zoom', 'CooperativeGesturesHandler.MacHelpText': 'Usa ⌘ + rueda para hacer zoom', 'CooperativeGesturesHandler.MobileHelpText': 'Usa dos dedos para mover el mapa' },
     // Guardar el canvas permite exportar la vista como imagen.
     canvasContextAttributes: { preserveDrawingBuffer: true },
   });

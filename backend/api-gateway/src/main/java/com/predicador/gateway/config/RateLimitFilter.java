@@ -178,7 +178,7 @@ public class RateLimitFilter implements WebFilter, Ordered {
     private static Mono<Void> tooManyRequests(ServerWebExchange exchange) {
         ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.TOO_MANY_REQUESTS);
         pd.setTitle("Demasiadas solicitudes");
-        pd.setDetail("Alcanzaste el límite de intentos. Intentá de nuevo en un minuto.");
+        pd.setDetail("Alcanzaste el límite de intentos. Intenta de nuevo en un minuto.");
         exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
         exchange.getResponse().getHeaders().setContentType(PROBLEM_JSON);
         exchange.getResponse().getHeaders().set("Retry-After", "60");

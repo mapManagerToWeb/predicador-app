@@ -3,7 +3,8 @@ import { ProfilePage } from './profile';
 import { Profile } from '../../core/services/profile';
 import { EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
-import { ActivatedRoute, Router } from '@angular/router';
+import { AuthTokenService } from '../../core/services/auth-token';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 
 describe('ProfilePage', () => {
   let fixture: ComponentFixture<ProfilePage>;
@@ -11,6 +12,8 @@ describe('ProfilePage', () => {
   let profile: { hasProfile: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
   let encargadoService: { buscarOCrear: ReturnType<typeof vi.fn> };
   let toast: { show: ReturnType<typeof vi.fn> };
+  let authToken: { hasToken: ReturnType<typeof vi.fn> };
+  let queryParams: Record<string, string>;
   let router: {
     navigate: ReturnType<typeof vi.fn>;
     createUrlTree: ReturnType<typeof vi.fn>;
@@ -22,6 +25,8 @@ describe('ProfilePage', () => {
     profile = { hasProfile: vi.fn().mockReturnValue(false), save: vi.fn() };
     encargadoService = { buscarOCrear: vi.fn() };
     toast = { show: vi.fn() };
+    authToken = { hasToken: vi.fn().mockReturnValue(true) };
+    queryParams = {};
     router = {
       navigate: vi.fn().mockResolvedValue(true),
       createUrlTree: vi.fn(),
@@ -36,7 +41,8 @@ describe('ProfilePage', () => {
         { provide: EncargadoService, useValue: encargadoService },
         { provide: Toast, useValue: toast },
         { provide: Router, useValue: router },
-        { provide: ActivatedRoute, useValue: { snapshot: {} } },
+        { provide: AuthTokenService, useValue: authToken },
+        { provide: ActivatedRoute, useValue: { snapshot: { get queryParamMap() { return convertToParamMap(queryParams); } } } },
       ],
     }).compileComponents();
 
@@ -55,6 +61,21 @@ describe('ProfilePage', () => {
     component.ngOnInit();
 
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('con un perfil guardado pero sin sesión (vencida) se queda en el formulario', () => {
+    profile.hasProfile.mockReturnValue(true);
+    authToken.hasToken.mockReturnValue(false);
+    component.ngOnInit();
+
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('trae el teléfono que se escribió en el login', () => {
+    queryParams = { telefono: '912345678' };
+    component.ngOnInit();
+
+    expect(component.telefono()).toBe('912345678');
   });
 
   it('updates fields from input events', () => {
@@ -109,7 +130,7 @@ describe('ProfilePage', () => {
     expect(component.loading()).toBe(false);
   });
 
-  it('falls back to a local profile when the backend is unavailable', async () => {
+  it('sin conexión no guarda un perfil local: avisa y se queda en el formulario', async () => {
     encargadoService.buscarOCrear.mockRejectedValue(new Error('offline'));
     component.name.set('Daniel');
     component.lastName.set('Uribe');
@@ -117,13 +138,9 @@ describe('ProfilePage', () => {
 
     await component.save();
 
-    expect(profile.save).toHaveBeenCalledWith({
-      name: 'Daniel',
-      lastName: 'Uribe',
-      avatar: 0,
-      telefono: '+56912345678',
-    });
-    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('guardado localmente'), 3000, 'warning');
-    expect(router.navigate).toHaveBeenCalledWith(['/map']);
+    expect(profile.save).not.toHaveBeenCalled();
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('intenta de nuevo'), 5000, 'error');
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(component.loading()).toBe(false);
   });
 });

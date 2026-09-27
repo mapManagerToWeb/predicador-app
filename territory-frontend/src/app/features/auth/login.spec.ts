@@ -98,7 +98,7 @@ describe('LoginPage', () => {
 
     await component.login();
 
-    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no encontrado'), 4000, 'warning');
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no está registrado'), 4000, 'warning');
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
@@ -108,7 +108,7 @@ describe('LoginPage', () => {
 
     await component.login();
 
-    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Servidor no disponible'), 4000, 'error');
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Sin conexión con el servidor'), 4000, 'error');
   });
 
   it('shows a generic error toast for any other failure', async () => {
@@ -123,7 +123,7 @@ describe('LoginPage', () => {
 
   it('pide el PIN cuando el backend responde pin_requerido y lo envía en el segundo intento', async () => {
     encargadoService.loginByPhone
-      .mockRejectedValueOnce({ status: 401, error: { code: 'pin_requerido', detail: 'Ingresá tu PIN' } })
+      .mockRejectedValueOnce({ status: 401, error: { code: 'pin_requerido', detail: 'Ingresa tu PIN' } })
       .mockResolvedValueOnce({ id: 7, nombre: 'Ana', apellido: 'Pérez', avatar: 1, telefono: '56912345678', activo: true });
     component.telefono.set('912345678');
 
@@ -140,7 +140,7 @@ describe('LoginPage', () => {
   it('muestra el motivo cuando la cuenta está bloqueada o desactivada', async () => {
     encargadoService.loginByPhone.mockRejectedValue({
       status: 423,
-      error: { code: 'pin_bloqueado', detail: 'Demasiados intentos. Probá de nuevo en 15 minuto(s).' },
+      error: { code: 'pin_bloqueado', detail: 'Demasiados intentos. Prueba de nuevo en 15 minuto(s).' },
     });
     component.telefono.set('912345678');
 

@@ -68,7 +68,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('isAdmin');
         }
-        toastService.show('Sesión expirada. Iniciá sesión nuevamente.', 4000, 'warning');
+        toastService.show('Tu sesión venció. Vuelve a entrar: lo que marcaste sigue guardado.', 4000, 'warning');
         // Desde el panel se vuelve a su propio login, no al de encargados.
         void router.navigate([isAdminRequest ? '/admin' : '/login']);
         return throwError(() => error);
@@ -80,11 +80,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         if (error.status === 0) {
           message = 'Servidor no disponible';
         } else if (error.status === 403) {
-          message = 'No tenés permisos para realizar esta acción';
+          message = 'No tienes permiso para hacer esto';
         } else if (error.status === 404) {
           message = 'Recurso no encontrado';
         } else if (error.status === 429) {
-          message = 'Demasiadas solicitudes. Esperá un momento.';
+          message = 'Demasiados intentos. Espera un momento.';
         } else if (error.status >= 500) {
           message = 'Error del servidor';
         }

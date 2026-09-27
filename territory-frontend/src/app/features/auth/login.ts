@@ -71,16 +71,16 @@ export class LoginPage implements OnInit {
       const { code, detail } = codigoLogin(err);
       if (code === 'pin_requerido') {
         this.pinRequerido.set(true);
-        this.toast.show('Ingresá tu PIN', 3000, 'info');
+        this.toast.show('Ingresa tu PIN', 3000, 'info');
       } else if (code === 'pin_incorrecto') {
         this.pin.set('');
         this.toast.show('PIN incorrecto', 3000, 'error');
       } else if (code === 'pin_bloqueado' || code === 'inactivo') {
-        this.toast.show(detail ?? 'No podés ingresar ahora', 6000, 'error');
+        this.toast.show(detail ?? 'No puedes entrar ahora', 6000, 'error');
       } else if (status === 0) {
-        this.toast.show('Servidor no disponible. Intentá de nuevo.', 4000, 'error');
+        this.toast.show('Sin conexión con el servidor. Intenta de nuevo.', 4000, 'error');
       } else if (status === 404) {
-        this.toast.show('Usuario no encontrado. Creá tu perfil.', 4000, 'warning');
+        this.toast.show('Ese número no está registrado. Crea tu perfil.', 4000, 'warning');
       } else {
         this.toast.show('Error al iniciar sesión', 3000, 'error');
       }

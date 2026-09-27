@@ -35,15 +35,21 @@ export class AuthTokenService {
     this.persist(role);
   }
 
+  /**
+   * Olvida la sesión (vencida o rechazada por el backend). Lo marcado sin
+   * enviar se conserva: al volver a entrar la misma persona lo recupera.
+   */
   clear(): void {
     this.roleSignal.set(null);
     this.persist(null);
     this.authService?.invalidateCache();
-    this.territorioService?.logout();
+    this.territorioService?.olvidarCache();
   }
 
+  /** Cierre de sesión pedido por el usuario: borra también lo marcado sin enviar. */
   logout(): void {
     this.clear();
+    this.territorioService?.logout();
     this.http?.post('/api/v1/auth/logout', {}).subscribe({
       error: () => undefined,
       complete: () => undefined,

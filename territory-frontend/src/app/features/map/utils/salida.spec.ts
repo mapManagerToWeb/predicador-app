@@ -173,7 +173,7 @@ describe('salida', () => {
       expect(resumir(t, 3).completo).toBe(true);
     });
 
-    it('un único territorio completo va sin captura; con incompletos se omiten los completos', () => {
+    it('un único territorio completo va sin captura; con varios van todos, con captura', () => {
       const completo = { numero: 5, total: 3, enteras: 3, porCalles: 0, completo: true, cambios: true };
       const incompleto = { numero: 6, total: 4, enteras: 1, porCalles: 1, completo: false, cambios: true };
       expect(envioDe([completo])).toEqual({
@@ -181,9 +181,16 @@ describe('salida', () => {
         requiereScreenshot: false,
       });
       expect(envioDe([completo, incompleto])).toEqual({
-        territorios: [{ numero: 6, finalizado: false, totalManzanas: 4, manzanasMarcadas: 2 }],
+        territorios: [
+          { numero: 5, finalizado: true, totalManzanas: 3, manzanasMarcadas: 3 },
+          { numero: 6, finalizado: false, totalManzanas: 4, manzanasMarcadas: 2 },
+        ],
         requiereScreenshot: true,
       });
+      // Dos completos en la misma salida: el mensaje no puede quedar vacío (el servidor lo rechaza).
+      const otroCompleto = { ...completo, numero: 7 };
+      expect(envioDe([completo, otroCompleto]).territorios.map(t => t.numero)).toEqual([5, 7]);
+      expect(envioDe([completo, otroCompleto]).requiereScreenshot).toBe(true);
     });
   });
 

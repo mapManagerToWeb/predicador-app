@@ -213,6 +213,36 @@ describe('MapaStore', () => {
     expect(otro.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
   });
 
+  it('si entra otra persona en el mismo teléfono no hereda el borrador ajeno', async () => {
+    vi.useFakeTimers();
+    try {
+      await cargar(store);
+      await store.abrir(5);
+      store.tocar({ manzana: '5-5.c', cercana: null });
+      TestBed.tick();
+      await vi.advanceTimersByTimeAsync(400);
+      expect(TestBed.inject(DraftMarksService).cargar()).toMatchObject({ dueno: '3' });
+    } finally {
+      vi.useRealTimers();
+    }
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        MapaStore,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: TerritorioService, useValue: territorios },
+        { provide: WhatsAppService, useValue: whatsapp },
+        { provide: Profile, useValue: { currentUser: () => ({ name: 'Luis', lastName: 'R', avatar: 1, encargadoId: 9 }) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const otro = crear();
+    await cargar(otro);
+    expect(otro.abiertos()).toEqual([]);
+    expect(TestBed.inject(DraftMarksService).cargar()).toBeNull();
+  });
+
   it('buscar abre varios territorios y avisa si uno no existe', async () => {
     const aviso = vi.spyOn(TestBed.inject(Toast), 'show');
     await cargar(store);

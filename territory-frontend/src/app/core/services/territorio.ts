@@ -83,10 +83,15 @@ export class TerritorioService {
     return reportes;
   }
 
-  /** Logout hygiene: clears report cache + marks draft. */
-  logout(): void {
+  /** Sesión vencida: olvida los reportes cacheados, pero no lo marcado sin enviar. */
+  olvidarCache(): void {
     this.reportCache.clear();
     this.versionsSeen.clear();
+  }
+
+  /** Logout hygiene: clears report cache + marks draft. */
+  logout(): void {
+    this.olvidarCache();
     this.draftMarksService.clear();
   }
 

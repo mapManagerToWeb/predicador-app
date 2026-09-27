@@ -172,3 +172,45 @@ h2 {
 .tarjeta.compacta .botones:empty {
   display: none;
 }
+
+/* Teléfono de lado: el panel del mapa es una columna a la derecha; la tarjeta
+   va a la izquierda para no tapar los botones que señala. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .tarjeta {
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+    width: calc(100% - min(340px, 46vw) - 44px);
+    max-width: 440px;
+    max-height: calc(100% - 20px);
+    margin: 0;
+    padding: 14px 16px;
+    overflow-y: auto;
+  }
+
+  .tarjeta:not(.compacta) {
+    bottom: 10px;
+  }
+
+  .tarjeta.arriba,
+  .tarjeta.compacta {
+    top: max(10px, env(safe-area-inset-top));
+    bottom: auto;
+  }
+
+  h2 {
+    font-size: 19px;
+  }
+
+  .texto,
+  .tarjeta.compacta .texto {
+    font-size: 16px;
+  }
+
+  .botones {
+    margin-top: 12px;
+  }
+
+  .botones button {
+    height: 46px;
+  }
+}

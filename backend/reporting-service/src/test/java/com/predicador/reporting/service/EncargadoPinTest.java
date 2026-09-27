@@ -130,6 +130,25 @@ class EncargadoPinTest {
     }
 
     @Test
+    void buscarOCrear_conElNombreDeOtro_noLeCambiaElTelefono() {
+        when(repository.findByNaturalIdentity("Ana", "Pérez")).thenReturn(Optional.of(ana));
+
+        assertThatThrownBy(() -> service.buscarOCrear("Ana", "Pérez", "56900000000"))
+                .isInstanceOfSatisfying(EncargadoLoginException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(EncargadoLoginException.YA_REGISTRADO));
+        assertThat(ana.getTelefono()).isEqualTo("56911111111");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void buscarOCrear_conElMismoTelefono_entra() {
+        when(repository.findByNaturalIdentity("Ana", "Pérez")).thenReturn(Optional.of(ana));
+        when(repository.save(any(Encargado.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.buscarOCrear("Ana", "Pérez", "9 1111 1111").orElseThrow().id()).isEqualTo(7L);
+    }
+
+    @Test
     void registroCerrado_bloqueaAutoRegistro() {
         when(configuracion.registroAbierto()).thenReturn(false);
 

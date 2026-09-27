@@ -107,17 +107,18 @@ describe('AuthTokenService', () => {
     expect(localStorage.getItem('territory_role')).toBeNull();
   });
 
-  it('clear() propagates logout hygiene to the territory service when present', () => {
-    const territorioService = { logout: vi.fn() };
+  it('clear() (sesión vencida) olvida los reportes cacheados pero conserva lo marcado sin enviar', () => {
+    const territorioService = { logout: vi.fn(), olvidarCache: vi.fn() };
     const svc = new AuthTokenService(undefined, undefined, territorioService as never);
     svc.set('admin');
     svc.clear();
 
-    expect(territorioService.logout).toHaveBeenCalledTimes(1);
+    expect(territorioService.olvidarCache).toHaveBeenCalledTimes(1);
+    expect(territorioService.logout).not.toHaveBeenCalled();
   });
 
   it('logout() propagates logout hygiene to the territory service when present', () => {
-    const territorioService = { logout: vi.fn() };
+    const territorioService = { logout: vi.fn(), olvidarCache: vi.fn() };
     const svc = new AuthTokenService(undefined, undefined, territorioService as never);
     svc.set('admin');
     svc.logout();
