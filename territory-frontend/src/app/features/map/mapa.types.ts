@@ -12,6 +12,8 @@ export interface EdicionLados {
   geometria: GeometriaManzana;
   lados: Lado[];
   seleccion: number[];
+  /** Calles que ya vinieron en el último reporte: se ven marcadas y no se pueden quitar. */
+  bloqueados: number[];
 }
 
 /** Pregunta en pantalla (en vez de borrar o enviar sin avisar). */

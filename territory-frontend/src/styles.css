@@ -486,3 +486,10 @@ img {
 @media (prefers-reduced-motion: reduce) {
   .maplibregl-marker.pulso-practica > span { animation: none; }
 }
+
+/* Calle que ya vino en un reporte enviado: se ve marcada pero no se puede quitar. */
+.maplibregl-marker.lado-badge.marcado.bloqueado {
+  background: #6b7280;
+  border-color: #ffffff;
+  cursor: not-allowed;
+}

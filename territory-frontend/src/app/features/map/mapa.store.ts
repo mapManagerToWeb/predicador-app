@@ -25,6 +25,8 @@ import {
   guardarLados,
   hayCambios,
   ladosElegidos,
+  ladosDeLaBase,
+  enteraEnLaBase,
   registroDe,
   resumir,
   turnoPorHora,
@@ -531,9 +533,22 @@ export class MapaStore {
       return;
     }
     const antes = this.salida().get(m.territorio)!;
+    if (antes.marcadas.includes(m.id) && enteraEnLaBase(antes, m.id)) {
+      this.avisarYaReportada(m, antes);
+      return;
+    }
     this.actualizar(m.territorio, t => alternarManzana(t, m));
     const marcada = this.salida().get(m.territorio)!.marcadas.includes(m.id);
     if (!marcada && antes.marcadas.includes(m.id)) this.toast.show(`Manzana ${m.nombre} desmarcada`, 1500);
+  }
+
+  /**
+   * Lo que ya llegó en un reporte enviado no se deshace desde el mapa: se
+   * corrige desde el panel de administración (queda registrado).
+   */
+  private avisarYaReportada(m: Manzana, t: TerritorioSalida): void {
+    const fecha = t.base?.fecha ? ` el ${new Date(t.base.fecha).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })}` : '';
+    this.toast.show(`La manzana ${m.nombre} ya se reportó${fecha}. Si fue un error, avisa al administrador.`, 4000, 'warning');
   }
 
   cambiarModo(modo: ModoMarcado): void {
@@ -549,6 +564,10 @@ export class MapaStore {
       return;
     }
     const t = this.salida().get(m.territorio)!;
+    if (enteraEnLaBase(t, m.id)) {
+      this.avisarYaReportada(m, t);
+      return;
+    }
     const ed: EdicionLados = {
       manzanaId: m.id,
       nombre: m.nombre,
@@ -557,6 +576,7 @@ export class MapaStore {
       geometria: m.geometria,
       lados,
       seleccion: ladosElegidos(t, m.id, lados.length),
+      bloqueados: ladosDeLaBase(t, m.id, lados.length),
     };
     this.edicion.set(ed);
     this.vista?.mostrarLados(ed, true);
@@ -565,6 +585,10 @@ export class MapaStore {
   tocarLado(indice: number): void {
     const ed = this.edicion();
     if (!ed) return;
+    if (ed.bloqueados.includes(indice)) {
+      this.toast.show('Esa calle ya se reportó. Si fue un error, avisa al administrador.', 3500, 'warning');
+      return;
+    }
     const seleccion = ed.seleccion.includes(indice)
       ? ed.seleccion.filter(i => i !== indice)
       : [...ed.seleccion, indice].sort((a, b) => a - b);

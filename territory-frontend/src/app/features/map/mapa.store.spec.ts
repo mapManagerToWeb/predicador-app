@@ -221,6 +221,19 @@ describe('MapaStore', () => {
     expect(aviso).toHaveBeenCalledWith('No existe el territorio 99', 3000, 'warning');
   });
 
+  it('lo que llegó en el último reporte no se puede desmarcar desde el mapa', async () => {
+    const aviso = vi.spyOn(TestBed.inject(Toast), 'show');
+    await cargar(store);
+    await store.abrir(5); // el último reporte trae 5-5.a
+    store.tocar({ manzana: '5-5.a', cercana: null });
+    expect(store.resumenes()[0]).toMatchObject({ enteras: 1, cambios: false });
+    expect(aviso).toHaveBeenCalledWith(expect.stringContaining('La manzana 5.a ya se reportó'), 4000, 'warning');
+    // Tampoco se abre por calles para quitarle lados.
+    store.cambiarModo('calles');
+    store.tocar({ manzana: '5-5.a', cercana: null });
+    expect(store.edicion()).toBeNull();
+  });
+
   describe('práctica del tutorial', () => {
     it('sugiere un territorio cercano al centro del mapa y su manzana más cómoda de tocar', async () => {
       await cargar(store);
