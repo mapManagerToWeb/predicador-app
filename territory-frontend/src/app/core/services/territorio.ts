@@ -31,6 +31,22 @@ interface ReportDto {
 
 const BATCH_SIZE = 50;
 
+/**
+ * DTO returned by `GET /api/v1/territories/metadata` — the lightweight
+ * replacement for the former full-geometry snapshot endpoint. Bounds/center
+ * are null when the geometry is empty; `fids` lists the manzana PKs of each
+ * territory (membership-only — never zip positionally against feature arrays).
+ */
+export interface TerritoryMetadataDto {
+  numero: number;
+  nombre: string;
+  color: string;
+  bounds: [number, number, number, number] | null;
+  center: [number, number] | null;
+  manzanaCount: number;
+  fids: number[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class TerritorioService {
   private readonly http = inject(HttpClient);
@@ -46,10 +62,12 @@ export class TerritorioService {
     return firstValueFrom(this.http.get<number[]>(this.apiUrl));
   }
 
-  async getAllGeoJson(): Promise<string> {
-    return firstValueFrom(
-      this.http.get(`${this.apiUrl}/all/geojson`, { responseType: 'text' })
-    );
+  /**
+   * Per-territory metadata DTOs (counts, bounds, center, fids). The payload
+   * is untrusted JSON — the caller validates it at the boundary.
+   */
+  async getTerritoryMetadata(): Promise<unknown> {
+    return firstValueFrom(this.http.get<unknown>(`${this.apiUrl}/metadata`));
   }
 
   async getGeoJsonByTerritorio(numero: number): Promise<string> {
@@ -176,6 +194,9 @@ export class TerritorioService {
           this.reportCache.setTerritorio(num, ultimo);
           result.set(num, [ultimo]);
         } else {
+          // Sin reportes en el backend: podar también el cache persistente,
+          // si no el paint instantáneo seguiría mostrando un reporte borrado.
+          this.reportCache.removeTerritorios([num]);
           result.delete(num);
         }
       }
@@ -204,6 +225,9 @@ export class TerritorioService {
       this.reportCache.setTerritorio(territorioNumero, ultimo);
       this.versionsSeen.set(territorioNumero, ultimo.id);
     } else {
+      // Respuesta exitosa sin reportes: podar el cache viejo (si no, el paint
+      // instantáneo seguiría mostrando un reporte que ya no existe).
+      this.reportCache.removeTerritorios([territorioNumero]);
       this.versionsSeen.set(territorioNumero, -1);
     }
     return reportes;

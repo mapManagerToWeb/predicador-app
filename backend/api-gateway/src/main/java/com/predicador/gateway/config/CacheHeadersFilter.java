@@ -26,9 +26,7 @@ public class CacheHeadersFilter implements WebFilter, Ordered {
 
     private static final Map<String, CacheControl> CACHE_POLICIES = Map.of(
             "/api/v1/territories/colors",
-            CacheControl.maxAge(600, TimeUnit.SECONDS),
-            "/api/v1/territories/all/geojson",
-            CacheControl.maxAge(300, TimeUnit.SECONDS)
+            CacheControl.maxAge(600, TimeUnit.SECONDS)
     );
 
     @Override

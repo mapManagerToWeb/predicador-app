@@ -7,7 +7,6 @@ import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
 import com.predicador.territory.repository.TerritoryRepository.ManzanaGeoJsonProjection;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,11 +37,16 @@ class TerritoryServiceTest {
     @BeforeEach
     void setUp() {
         geoJsonSerializer = new HibernateSpatialTerritoryGeoJsonSerializer();
-        territoryService = new TerritoryService(territoryRepository, colorRepository, geoJsonSerializer, new SimpleMeterRegistry());
+        territoryService = new TerritoryService(territoryRepository, colorRepository, geoJsonSerializer);
     }
 
-    private ManzanaGeoJsonProjection projection(Long territorioPadre, String nombreBloque, String geoJson) {
+    private ManzanaGeoJsonProjection projection(Long id, Long territorioPadre, String nombreBloque, String geoJson) {
         return new ManzanaGeoJsonProjection() {
+            @Override
+            public Long getId() {
+                return id;
+            }
+
             @Override
             public Long getTerritorioPadre() {
                 return territorioPadre;
@@ -58,6 +62,10 @@ class TerritoryServiceTest {
                 return geoJson;
             }
         };
+    }
+
+    private ManzanaGeoJsonProjection projection(Long territorioPadre, String nombreBloque, String geoJson) {
+        return projection(null, territorioPadre, nombreBloque, geoJson);
     }
 
     private String simplePolygonGeojson() {
@@ -108,23 +116,6 @@ class TerritoryServiceTest {
         assertTrue(result.contains("Feature"));
         assertTrue(result.contains("Polygon"));
         assertTrue(result.contains("1.a"));
-    }
-
-    @Test
-    void getAllTerritoriesGeoJson_shouldReturnAllFeatures() {
-        String expected = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
-                + "\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[1,0],[1,1],[0,0]]]},"
-                + "\"properties\":{\"id\":\"1-1.a\",\"nombre_bloque\":\"1.a\","
-                + "\"territorio_padre\":1,\"color\":null}}]}";
-
-        when(territoryRepository.findAllGeoJsonAsFeatureCollection()).thenReturn(expected);
-
-        String result = territoryService.getAllTerritoriesGeoJson();
-
-        assertNotNull(result);
-        assertTrue(result.contains("FeatureCollection"));
-        assertTrue(result.contains("territorio_padre"));
-        assertTrue(result.contains("color"));
     }
 
     @Test
@@ -218,6 +209,42 @@ class TerritoryServiceTest {
         assertTrue(result.contains("1.a"));
         assertTrue(result.contains("1.c"));
         assertFalse(result.contains("1.b"));
+    }
+
+    @Test
+    void getTerritoryGeoJson_shouldIncludeFidPairingWithFeatureId() throws Exception {
+        ManzanaGeoJsonProjection m = projection(42L, 1L, "1.a", simplePolygonGeojson());
+        when(territoryRepository.findGeoJsonByTerritorioPadre(1L)).thenReturn(List.of(m));
+        TerritoryColor tc = new TerritoryColor();
+        tc.setTerritoryNumber(1L);
+        tc.setColor("#3cb44b");
+        when(colorRepository.findById(1L)).thenReturn(Optional.of(tc));
+
+        String result = territoryService.getTerritoryGeoJson(1L);
+
+        com.fasterxml.jackson.databind.JsonNode props = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(result).get("features").get(0).get("properties");
+        // fid = manzanas_territorio.id: aparece como número y empareja con id
+        assertTrue(props.get("fid").isNumber(), "fid debe ser numérico (paridad con el snapshot)");
+        assertEquals(42L, props.get("fid").asLong());
+        assertEquals("1-1.a", props.get("id").asText());
+        // las propiedades existentes siguen idénticas
+        assertEquals("1.a", props.get("nombre_bloque").asText());
+        assertEquals(1L, props.get("territorio_padre").asLong());
+        assertEquals("#3cb44b", props.get("color").asText());
+    }
+
+    @Test
+    void serializeTerritory_shouldOmitFidWhenManzanaIdIsNull() throws Exception {
+        ManzanaGeoJsonProjection m = projection(null, 1L, "1.a", simplePolygonGeojson());
+
+        String result = geoJsonSerializer.serializeTerritory(List.of(m), "#ff0000");
+
+        com.fasterxml.jackson.databind.JsonNode props = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(result).get("features").get(0).get("properties");
+        assertFalse(props.has("fid"), "sin id de manzana no se emite fid");
+        assertEquals("1-1.a", props.get("id").asText());
+        assertEquals("#ff0000", props.get("color").asText());
     }
 
     @Test

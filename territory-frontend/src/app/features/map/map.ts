@@ -18,6 +18,7 @@ import { MapLabelLayerService } from './services/map-label-layer.service';
 import { TileVersionService } from './services/tile-version.service';
 import { MapInitializationService } from './services/map-initialization.service';
 import { MapLocationService } from './services/map-location.service';
+import { MapGpsFollowService } from './services/map-gps-follow.service';
 import { MapMarkedOverlayService } from './services/map-marked-overlay.service';
 import { MapPartialMarkService } from './services/map-partial-mark.service';
 import { MapDataPersistenceService } from './services/map-data-persistence.service';
@@ -43,6 +44,7 @@ export class MapPage implements OnDestroy {
   private readonly partialMark = inject(MapPartialMarkService);
   private readonly dataPersistence = inject(MapDataPersistenceService);
   private readonly location = inject(MapLocationService);
+  private readonly gpsFollow = inject(MapGpsFollowService);
   private readonly picking = inject(MapPickingService);
   private readonly vectorTile = inject(MapVectorTileService);
   private readonly labelLayer = inject(MapLabelLayerService);
@@ -73,7 +75,13 @@ export class MapPage implements OnDestroy {
   isSatellite = this.state.isSatellite;
   predicacion = this.state.predicacion;
   screenshotPreview = this.state.screenshotPreview;
-  locationStatus = this.location.status;
+
+  // ─── GPS follow-me mode (D4: control hidden while editing) ────
+  gpsState = this.gpsFollow.state;
+  gpsError = this.gpsFollow.error;
+  gpsErrorMessage = this.gpsFollow.errorMessage;
+  gpsHasTrail = this.gpsFollow.hasTrail;
+  followEditing = this.gpsFollow.editing;
 
   constructor() {
     afterNextRender(() => this.initMap());
@@ -118,6 +126,10 @@ export class MapPage implements OnDestroy {
     this.rendering.initSelectedManzanaOverlay(engine);
     this.labelLayer.initLabels(engine);
     this.labelLayer.updateLabels(engine, this.state.territoriosSeleccionados());
+    // GPS follow overlay + pause handlers attach LAST so the GPS layers
+    // (marker, accuracy ring, trail) render above the marked/selected/label
+    // layers and never pick up their tints (style is loaded after engine.init).
+    this.gpsFollow.attachEngine(engine);
     // Apply completion opacity (0.6 complete / 0.05 incomplete) and the
     // marked overlay from the restored marks.
     this.rendering.refreshMarksVisual();
@@ -369,8 +381,23 @@ export class MapPage implements OnDestroy {
     engine.addLayer({ id: 'basemap-layer', type: 'raster', source: 'basemap' }, 'territory-fill');
   }
 
-  toggleUbicacion(): void {
-    this.location.toggle();
+  /** Toggle GPS follow-me mode (off → activate, active/paused → deactivate). */
+  toggleGpsFollow(): void {
+    if (this.gpsFollow.state() === 'off') {
+      this.gpsFollow.activate();
+    } else {
+      this.gpsFollow.deactivate();
+    }
+  }
+
+  /** Re-center on the current position and resume following (paused only). */
+  recenterGps(): void {
+    this.gpsFollow.recenter();
+  }
+
+  /** Clear the accumulated breadcrumb trail. */
+  clearGpsTrail(): void {
+    this.gpsFollow.clearTrail();
   }
 
   onPredicacionChange(event: Event): void {
@@ -444,6 +471,11 @@ export class MapPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Follow first: it releases its location consumer through MapLocationService,
+    // which must still be alive. Then tear down the root-provided location
+    // service — a no-op when follow already released the last consumer, but it
+    // guarantees no orphaned OS watch can outlive the map route.
+    this.gpsFollow.destroy();
     this.location.destroy();
     this.tileVersion.stopPolling();
     const mlEngine = this.maplibreEngine();

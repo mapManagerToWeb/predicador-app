@@ -318,4 +318,170 @@ describe('TerritorioService', () => {
       vi.useRealTimers();
     }
   });
+
+  describe('endpoints de territorios', () => {
+    it('getTerritoryMetadata fetches the lightweight metadata DTO', async () => {
+      const payload = [
+        { numero: 1, nombre: 'Centro', color: '#ff0000', bounds: null, center: null, manzanaCount: 0, fids: [] },
+      ];
+      const promise = service.getTerritoryMetadata();
+      const req = httpMock.expectOne(r => r.method === 'GET' && r.url.endsWith('/territories/metadata'));
+      req.flush(payload);
+
+      expect(await promise).toEqual(payload);
+    });
+
+    it('getGeoJsonByTerritorio fetches the raw GeoJSON as text', async () => {
+      const promise = service.getGeoJsonByTerritorio(7);
+      const req = httpMock.expectOne(r => r.method === 'GET' && r.url.endsWith('/territories/7/geojson'));
+      req.flush('{"type":"FeatureCollection","features":[]}');
+
+      expect(await promise).toContain('FeatureCollection');
+    });
+
+    it('getColores fetches the territory color map', async () => {
+      const promise = service.getColores();
+      const req = httpMock.expectOne(r => r.method === 'GET' && r.url.endsWith('/territories/colors'));
+      req.flush({ 1: '#ff0000', 2: '#00ff00' });
+
+      expect(await promise).toEqual({ 1: '#ff0000', 2: '#00ff00' });
+    });
+
+    it('asignarColor PUTs the color for a territory', async () => {
+      const promise = service.asignarColor(3, '#00ff00');
+      const req = httpMock.expectOne(r => r.method === 'PUT' && r.url.endsWith('/territories/3/color'));
+      expect(req.request.body).toEqual({ color: '#00ff00' });
+      req.flush(null);
+
+      await expect(promise).resolves.toBeUndefined();
+    });
+  });
+
+  describe('limpiarCache', () => {
+    it('clears the persistent cache and the in-session version guard', () => {
+      service['reportCache'].setTerritorio(1, reporte(10, 1));
+      service['versionsSeen'].set(1, 10);
+
+      service.limpiarCache();
+
+      expect(service['reportCache'].hasData()).toBe(false);
+      expect(service['versionsSeen'].size).toBe(0);
+      expect(service.hasCacheReportes()).toBe(false);
+    });
+  });
+
+  describe('getReportesPorTerritorio — ramas de resultado', () => {
+    it('serves the cached report when its version is already seen (no network)', async () => {
+      service['reportCache'].setTerritorio(3, reporte(10, 3));
+      service['versionsSeen'].set(3, 10);
+
+      const result = await service.getReportesPorTerritorio(3);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(10);
+      httpMock.expectNone(r => r.url.includes('/reports?territorioNumero='));
+    });
+
+    it('marks a territory as empty when the backend returns no reports', async () => {
+      service['reportCache'].setTerritorio(55, reporte(10, 55)); // reporte viejo en cache
+
+      const promise = service.getReportesPorTerritorio(55);
+      const req = httpMock.expectOne(r => r.url.includes('/reports?territorioNumero=55'));
+      req.flush([]);
+
+      const result = await promise;
+
+      expect(result).toEqual([]);
+      expect(service['versionsSeen'].get(55)).toBe(-1);
+      // El cache viejo se poda: la respuesta exitosa sin reportes es definitiva.
+      expect(service['reportCache'].getCache().has(55)).toBe(false);
+    });
+
+    it('persists the newest report by fecha and normalizes DTO fallbacks', async () => {
+      const promise = service.getReportesPorTerritorio(7);
+      const req = httpMock.expectOne(r => r.url.includes('/reports?territorioNumero=7'));
+      req.flush([
+        { id: 1, fecha: '2026-01-01T00:00:00Z', encargadoNombre: 'A', manzanaId: 'M1', territorioNumero: 7 },
+        { id: 2, fecha: '2026-03-01T00:00:00Z', encargadoNombre: 'B' },
+        { id: 3, encargadoNombre: 'C' }, // sin fecha -> compara contra ''
+      ]);
+
+      const result = await promise;
+
+      expect(result).toHaveLength(3);
+      // elegirUltimo: id 2 tiene la fecha más reciente.
+      expect(service['reportCache'].getCache().get(7)?.id).toBe(2);
+      expect(service['versionsSeen'].get(7)).toBe(2);
+      // toReporte fallbacks para el DTO incompleto (id 3).
+      const incompleto = result[2];
+      expect(incompleto.id).toBe(3);
+      expect(incompleto.fecha).toBe('');
+      expect(incompleto.territorioNumero).toBe(7); // fallbackNumero
+      expect(incompleto.encargadoId).toBe(0);
+      expect(incompleto.estado).toBe('completed');
+      expect(incompleto.tipoSesion).toBe('completa');
+      expect(incompleto.totalManzanas).toBe(0);
+      expect(incompleto.manzanasMarcadas).toBe(0);
+      expect(incompleto.sessionTime).toBe('');
+      expect(incompleto.encargadoApellido).toBe('');
+      expect(incompleto.geometriaParcial).toBeNull();
+      expect(incompleto.puntosParciales).toBeNull();
+      expect(incompleto.manzanasIds).toBeNull();
+      // rama con valores presentes (id 1).
+      expect(result[0].manzanaId).toBe('M1');
+    });
+  });
+
+  describe('revalidarReportes — ramas de vacío', () => {
+    it('treats an empty /versions payload as unknown version (-1) without batching', async () => {
+      const promise = service.revalidarReportes([1]);
+      const versionsReq = httpMock.expectOne(isVersions);
+      versionsReq.flush(null);
+
+      const result = await promise;
+
+      expect(service['versionsSeen'].get(1)).toBe(-1);
+      expect(result.has(1)).toBe(false);
+      httpMock.expectNone(isBatch);
+    });
+
+    it('drops the cached paint when a changed territory has no reports left', async () => {
+      service['reportCache'].setTerritorio(1, reporte(10, 1));
+
+      const promise = service.revalidarReportes([1]);
+      const versionsReq = httpMock.expectOne(isVersions);
+      versionsReq.flush({ 1: 11 }); // versión distinta -> cambiado
+      await Promise.resolve();
+
+      const batchReq = httpMock.expectOne(isBatch);
+      batchReq.flush({ 1: [] }); // sin reportes -> result.delete
+
+      const result = await promise;
+      expect(result.has(1)).toBe(false);
+      expect(service['reportCache'].getCache().has(1)).toBe(false);
+    });
+  });
+
+  describe('crearReportes — normalización del DTO', () => {
+    it('fills missing optional fields with defaults when the response is sparse', async () => {
+      const promise = service.crearReportes([registro(1)]);
+      const req = httpMock.expectOne(r => r.method === 'POST' && r.url.includes('/reports'));
+      req.flush([{ encargadoNombre: 'Ana', geometriaParcial: 'POLYGON((0 0,1 1,0 0))' }]);
+
+      const [guardado] = await promise;
+      expect(guardado.id).toBe(0); // id ?? 0
+      expect(guardado.fecha).toBe('');
+      expect(guardado.territorioNumero).toBe(0); // d.territorioNumero ?? 0
+      expect(guardado.encargadoId).toBe(0);
+      expect(guardado.encargadoApellido).toBe('');
+      expect(guardado.sessionTime).toBe('');
+      expect(guardado.estado).toBe('completed');
+      expect(guardado.tipoSesion).toBe('completa');
+      expect(guardado.totalManzanas).toBe(0);
+      expect(guardado.manzanasMarcadas).toBe(0);
+      expect(guardado.geometriaParcial).toBe('POLYGON((0 0,1 1,0 0))');
+      expect(guardado.puntosParciales).toBeNull();
+      expect(guardado.manzanasIds).toBeNull();
+    });
+  });
 });

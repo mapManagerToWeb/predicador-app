@@ -79,4 +79,127 @@ describe('DraftMarksService', () => {
       if (storage) globalThis.localStorage = storage;
     }
   });
+
+  describe('guardar (storage failure)', () => {
+    it('discards the stored draft when setItem throws (quota exceeded)', () => {
+      const removeItem = vi.fn();
+      vi.stubGlobal('localStorage', {
+        getItem: vi.fn().mockReturnValue(null),
+        setItem: vi.fn(() => {
+          throw new Error('QuotaExceededError');
+        }),
+        removeItem,
+      });
+      try {
+        service.guardar(sampleDraft());
+        expect(removeItem).toHaveBeenCalledWith('territory_map_draft');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+  });
+
+  describe('eliminarTerritorios (territorioSeleccionado)', () => {
+    it('reassigns the selection to the single remaining territory', () => {
+      const draft = sampleDraft();
+      draft.territoriosSeleccionados = [1, 2];
+      draft.territorioSeleccionado = 1;
+      service.guardar(draft);
+
+      service.eliminarTerritorios([1]);
+
+      const restored = service.cargar();
+      expect(restored?.territoriosSeleccionados).toEqual([2]);
+      expect(restored?.territorioSeleccionado).toBe(2);
+    });
+
+    it('clears the selection when no selected territory remains', () => {
+      const draft = sampleDraft();
+      draft.territoriosSeleccionados = [1];
+      draft.territorioSeleccionado = 1;
+      service.guardar(draft);
+
+      service.eliminarTerritorios([1]);
+
+      const restored = service.cargar();
+      expect(restored?.territoriosSeleccionados).toEqual([]);
+      expect(restored?.territorioSeleccionado).toBeNull();
+    });
+
+    it('keeps the selection when the selected territory is not removed', () => {
+      const draft = sampleDraft();
+      draft.territoriosSeleccionados = [1, 2];
+      draft.territorioSeleccionado = 2;
+      service.guardar(draft);
+
+      service.eliminarTerritorios([1]);
+
+      const restored = service.cargar();
+      expect(restored?.territorioSeleccionado).toBe(2);
+    });
+
+    it('is a no-op when there is no draft', () => {
+      expect(() => service.eliminarTerritorios([1])).not.toThrow();
+      expect(service.cargar()).toBeNull();
+    });
+  });
+
+  describe('cargar (validation guards)', () => {
+    function discard(payload: unknown): void {
+      localStorage.setItem('territory_map_draft', JSON.stringify(payload));
+      expect(service.cargar()).toBeNull();
+      expect(localStorage.getItem('territory_map_draft')).toBeNull();
+    }
+
+    it('rejects a draft whose territoriosSeleccionados is not an array', () => {
+      discard({ ...sampleDraft(), territoriosSeleccionados: 'nope' });
+    });
+
+    it('rejects a draft whose modoMarcado is not a string', () => {
+      discard({ ...sampleDraft(), modoMarcado: 7 });
+    });
+
+    it('rejects a draft whose predicacion is not a string', () => {
+      discard({ ...sampleDraft(), predicacion: null });
+    });
+
+    it('rejects a draft with a malformed manzana', () => {
+      discard({ ...sampleDraft(), manzanasById: { A: { id: 'A' } } });
+    });
+
+    it('rejects a draft with a non-object manzana', () => {
+      discard({ ...sampleDraft(), manzanasById: { A: 'nope' } });
+    });
+
+    it('rejects a draft whose datosParcialesGuardados is missing', () => {
+      const draft = sampleDraft() as unknown as Record<string, unknown>;
+      delete draft['datosParcialesGuardados'];
+      discard(draft);
+    });
+
+    it('rejects a draft whose parcial points are not an array', () => {
+      discard({
+        ...sampleDraft(),
+        datosParcialesGuardados: { 1: { puntos: 'x', geometria: '{}' } },
+      });
+    });
+
+    it('rejects a draft with a malformed point', () => {
+      discard({
+        ...sampleDraft(),
+        datosParcialesGuardados: { 1: { puntos: [{ lat: 'x', lng: 1 }], geometria: '{}' } },
+      });
+    });
+
+    it('rejects a draft whose geometria is not a string', () => {
+      discard({
+        ...sampleDraft(),
+        datosParcialesGuardados: { 1: { puntos: [], geometria: 42 } },
+      });
+    });
+
+    it('returns null when the stored value is not an object', () => {
+      discard('just a string');
+    });
+  });
 });

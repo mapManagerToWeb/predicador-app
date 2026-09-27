@@ -24,6 +24,7 @@ const fakeMapInstance = {
   setZoom: vi.fn(),
   getCenter: vi.fn().mockReturnValue({ lng: -73.345, lat: -37.4779 }),
   setCenter: vi.fn(),
+  easeTo: vi.fn(),
   resize: vi.fn(),
   remove: vi.fn(),
   setFeatureState: vi.fn(),
@@ -777,5 +778,296 @@ describe('MaplibreEngineService', () => {
       warn.mockRestore();
       vi.unstubAllGlobals();
     }
+  });
+
+  describe('delegaciones de cámara y layout', () => {
+    async function boot(): Promise<void> {
+      await service.init(document.createElement('div'), {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+    }
+
+    it('delegates setLayoutProperty to the underlying map', async () => {
+      await boot();
+
+      service.setLayoutProperty('labels', 'visibility', 'none');
+
+      expect(fakeMapInstance.setLayoutProperty).toHaveBeenCalledWith(
+        'labels',
+        'visibility',
+        'none',
+      );
+    });
+
+    it('delegates fitBounds with options', async () => {
+      await boot();
+
+      const bounds: [number, number, number, number] = [-73.5, -37.6, -73.2, -37.4];
+      service.fitBounds(bounds, { padding: 40, duration: 0 });
+
+      expect(fakeMapInstance.fitBounds).toHaveBeenCalledWith(bounds, {
+        padding: 40,
+        duration: 0,
+      });
+    });
+
+    it('delegates setZoom to the underlying map', async () => {
+      await boot();
+
+      service.setZoom(16);
+
+      expect(fakeMapInstance.setZoom).toHaveBeenCalledWith(16);
+    });
+
+    it('delegates easeTo with center and options', async () => {
+      await boot();
+
+      service.easeTo([-73.0, -37.0], { duration: 250 });
+
+      expect(fakeMapInstance.easeTo).toHaveBeenCalledWith({
+        center: [-73.0, -37.0],
+        duration: 250,
+      });
+    });
+
+    it('delegates resize to the underlying map', async () => {
+      await boot();
+
+      service.resize();
+
+      expect(fakeMapInstance.resize).toHaveBeenCalledTimes(1);
+    });
+
+    it('camera delegations are safe no-ops without a map', () => {
+      expect(() => {
+        service.setLayoutProperty('l', 'visibility', 'visible');
+        service.fitBounds([0, 0, 1, 1]);
+        service.setZoom(10);
+        service.easeTo([0, 0]);
+        service.resize();
+      }).not.toThrow();
+    });
+  });
+
+  describe('init — defaults y espera de estilo', () => {
+    it('falls back to default maxZoom/minZoom/attribution when omitted', async () => {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      const MapCtor = (await import('maplibre-gl')).Map as ReturnType<typeof vi.fn>;
+      const options = MapCtor.mock.calls.at(-1)![0] as Record<string, unknown>;
+      expect(options['maxZoom']).toBe(18); // MAP_DEFAULTS.maxZoom
+      expect(options['minZoom']).toBe(0);
+
+      // attribution omitted -> default OSM attribution on the basemap source.
+      expect(fakeMapInstance.addSource).toHaveBeenCalledWith(
+        'basemap',
+        expect.objectContaining({
+          attribution: '© OpenStreetMap contributors',
+        }),
+      );
+    });
+
+    it('uses the provided attribution and zoom bounds', async () => {
+      const container = document.createElement('div');
+      await service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        maxZoom: 14,
+        minZoom: 3,
+        attribution: 'Mi atribución',
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      const MapCtor = (await import('maplibre-gl')).Map as ReturnType<typeof vi.fn>;
+      const options = MapCtor.mock.calls.at(-1)![0] as Record<string, unknown>;
+      expect(options['maxZoom']).toBe(14);
+      expect(options['minZoom']).toBe(3);
+      expect(fakeMapInstance.addSource).toHaveBeenCalledWith(
+        'basemap',
+        expect.objectContaining({ attribution: 'Mi atribución' }),
+      );
+    });
+
+    it('waits for the load event when the style is not ready yet', async () => {
+      // Style not loaded on construction -> init must register the `load`
+      // handler instead of resolving immediately (MapLibre v6 throws
+      // "Style is not done loading" if sources are added too early).
+      fakeMapInstance.isStyleLoaded.mockReturnValueOnce(false);
+      let loadHandler: (() => void) | undefined;
+      fakeMapInstance.on.mockImplementation((event: string, handler: () => void) => {
+        if (event === 'load') loadHandler = handler;
+      });
+
+      const container = document.createElement('div');
+      const initPromise = service.init(container, {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+
+      // init awaits loadMaplibre() before touching the map — wait for the
+      // load handler registration instead of asserting synchronously.
+      await vi.waitFor(() => expect(loadHandler).toBeTypeOf('function'));
+      // Adding sources before the style loads would throw — not yet.
+      expect(fakeMapInstance.addSource).not.toHaveBeenCalled();
+
+      loadHandler!();
+      await initPromise;
+
+      expect(fakeMapInstance.addSource).toHaveBeenCalledWith(
+        'basemap',
+        expect.anything(),
+      );
+      fakeMapInstance.on.mockReset();
+      fakeMapInstance.isStyleLoaded.mockReturnValue(true);
+    });
+  });
+
+  describe('addSource / setSourceUrl — ramas restantes', () => {
+    async function boot(): Promise<void> {
+      await service.init(document.createElement('div'), {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+    }
+
+    it('addSource with a tile array registers a raster source', async () => {
+      await boot();
+
+      service.addSource('satellite', ['https://a/{z}/{x}/{y}.jpg'], 'Esri');
+
+      expect(fakeMapInstance.addSource).toHaveBeenCalledWith('satellite', {
+        type: 'raster',
+        tiles: ['https://a/{z}/{x}/{y}.jpg'],
+        tileSize: 256,
+        attribution: 'Esri',
+      });
+    });
+
+    it('setSourceUrl falls back to setUrl when setTiles is absent', async () => {
+      await boot();
+
+      const setUrlSpy = vi.fn();
+      fakeMapInstance.getSource.mockReturnValue({ setUrl: setUrlSpy });
+
+      service.setSourceUrl('imagery', 'https://a/{z}/{x}/{y}.jpg');
+
+      expect(setUrlSpy).toHaveBeenCalledWith('https://a/{z}/{x}/{y}.jpg');
+    });
+
+    it('setSourceUrl ignores a source with neither setTiles nor setUrl', async () => {
+      await boot();
+
+      fakeMapInstance.getSource.mockReturnValue({});
+
+      expect(() => service.setSourceUrl('other', '/tiles/{z}/{x}/{y}.pbf')).not.toThrow();
+    });
+  });
+
+  describe('captureCanvas — guarda de re-entrada y vacíos', () => {
+    beforeEach(() => {
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        cb(0);
+        return 1;
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    async function boot(): Promise<void> {
+      await service.init(document.createElement('div'), {
+        center: [-73.345, -37.4779],
+        zoom: 15,
+        tileUrl: '/api/v1/territories/tiles/{z}/{x}/{y}.pbf',
+      });
+    }
+
+    it('clears the in-flight guard when the capture rejects, so a later capture can run', async () => {
+      await boot();
+
+      // Tainted canvas forces the fallback; the fallback's basemap probe
+      // (`getLayer` before its try) throws -> the capture promise rejects.
+      const toDataURL = vi.fn(() => {
+        throw new DOMException('tainted canvas', 'SecurityError');
+      });
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementationOnce(() => {
+        throw new Error('style exploded');
+      });
+
+      await expect(service.captureCanvas()).rejects.toThrow('style exploded');
+
+      // Guard cleared by the rejection handler: the next capture starts fresh.
+      fakeMapInstance.getLayer.mockImplementation(() => undefined);
+      fakeMapInstance.getLayer.mockReset();
+      toDataURL.mockReturnValue('data:image/jpeg;base64,QUJD');
+      expect(await service.captureCanvas()).toBe('QUJD');
+    });
+
+    it('warns and returns null when the fallback capture also yields a blank payload', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await boot();
+
+        // First attempt tainted; fallback returns a blank payload -> the
+        // inner empty-payload warning fires and the capture resolves null.
+        const toDataURL = vi.fn()
+          .mockImplementationOnce(() => {
+            throw new DOMException('tainted canvas', 'SecurityError');
+          })
+          .mockReturnValue('data:image/jpeg;base64,   ');
+        fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+        fakeMapInstance.getLayer.mockReturnValue(undefined);
+
+        expect(await service.captureCanvas()).toBeNull();
+        expect(
+          warn.mock.calls.filter(call =>
+            String(call[0]).includes('payload JPEG vacío')
+          ),
+        ).toHaveLength(1);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('adds the white background without a beforeId when the style has no layers', async () => {
+      await boot();
+
+      const toDataURL = vi.fn()
+        .mockImplementationOnce(() => {
+          throw new DOMException('tainted canvas', 'SecurityError');
+        })
+        .mockReturnValue('data:image/jpeg;base64,TEFDRQ==');
+      fakeMapInstance.getCanvas.mockReturnValue({ toDataURL });
+      fakeMapInstance.getLayer.mockImplementation((id: string) =>
+        id === 'basemap-layer' ? {} : undefined,
+      );
+      // Empty style: no first layer to insert before -> plain addLayer call.
+      fakeMapInstance.getStyle.mockReturnValue({ version: 8, sources: {}, layers: [] });
+
+      const result = await service.captureCanvas();
+
+      expect(result).toBe('TEFDRQ==');
+      const backgroundAdds = fakeMapInstance.addLayer.mock.calls.filter(
+        (call: [{ id?: string }]) => call[0]?.id === 'capture-background',
+      );
+      expect(backgroundAdds).toHaveLength(1);
+      expect(backgroundAdds[0]).toHaveLength(1); // sin beforeId
+      // Restore also runs without a beforeId (no territory-fill either).
+      const basemapRestores = fakeMapInstance.addLayer.mock.calls.filter(
+        (call: [{ id?: string }]) => call[0]?.id === 'basemap-layer',
+      );
+      expect(basemapRestores.at(-1)).toHaveLength(1);
+    });
   });
 });

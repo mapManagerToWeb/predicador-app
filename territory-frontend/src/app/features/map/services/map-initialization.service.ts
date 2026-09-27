@@ -28,12 +28,13 @@ export class MapInitializationService {
     this.state.isLoading.set(true);
 
     try {
-      // In MapLibre mode, fetch territory colors + the one-time GeoJSON
-      // snapshot (counts, bounds, label centroids, raw features) needed by
-      // selection, marking, restoration, counters, labels and save flows.
+      // In MapLibre mode, fetch territory colors + the metadata DTOs
+      // (counts, bounds, label centroids) needed by selection, marking,
+      // restoration, counters and labels. Geometry is fetched on demand
+      // per territory by the rendering facade.
       await Promise.all([
         this.rendering.fetchAndBuildFeatureLayers(this.territorioService),
-        this.rendering.loadGeoJsonMetadata(this.territorioService),
+        this.rendering.loadTerritoryMetadata(),
       ]);
 
       // Restore marks from DB/cache for previously worked territories
@@ -42,76 +43,6 @@ export class MapInitializationService {
       this.toastService.show(TOAST_MESSAGES.loadError);
     } finally {
       this.state.isLoading.set(false);
-    }
-  }
-
-  /**
-   * Detecta territorios borrados en el backend y poda los caches del navegador
-   * (reportes en localStorage + snapshot de GeoJSON en sessionStorage) para que
-   * el mapa vuelva a la normalidad sin recargar a mano. Best-effort: si no hay
-   * datos cacheados o el backend no responde no hace nada (modo offline).
-   */
-  private async reconciliarCaches(): Promise<void> {
-    if (!this.rendering.hasCachedGeojson() && !this.territorioService.hasCacheReportes()) return;
-    const vigentes = await this.territorioService.reconciliarCacheConBackend();
-    if (vigentes) this.rendering.podarGeojsonCache(vigentes);
-  }
-
-  /**
-   * Reintenta la carga inicial de territorios con backoff. Durante el arranque
-   * en frío del stack los servicios todavía no se registran en Eureka y el
-   * gateway no puede resolver `lb://territory-service` (502/503). El retry del
-   * gateway no ayuda ahí — el load balancer falla antes de llegar a él — así
-   * que reintentamos desde el frontend para no obligar al usuario a recargar.
-   *
-   * El territory-service puede tardar hasta ~150s en arrancar cuando conecta a
-   * una BD cloud (Neon): HikariPool inicializa, Flyway valida y el registro en
-   * Eureka se propaga. Por eso el backoff es lineal y prolongado (20 intentos
-   * x 10s = 200s máx) en vez de exponencial corto.
-   */
-  private static readonly MAX_LOAD_RETRIES = 20;
-  private static readonly LOAD_RETRY_DELAY_MS = 10000;
-
-  private async loadTerritoriesWithRetry(attempt = 1): Promise<void> {
-    try {
-      await this.rendering.loadAllTerritories(this.territorioService);
-    } catch (error) {
-      if (attempt >= MapInitializationService.MAX_LOAD_RETRIES) throw error;
-      await new Promise(resolve => setTimeout(resolve, MapInitializationService.LOAD_RETRY_DELAY_MS));
-      await this.loadTerritoriesWithRetry(attempt + 1);
-    }
-  }
-
-  private onMoveEnd(): void {
-    // No-op: MapLibre manages viewport loading via tiles
-  }
-
-  /** Restaura marcas/cache para los territorios recién agregados al mapa. */
-  private restaurarMarcasDeTerritorios(newlyLoaded: number[]): void {
-    if (newlyLoaded.length === 0) return;
-
-    const draft = this.draftService.cargar();
-
-    for (const num of newlyLoaded) {
-      const fl = this.rendering.getFeatureLayerByTerritorio(num);
-      if (!fl) continue;
-
-      // Sin red: los territorios recién visibles se pintan desde el cache de
-      // localStorage (sembrado por la revalidación de restoreAllMarks) o desde
-      // el draft si están en borrador. El revalidador ya marcó los vacíos como
-      // -1, así que un territorio sin cache no pinta nada y no pide reportes.
-      if (draft?.territoriosSeleccionados.includes(num)) {
-        this.selection.restaurarMarcadoConReportes(
-          num,
-          [this.reporteDesdeDraft(draft, num)],
-          fl.color,
-          { actualizarEstadoMarcado: false }
-        );
-        continue;
-      }
-
-      const cached = this.territorioService.getReportesDesdeCache([num]).get(num) ?? [];
-      this.selection.restaurarMarcadoConReportes(num, cached, fl.color, { actualizarEstadoMarcado: false });
     }
   }
 

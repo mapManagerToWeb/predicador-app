@@ -14,7 +14,7 @@ import { Rate, Trend } from "k6/metrics";
 const BASE_URL = __ENV.BASE_URL || "http://localhost:8080";
 
 const errorRate = new Rate("errors");
-const geojsonDuration = new Trend("geojson_load_duration", true);
+const metadataDuration = new Trend("territory_metadata_duration", true);
 const reportDuration = new Trend("report_create_duration", true);
 
 export const options = {
@@ -38,22 +38,22 @@ export default function apiGatewayTest() {
   errorRate.add(healthRes.status !== 200);
   sleep(0.5);
 
-  // 2. Get all territories GeoJSON
-  const geoStart = Date.now();
-  const geoRes = http.get(`${BASE_URL}/api/v1/territories/all/geojson`);
-  geojsonDuration.add(Date.now() - geoStart);
-  check(geoRes, {
-    "geojson status is 200": (r) => r.status === 200,
-    "geojson is valid": (r) => {
+  // 2. Get territory metadata (replaces the removed /all/geojson snapshot)
+  const metaStart = Date.now();
+  const metaRes = http.get(`${BASE_URL}/api/v1/territories/metadata`);
+  metadataDuration.add(Date.now() - metaStart);
+  check(metaRes, {
+    "metadata status is 200": (r) => r.status === 200,
+    "metadata is valid": (r) => {
       try {
         const body = JSON.parse(r.body);
-        return body.type === "FeatureCollection";
+        return Array.isArray(body);
       } catch {
         return false;
       }
     },
   });
-  errorRate.add(geoRes.status !== 200);
+  errorRate.add(metaRes.status !== 200);
   sleep(1);
 
   // 3. Get territory list

@@ -112,11 +112,13 @@ export const TOAST_MESSAGES = {
 export const LOCATION_DEFAULTS = {
   enableHighAccuracy: true,
   timeoutMs: 15000,
-  maximumAgeMs: 10000,
+  maximumAgeMs: 3000,
   /** Por encima de este radio (m) se avisa una sola vez de baja precisión. */
   lowAccuracyMeters: 200,
-  /** Recentra solo si la posición sale del viewport contraído este factor. */
-  recenterPadFactor: 0.05,
+  /** Higiene de la ruta (D1): descarta puntos a menos de esta distancia. */
+  trailMinDistanceM: 5,
+  /** Higiene de la ruta (D1): tope duro de puntos, se descarta el más antiguo. */
+  trailMaxPoints: 2000,
 } as const;
 
 let parcialSeq = 0;

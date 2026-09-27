@@ -275,6 +275,186 @@ describe('TileVersionService', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
   });
+
+  describe('checkVersionNow', () => {
+    it('reusa el engine adjunto y refresca la versión de inmediato', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      vectorTile.updateTileUrl.mockClear();
+
+      service.checkVersionNow();
+
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 2 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(mockEngine, `${TILE_URL}?v=2`);
+    });
+
+    it('acepta un engine explícito cuando el polling no está activo', async () => {
+      service.checkVersionNow(mockEngine);
+
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 7 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(mockEngine, `${TILE_URL}?v=7`);
+    });
+  });
+
+  describe('visibilitychange', () => {
+    function setVisibility(state: DocumentVisibilityState): void {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => state,
+      });
+    }
+
+    afterEach(() => {
+      delete (document as { visibilityState?: DocumentVisibilityState }).visibilityState;
+    });
+
+    it('revisa la versión al volver la pestaña a visible', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      setVisibility('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      // Sin cambio de versión: no reescribe la URL.
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignora el evento cuando la pestaña queda oculta', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      setVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(httpMock.match('/api/v1/territories/tiles.json')).toHaveLength(0);
+    });
+
+    it('ignora el evento si el polling ya se detuvo', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      service.stopPolling();
+
+      setVisibility('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(httpMock.match('/api/v1/territories/tiles.json')).toHaveLength(0);
+    });
+  });
+
+  describe('checkVersion edge cases', () => {
+    it('trata data_version: null como backend legado (hash de bounds)', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: null });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+
+      // Segundo poll con los mismos bounds: sin cambio, sin actualización.
+      await vi.advanceTimersByTimeAsync(30_000);
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: null });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+    });
+
+    it('usa & como separador cuando la plantilla ya trae query string', async () => {
+      service.startPolling(mockEngine);
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req.flush({
+        tilejson: '3.0.0',
+        bounds: BOUNDS,
+        tiles: ['/tiles/{z}/{x}/{y}.pbf?layer=territory'],
+        data_version: 4,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(
+        mockEngine,
+        '/tiles/{z}/{x}/{y}.pbf?layer=territory&v=4',
+      );
+    });
+
+    it('no hace nada si el polling se detiene con la petición en vuelo', async () => {
+      service.startPolling(mockEngine);
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      service.stopPolling();
+      req.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 9 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+      expect(service.isPolling()).toBe(false);
+    });
+  });
+
+  describe('recoverTiles branches', () => {
+    it('no usa cache-buster cuando la versión cambió durante la recuperación', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      vectorTile.updateTileUrl.mockClear();
+
+      service.handleTileError();
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 2 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Solo la actualización por ?v=2; sin Date.now() extra.
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledTimes(1);
+      expect(vectorTile.updateTileUrl).toHaveBeenCalledWith(mockEngine, `${TILE_URL}?v=2`);
+    });
+
+    it('no cache-bustea en backend legado sin data_version', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL] });
+      await vi.advanceTimersByTimeAsync(0);
+      vectorTile.updateTileUrl.mockClear();
+
+      service.handleTileError();
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL] });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // previousVersion sigue en null: no hay bust ni actualización.
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+    });
+
+    it('aborta si el polling se detiene durante la recuperación', async () => {
+      service.startPolling(mockEngine);
+      const req1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req1.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      vectorTile.updateTileUrl.mockClear();
+
+      service.handleTileError();
+      const req2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+      service.stopPolling();
+      req2.flush({ tilejson: '3.0.0', bounds: BOUNDS, tiles: [TILE_URL], data_version: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(vectorTile.updateTileUrl).not.toHaveBeenCalled();
+    });
+  });
 });
 
 function createMockMapEngine(): MapEngine {

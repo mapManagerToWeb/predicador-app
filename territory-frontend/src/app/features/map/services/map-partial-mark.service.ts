@@ -184,16 +184,16 @@ export class MapPartialMarkService {
 
   /**
    * Identifiers (in {@link manzanaKeyOf} form) of the territory's marked
-   * manzanas, bridged across the two key spaces:
+   * manzanas, bridged across the two key spaces — both now readable from
+   * `editGeoJson` itself:
    *
-   * <p>Marks ({@link MapStateService.manzanasVisiblesByTerritorio}) are keyed
-   * by the MVT `fid` (numeric PK), while the per-territory snapshot loaded
-   * into `editGeoJson` identifies features by `id` ("{t}-{b}") — the keys do
-   * NOT overlap. The {@link MapRenderingFacade} metadata (the `/all/geojson`
-   * snapshot) carries BOTH `fid` and `id`, so a fid-keyed mark resolves to
-   * its "{t}-{b}" id there and the resulting set excludes the matching
-   * `editGeoJson` feature. Marks that cannot be bridged (no metadata loaded,
-   * or already "{t}-{b}"-shaped — tests) fall back to plain key equality.</p>
+   * <p>Marks ({@link MapStateService.manzanasVisiblesByTerritorio}) are
+   * usually keyed by the MVT `fid` (numeric PK), while the per-territory
+   * GeoJSON loaded into `editGeoJson` carries `fid`, `id` ("{t}-{b}") and
+   * `nombre_bloque` on every feature. {@link manzanaKeyOf} resolves each
+   * feature to its fid when present, so the set below contains BOTH the
+   * raw mark id and its fid-space counterpart (when the mark's id is an
+   * "{t}-{b}" id). Either shape then excludes the matching feature.</p>
    *
    * @returns The marked manzana keys; empty when no marks exist for the
    *          territory (the caller then treats every feature as a candidate).
@@ -202,20 +202,27 @@ export class MapPartialMarkService {
     const marks = this.state.manzanasVisiblesByTerritorio().get(territorio) ?? [];
     if (marks.length === 0) return new Set();
 
-    // fid → "{t}-{b}" bridge from the /all/geojson metadata.
-    const propsIdByKey = new Map<string, string>();
-    for (const feature of this.rendering.getGeoJsonFeaturesByTerritorio(territorio)) {
-      const key = manzanaKeyOf(feature);
-      const propsId = (feature.properties ?? {})['id'];
-      if (key !== '' && propsId !== undefined && propsId !== null) {
-        propsIdByKey.set(key, String(propsId));
+    // "{t}-{b}" id → manzana key (fid when present) from editGeoJson.
+    const keyById = new Map<string, string>();
+    const fc = this.state.editGeoJson();
+    if (fc) {
+      for (const feature of fc.features) {
+        const props = (feature.properties ?? {}) as Record<string, unknown>;
+        if (Number(props['territorio_padre']) !== territorio) continue;
+        const propsId = props['id'];
+        const key = manzanaKeyOf(feature);
+        if (key !== '' && propsId !== undefined && propsId !== null) {
+          keyById.set(String(propsId), key);
+        }
       }
     }
 
     const marked = new Set<string>();
     for (const mark of marks) {
       if (mark.id.startsWith('parcial-')) continue;
-      marked.add(propsIdByKey.get(mark.id) ?? mark.id);
+      marked.add(mark.id);
+      const bridged = keyById.get(mark.id);
+      if (bridged !== undefined) marked.add(bridged);
     }
     return marked;
   }

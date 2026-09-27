@@ -15,7 +15,7 @@ describe('MapInitializationService', () => {
     hasCachedGeojson: ReturnType<typeof vi.fn>;
     podarGeojsonCache: ReturnType<typeof vi.fn>;
     fetchAndBuildFeatureLayers: ReturnType<typeof vi.fn>;
-    loadGeoJsonMetadata: ReturnType<typeof vi.fn>;
+    loadTerritoryMetadata: ReturnType<typeof vi.fn>;
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getTerritoryDataCache: ReturnType<typeof vi.fn>;
   };
@@ -38,7 +38,7 @@ describe('MapInitializationService', () => {
       hasCachedGeojson: vi.fn(() => false),
       podarGeojsonCache: vi.fn(),
       fetchAndBuildFeatureLayers: vi.fn().mockResolvedValue(undefined),
-      loadGeoJsonMetadata: vi.fn().mockResolvedValue(undefined),
+      loadTerritoryMetadata: vi.fn().mockResolvedValue(undefined),
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getTerritoryDataCache: vi.fn().mockReturnValue(new Map()),
     };
@@ -95,7 +95,7 @@ describe('MapInitializationService', () => {
     await service.initialize(document.createElement('div'), vi.fn());
 
     expect(rendering.fetchAndBuildFeatureLayers).toHaveBeenCalled();
-    expect(rendering.loadGeoJsonMetadata).toHaveBeenCalled();
+    expect(rendering.loadTerritoryMetadata).toHaveBeenCalled();
   });
 
   it('handles fetch errors gracefully', async () => {
@@ -148,6 +148,75 @@ describe('MapInitializationService', () => {
     await service.initialize(document.createElement('div'), vi.fn());
 
     expect(territorioService.revalidarReportes).toHaveBeenCalledWith([57]);
+  });
+
+  it('loadAllTerritoriesPublic runs the same load flow MapPage boot uses', async () => {
+    await service.loadAllTerritoriesPublic();
+
+    expect(rendering.fetchAndBuildFeatureLayers).toHaveBeenCalled();
+    expect(rendering.loadTerritoryMetadata).toHaveBeenCalled();
+    expect(rendering.getAllTerritoriesLayer).toHaveBeenCalled();
+    expect(state.isLoading()).toBe(false);
+  });
+
+  it('applies background revalidation results to territories that already have a layer', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 56, color: '#ff0000' },
+      { territorioPadre: 57, color: '#00ff00' },
+    ] as never);
+    rendering.getTerritoryDataCache.mockReturnValue(new Map());
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map());
+    territorioService.revalidarReportes.mockResolvedValue(
+      new Map([[56, [{ id: 1 } as never]]]),
+    );
+
+    await service.loadAllTerritoriesPublic();
+
+    // The revalidation pass restores 56 with the freshly fetched reportes and
+    // the layer's color; 57 got only the instant (empty) paint from the
+    // localStorage pass, never a revalidation result.
+    expect(selection.restaurarMarcadoConReportes).toHaveBeenCalledWith(
+      56,
+      [{ id: 1 }],
+      '#ff0000',
+      { actualizarEstadoMarcado: false },
+    );
+    expect(
+      selection.restaurarMarcadoConReportes.mock.calls.filter(([numero]) => numero === 57),
+    ).toHaveLength(1); // instant paint only
+  });
+
+  it('skips revalidation results whose layer has not been built yet (cache stays seeded)', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 56, color: '#ff0000' },
+    ] as never);
+    rendering.getTerritoryDataCache.mockReturnValue(new Map());
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map());
+    territorioService.revalidarReportes.mockResolvedValue(
+      new Map([[99, [{ id: 9 } as never]]]),
+    );
+
+    await service.loadAllTerritoriesPublic();
+
+    expect(territorioService.revalidarReportes).toHaveBeenCalledWith([56]);
+    // 99 has no layer → the result must not be painted against any territory.
+    expect(
+      selection.restaurarMarcadoConReportes.mock.calls.filter(([numero]) => numero === 99),
+    ).toHaveLength(0);
+  });
+
+  it('swallows revalidation failures (offline) instead of surfacing a load error', async () => {
+    rendering.getAllTerritoriesLayer.mockReturnValue([
+      { territorioPadre: 56, color: '#ff0000' },
+    ] as never);
+    rendering.getTerritoryDataCache.mockReturnValue(new Map());
+    territorioService.getReportesDesdeCache.mockReturnValue(new Map());
+    territorioService.revalidarReportes.mockRejectedValue(new Error('offline'));
+
+    await service.loadAllTerritoriesPublic();
+
+    expect(toast.show).not.toHaveBeenCalled();
+    expect(state.isLoading()).toBe(false);
   });
 
   it('seeds per-territory partial geometry from the draft before restoring marks', async () => {

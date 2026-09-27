@@ -67,7 +67,12 @@ jobs:
           DB_PASSWORD: test
           TESTCONTAINERS_RYUK_DISABLED: "true"
           DOCKER_HOST: unix:///var/run/docker.sock
-        run: mvn verify -Pcoverage -B
+        # -Ddocker.available=true: mismo flag que ci-backend.yml — habilita
+        # los tests de integración PostGIS (PostgisIntegrationTest +
+        # TilePipelineIntegrationTest). Sin ellos la cobertura de
+        # territory-service cae por debajo del gate JaCoCo 40% y este job
+        # falla aunque ci-backend pase (raíz del fallo de 2026-09-24).
+        run: mvn verify -Pcoverage -B -Ddocker.available=true
 
       - name: SonarCloud Scan
         if: github.actor != 'dependabot[bot]'

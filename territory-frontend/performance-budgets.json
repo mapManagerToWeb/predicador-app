@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "version": 1,
+    "calibratedFrom": "openspec/changes/f5-gps-mode-cwv-hardening/baseline.md (2026-09-24)",
+    "calibrationRule": "budget = min(Good, baseline_max * 1.25), floored at half of Good (never tighter than Good/2 so ordinary lab variance does not flap, never weaker than Good per the spec).",
+    "measurementMethod": "Lab: headless system Chrome (channel 'chrome'), 4x CPU throttle (CDP Emulation.setCPUThrottlingRate), fixed 1366x768 viewport, no-backend reference mode (production SSR build started with a dead GATEWAY_URL so API calls 502 and validateSession fails open), scripted interactions after waitForLcpStable. web-vitals v6 (same metric definitions as the RUM pipeline at /api/v1/rum). Percentile target: p75.",
+    "metricDefinitions": "LCP (ms), INP (ms), CLS (unitless) exactly as reported by web-vitals v6 onLCP/onINP/onCLS — identical to the values RUM reports.",
+    "goodThresholds": {
+      "lcpMs": 2500,
+      "inpMs": 200,
+      "cls": 0.1
+    }
+  },
+  "routes": {
+    "/login": {
+      "lcpMs": 1650,
+      "inpMs": 200,
+      "cls": 0.05
+    },
+    "/map": {
+      "lcpMs": 1695,
+      "inpMs": 100,
+      "cls": 0.05
+    }
+  },
+  "bundle": {
+    "_note": "Angular build gate (angular.json 'budgets'). warning ~= 90% of error. Measured baseline 2026-09-24: initial 429.17 kB raw / 103.06 kB transfer; largest lazy chunk maplibre-gl 1.06 MB (lazy, on-demand).",
+    "initialWarningKb": 450,
+    "initialErrorKb": 500,
+    "anyComponentStyleWarningKb": 12,
+    "anyComponentStyleErrorKb": 16,
+    "lazyChunksReferenceKb": {
+      "_note": "angular.json has no per-lazy-chunk budget type; recorded here for review when lazy chunks change.",
+      "maplibre-gl": 1150,
+      "map": 105,
+      "admin": 25,
+      "profile": 20,
+      "login": 18
+    }
+  }
+}

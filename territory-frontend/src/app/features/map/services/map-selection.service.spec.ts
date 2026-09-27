@@ -303,6 +303,56 @@ describe('MapSelectionService', () => {
       expect(rendering.ocultarPoligonosNoSeleccionados).toHaveBeenCalled();
       expect(rendering.refreshMarksVisual).toHaveBeenCalled();
     });
+
+    it('only refreshes the overlay when the territory is already selected', () => {
+      state.territoriosSeleccionados.set([1]);
+      state.totalManzanas.set(7);
+
+      service.marcarManzanaById('m1', 'Bloque-m1', '#ff0000', 1);
+
+      expect(state.territoriosSeleccionados()).toEqual([1]);
+      expect(rendering.ocultarPoligonosNoSeleccionados).not.toHaveBeenCalled();
+      expect(rendering.refreshMarksVisual).toHaveBeenCalled();
+      expect(state.totalManzanas()).toBe(7);
+    });
+  });
+
+  describe('restaurarMarcadoDesdeDB', () => {
+    it('delegates to the restoration service with defaults', async () => {
+      await service.restaurarMarcadoDesdeDB(3);
+
+      expect(restoration.restaurarDesdeDB).toHaveBeenCalledWith(3, undefined, {});
+    });
+
+    it('forwards the color override and options', async () => {
+      await service.restaurarMarcadoDesdeDB(5, '#00ff00', { actualizarEstadoMarcado: false });
+
+      expect(restoration.restaurarDesdeDB).toHaveBeenCalledWith(5, '#00ff00', {
+        actualizarEstadoMarcado: false,
+      });
+    });
+  });
+
+  describe('restaurarMarcadoConReportes', () => {
+    it('delegates to the restoration service with defaults', () => {
+      const reportes = [{ territorio: 2, year: 2026, mes: 1 } as never];
+
+      service.restaurarMarcadoConReportes(2, reportes);
+
+      expect(restoration.restaurarConReportes).toHaveBeenCalledWith(2, reportes, undefined, {});
+    });
+
+    it('forwards the color override and options', () => {
+      const reportes = [] as never[];
+
+      service.restaurarMarcadoConReportes(4, reportes, '#123456', {
+        actualizarEstadoMarcado: true,
+      });
+
+      expect(restoration.restaurarConReportes).toHaveBeenCalledWith(4, reportes, '#123456', {
+        actualizarEstadoMarcado: true,
+      });
+    });
   });
 
   describe('seleccionarManzana', () => {

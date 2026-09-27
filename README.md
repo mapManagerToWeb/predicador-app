@@ -320,7 +320,7 @@ Ver `.env.example` para la lista completa.
 |---|---|---|---|
 | `GET` | `/api/v1/territories` | Público | Números de territorios |
 | `GET` | `/api/v1/territories/{n}` | Público | Territorio por número |
-| `GET` | `/api/v1/territories/all/geojson` | Público | GeoJSON de todos los territorios |
+| `GET` | `/api/v1/territories/metadata` | Público | Metadatos de territorios (sin geometría) |
 | `GET` | `/api/v1/territories/{n}/geojson` | Público | GeoJSON de un territorio |
 | `GET` | `/api/v1/territories/colors` | Público | Colores asignados |
 | `PUT` | `/api/v1/territories/{n}/color` | Admin | Asignar color |

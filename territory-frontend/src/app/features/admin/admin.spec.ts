@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { AdminPage } from './admin';
@@ -86,6 +87,101 @@ describe('AdminPage', () => {
       expect(component.isLoggedIn()).toBeFalsy();
       expect(component.loginError()).toBeTruthy();
     });
+
+    it('should show error when the backend responds success: false', async () => {
+      component.username.set('admin');
+      component.password.set('bad');
+
+      const loginPromise = component.login();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
+      req.flush({ success: false });
+
+      await loginPromise;
+
+      expect(component.isLoggedIn()).toBeFalsy();
+      expect(component.loginError()).toBeTruthy();
+      expect(component.logging()).toBe(false);
+    });
+
+    it('should reset loginError before a new attempt', async () => {
+      component.loginError.set(true);
+      component.username.set('admin');
+      component.password.set('pw');
+
+      const loginPromise = component.login();
+      expect(component.loginError()).toBe(false);
+
+      httpMock.expectOne(`${environment.apiUrl}/auth/login`).flush({ success: false });
+      await loginPromise;
+      expect(component.loginError()).toBe(true);
+    });
+  });
+
+  describe('input handlers', () => {
+    it('onUsernameInput reads the input value', () => {
+      const target = { value: 'admin2' };
+      component.onUsernameInput({ target } as unknown as Event);
+      expect(component.username()).toBe('admin2');
+    });
+
+    it('onPasswordInput reads the input value', () => {
+      const target = { value: 'secret' };
+      component.onPasswordInput({ target } as unknown as Event);
+      expect(component.password()).toBe('secret');
+    });
+  });
+
+  describe('cargarDatos', () => {
+    it('loads territory numbers and colors', async () => {
+      const svc = TestBed.inject(TerritorioService);
+      vi.spyOn(svc, 'getNumerosTerritorios').mockResolvedValue([1, 2, 3]);
+      vi.spyOn(svc, 'getColores').mockResolvedValue({ 1: '#ff0000' });
+
+      await component.cargarDatos();
+
+      expect(component.numerosTerritorios()).toEqual([1, 2, 3]);
+      expect(component.colores()).toEqual({ 1: '#ff0000' });
+    });
+
+    it('shows a toast when loading fails', async () => {
+      const svc = TestBed.inject(TerritorioService);
+      vi.spyOn(svc, 'getNumerosTerritorios').mockRejectedValue(new Error('boom'));
+      const toast = TestBed.inject(Toast);
+      const showSpy = vi.spyOn(toast, 'show');
+
+      await component.cargarDatos();
+
+      expect(showSpy).toHaveBeenCalledWith('Error al cargar territorios');
+      expect(component.numerosTerritorios()).toEqual([]);
+    });
+  });
+
+  describe('cambiarColor', () => {
+    it('persists the new color and confirms with a toast', async () => {
+      const svc = TestBed.inject(TerritorioService);
+      const asignar = vi.spyOn(svc, 'asignarColor').mockResolvedValue(undefined);
+      const toast = TestBed.inject(Toast);
+      const showSpy = vi.spyOn(toast, 'show');
+
+      await component.cambiarColor(5, '#123456');
+
+      expect(component.colores()[5]).toBe('#123456');
+      expect(asignar).toHaveBeenCalledWith(5, '#123456');
+      expect(showSpy).toHaveBeenCalledWith('Color del territorio 5 actualizado');
+    });
+
+    it('keeps the optimistic color and warns when saving fails', async () => {
+      const svc = TestBed.inject(TerritorioService);
+      vi.spyOn(svc, 'asignarColor').mockRejectedValue(new Error('down'));
+      const toast = TestBed.inject(Toast);
+      const showSpy = vi.spyOn(toast, 'show');
+
+      await component.cambiarColor(7, '#654321');
+
+      expect(component.colores()[7]).toBe('#654321');
+      expect(showSpy).toHaveBeenCalledWith('Error al guardar color');
+    });
   });
 
   describe('logout', () => {
@@ -146,8 +242,13 @@ describe('AdminPage', () => {
   });
 
   describe('goToMap', () => {
-    it('should be defined', () => {
-      expect(component.goToMap).toBeDefined();
+    it('navigates to the map', () => {
+      const router = TestBed.inject(Router);
+      const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      component.goToMap();
+
+      expect(navSpy).toHaveBeenCalledWith(['/map']);
     });
   });
 

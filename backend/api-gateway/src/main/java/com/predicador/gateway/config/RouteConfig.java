@@ -68,16 +68,6 @@ public class RouteConfig {
                                         .setMethods(HttpMethod.GET)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
                         .uri(TERRITORY_SERVICE_URI))
-                .route("territory-geojson-all", r -> r
-                        .path("/api/v1/territories/all/geojson")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c.setName("territoryCB-geojson")
-                                        .setFallbackUri(TERRITORY_FALLBACK))
-                                .retry(config -> config
-                                        .setRetries(1)
-                                        .setMethods(HttpMethod.GET)
-                                        .setBackoff(Duration.ofMillis(100), Duration.ofSeconds(1), 2, true)))
-                        .uri(TERRITORY_SERVICE_URI))
                 // Pipeline MVT (F1): alta frecuencia, payload binario. CB con
                 // fallback binario propio: forward:/fallback/tile devuelve un
                 // MVT vacío gzip (application/vnd.mapbox-vector-tile), no JSON,

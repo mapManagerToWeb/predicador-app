@@ -12,6 +12,12 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -133,5 +139,67 @@ class RouteConfigTest {
                 .as("tiles-json must stay a plain GET without retry or fallback")
                 .doesNotContain("retries = 1")
                 .doesNotContain("forward:/fallback");
+    }
+
+    // ------------------------------------------------------------------
+    // F5: removal of the bulk snapshot route (territory-geojson-all).
+    // ------------------------------------------------------------------
+
+    /**
+     * Returns every route whose predicate matches the given request path,
+     * evaluated against a mocked exchange (no live gateway needed).
+     */
+    private List<Route> routesMatching(String path) {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get(path).build());
+        return config.customRouteLocator(new RouteLocatorBuilder(ctx))
+                .getRoutes().toStream()
+                .filter(r -> Boolean.TRUE.equals(
+                        Mono.from(r.getPredicate().apply(exchange)).block()))
+                .toList();
+    }
+
+    @Test
+    void territoryGeojsonAllDedicatedRoute_isRemoved() {
+        List<Route> routes = config.customRouteLocator(new RouteLocatorBuilder(ctx))
+                .getRoutes().toStream().toList();
+
+        assertThat(routes)
+                .as("the dedicated bulk-snapshot route must be gone (F5 BREAKING)")
+                .noneMatch(r -> r.getId().equals("territory-geojson-all"));
+
+        String allFilters = routes.stream()
+                .map(r -> r.getFilters().toString())
+                .reduce("", (a, b) -> a + " " + b);
+
+        assertThat(allFilters)
+                .as("no route may reference the removed circuit breaker")
+                .doesNotContain("territoryCB-geojson")
+                .doesNotContain("territory-geojson-all");
+    }
+
+    @Test
+    void allGeoJsonPath_isForwardedOnlyByGenericTerritoryRoute() {
+        List<Route> matches = routesMatching("/api/v1/territories/all/geojson");
+
+        assertThat(matches)
+                .as("only the generic catch-all may still match — the dedicated "
+                        + "snapshot route (territoryCB-geojson) is gone, so the "
+                        + "request reaches territory-service where the controller "
+                        + "no longer exists → 404 with no territory data")
+                .hasSize(1);
+        assertThat(matches.get(0).getId()).isEqualTo("territory-service");
+        assertThat(matches.get(0).getUri().toString()).isEqualTo("lb://territory-service");
+    }
+
+    @Test
+    void territoryMetadataPath_matchesGenericTerritoryRoute() {
+        List<Route> matches = routesMatching("/api/v1/territories/metadata");
+
+        assertThat(matches)
+                .as("the lightweight metadata endpoint must keep routing downstream")
+                .hasSize(1);
+        assertThat(matches.get(0).getId()).isEqualTo("territory-service");
+        assertThat(matches.get(0).getUri().toString()).isEqualTo("lb://territory-service");
     }
 }

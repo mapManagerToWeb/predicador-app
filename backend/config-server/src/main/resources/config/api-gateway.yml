@@ -95,9 +95,6 @@ resilience4j:
       territoryCB-colors:
         timeout-duration: 5s
         cancel-running-future: true
-      territoryCB-geojson:
-        timeout-duration: 30s
-        cancel-running-future: true
       territoryCB-default:
         timeout-duration: 15s
         cancel-running-future: true
@@ -122,9 +119,6 @@ resilience4j:
     instances:
       territoryCB-colors:
         timeout-duration: 5s
-        cancel-running-future: true
-      territoryCB-geojson:
-        timeout-duration: 30s
         cancel-running-future: true
       territoryCB-default:
         timeout-duration: 15s

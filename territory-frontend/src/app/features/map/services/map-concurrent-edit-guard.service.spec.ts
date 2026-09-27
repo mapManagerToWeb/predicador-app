@@ -94,6 +94,15 @@ describe('ConcurrentEditGuardService', () => {
       const req = httpMock.expectOne('/api/v1/territories/tiles.json');
       req.flush({ bounds: [0, 0, 1, 1], tiles: [] });
     });
+
+    it('should use a custom tile JSON URL when provided', () => {
+      const engine = createMockEngine();
+
+      service.startMonitoring(engine, '/custom/tiles.json');
+
+      const req = httpMock.expectOne('/custom/tiles.json');
+      req.flush({ bounds: [0, 0, 1, 1], tiles: [] });
+    });
   });
 
   describe('stopMonitoring', () => {
@@ -111,6 +120,122 @@ describe('ConcurrentEditGuardService', () => {
   });
 
   describe('concurrent edit detection', () => {
+    it('warns when bounds change is detected on a poll cycle', async () => {
+      vi.useFakeTimers();
+      try {
+        const engine = createMockEngine();
+        const showSpy = vi.spyOn(toastService, 'show');
+
+        service.startMonitoring(engine);
+        const baselineReq = httpMock.expectOne('/api/v1/territories/tiles.json');
+        baselineReq.flush({ bounds: [0, 0, 1, 1], tiles: [] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        // Primer ciclo de polling: mismos bounds → sin aviso.
+        await vi.advanceTimersByTimeAsync(10_000);
+        const pollReq1 = httpMock.expectOne('/api/v1/territories/tiles.json');
+        pollReq1.flush({ bounds: [0, 0, 1, 1], tiles: [] });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(showSpy).not.toHaveBeenCalled();
+
+        // Segundo ciclo: otro usuario cambió los bounds → aviso.
+        await vi.advanceTimersByTimeAsync(10_000);
+        const pollReq2 = httpMock.expectOne('/api/v1/territories/tiles.json');
+        pollReq2.flush({ bounds: [0, 0, 2, 2], tiles: [] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(showSpy).toHaveBeenCalledWith(
+          'El territorio fue modificado por otro usuario. Guarda tu trabajo o descárgalo.',
+          6000,
+          'warning',
+        );
+      } finally {
+        service.stopMonitoring();
+        vi.useRealTimers();
+      }
+    });
+
+    it('updates the baseline after a change so the warning fires once', async () => {
+      vi.useFakeTimers();
+      try {
+        const engine = createMockEngine();
+        const showSpy = vi.spyOn(toastService, 'show');
+
+        service.startMonitoring(engine);
+        httpMock.expectOne('/api/v1/territories/tiles.json').flush({ bounds: [0, 0, 1, 1] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        httpMock.expectOne('/api/v1/territories/tiles.json').flush({ bounds: [5, 5, 6, 6] });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(showSpy).toHaveBeenCalledTimes(1);
+
+        // Mismos bounds que el ciclo anterior: el baseline ya se actualizó.
+        await vi.advanceTimersByTimeAsync(10_000);
+        httpMock.expectOne('/api/v1/territories/tiles.json').flush({ bounds: [5, 5, 6, 6] });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(showSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        service.stopMonitoring();
+        vi.useRealTimers();
+      }
+    });
+
+    it('swallows network errors on the baseline capture', async () => {
+      const engine = createMockEngine();
+
+      service.startMonitoring(engine);
+      const req = httpMock.expectOne('/api/v1/territories/tiles.json');
+      req.error(new ProgressEvent('error'));
+      await Promise.resolve();
+
+      expect(service.isMonitoring()).toBe(true);
+    });
+
+    it('swallows network errors on a poll cycle and retries next time', async () => {
+      vi.useFakeTimers();
+      try {
+        const engine = createMockEngine();
+        const showSpy = vi.spyOn(toastService, 'show');
+
+        service.startMonitoring(engine);
+        httpMock.expectOne('/api/v1/territories/tiles.json').flush({ bounds: [0, 0, 1, 1] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        httpMock.expectOne('/api/v1/territories/tiles.json').error(new ProgressEvent('error'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(showSpy).not.toHaveBeenCalled();
+
+        // El siguiente ciclo vuelve a comparar contra el baseline original.
+        await vi.advanceTimersByTimeAsync(10_000);
+        httpMock.expectOne('/api/v1/territories/tiles.json').flush({ bounds: [9, 9, 9, 9] });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(showSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        service.stopMonitoring();
+        vi.useRealTimers();
+      }
+    });
+
+    it('ignores a poll tick that races after stopMonitoring', async () => {
+      vi.useFakeTimers();
+      try {
+        const engine = createMockEngine();
+
+        service.startMonitoring(engine);
+        httpMock.expectOne('/api/v1/territories/tiles.json').flush({ bounds: [0, 0, 1, 1] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        service.stopMonitoring();
+        await vi.advanceTimersByTimeAsync(30_000);
+
+        expect(httpMock.match('/api/v1/territories/tiles.json')).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should show warning when version changes during edit session', () => {
       const engine = createMockEngine();
       const showSpy = vi.spyOn(toastService, 'show');

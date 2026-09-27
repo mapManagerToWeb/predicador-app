@@ -2,71 +2,53 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MapLabelLayerService } from './map-label-layer.service';
 import { MapRenderingFacade, buildTerritorioMetadata } from './map-rendering.facade';
-import type { MapEngine } from './map-engine.interface';
+import { TerritorioService } from '../../../core/services/territorio';
+import { getColorForTerritorio } from '../../../core/models/territory-colors';
+import type { LayerSpecification, MapEngine } from './map-engine.interface';
+
+function layerById(mock: MapEngine, id: string): LayerSpecification {
+  const calls = (mock.addLayer as ReturnType<typeof vi.fn>).mock.calls as [
+    LayerSpecification,
+  ][];
+  const layer = calls.map((c) => c[0]).find((l) => l.id === id);
+  if (!layer) throw new Error(`layer ${id} was not added`);
+  return layer;
+}
 
 describe('MapLabelLayerService', () => {
   let service: MapLabelLayerService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [MapLabelLayerService, MapRenderingFacade],
+      providers: [
+        MapLabelLayerService,
+        MapRenderingFacade,
+        { provide: TerritorioService, useValue: { getTerritoryMetadata: vi.fn() } },
+      ],
     });
     service = TestBed.inject(MapLabelLayerService);
     const facade = TestBed.inject(MapRenderingFacade);
     // Seed the facade metadata: territories 56 (two manzanas) and 57 (one).
-    facade['metadata'] = buildTerritorioMetadata({
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [-73.3, -37.4],
-                [-73.2, -37.4],
-                [-73.2, -37.3],
-                [-73.3, -37.3],
-                [-73.3, -37.4],
-              ],
-            ],
-          },
-          properties: { territorio_padre: 56, id: '56-56.a' },
-        },
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [-73.1, -37.2],
-                [-73.05, -37.2],
-                [-73.05, -37.15],
-                [-73.1, -37.15],
-                [-73.1, -37.2],
-              ],
-            ],
-          },
-          properties: { territorio_padre: 56, id: '56-56.b' },
-        },
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [-72.9, -37.0],
-                [-72.8, -37.0],
-                [-72.8, -36.9],
-                [-72.9, -36.9],
-                [-72.9, -37.0],
-              ],
-            ],
-          },
-          properties: { territorio_padre: 57, id: '57-57.a' },
-        },
-      ],
-    } as never);
+    facade['metadata'] = buildTerritorioMetadata([
+      {
+        numero: 56,
+        nombre: 'Territorio 56',
+        color: '#00A86B',
+        bounds: [-73.3, -37.4, -73.05, -37.15],
+        center: [-73.175, -37.275],
+        manzanaCount: 2,
+        fids: [5541, 5542],
+      },
+      {
+        numero: 57,
+        nombre: 'Territorio 57',
+        color: '#3b82f6',
+        bounds: [-72.9, -37.0, -72.8, -36.9],
+        center: [-72.85, -36.95],
+        manzanaCount: 1,
+        fids: [5543],
+      },
+    ]);
   });
 
   it('should be created', () => {
@@ -80,21 +62,49 @@ describe('MapLabelLayerService', () => {
   });
 
   describe('initLabels', () => {
-    it('should add a GeoJSON centroid source and a symbol layer', () => {
+    it('should add a GeoJSON centroid source, the badge circle layer, and the symbol layer', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
       expect(mockEngine.addGeoJsonSource).toHaveBeenCalledTimes(1);
       expect(mockEngine.addGeoJsonSource.mock.calls[0][0]).toBe('territory-label-centroids');
-      expect(mockEngine.addLayer).toHaveBeenCalledTimes(1);
+      expect(mockEngine.addLayer).toHaveBeenCalledTimes(2);
+      expect(mockEngine.addLayer.mock.calls[0][0].id).toBe('territory-label-badge');
+      expect(mockEngine.addLayer.mock.calls[1][0].id).toBe('territory-labels');
+    });
+
+    it('should configure a white badge disc with a territory-colored ring on the centroid source', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLabels(mockEngine);
+
+      const badge = mockEngine.addLayer.mock.calls[0][0];
+      expect(badge.id).toBe('territory-label-badge');
+      expect(badge.type).toBe('circle');
+      expect(badge.source).toBe('territory-label-centroids');
+      expect(badge.minzoom).toBe(14);
+      expect(badge.paint['circle-radius']).toBe(12);
+      expect(badge.paint['circle-color']).toBe('#ffffff');
+      expect(badge.paint['circle-stroke-color']).toEqual([
+        'coalesce',
+        ['get', 'color'],
+        '#475569',
+      ]);
+      expect(badge.paint['circle-stroke-width']).toBe(1.5);
+    });
+
+    it('should add the badge BEFORE the symbol layer so the number paints on top', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLabels(mockEngine);
+
+      const order = mockEngine.addLayer.mock.calls.map((c) => c[0].id);
+      expect(order).toEqual(['territory-label-badge', 'territory-labels']);
     });
 
     it('should configure the symbol layer on the centroid source', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
-      const layer = mockEngine.addLayer.mock.calls[0][0];
-      expect(layer.id).toBe('territory-labels');
+      const layer = layerById(mockEngine, 'territory-labels');
       expect(layer.type).toBe('symbol');
       expect(layer.source).toBe('territory-label-centroids');
       expect(layer['source-layer']).toBeUndefined();
@@ -105,7 +115,7 @@ describe('MapLabelLayerService', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
-      const layer = mockEngine.addLayer.mock.calls[0][0];
+      const layer = layerById(mockEngine, 'territory-labels');
       expect(layer.layout['text-field']).toEqual(['to-string', ['get', 'territorio']]);
     });
 
@@ -113,7 +123,7 @@ describe('MapLabelLayerService', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
-      const layer = mockEngine.addLayer.mock.calls[0][0];
+      const layer = layerById(mockEngine, 'territory-labels');
       expect(layer.layout['text-size']).toBe(12);
     });
 
@@ -121,7 +131,7 @@ describe('MapLabelLayerService', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
-      const layer = mockEngine.addLayer.mock.calls[0][0];
+      const layer = layerById(mockEngine, 'territory-labels');
       expect(layer.layout['text-anchor']).toBe('center');
     });
 
@@ -129,17 +139,21 @@ describe('MapLabelLayerService', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
-      const layer = mockEngine.addLayer.mock.calls[0][0];
+      const layer = layerById(mockEngine, 'territory-labels');
       expect(layer.layout['symbol-avoid-edges']).toBe(true);
     });
 
-    it('should configure text paint properties', () => {
+    it('should paint the number in the territory color with a dark contrast halo', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
 
-      const layer = mockEngine.addLayer.mock.calls[0][0];
-      expect(layer.paint['text-color']).toBe('#1e293b');
-      expect(layer.paint['text-halo-color']).toBe('#ffffff');
+      const layer = layerById(mockEngine, 'territory-labels');
+      expect(layer.paint['text-color']).toEqual([
+        'coalesce',
+        ['get', 'color'],
+        '#475569',
+      ]);
+      expect(layer.paint['text-halo-color']).toBe('rgba(0,0,0,0.45)');
       expect(layer.paint['text-halo-width']).toBe(1);
     });
 
@@ -148,7 +162,7 @@ describe('MapLabelLayerService', () => {
       service.initLabels(mockEngine);
       service.initLabels(mockEngine);
 
-      expect(mockEngine.addLayer).toHaveBeenCalledTimes(1);
+      expect(mockEngine.addLayer).toHaveBeenCalledTimes(2);
       expect(mockEngine.addGeoJsonSource).toHaveBeenCalledTimes(1);
     });
   });
@@ -165,8 +179,32 @@ describe('MapLabelLayerService', () => {
       expect(sourceId).toBe('territory-label-centroids');
       const numeros = collection.features.map(f => f.properties.territorio);
       expect(numeros).toEqual([56]);
-      // Centroid of territory 56 = bounds center of its two manzanas.
+      // Centroid of territory 56 = the metadata `center` for its two manzanas.
       expect(collection.features[0].geometry.coordinates).toEqual([-73.175, -37.275]);
+    });
+
+    it('writes the backend territory color onto each centroid feature', () => {
+      const mockEngine = createMockMapEngine();
+      service.initLabels(mockEngine);
+      // Seed the backend color map (populated in prod via /territories/colors).
+      const facade = TestBed.inject(MapRenderingFacade);
+      facade['featureLayers'].set(56, {
+        territorioPadre: 56,
+        color: '#00A86B',
+        layer: null as never,
+      });
+
+      service.updateLabels(mockEngine, []);
+
+      const [, collection] = mockEngine.updateGeoJsonSourceData.mock.calls[0];
+      const colors = new Map(
+        collection.features.map((f) => [f.properties.territorio, f.properties.color]),
+      );
+      // Backend color wins when present...
+      expect(colors.get(56)).toBe('#00A86B');
+      // ...otherwise the TERRITORY_COLORS cycle fallback applies.
+      expect(colors.get(57)).toBe(getColorForTerritorio(57, null));
+      expect(colors.get(57)).toMatch(/^#[0-9a-fA-F]{6}$/);
     });
 
     it('sends all centroids when the selection is empty', () => {
@@ -189,12 +227,13 @@ describe('MapLabelLayerService', () => {
   });
 
   describe('destroy', () => {
-    it('should remove the label layer and the centroid source', () => {
+    it('should remove both label layers and the centroid source', () => {
       const mockEngine = createMockMapEngine();
       service.initLabels(mockEngine);
       service.destroy(mockEngine);
 
       expect(mockEngine.removeLayer).toHaveBeenCalledWith('territory-labels');
+      expect(mockEngine.removeLayer).toHaveBeenCalledWith('territory-label-badge');
       expect(mockEngine.removeSource).toHaveBeenCalledWith('territory-label-centroids');
       expect(service.isInitialized()).toBe(false);
     });
@@ -212,7 +251,9 @@ describe('MapLabelLayerService', () => {
       service.destroy(mockEngine);
       service.destroy(mockEngine);
 
-      expect(mockEngine.removeLayer).toHaveBeenCalledTimes(1);
+      // One removal per layer (badge + symbol) on the first destroy only.
+      expect(mockEngine.removeLayer).toHaveBeenCalledTimes(2);
+      expect(mockEngine.removeSource).toHaveBeenCalledTimes(1);
     });
 
     it('should not throw if layer or source does not exist', () => {

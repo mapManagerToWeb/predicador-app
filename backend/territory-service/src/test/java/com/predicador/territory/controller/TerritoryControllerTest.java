@@ -1,6 +1,8 @@
 package com.predicador.territory.controller;
 
 import com.predicador.territory.dto.TerritoryDto;
+import com.predicador.territory.dto.TerritoryMetadataDto;
+import com.predicador.territory.service.TerritoryMetadataService;
 import com.predicador.territory.service.TerritoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +16,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -26,6 +31,9 @@ class TerritoryControllerTest {
 
     @Mock
     private TerritoryService territoryService;
+
+    @Mock
+    private TerritoryMetadataService territoryMetadataService;
 
     @InjectMocks
     private TerritoryController territoryController;
@@ -47,13 +55,16 @@ class TerritoryControllerTest {
     }
 
     @Test
-    void getAllTerritoriesGeoJson_shouldReturn200() throws Exception {
-        String geoJson = "{\"type\":\"FeatureCollection\",\"features\":[]}";
-        when(territoryService.getAllTerritoriesGeoJson()).thenReturn(geoJson);
-
+    void getAllTerritoriesGeoJson_endpointRemoved_returns404WithoutTerritoryData() throws Exception {
+        // Spec (geojson-api): el snapshot bulk ya no existe — la petición
+        // SHALL devolver 404 sin datos de territorios. Restricción \d+ en
+        // /{number}/geojson evita que "all" caiga en la conversión a Long.
         mockMvc.perform(get("/api/v1/territories/all/geojson"))
-            .andExpect(status().isOk())
-            .andExpect(content().string(geoJson));
+            .andExpect(status().isNotFound())
+            .andExpect(content().string(not(containsString("FeatureCollection"))))
+            .andExpect(content().string(not(containsString("features"))));
+
+        verifyNoInteractions(territoryService);
     }
 
     @Test
@@ -82,6 +93,38 @@ class TerritoryControllerTest {
                 .contentType("application/json")
                 .content("{\"color\":\"#ff0000\"}"))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void getTerritoriesMetadata_shouldReturnDtoFieldsWithoutGeometry() throws Exception {
+        TerritoryMetadataDto dto = new TerritoryMetadataDto(7L, "Territorio 7", "#ff0000",
+            List.of(-71.0, -33.1, -70.9, -33.0), List.of(-70.95, -33.05), 3L,
+            List.of(7100L, 7101L, 7102L));
+        when(territoryMetadataService.getMetadata()).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/v1/territories/metadata"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].numero").value(7))
+            .andExpect(jsonPath("$[0].nombre").value("Territorio 7"))
+            .andExpect(jsonPath("$[0].color").value("#ff0000"))
+            .andExpect(jsonPath("$[0].bounds[0]").value(-71.0))
+            .andExpect(jsonPath("$[0].bounds[3]").value(-33.0))
+            .andExpect(jsonPath("$[0].center[0]").value(-70.95))
+            .andExpect(jsonPath("$[0].center[1]").value(-33.05))
+            .andExpect(jsonPath("$[0].manzanaCount").value(3))
+            .andExpect(jsonPath("$[0].fids[0]").value(7100))
+            .andExpect(jsonPath("$[0].fids[2]").value(7102))
+            .andExpect(content().string(not(containsString("geometry"))))
+            .andExpect(content().string(not(containsString("coordinates"))));
+    }
+
+    @Test
+    void getTerritoriesMetadata_shouldReturnEmptyArrayWhenNoTerritories() throws Exception {
+        when(territoryMetadataService.getMetadata()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/territories/metadata"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("[]"));
     }
 
     @Test

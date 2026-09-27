@@ -24,8 +24,8 @@ const MARKED_FALLBACK_COLOR = '#22c55e';
 
 /**
  * Matches a {@link ManzanaMarcada} against the manzana features of its
- * territory (from the `/all/geojson` snapshot). Marks carry one of three
- * ID shapes and we must accept all of them:
+ * territory (the on-demand per-territory GeoJSON). Marks carry one of
+ * three ID shapes and we must accept all of them:
  *
  * - numeric MVT fid ("554")           → matches the `fid` property;
  * - legacy composite "{t}-{b}" ("56-56.b") → matches the `id` property;
@@ -61,8 +61,8 @@ function stringify(value: unknown): string {
  * vector tiles (Leaflet parity: marked manzanas get fill 0.95/0.85 and a
  * 3px stroke — the tile fills alone cannot express per-mark styling).
  *
- * <p>Features are matched from the `/all/geojson` snapshot via
- * {@link matchMarkedFeature} and carry two extra properties:
+ * <p>Features are matched against the on-demand per-territory geometry
+ * via {@link matchMarkedFeature} and carry two extra properties:
  * `color` (the mark color) and `completo` (whether the territory finished),
  * which drive the data-driven paints.</p>
  *

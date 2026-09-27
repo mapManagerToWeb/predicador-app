@@ -70,10 +70,13 @@
 }
 
 /* ── Map toggle buttons ── */
-.map-toggle-satellite,
-.map-toggle-location {
+.map-toggle-satellite {
   position: absolute;
   left: var(--space-3);
+}
+
+.map-toggle-satellite,
+.follow-toggle {
   z-index: 1000;
   width: 36px;
   height: 36px;
@@ -97,19 +100,15 @@
   bottom: 16px;
 }
 
-.map-toggle-location {
-  bottom: 60px;
-}
-
 .map-toggle-satellite svg,
-.map-toggle-location svg {
+.follow-toggle svg {
   width: 16px;
   height: 16px;
   transition: transform 0.15s var(--ease-out);
 }
 
 .map-toggle-satellite:hover,
-.map-toggle-location:hover {
+.follow-toggle:hover {
   color: var(--ink);
   background: var(--surface-3);
   border-color: var(--ink-faint);
@@ -117,27 +116,61 @@
 }
 
 .map-toggle-satellite:active,
-.map-toggle-location:active {
+.follow-toggle:active {
   transform: scale(0.95);
 }
 
-.map-toggle-satellite.active {
+.map-toggle-satellite.active,
+.follow-toggle.active {
   background: var(--color-primary);
   color: #FFFFFF;
   border-color: var(--color-primary);
   box-shadow: 0 0 16px var(--color-primary-glow);
 }
 
-.map-toggle-location:disabled {
-  cursor: default;
-  opacity: 0.3;
+/* GPS follow controls */
+.follow-controls {
+  position: absolute;
+  left: var(--space-3);
+  bottom: 60px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
 }
 
-.map-toggle-location .btn-spinner {
-  width: 14px;
-  height: 14px;
-  border-color: rgba(255, 255, 255, 0.25);
-  border-top-color: #fff;
+.follow-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 220px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.follow-error {
+  color: var(--color-danger);
+}
+
+.follow-action {
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--ink);
+}
+
+.follow-action:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--ink-faint);
+}
+
+.follow-action:disabled {
+  opacity: 0.4;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -515,10 +548,13 @@
     height: 38px;
   }
 
-  .map-toggle-location {
-    bottom: 266px;
+  .follow-toggle {
     width: 38px;
     height: 38px;
+  }
+
+  .follow-controls {
+    bottom: 266px;
   }
 
   .sheet-row {
@@ -660,10 +696,13 @@
     height: 38px;
   }
 
-  .map-toggle-location {
-    bottom: 250px;
+  .follow-toggle {
     width: 38px;
     height: 38px;
+  }
+
+  .follow-controls {
+    bottom: 250px;
   }
 
   .mode-tab {
@@ -696,12 +735,6 @@
     height: 36px;
   }
 
-  .map-toggle-location {
-    bottom: 60px;
-    width: 36px;
-    height: 36px;
-  }
-
   .mode-tab {
     height: 36px;
     padding: 0 var(--space-3);
@@ -723,7 +756,7 @@
   .action-btn,
   .partial-btn,
   .map-toggle-satellite,
-  .map-toggle-location {
+  .follow-toggle {
     min-height: 44px;
   }
 

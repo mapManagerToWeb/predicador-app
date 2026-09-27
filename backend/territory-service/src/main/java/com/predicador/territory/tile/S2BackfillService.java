@@ -75,7 +75,7 @@ public class S2BackfillService implements ApplicationRunner {
         } catch (RuntimeException ex) {
             // No tumbamos el arranque: el guard sigue ausente y el próximo
             // reinicio reanuda el backfill (idempotente). El pipeline
-            // existente (/all/geojson) sigue sirviendo.
+            // existente (tiles MVT + GeoJSON por territorio) sigue sirviendo.
             log.error("S2 backfill falló; se reintentará en el próximo arranque (guard s2_backfill_done ausente)", ex);
         }
     }

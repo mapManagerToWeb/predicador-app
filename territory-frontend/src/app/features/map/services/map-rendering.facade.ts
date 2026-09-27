@@ -3,7 +3,7 @@ import { MapStateService } from './map-state.service';
 import { MapVectorTileService } from './map-vector-tile.service';
 import { MapMarkedOverlayService, matchMarkedFeature } from './map-marked-overlay.service';
 import { MapSelectedManzanaOverlayService } from './map-selected-manzana-overlay.service';
-import type { TerritorioService } from '../../../core/services/territorio';
+import { TerritorioService, type TerritoryMetadataDto } from '../../../core/services/territorio';
 import type { FeatureLayer, TerritorioCacheData, ManzanaMarcada } from '../types/map.types';
 import type { MapEngine } from './map-engine.interface';
 import type * as GeoJSON from 'geojson';
@@ -42,100 +42,147 @@ function parseSavedGeometry(raw: string): GeoJSON.Geometry | null {
 }
 
 /**
- * Per-territory metadata derived once from the `/all/geojson` snapshot
- * (the source of truth also used by the deployed Leaflet app):
- * manzana counts, bounds (fitBounds focus), label centroids (bounds
- * center) and the raw features (marked overlay / partial draw).
+ * Per-territory metadata derived from the validated
+ * `GET /api/v1/territories/metadata` DTO list: manzana counts, bounds
+ * (fitBounds focus) and label centroids (ST_PointOnSurface). Feature
+ * geometry is NOT part of this payload — it is fetched on demand per
+ * territory (see {@link MapRenderingFacade.getGeoJsonFeaturesByTerritorio}).
  */
 export interface TerritorioMetadata {
   manzanaCounts: Map<number, number>;
   boundsByTerritorio: Map<number, GeojsonBounds>;
   centroidsByTerritorio: Map<number, [number, number]>;
-  featuresByTerritorio: Map<number, GeoJSON.Feature[]>;
 }
 
 /** FitBounds padding for territory focus (Leaflet parity: 30px each side). */
 const TERRITORY_FOCUS_PADDING = 30;
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** Parses an exact-length finite-number tuple, or null when malformed. */
+function parseNumberTuple(value: unknown, length: number): number[] | null {
+  if (!Array.isArray(value)) return null;
+  const entries: unknown[] = value;
+  if (entries.length !== length) return null;
+  const tuple: number[] = [];
+  for (const entry of entries) {
+    if (!isFiniteNumber(entry)) return null;
+    tuple.push(entry);
+  }
+  return tuple;
+}
+
 /**
- * Derives per-territory metadata from the GeoJSON FeatureCollection.
- * Feature properties use the snake_case keys served by the backend
- * (`territorio_padre`, `id`, `nombre_bloque`, `color`).
+ * Validates one raw `/territories/metadata` item against the
+ * {@link TerritoryMetadataDto} contract (trust boundary). Malformed items
+ * yield null and are skipped by the caller; `bounds`/`center` may be
+ * explicitly null (territory without geometry) but must be well-formed
+ * tuples otherwise.
  */
-export function buildTerritorioMetadata(fc: GeoJSON.FeatureCollection): TerritorioMetadata {
+function parseMetadataDto(value: unknown): TerritoryMetadataDto | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const item = value as Record<string, unknown>;
+
+  const numero = item['numero'];
+  const nombre = item['nombre'];
+  const color = item['color'];
+  const manzanaCount = item['manzanaCount'];
+  const fidsRaw = item['fids'];
+  const boundsRaw = item['bounds'];
+  const centerRaw = item['center'];
+
+  if (!isFiniteNumber(numero)) return null;
+  if (typeof nombre !== 'string') return null;
+  if (typeof color !== 'string') return null;
+  if (!isFiniteNumber(manzanaCount) || manzanaCount < 0) return null;
+  if (!Array.isArray(fidsRaw)) return null;
+  const fidEntries: unknown[] = fidsRaw;
+  const fids: number[] = [];
+  for (const fid of fidEntries) {
+    if (!isFiniteNumber(fid)) return null;
+    fids.push(fid);
+  }
+
+  let bounds: GeojsonBounds | null = null;
+  if (boundsRaw !== null) {
+    const parsed = parseNumberTuple(boundsRaw, 4);
+    if (parsed === null) return null;
+    bounds = [parsed[0], parsed[1], parsed[2], parsed[3]];
+  }
+
+  let center: [number, number] | null = null;
+  if (centerRaw !== null) {
+    const parsed = parseNumberTuple(centerRaw, 2);
+    if (parsed === null) return null;
+    center = [parsed[0], parsed[1]];
+  }
+
+  return { numero, nombre, color, bounds, center, manzanaCount, fids };
+}
+
+/**
+ * Derives per-territory metadata from validated
+ * `GET /territories/metadata` DTOs: manzana counts, bounds (fitBounds
+ * focus) and label centroids (`center`, ST_PointOnSurface).
+ */
+export function buildTerritorioMetadata(dtos: TerritoryMetadataDto[]): TerritorioMetadata {
   const manzanaCounts = new Map<number, number>();
   const boundsByTerritorio = new Map<number, GeojsonBounds>();
   const centroidsByTerritorio = new Map<number, [number, number]>();
-  const featuresByTerritorio = new Map<number, GeoJSON.Feature[]>();
 
-  for (const feature of fc.features) {
-    const num = Number(feature.properties?.['territorio_padre']);
-    if (!Number.isFinite(num)) continue;
-
-    manzanaCounts.set(num, (manzanaCounts.get(num) ?? 0) + 1);
-
-    const list = featuresByTerritorio.get(num) ?? [];
-    list.push(feature);
-    featuresByTerritorio.set(num, list);
-
-    const bbox = featureBBox(feature.geometry);
-    if (!bbox) continue;
-    const current = boundsByTerritorio.get(num);
-    boundsByTerritorio.set(
-      num,
-      current
-        ? [
-            Math.min(current[0], bbox[0]),
-            Math.min(current[1], bbox[1]),
-            Math.max(current[2], bbox[2]),
-            Math.max(current[3], bbox[3]),
-          ]
-        : bbox,
-    );
+  for (const dto of dtos) {
+    manzanaCounts.set(dto.numero, dto.manzanaCount);
+    if (dto.bounds !== null) boundsByTerritorio.set(dto.numero, dto.bounds);
+    if (dto.center !== null) centroidsByTerritorio.set(dto.numero, dto.center);
   }
 
-  for (const [num, b] of boundsByTerritorio) {
-    centroidsByTerritorio.set(num, [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
-  }
-
-  return { manzanaCounts, boundsByTerritorio, centroidsByTerritorio, featuresByTerritorio };
+  return { manzanaCounts, boundsByTerritorio, centroidsByTerritorio };
 }
 
-/** Bounding box of a feature geometry (polygons and points only — the app's data). */
-function featureBBox(geometry: GeoJSON.Geometry | null): GeojsonBounds | null {
-  if (!geometry) return null;
-  switch (geometry.type) {
-    case 'Polygon':
-      return coordinatesBBox(geometry.coordinates);
-    case 'MultiPolygon':
-      return coordinatesBBox(geometry.coordinates.flat());
-    case 'Point':
-      return [
-        geometry.coordinates[0],
-        geometry.coordinates[1],
-        geometry.coordinates[0],
-        geometry.coordinates[1],
-      ];
-    default:
-      return null;
+/**
+ * Validates a raw `/territories/metadata` payload at the trust boundary:
+ * anything that is not an array yields null; malformed items are skipped
+ * and the well-formed remainder is kept.
+ */
+export function parseTerritoryMetadata(raw: unknown): TerritorioMetadata | null {
+  if (!Array.isArray(raw)) return null;
+  const entries: unknown[] = raw;
+  const dtos: TerritoryMetadataDto[] = [];
+  for (const entry of entries) {
+    const dto = parseMetadataDto(entry);
+    if (dto !== null) dtos.push(dto);
   }
+  return buildTerritorioMetadata(dtos);
 }
 
-function coordinatesBBox(rings: GeoJSON.Position[][]): GeojsonBounds | null {
-  let bbox: GeojsonBounds | null = null;
-  for (const ring of rings) {
-    for (const [x, y] of ring) {
-      if (!bbox) {
-        bbox = [x, y, x, y];
-      } else {
-        if (x < bbox[0]) bbox[0] = x;
-        if (y < bbox[1]) bbox[1] = y;
-        if (x > bbox[2]) bbox[2] = x;
-        if (y > bbox[3]) bbox[3] = y;
-      }
-    }
+/**
+ * Parses a per-territory `/geojson` payload into its feature list.
+ * Anything that is not a FeatureCollection with a features array yields
+ * null (the caller then marks the territory as failed for this session).
+ */
+function parseTerritoryFeatures(raw: string): GeoJSON.Feature[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
   }
-  return bbox;
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const collection = parsed as Record<string, unknown>;
+  const list = collection['features'];
+  if (!Array.isArray(list)) return null;
+  const entries: unknown[] = list;
+  const features: GeoJSON.Feature[] = [];
+  for (const entry of entries) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const candidate = entry as Record<string, unknown>;
+    if (candidate['type'] !== 'Feature') continue;
+    if (candidate['geometry'] === undefined || candidate['geometry'] === null) continue;
+    features.push(candidate as unknown as GeoJSON.Feature);
+  }
+  return features;
 }
 
 /**
@@ -157,6 +204,7 @@ export class MapRenderingFacade {
   private readonly markedOverlay = inject(MapMarkedOverlayService);
   private readonly selectedOverlay = inject(MapSelectedManzanaOverlayService);
   private readonly state = inject(MapStateService);
+  private readonly territorioService = inject(TerritorioService);
 
   /** Active map engine, attached once by {@link attachEngine}. */
   private engine: MapEngine | null = null;
@@ -178,12 +226,27 @@ export class MapRenderingFacade {
   private readonly featureLayers = new Map<number, FeatureLayer>();
 
   /**
-   * Per-territory metadata derived from the `/all/geojson` snapshot.
-   * Populated by {@link loadGeoJsonMetadata}; absent (null) when the
-   * fetch fails — tiles still render, but counters/labels/overlay are
-   * unavailable (same degradation as the colors-only path).
+   * Per-territory metadata derived from the `GET /territories/metadata`
+   * DTOs. Populated by {@link loadTerritoryMetadata}; absent (null) when the
+   * fetch fails — tiles still render, but counters/labels are unavailable
+   * (same degradation as the colors-only path).
    */
   private metadata: TerritorioMetadata | null = null;
+
+  /**
+   * On-demand per-territory geometry (fetched via `GET /{numero}/geojson`),
+   * backing {@link getGeoJsonFeaturesByTerritorio}. Kept separate from
+   * {@link metadata} so the initial load stays a single small DTO request.
+   */
+  private readonly geoJsonFeatures = new Map<number, GeoJSON.Feature[]>();
+  /** In-flight geometry fetches, deduplicating concurrent heal requests. */
+  private readonly geoJsonInFlight = new Map<number, Promise<void>>();
+  /** Territories whose geometry fetch failed this session (no retry). */
+  private readonly geoJsonFailed = new Set<number>();
+  /** Territories with a heal already registered (avoids duplicate repaints). */
+  private readonly healing = new Set<number>();
+  /** Bumped on every metadata reload; stale in-flight writes check it. */
+  private metadataGeneration = 0;
 
   /**
    * Attach the active map engine. Called once during map initialization;
@@ -220,7 +283,7 @@ export class MapRenderingFacade {
     }
   }
 
-  async loadAllTerritories(_territorioService: { getAllGeoJson(): Promise<string> }): Promise<void> {
+  async loadAllTerritories(): Promise<void> {
     // No-op: MapLibre loads territories via vector tiles
   }
 
@@ -247,42 +310,64 @@ export class MapRenderingFacade {
   // ─── GeoJSON metadata (counts, bounds, centroids, features) ─────────
 
   /**
-   * Fetches and parses the one-time `/all/geojson` snapshot, deriving
-   * per-territory manzana COUNTS, BOUNDS (fitBounds focus), label
-   * CENTROIDS and the raw FEATURES (marked overlay / partial draw).
-   * Fail-tolerant: on error the metadata stays null and tiles keep
-   * rendering normally.
+   * Fetches and validates the one-time `GET /territories/metadata` DTO
+   * list, deriving per-territory manzana COUNTS, BOUNDS (fitBounds focus)
+   * and label CENTROIDS. Fail-tolerant: on a fetch error or a malformed
+   * payload the metadata stays null (with a `console.warn`) and tiles keep
+   * rendering normally. Reloading also resets the on-demand geometry cache.
    */
-  async loadGeoJsonMetadata(territorioService: TerritorioService): Promise<void> {
+  async loadTerritoryMetadata(): Promise<void> {
+    this.metadataGeneration += 1;
+    this.geoJsonFeatures.clear();
+    this.geoJsonInFlight.clear();
+    this.geoJsonFailed.clear();
+    this.healing.clear();
+
     try {
-      const raw = await territorioService.getAllGeoJson();
-      this.metadata = buildTerritorioMetadata(JSON.parse(raw) as GeoJSON.FeatureCollection);
-    } catch {
+      const raw = await this.territorioService.getTerritoryMetadata();
+      const parsed = parseTerritoryMetadata(raw);
+      if (parsed === null) {
+        this.metadata = null;
+        console.warn(
+          'MapRenderingFacade: malformed /territories/metadata payload — counters/labels degraded',
+        );
+        return;
+      }
+      this.metadata = parsed;
+    } catch (error) {
       this.metadata = null;
+      console.warn(
+        'MapRenderingFacade: /territories/metadata fetch failed — counters/labels degraded',
+        error,
+      );
     }
   }
 
-  /** Real per-territory manzana count from the GeoJSON snapshot. */
+  /** Real per-territory manzana count from the metadata DTOs. */
   getManzanaCountByTerritorio(territorioNum: number): number {
     return this.metadata?.manzanaCounts.get(territorioNum) ?? 0;
   }
 
-  /** Territory bounding box from the GeoJSON snapshot, or null if unknown. */
+  /** Territory bounding box from the metadata DTOs, or null if unknown. */
   getBoundsByTerritorio(territorioNum: number): GeojsonBounds | null {
     return this.metadata?.boundsByTerritorio.get(territorioNum) ?? null;
   }
 
-  /** Label centroid (bounds center) for a territory, or null if unknown. */
+  /** Label centroid (`center`, ST_PointOnSurface) or null if unknown. */
   getCentroidByTerritorio(territorioNum: number): [number, number] | null {
     return this.metadata?.centroidsByTerritorio.get(territorioNum) ?? null;
   }
 
-  /** Raw GeoJSON features of a territory (marked overlay / partial draw). */
+  /**
+   * Per-territory geometry features from the on-demand cache (empty until
+   * the territory is fetched — see {@link healGeoJsonGeometry}). Feeds the
+   * marked overlay, the highlight and matchMarkedFeature.
+   */
   getGeoJsonFeaturesByTerritorio(territorioNum: number): GeoJSON.Feature[] {
-    return this.metadata?.featuresByTerritorio.get(territorioNum) ?? [];
+    return this.geoJsonFeatures.get(territorioNum) ?? [];
   }
 
-  /** Territory numbers present in the GeoJSON metadata. */
+  /** Territory numbers present in the metadata DTOs. */
   getTerritoriosConMetadata(): number[] {
     return this.metadata ? Array.from(this.metadata.manzanaCounts.keys()) : [];
   }
@@ -369,7 +454,7 @@ export class MapRenderingFacade {
   /**
    * Initialize the marked-manzana GeoJSON overlay and populate it with the
    * current marks. Must be called once after the engine is attached and
-   * the GeoJSON metadata is loaded (and BEFORE the label layer, so marks
+   * the territory metadata is loaded (and BEFORE the label layer, so marks
    * render below the territory-number labels).
    */
   initMarkedOverlay(engine: MapEngine): void {
@@ -389,9 +474,9 @@ export class MapRenderingFacade {
   /**
    * Highlight the tapped manzana (Leaflet parity: `selectedManzana` yellow
    * `#facc15`, fill 0.15, 4px stroke). The geometry comes from the
-   * `/all/geojson` snapshot, matched by fid / "{t}-{b}" / bloque.
+   * on-demand per-territory cache, matched by fid / "{t}-{b}" / bloque.
    *
-   * <p>When the feature cannot be resolved (snapshot still loading) the
+   * <p>When the feature cannot be resolved (geometry still loading) the
    * previous highlight is cleared rather than left stale.</p>
    */
   setSelectedManzana(manzanaId: string, nombreBloque: string, territorioNumero: number): void {
@@ -399,6 +484,7 @@ export class MapRenderingFacade {
     this.selectedManzanaNombre = nombreBloque;
     this.selectedManzanaTerritorio = territorioNumero;
     this.renderSelectedManzana();
+    this.healGeoJsonGeometry();
   }
 
   /** Remove the manzana highlight (selection cleared / territory deselected). */
@@ -456,13 +542,16 @@ export class MapRenderingFacade {
   /**
    * Rebuild the marked overlay from the current marks — editable marks plus the
    * display-only ones restored from the backend. Marks are matched against the
-   * `/all/geojson` snapshot by fid / "{t}-{b}" id / bloque; matched features
-   * carry the mark color and a `completo` flag.
+   * on-demand per-territory geometry by fid / "{t}-{b}" id / bloque; matched
+   * features carry the mark color and a `completo` flag.
    *
    * <p>Bug fix "modo parcial": `parcial-` marks have no manzana feature to
    * match — their zone is synthesized directly from the SAVED geometry
    * ({@link MapStateService.getDatosParciales}), so a restored partial zone
    * repaints its real polygon instead of disappearing.</p>
+   *
+   * <p>Ends with {@link healGeoJsonGeometry}: a mark whose territory geometry
+   * is not cached yet renders as skipped, then repaints once fetched.</p>
    */
   refreshOverlayMarks(): void {
     if (!this.engine || !this.markedOverlay.isInitialized()) return;
@@ -508,6 +597,86 @@ export class MapRenderingFacade {
     }
 
     this.markedOverlay.updateOverlay(this.engine, features);
+    this.healGeoJsonGeometry();
+  }
+
+  /**
+   * Fetches (once per territory, per session) and caches the geometry
+   * behind {@link getGeoJsonFeaturesByTerritorio}. A failed fetch is
+   * remembered (single `console.warn`, no retry until the next metadata
+   * reload) so callers degrade to "no match" instead of hammering the
+   * backend. In-flight fetches are deduplicated; results from a previous
+   * metadata generation are discarded.
+   */
+  private ensureGeoJsonGeometry(territorioNum: number): Promise<void> {
+    if (this.geoJsonFeatures.has(territorioNum)) return Promise.resolve();
+    if (this.geoJsonFailed.has(territorioNum)) return Promise.resolve();
+    const inFlight = this.geoJsonInFlight.get(territorioNum);
+    if (inFlight !== undefined) return inFlight;
+
+    const generation = this.metadataGeneration;
+    const request: Promise<void> = this.territorioService
+      .getGeoJsonByTerritorio(territorioNum)
+      .then(raw => {
+        const features = parseTerritoryFeatures(raw);
+        if (generation !== this.metadataGeneration) return; // stale — metadata reloaded
+        if (features === null) {
+          this.geoJsonFailed.add(territorioNum);
+          console.warn(
+            `MapRenderingFacade: invalid geometry for territory ${territorioNum} — overlay degraded`,
+          );
+          return;
+        }
+        this.geoJsonFeatures.set(territorioNum, features);
+      })
+      .catch(() => {
+        if (generation !== this.metadataGeneration) return;
+        this.geoJsonFailed.add(territorioNum);
+        console.warn(
+          `MapRenderingFacade: geometry fetch failed for territory ${territorioNum} — overlay degraded`,
+        );
+      })
+      .finally(() => {
+        if (this.geoJsonInFlight.get(territorioNum) === request) {
+          this.geoJsonInFlight.delete(territorioNum);
+        }
+      });
+    this.geoJsonInFlight.set(territorioNum, request);
+    return request;
+  }
+
+  /**
+   * On-demand geometry healing: collect the territories that still need
+   * geometry — marked ones (partial zones synthesize their own shape and
+   * are skipped) plus the selected territory while it is selected — fetch
+   * each once, then repaint the overlay and the highlight.
+   *
+   * <p>Never triggered from the fetch itself, so a failure cannot loop;
+   * already-cached and already-failed territories are skipped by
+   * {@link ensureGeoJsonGeometry}.</p>
+   */
+  private healGeoJsonGeometry(): void {
+    if (!this.engine) return;
+
+    const pending = new Set<number>();
+    for (const mark of this.state.manzanasVisiblesList()) {
+      if (mark.id.startsWith('parcial-')) continue;
+      pending.add(mark.territorioNumero);
+    }
+    const seleccionados = this.state.territoriosSeleccionados();
+    const selected = this.selectedManzanaTerritorio;
+    if (selected !== null && seleccionados.includes(selected)) pending.add(selected);
+
+    for (const numero of pending) {
+      if (this.healing.has(numero)) continue;
+      if (this.geoJsonFeatures.has(numero) || this.geoJsonFailed.has(numero)) continue;
+      this.healing.add(numero);
+      void this.ensureGeoJsonGeometry(numero).then(() => {
+        this.healing.delete(numero);
+        this.refreshOverlayMarks();
+        this.renderSelectedManzana();
+      });
+    }
   }
 
   /**

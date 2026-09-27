@@ -46,7 +46,7 @@ const TERRITORY_GEOJSON: GeoJSON.FeatureCollection = {
           ],
         ],
       },
-      properties: { id: '56-56.a', nombre_bloque: '56.a', territorio_padre: 56 },
+      properties: { fid: 5541, id: '56-56.a', nombre_bloque: '56.a', territorio_padre: 56 },
     },
     {
       type: 'Feature',
@@ -64,7 +64,7 @@ const TERRITORY_GEOJSON: GeoJSON.FeatureCollection = {
           ],
         ],
       },
-      properties: { id: '57-57.a', nombre_bloque: '57.a', territorio_padre: 57 },
+      properties: { fid: 5543, id: '57-57.a', nombre_bloque: '57.a', territorio_padre: 57 },
     },
   ],
 };
@@ -91,7 +91,7 @@ const TWO_MANZANA_GEOJSON: GeoJSON.FeatureCollection = {
           ],
         ],
       },
-      properties: { id: '56-56.a', nombre_bloque: '56.a', territorio_padre: 56 },
+      properties: { fid: 5541, id: '56-56.a', nombre_bloque: '56.a', territorio_padre: 56 },
     },
     {
       type: 'Feature',
@@ -107,7 +107,7 @@ const TWO_MANZANA_GEOJSON: GeoJSON.FeatureCollection = {
           ],
         ],
       },
-      properties: { id: '56-56.b', nombre_bloque: '56.b', territorio_padre: 56 },
+      properties: { fid: 5542, id: '56-56.b', nombre_bloque: '56.b', territorio_padre: 56 },
     },
   ],
 };
@@ -119,7 +119,6 @@ describe('MapPartialMarkService', () => {
     getAllTerritoriesLayer: ReturnType<typeof vi.fn>;
     getCurrentTerritoryColor: ReturnType<typeof vi.fn>;
     refreshMarksVisual: ReturnType<typeof vi.fn>;
-    getGeoJsonFeaturesByTerritorio: ReturnType<typeof vi.fn>;
   };
   let selection: {
     selectManzanaById: ReturnType<typeof vi.fn>;
@@ -141,7 +140,6 @@ describe('MapPartialMarkService', () => {
       getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
       getCurrentTerritoryColor: vi.fn().mockReturnValue('#22c55e'),
       refreshMarksVisual: vi.fn(),
-      getGeoJsonFeaturesByTerritorio: vi.fn().mockReturnValue([]),
     };
     selection = {
       selectManzanaById: vi.fn(),
@@ -389,23 +387,11 @@ describe('MapPartialMarkService', () => {
       expect(snapped.latlng.lng).toBe(-73.25);
     });
 
-    it('excludes fid-keyed marks by bridging them through the facades /all/geojson metadata', () => {
+    it('excludes fid-keyed marks by bridging them through the editGeoJson features', () => {
       withTwoManzanas();
-      // The per-territory snapshot identifies manzanas by id ("56-56.b"),
-      // while marks store the MVT fid (5542). The /all/geojson metadata
-      // carries BOTH — the bridge maps 5542 → "56-56.b".
-      rendering.getGeoJsonFeaturesByTerritorio.mockReturnValue([
-        {
-          type: 'Feature',
-          geometry: { type: 'Polygon', coordinates: [] },
-          properties: { id: '56-56.a', fid: 5541, territorio_padre: 56 },
-        },
-        {
-          type: 'Feature',
-          geometry: { type: 'Polygon', coordinates: [] },
-          properties: { id: '56-56.b', fid: 5542, territorio_padre: 56 },
-        },
-      ] as unknown as GeoJSON.Feature[]);
+      // The per-territory GeoJSON identifies manzanas by fid (5541/5542)
+      // AND by id ("56-56.b"), while this mark stores only the MVT fid
+      // (5542). The bridge maps both key spaces so 5542 excludes "56-56.b".
       state.manzanasById.set(
         new Map([
           ['5542', { id: '5542', nombreBloque: '', color: '#ff0000', territorioNumero: 56 }],
@@ -528,6 +514,83 @@ describe('MapPartialMarkService', () => {
       expect(state.partialDrawGeoJson()).toBeNull();
       expect(toast.show).toHaveBeenCalledWith('Zona parcial marcada — tocá para eliminar');
     });
+
+    it('uses the generic name when no manzana is selected', () => {
+      state.territoriosSeleccionados.set([56]);
+      rendering.getCurrentTerritoryColor.mockReturnValue('#00ff00');
+      pendingPoints(3);
+
+      service.finalizarParcial();
+
+      const marks = Array.from(state.manzanasById().values());
+      expect(marks).toHaveLength(1);
+      expect(marks[0].nombreBloque).toBe('Zona parcial');
+      expect(marks[0].territorioNumero).toBe(56);
+    });
+
+    it('persists a LineString when the traced ring degenerates', () => {
+      state.manzanaSeleccionadaTerritorio.set(56);
+      rendering.getCurrentTerritoryColor.mockReturnValue('#00ff00');
+      // Three coincident points dedupe down to a single vertex → the ring
+      // cannot close (≥4 coords), so the geometry falls back to LineString.
+      state.puntosParciales.set([
+        { latlng: { lat: 1, lng: 1 }, edgeIdx: 0, t: 0 },
+        { latlng: { lat: 1, lng: 1 }, edgeIdx: 0, t: 1 },
+        { latlng: { lat: 1, lng: 1 }, edgeIdx: 0, t: 2 },
+      ]);
+
+      service.finalizarParcial();
+
+      const guardado = state.getDatosParciales(56);
+      expect(JSON.parse(guardado!.geometria)).toEqual({
+        type: 'LineString',
+        coordinates: [[1, 1]],
+      });
+    });
+
+    it('falls back to the default green when no territory color is available', () => {
+      state.manzanaSeleccionadaTerritorio.set(56);
+      rendering.getCurrentTerritoryColor.mockReturnValue('');
+      rendering.getAllTerritoriesLayer.mockReturnValue([]);
+      pendingPoints(3);
+
+      service.finalizarParcial();
+
+      const marks = Array.from(state.manzanasById().values());
+      expect(marks[0].color).toBe('#22c55e');
+    });
+
+    it('ignores a feature layer without a color', () => {
+      state.manzanaSeleccionadaTerritorio.set(56);
+      rendering.getCurrentTerritoryColor.mockReturnValue('');
+      rendering.getAllTerritoriesLayer.mockReturnValue([{ territorioPadre: 56 }]);
+      pendingPoints(3);
+
+      service.finalizarParcial();
+
+      const marks = Array.from(state.manzanasById().values());
+      expect(marks[0].color).toBe('#22c55e');
+    });
+
+    it('works without an attached engine (SSR / teardown race)', () => {
+      state.territoriosSeleccionados.set([56]);
+      rendering.getCurrentTerritoryColor.mockReturnValue('#00ff00');
+      pendingPoints(3);
+
+      expect(() => service.finalizarParcial()).not.toThrow();
+
+      const marks = Array.from(state.manzanasById().values());
+      expect(marks).toHaveLength(1);
+      expect(overlay.removeOverlay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('limpiarDibujo without engine', () => {
+    it('is a no-op on the overlay when no engine is attached', () => {
+      expect(() => service.limpiarDibujo()).not.toThrow();
+      expect(overlay.removeOverlay).not.toHaveBeenCalled();
+      expect(state.partialDrawGeoJson()).toBeNull();
+    });
   });
 
   describe('cancelarParcial', () => {
@@ -542,6 +605,42 @@ describe('MapPartialMarkService', () => {
       expect(state.modoMarcado()).toBe('none');
       expect(overlay.removeOverlay).toHaveBeenCalledWith(engine);
       expect(state.partialDrawGeoJson()).toBeNull();
+    });
+  });
+
+  describe('eliminarParcial', () => {
+    function seedParcial(id: string, territorioNumero: number): void {
+      state.manzanasById.set(
+        new Map([
+          [id, { id, nombreBloque: 'Zona parcial', color: '#22c55e', territorioNumero }],
+        ]),
+      );
+      state.setDatosParciales(territorioNumero, {
+        puntos: [{ lat: -33.4, lng: -70.6, edgeIdx: 0, t: 0.5 }],
+        geometria: '{"type":"Polygon"}',
+      });
+    }
+
+    it('removes the mark, its saved geometry and refreshes the overlay', () => {
+      seedParcial('parcial-1', 56);
+
+      service.eliminarParcial('parcial-1');
+
+      expect(state.manzanasById().size).toBe(0);
+      expect(state.datosParcialesGuardados.has(56)).toBe(false);
+      expect(rendering.refreshMarksVisual).toHaveBeenCalled();
+      expect(toast.show).toHaveBeenCalledWith('Zona parcial eliminada');
+    });
+
+    it('is a no-op for an unknown id', () => {
+      seedParcial('parcial-1', 56);
+
+      service.eliminarParcial('parcial-99');
+
+      expect(state.manzanasById().has('parcial-1')).toBe(true);
+      expect(state.datosParcialesGuardados.has(56)).toBe(true);
+      expect(rendering.refreshMarksVisual).not.toHaveBeenCalled();
+      expect(toast.show).not.toHaveBeenCalled();
     });
   });
 });

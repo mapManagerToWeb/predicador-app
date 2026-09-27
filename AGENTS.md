@@ -66,10 +66,10 @@ All downstream URIs use `lb://<service>` resolved through Eureka; each route has
 | Route                             | Downstream        | Notes                                                |
 | --------------------------------- | ----------------- | ---------------------------------------------------- |
 | `/api/v1/territories/colors`      | territory-service | CB `territoryCB-colors`, 5s timeout                  |
-| `/api/v1/territories/all/geojson` | territory-service | CB `territoryCB-geojson`, 30s timeout                |
 | `/api/v1/territories/tiles/{z}/{x}/{y}.pbf` | territory-service | CB `territoryCB-tiles`, 20s, bulkhead 100; fallback `forward:/fallback/tile` (empty gzip MVT so MapLibre never gets an AJAXError — a JSON body in MVT content-type would break the map) |
 | `/api/v1/territories/tiles.json`  | territory-service | CB `territoryCB-tilesjson`, 20s, bulkhead 100        |
-| `/api/v1/territories/**`          | territory-service | CB `territoryCB-default`, 15s timeout               |
+| `/api/v1/territories/metadata`    | territory-service | Lightweight territory metadata (cached by `data_version`); no dedicated route — served via the `/api/v1/territories/**` catch-all (CB `territoryCB-default`, 15s timeout) |
+| `/api/v1/territories/**`          | territory-service | CB `territoryCB-default`, 15s timeout (also serves `/{numero}/geojson`, and previously `/all/geojson` — removed; now 404)               |
 | `/api/v1/reports/**`              | reporting-service | CB `reportingCB`, 20s timeout                       |
 | `/api/v1/encargados/**`           | reporting-service | CB `encargadosCB`, 10s timeout                      |
 | `/api/v1/rum`                     | reporting-service | Public RUM sink, high volume, no retries, CB `rumCB`, 5s timeout |

@@ -1,7 +1,9 @@
 package com.predicador.shared.exception;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,6 +43,25 @@ class GlobalExceptionHandlerTest {
         NumberFormatException ex = new NumberFormatException("For input string: \"abc\"");
         ProblemDetail problem = handler.handleNumberFormat(ex);
         assertEquals(400, problem.getStatus());
+    }
+
+    @Test
+    void handleNoResourceFound_returns404ProblemDetailWithoutData() {
+        // Spec geojson-api: /api/v1/territories/all/geojson fue eliminada; el
+        // dispatcher real cae a recursos estáticos y ResourceHttpRequestHandler
+        // lanza NoResourceFoundException → debe ser 404, nunca 500 del catch-all,
+        // y sin payload de territorios.
+        NoResourceFoundException ex = new NoResourceFoundException(
+                HttpMethod.GET, "/api/v1/territories/all/geojson",
+                "No static resource api/v1/territories/all/geojson.");
+        ProblemDetail problem = handler.handleNoResourceFound(ex);
+        assertEquals(404, problem.getStatus());
+        assertEquals("Recurso no encontrado", problem.getTitle());
+        assertEquals("Recurso no encontrado", problem.getDetail());
+        assertEquals("https://api.predicador.com/errors/not-found", problem.getType().toString());
+        assertTrue(problem.getProperties() == null || problem.getProperties().isEmpty());
+        assertFalse(problem.getDetail().contains("FeatureCollection"));
+        assertFalse(problem.getDetail().contains("features"));
     }
 
     @Test

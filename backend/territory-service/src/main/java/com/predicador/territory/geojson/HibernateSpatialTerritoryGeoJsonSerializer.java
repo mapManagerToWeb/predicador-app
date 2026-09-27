@@ -76,6 +76,12 @@ public class HibernateSpatialTerritoryGeoJsonSerializer implements TerritoryGeoJ
             properties.put("id", row.getTerritorioPadre() + "-" + blankToEmpty(row.getNombreBloque()));
             properties.put("nombre_bloque", blankToEmpty(row.getNombreBloque()));
             properties.put("territorio_padre", row.getTerritorioPadre());
+            // fid = manzanas_territorio.id: mismo valor numérico que publica
+            // el pipeline MVT — permite que el emparejamiento
+            // fid ↔ "{t}-{b}" viaje con la geometría por territorio.
+            if (row.getId() != null) {
+                properties.put("fid", row.getId());
+            }
             properties.put("color", color);
             feature.set("properties", properties);
             feature.set("geometry", geometry);

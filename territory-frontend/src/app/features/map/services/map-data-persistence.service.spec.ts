@@ -9,6 +9,7 @@ import { TerritorioService } from '../../../core/services/territorio';
 import { Toast } from '../../../core/services/toast';
 import { ReportCacheService } from '../../../core/services/report-cache';
 import { DraftMarksService } from './map-draft';
+import { MapCaptureService } from './map-capture.service';
 import { TOAST_MESSAGES } from '../utils/map-constants';
 
 describe('MapDataPersistenceService', () => {
@@ -24,6 +25,7 @@ describe('MapDataPersistenceService', () => {
     sendWhatsApp: ReturnType<typeof vi.fn>;
     eliminarReportes: ReturnType<typeof vi.fn>;
   };
+  let capture: { prepararCapturaSoloIncompletos: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     report = {
@@ -40,6 +42,7 @@ describe('MapDataPersistenceService', () => {
       sendWhatsApp: vi.fn().mockResolvedValue(true),
       eliminarReportes: vi.fn().mockResolvedValue(undefined),
     };
+    capture = { prepararCapturaSoloIncompletos: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         MapDataPersistenceService,
@@ -50,6 +53,7 @@ describe('MapDataPersistenceService', () => {
           useValue: {
             getAllTerritoriesLayer: vi.fn().mockReturnValue([]),
             restaurarVisibilidadPoligonos: vi.fn(),
+            getManzanaCountByTerritorio: vi.fn().mockReturnValue(0),
           },
         },
         {
@@ -60,6 +64,7 @@ describe('MapDataPersistenceService', () => {
           },
         },
         { provide: TerritorioService, useValue: { crearReportes: vi.fn().mockResolvedValue([]) } },
+        { provide: MapCaptureService, useValue: capture },
         { provide: Toast, useValue: { show: vi.fn() } },
         {
           provide: ReportCacheService,
@@ -537,6 +542,194 @@ describe('MapDataPersistenceService', () => {
     expect(datosParcialesClearedDuringAwait).toBe(false);
     // After the request completes, datosParciales should be cleared.
     expect(state.datosParcialesGuardados.size).toBe(0);
+  });
+
+  it('warns about missing profile and skips the save (guardarEnBaseDeDatos)', async () => {
+    report.getProfile.mockReturnValue(null);
+
+    await service.guardarEnBaseDeDatos();
+
+    const toast = TestBed.inject(Toast);
+    expect(toast.show as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(TOAST_MESSAGES.noProfile);
+    expect(report.saveToDatabase).not.toHaveBeenCalled();
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('warns about missing profile and skips the send (guardarYEnviar)', async () => {
+    report.getProfile.mockReturnValue(null);
+
+    await service.guardarYEnviar();
+
+    const toast = TestBed.inject(Toast);
+    expect(toast.show as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(TOAST_MESSAGES.noProfile);
+    expect(report.captureScreenshot).not.toHaveBeenCalled();
+    expect(report.sendWhatsApp).not.toHaveBeenCalled();
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('warns when there are no marked blocks in guardarEnBaseDeDatos', async () => {
+    state.manzanasById.set(new Map());
+
+    await service.guardarEnBaseDeDatos();
+
+    const toast = TestBed.inject(Toast);
+    expect(toast.show as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(TOAST_MESSAGES.noMarked);
+    expect(report.saveToDatabase).not.toHaveBeenCalled();
+  });
+
+  it('warns when there are no marked blocks in guardarYEnviar', async () => {
+    state.manzanasById.set(new Map());
+
+    await service.guardarYEnviar();
+
+    const toast = TestBed.inject(Toast);
+    expect(toast.show as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      TOAST_MESSAGES.noTerritories,
+    );
+    expect(report.sendWhatsApp).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when a save is already in flight (enviando guard)', async () => {
+    state.enviando.set(true);
+
+    await service.guardarEnBaseDeDatos();
+
+    const toast = TestBed.inject(Toast);
+    expect(report.saveToDatabase).not.toHaveBeenCalled();
+    expect(toast.show as ReturnType<typeof vi.fn>).not.toHaveBeenCalledWith(TOAST_MESSAGES.saving);
+    expect(state.enviando()).toBe(true);
+    state.enviando.set(false);
+  });
+
+  it('does nothing when a send is already in flight (enviando guard)', async () => {
+    state.enviando.set(true);
+
+    await service.guardarYEnviar();
+
+    expect(report.buildTerritoriosParaEnvio).not.toHaveBeenCalled();
+    expect(report.sendWhatsApp).not.toHaveBeenCalled();
+    state.enviando.set(false);
+  });
+
+  it('keeps marks and shows no error toast on SSR AbortError (guardarEnBaseDeDatos)', async () => {
+    report.saveToDatabase.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+
+    await service.guardarEnBaseDeDatos();
+
+    const toast = TestBed.inject(Toast);
+    expect(toast.show as ReturnType<typeof vi.fn>).not.toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.territoriosSeleccionados()).toEqual([1]);
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('keeps marks and shows no error toast on SSR AbortError (guardarYEnviar)', async () => {
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: false,
+    });
+    report.saveToDatabase.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+
+    await service.guardarYEnviar();
+
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+    expect(show).not.toHaveBeenCalledWith(TOAST_MESSAGES.saveError);
+    expect(show).not.toHaveBeenCalledWith(TOAST_MESSAGES.sendRollbackError);
+    expect(report.eliminarReportes).not.toHaveBeenCalled();
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.enviando()).toBe(false);
+    expect(state.screenshotPreview()).toBeNull();
+  });
+
+  it('invokes the screenshot prepare callback with marks, selection, layers and manzana counter', async () => {
+    state.manzanasById.set(
+      new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]),
+    );
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: true,
+    });
+    report.captureScreenshot.mockImplementation(
+      async (prepare: () => unknown, restore: () => undefined) => {
+        prepare();
+        restore();
+        return 'screenshot-base64';
+      },
+    );
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A',
+      encargadoApellido: 'B',
+      fechaRegistro: '01-08-2026',
+      predicacion: 'tarde',
+      territorios: [],
+      screenshotBase64: 'screenshot-base64',
+      destinationNumber: '56912345678',
+    });
+    report.sendWhatsApp.mockResolvedValue(true);
+
+    await service.guardarYEnviar();
+
+    expect(capture.prepararCapturaSoloIncompletos).toHaveBeenCalledTimes(1);
+    const [marksArg, selArg, layersArg, counterFn] = capture.prepararCapturaSoloIncompletos.mock
+      .calls[0] as [unknown[], number[], unknown[], (n: number) => number];
+    expect(marksArg).toHaveLength(1);
+    expect(selArg).toEqual([1]);
+    expect(layersArg).toEqual([]);
+    // El 4° argumento delega el conteo de manzanas en la fachada de render.
+    expect(counterFn(7)).toBe(0);
+    const facade = TestBed.inject(MapRenderingFacade) as unknown as {
+      getManzanaCountByTerritorio: ReturnType<typeof vi.fn>;
+    };
+    expect(facade.getManzanaCountByTerritorio).toHaveBeenCalledWith(7);
+  });
+
+  it('rolls back the saved reports when sendWhatsApp throws after a successful save', async () => {
+    state.manzanasById.set(
+      new Map([['m1', { id: 'm1', nombreBloque: 'A', color: '#f00', territorioNumero: 1 }]]),
+    );
+    report.buildTerritoriosParaEnvio.mockReturnValue({
+      territorios: [{ numero: 1, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 }],
+      requiereScreenshot: false,
+    });
+    report.buildWhatsAppRequest.mockReturnValue({
+      encargadoNombre: 'A',
+      encargadoApellido: 'B',
+      fechaRegistro: '01-08-2026',
+      predicacion: 'tarde',
+      territorios: [],
+      screenshotBase64: null,
+      destinationNumber: '56912345678',
+    });
+    const guardado = { id: 10, ...reporteShape(1) };
+    report.saveToDatabase.mockResolvedValue([guardado]);
+    report.sendWhatsApp.mockRejectedValue(new Error('network down'));
+    const toast = TestBed.inject(Toast);
+    const show = toast.show as ReturnType<typeof vi.fn>;
+
+    await service.guardarYEnviar();
+
+    expect(report.eliminarReportes).toHaveBeenCalledWith([guardado]);
+    expect(show).toHaveBeenCalledWith(TOAST_MESSAGES.sendRollbackError);
+    expect(state.manzanasById().size).toBeGreaterThan(0);
+    expect(state.enviando()).toBe(false);
+  });
+
+  it('skips the territory cache when a saved report has no territorioNumero', async () => {
+    const saved = [{ id: 11, territorioNumero: null }];
+    report.saveToDatabase.mockResolvedValue(saved);
+    const cache = TestBed.inject(ReportCacheService) as unknown as {
+      setTerritorio: ReturnType<typeof vi.fn>;
+    };
+    const drafts = TestBed.inject(DraftMarksService) as unknown as {
+      eliminarTerritorios: ReturnType<typeof vi.fn>;
+    };
+
+    await service.guardarEnBaseDeDatos();
+
+    expect(cache.setTerritorio).not.toHaveBeenCalled();
+    expect(drafts.eliminarTerritorios).toHaveBeenCalledWith([1]);
+    expect(state.enviando()).toBe(false);
   });
 
   function reporteShape(territorio: number) {

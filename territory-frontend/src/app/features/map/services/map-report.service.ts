@@ -182,7 +182,7 @@ export class MapReportService {
 
   private countTotalManzanas(featureLayer: FeatureLayer | undefined, fallback: number): number {
     if (!featureLayer) return fallback;
-    // Real per-territory count from the /all/geojson snapshot (Leaflet parity).
+    // Real per-territory count from the /territories/metadata DTOs (Leaflet parity).
     const total = this.rendering.getManzanaCountByTerritorio(featureLayer.territorioPadre);
     return total > 0 ? total : fallback;
   }

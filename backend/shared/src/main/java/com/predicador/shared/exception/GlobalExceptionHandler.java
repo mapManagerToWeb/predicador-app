@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.util.Map;
@@ -25,6 +26,23 @@ public class GlobalExceptionHandler {
         problem.setType(URI.create("https://api.predicador.com/errors/not-found"));
         problem.setProperty("resource", ex.getResource());
         problem.setProperty("id", ex.getId());
+        return problem;
+    }
+
+    /**
+     * Ruta sin handler (caída al manejador de recursos estáticos): en un servidor
+     * real {@code ResourceHttpRequestHandler} lanza {@link NoResourceFoundException}
+     * (MockMvc standalone no lo hace — por eso el 404 solo se ve en vivo). Sin este
+     * handler dedicado, el catch-all {@link #handleGeneral} lo convertía en 500.
+     * Devuelve 404 con el mismo problem-detail que {@link #handleNotFound}, sin datos.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResourceFound(NoResourceFoundException ex) {
+        log.debug("NoResourceFoundException: {} {}", ex.getHttpMethod(), ex.getResourcePath());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, "Recurso no encontrado");
+        problem.setTitle("Recurso no encontrado");
+        problem.setType(URI.create("https://api.predicador.com/errors/not-found"));
         return problem;
     }
 

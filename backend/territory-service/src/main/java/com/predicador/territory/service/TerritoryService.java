@@ -8,8 +8,6 @@ import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
 import com.predicador.territory.tile.DataChangedEvent;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -20,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,7 +27,6 @@ public class TerritoryService {
     private final TerritoryColorRepository colorRepository;
     private final TerritoryGeoJsonSerializer geoJsonSerializer;
     private final ObjectProvider<TerritoryService> self;
-    private final Timer geojsonLoadTimer;
     private final ApplicationEventPublisher publisher;
 
     private static final String[] PALETTE = {
@@ -40,26 +36,23 @@ public class TerritoryService {
         "#FF00FF", "#4169E1", "#FF69B4", "#7B68EE"
     };
 
-    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry) {
-        this(territoryRepository, colorRepository, geoJsonSerializer, registry, null, null);
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer) {
+        this(territoryRepository, colorRepository, geoJsonSerializer, null, null);
     }
 
-    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry,
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer,
                             ObjectProvider<TerritoryService> self) {
-        this(territoryRepository, colorRepository, geoJsonSerializer, registry, self, null);
+        this(territoryRepository, colorRepository, geoJsonSerializer, self, null);
     }
 
     @Autowired
-    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer, MeterRegistry registry,
+    public TerritoryService(TerritoryRepository territoryRepository, TerritoryColorRepository colorRepository, TerritoryGeoJsonSerializer geoJsonSerializer,
                             ObjectProvider<TerritoryService> self, ApplicationEventPublisher publisher) {
         this.territoryRepository = territoryRepository;
         this.colorRepository = colorRepository;
         this.geoJsonSerializer = geoJsonSerializer;
         this.self = self;
         this.publisher = publisher;
-        this.geojsonLoadTimer = Timer.builder("territory.geojson.load.duration")
-                .description("Tiempo para generar el GeoJSON completo de todos los territorios")
-                .register(registry);
     }
 
     /**
@@ -78,8 +71,8 @@ public class TerritoryService {
     }
 
     public TerritoryDto getTerritory(Long number) {
-        // No cacheado individualmente: la mayoría del tráfico usa el endpoint
-        // /all/geojson agregado. Cachear cada TerritoryDto duplicaría memoria.
+        // No cacheado individualmente: el mapa ahora lee tiles MVT + el
+        // endpoint /metadata; cachear cada TerritoryDto duplicaría memoria.
         List<TerritoryRepository.ManzanaGeoJsonProjection> manzanas =
                 territoryRepository.findGeoJsonByTerritorioPadre(number);
         if (manzanas.isEmpty()) {
@@ -101,17 +94,6 @@ public class TerritoryService {
             throw new ResourceNotFoundException("Territorio", number);
         }
         return geoJsonSerializer.serializeTerritory(manzanas, getColorForTerritory(number));
-    }
-
-    @Cacheable(CacheConfig.CACHE_GEOJSON_ALL)
-    public String getAllTerritoriesGeoJson() {
-        long start = System.nanoTime();
-        try {
-            return territoryRepository.findAllGeoJsonAsFeatureCollection();
-        } finally {
-            long elapsed = System.nanoTime() - start;
-            geojsonLoadTimer.record(elapsed, TimeUnit.NANOSECONDS);
-        }
     }
 
     @Cacheable(CacheConfig.CACHE_COLORS)
@@ -139,7 +121,6 @@ public class TerritoryService {
     @Transactional
     @Caching(evict = {
         @CacheEvict(value = CacheConfig.CACHE_COLORS, allEntries = true),
-        @CacheEvict(value = CacheConfig.CACHE_GEOJSON_ALL, allEntries = true),
         @CacheEvict(value = CacheConfig.CACHE_GEOJSON_ONE, key = "#territoryNumber")
     })
     public void assignColor(Long territoryNumber, String color) {

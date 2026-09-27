@@ -12,25 +12,52 @@
     <app-territory-search (territorySelected)="onTerritorioSeleccionado($event)" />
   </div>
 
-  <button
-    type="button"
-    class="map-toggle-location"
-    [class.active]="locationStatus() === 'following'"
-    [disabled]="locationStatus() === 'locating'"
-    (click)="toggleUbicacion()"
-    [attr.aria-label]="
-      locationStatus() === 'following' ? 'Dejar de seguir mi ubicación' : 'Mi ubicación'
-    "
-    [attr.aria-pressed]="locationStatus() === 'following'"
-  >
-    @if (locationStatus() === 'locating') {
-      <span class="btn-spinner" aria-hidden="true"></span>
-    } @else {
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
-      </svg>
-    }
-  </button>
+  <!-- GPS follow-me controls (hidden while editing per D4).
+       This is the ONLY geolocation control on the page. The legacy
+       `.map-toggle-location` button was removed: it acquired a live OS
+       geolocation watch but never read the resulting lat/lng/accuracy, so it
+       moved nothing and only drained the battery. -->
+  @if (!followEditing()) {
+    <div class="follow-controls" role="group" aria-label="Seguimiento GPS">
+      <button
+        type="button"
+        class="follow-toggle"
+        [class.active]="gpsState() === 'active'"
+        [class.paused]="gpsState() === 'paused'"
+        [attr.aria-pressed]="gpsState() !== 'off'"
+        [attr.aria-label]="gpsState() === 'off' ? 'Seguir mi ubicación' : 'Detener seguimiento'"
+        (click)="toggleGpsFollow()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+        </svg>
+      </button>
+
+      @if (gpsState() !== 'off' || gpsError()) {
+        <div class="follow-panel" role="status" aria-live="polite">
+          @if (gpsError()) {
+            <span class="follow-error">{{ gpsErrorMessage() }}</span>
+          }
+          @if (gpsState() === 'active') {
+            <span class="follow-status">Siguiendo tu ubicación</span>
+          } @else if (gpsState() === 'paused') {
+            <span class="follow-status">Seguimiento en pausa</span>
+            <button type="button" class="follow-action" (click)="recenterGps()">Recentrar</button>
+          }
+          @if (gpsState() !== 'off') {
+            <button
+              type="button"
+              class="follow-action"
+              [disabled]="!gpsHasTrail()"
+              (click)="clearGpsTrail()"
+            >
+              Limpiar ruta
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
 
   @if (tieneTerritorio()) {
     @defer (on viewport) {

@@ -252,6 +252,19 @@ export class MaplibreEngineService implements MapEngine {
     this.map?.setCenter(center);
   }
 
+  /**
+   * Animated camera move to `center`.
+   *
+   * <p>MapLibre fires the `*start` camera events synchronously inside this
+   * call (`_prepareEase`), so callers may guard re-entrant pause handlers with
+   * a flag toggled around the call. No `essential` option is passed: when the
+   * user prefers reduced motion MapLibre collapses the duration to 0
+   * (instant jump), which is the accessible behavior.</p>
+   */
+  easeTo(center: [number, number], options?: { duration?: number }): void {
+    this.map?.easeTo({ center, ...options });
+  }
+
   resize(): void {
     this.map?.resize();
   }

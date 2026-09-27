@@ -2,6 +2,8 @@ package com.predicador.territory.controller;
 
 import com.predicador.territory.dto.TerritoryColorRequest;
 import com.predicador.territory.dto.TerritoryDto;
+import com.predicador.territory.dto.TerritoryMetadataDto;
+import com.predicador.territory.service.TerritoryMetadataService;
 import com.predicador.territory.service.TerritoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +17,12 @@ import java.util.Map;
 public class TerritoryController {
 
     private final TerritoryService territoryService;
+    private final TerritoryMetadataService territoryMetadataService;
 
-    public TerritoryController(TerritoryService territoryService) {
+    public TerritoryController(TerritoryService territoryService,
+                               TerritoryMetadataService territoryMetadataService) {
         this.territoryService = territoryService;
+        this.territoryMetadataService = territoryMetadataService;
     }
 
     @GetMapping
@@ -25,9 +30,14 @@ public class TerritoryController {
         return ResponseEntity.ok(territoryService.getTerritoryNumbers());
     }
 
-    @GetMapping("/all/geojson")
-    public ResponseEntity<String> getAllTerritoriesGeoJson() {
-        return ResponseEntity.ok(territoryService.getAllTerritoriesGeoJson());
+    /**
+     * Metadatos ligeros por territorio (identidad, color, bounds, centro,
+     * conteo, fids) sin geometría — reemplaza la información no geométrica
+     * que el frontend derivaba del snapshot bulk retirado en F5.
+     */
+    @GetMapping("/metadata")
+    public ResponseEntity<List<TerritoryMetadataDto>> getTerritoriesMetadata() {
+        return ResponseEntity.ok(territoryMetadataService.getMetadata());
     }
 
     @GetMapping("/colors")
@@ -35,17 +45,21 @@ public class TerritoryController {
         return ResponseEntity.ok(territoryService.getAllColors());
     }
 
-    @GetMapping("/{number}")
+    // Restricción \d+ en {number}: sin ella, la ruta retirada del snapshot
+    // bulk caería en /{number}/geojson con number="all" y el fallo de
+    // conversión a Long produciría 400/500 en vez del 404 que exige la
+    // spec (bulk snapshot ausente).
+    @GetMapping("/{number:\\d+}")
     public ResponseEntity<TerritoryDto> getTerritory(@PathVariable Long number) {
         return ResponseEntity.ok(territoryService.getTerritory(number));
     }
 
-    @GetMapping("/{number}/geojson")
+    @GetMapping("/{number:\\d+}/geojson")
     public ResponseEntity<String> getTerritoryGeoJson(@PathVariable Long number) {
         return ResponseEntity.ok(territoryService.getTerritoryGeoJson(number));
     }
 
-    @PutMapping("/{number}/color")
+    @PutMapping("/{number:\\d+}/color")
     public ResponseEntity<Void> assignColor(
             @PathVariable Long number,
             @Valid @RequestBody TerritoryColorRequest request) {

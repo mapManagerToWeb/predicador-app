@@ -22,8 +22,6 @@ import java.util.List;
  * generates when the map viewport pans.</p>
  *
  * <ul>
- *   <li>{@code territoryGeoJsonAll} — full FeatureCollection, invalidated on
- *       color changes so the {@code color} property stays fresh.</li>
  *   <li>{@code territoryGeoJson} — per-territory GeoJSON.</li>
  *   <li>{@code territoryColors} — color map (small but hit on every load).</li>
  *   <li>{@code territoryNumbers} — the list of territory ids (rarely changes).</li>
@@ -37,7 +35,6 @@ import java.util.List;
 @EnableCaching
 public class CacheConfig {
 
-    public static final String CACHE_GEOJSON_ALL = "territoryGeoJsonAll";
     public static final String CACHE_GEOJSON_ONE = "territoryGeoJson";
     public static final String CACHE_COLORS = "territoryColors";
     public static final String CACHE_NUMBERS = "territoryNumbers";
@@ -82,7 +79,6 @@ public class CacheConfig {
                 .maximumSize(200)
                 .recordStats());
         manager.setCacheNames(List.of(
-                CACHE_GEOJSON_ALL,
                 CACHE_GEOJSON_ONE,
                 CACHE_COLORS,
                 CACHE_NUMBERS));

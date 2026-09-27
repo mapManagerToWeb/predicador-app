@@ -38,9 +38,11 @@
         <!--
             Transitive dependency overrides for CVEs that the managed versions
             shipped by Spring Boot do not yet fix.
+            rabbit-amqp-client 5.34.0 fixes CVE-2026-75516 (HIGH, DoS via
+            oversized frames) present in 5.33.1.
         -->
         <httpcore5.version>5.4.3</httpcore5.version>
-        <rabbit-amqp-client.version>5.33.1</rabbit-amqp-client.version>
+        <rabbit-amqp-client.version>5.34.0</rabbit-amqp-client.version>
     </properties>
 
     <modules>
@@ -86,9 +88,12 @@
                 <scope>import</scope>
             </dependency>
             <!--
-                Transitive dependency overrides for known CVEs (CVE-2026-54291
-                in pgjdbc, CVE-2025-14813 in Bouncy Castle) that the managed
-                versions shipped by Spring Boot / Spring Cloud do not yet fix.
+                Transitive dependency overrides for known CVEs that the managed
+                versions shipped by Spring Boot / Spring Cloud do not yet fix:
+                CVE-2026-54291 in pgjdbc; CVE-2025-14813 plus CVE-2026-8763
+                (CRITICAL, name-constraints bypass) and CVE-2026-13506 (HIGH,
+                ASN.1 DoS) in Bouncy Castle — both fixed in bcprov 1.85, so
+                1.86 (dependabot-validated, PR #66) clears the Trivy gate.
             -->
             <dependency>
                 <groupId>org.postgresql</groupId>
@@ -98,7 +103,7 @@
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk18on</artifactId>
-                <version>1.84</version>
+                <version>1.86</version>
             </dependency>
             <!-- Spring Cloud Config Server 5.0.0 has CVEs (CVE-2026-40982 CRITICAL, CVE-2026-22739 HIGH, CVE-2026-40981 HIGH, CVE-2026-41002 HIGH). Fixed in 5.0.3. -->
             <dependency>

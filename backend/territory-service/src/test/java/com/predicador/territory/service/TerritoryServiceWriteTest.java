@@ -5,7 +5,6 @@ import com.predicador.territory.model.TerritoryColor;
 import com.predicador.territory.repository.TerritoryColorRepository;
 import com.predicador.territory.repository.TerritoryRepository;
 import com.predicador.territory.tile.DataChangedEvent;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +44,6 @@ class TerritoryServiceWriteTest {
                 territoryRepository,
                 colorRepository,
                 new HibernateSpatialTerritoryGeoJsonSerializer(),
-                new SimpleMeterRegistry(),
                 null,
                 publisher);
     }
@@ -91,7 +89,6 @@ class TerritoryServiceWriteTest {
                 territoryRepository,
                 colorRepository,
                 new HibernateSpatialTerritoryGeoJsonSerializer(),
-                new SimpleMeterRegistry(),
                 null,
                 null);
 

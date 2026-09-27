@@ -5,11 +5,14 @@ on:
     branches: [main, chore/production-quality-hardening, feat/redesign]
     paths:
       - "territory-frontend/**"
+      - "tests/cwv/**"
       - ".github/workflows/ci-frontend.yml"
   pull_request:
     branches: [main, feat/redesign]
     paths:
       - "territory-frontend/**"
+      - "tests/cwv/**"
+      - ".github/workflows/ci-frontend.yml"
 
 concurrency:
   group: ci-frontend-${{ github.ref }}
@@ -59,3 +62,49 @@ jobs:
           name: frontend-coverage
           path: territory-frontend/coverage/
           retention-days: 7
+
+  cwv-lab:
+    # Presupuesto CWV de laboratorio (LCP/INP/CLS por ruta) — bloquea el merge
+    # junto al gate de bundle existente. Corre en paralelo a `lint-test-build`.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: territory-frontend
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: territory-frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build production
+        run: pnpm run build
+
+      # El runner de GitHub ya trae Google Chrome (`channel: 'chrome'`).
+      # El script levanta y detiene el SSR de producción por sí solo y lee
+      # los umbrales de territory-frontend/performance-budgets.json.
+      # Reintento inline (una sola re-ejecución) para absorber ruido de lab
+      # sin acciones de terceros.
+      - name: CWV lab budget gate (1 retry)
+        run: |
+          set +e
+          for attempt in 1 2; do
+            echo "::group::cwv attempt ${attempt}/2"
+            pnpm run cwv:check
+            status=$?
+            echo "::endgroup::"
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+          done
+          echo "CWV budget gate failed after 2 attempts"
+          exit 1

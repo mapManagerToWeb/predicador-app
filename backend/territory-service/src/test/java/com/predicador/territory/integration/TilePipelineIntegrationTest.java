@@ -2,6 +2,10 @@ package com.predicador.territory.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SessionToken;
+import com.predicador.shared.security.SessionTokenService;
+import com.predicador.territory.tile.DataVersionService;
 import com.predicador.territory.tile.S2BackfillService;
 import com.predicador.territory.tile.TileProperties;
 import com.predicador.territory.tile.TileService;
@@ -11,6 +15,7 @@ import io.github.sebasbaumh.mapbox.vectortile.adapt.jts.MvtReader;
 import io.github.sebasbaumh.mapbox.vectortile.adapt.jts.TagKeyValueMapConverter;
 import io.github.sebasbaumh.mapbox.vectortile.adapt.jts.model.JtsLayer;
 import io.github.sebasbaumh.mapbox.vectortile.adapt.jts.model.JtsMvt;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.locationtech.jts.geom.Envelope;
@@ -98,6 +103,49 @@ class TilePipelineIntegrationTest {
     @Autowired private S2BackfillService backfill;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TileService tileService;
+    @Autowired private SessionTokenService tokenService;
+    @Autowired private DataVersionService dataVersionService;
+
+    /**
+     * Los métodos comparten contexto Spring y la misma BD (contenedor
+     * estático): assignColor deja data_version=2 y el cache de tiles
+     * poblado con la clave v2. Restaura el estado base (v1 + cache limpio)
+     * para que cada método sea determinista sin importar el orden.
+     * También espera a que la caché de versión de DataVersionService
+     * (Caffeine, TTL 1 s) recargue desde la DB, porque el reset JDBC
+     * no la invalida y tileService.invalidateCache() solo limpia tiles.
+     */
+    @BeforeEach
+    void resetSharedState() throws InterruptedException {
+        // 0. Aislamiento de datos: los métodos comparten la BD (contenedor
+        //    estático). Limpia las tablas que los tests escriben para que
+        //    cada test arranque vacío — el backfill es incremental
+        //    (WHERE id > MAX(manzana_id) FROM manzana_s2_cover), así que una
+        //    manzana insertada después de covers ajenos nunca recibiría su
+        //    cover S2 y no llegaría al tile (el render hace JOIN a la tabla
+        //    de covers). manzana_s2_cover cascadea con manzanas_territorio,
+        //    pero se limpia explícitamente por claridad.
+        jdbc.update("DELETE FROM manzana_s2_cover");
+        jdbc.update("DELETE FROM territorio_disuelto");
+        jdbc.update("DELETE FROM manzanas_territorio");
+        // 1. Estado base en DB: data_version = 1 (assignColor lo deja en 2).
+        jdbc.update("UPDATE app_meta SET v = 1 WHERE k = 'data_version'");
+        // 2. DataVersionService cachea el valor 1 s (Caffeine); la escritura
+        //    JDBC anterior no la invalida y tileService.invalidateCache() solo
+        //    limpia la caché de tiles. Espera a que la caché de versión
+        //    recargue desde la DB (=1) para que el ETag de render sea v1.
+        //    Solo tarda cuando la caché quedó con el 2 de assignColor (≤1 s).
+        long deadline = System.currentTimeMillis() + 3_000;
+        while (dataVersionService.current() != 1L && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+        }
+        assertThat(dataVersionService.current())
+                .as("DataVersionService debe observar data_version=1 tras el reset")
+                .isEqualTo(1L);
+        // 3. Invalidar la caché de tiles al final: cualquier render que
+        //    ocurra después usa la versión ya fresca.
+        tileService.invalidateCache();
+    }
 
     // ────────────────────────────────────────────────────────────────────
     // Helpers
@@ -121,6 +169,10 @@ class TilePipelineIntegrationTest {
     private void reRunBackfill() {
         jdbc.update("DELETE FROM app_meta WHERE k = 's2_backfill_done'");
         backfill.runBackfill();
+        // Las escrituras por JDBC crudo no bumpan data_version, así que la
+        // clave del cache (z,x,y,version) no cambia → hay que invalidar el
+        // cache compartido del contexto antes de las aserciones.
+        tileService.invalidateCache();
     }
 
     private static int lonToTileX(double lon, int z) {
@@ -361,11 +413,14 @@ class TilePipelineIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("ETag", expectedEtagV1));
 
-        // 3. assignColor via MockMvc PUT
+        // 3. assignColor via MockMvc PUT (ruta protegida por
+        // SecurityRules.TERRITORY → requiere cookie de sesión con rol admin)
         String colorPayload = new ObjectMapper().writeValueAsString(
                 new com.predicador.territory.dto.TerritoryColorRequest("#ff0000"));
+        String adminToken = tokenService.issue("admin", SessionToken.ROLE_ADMIN);
         mockMvc.perform(put("/api/v1/territories/{number}/color", 50)
                         .contentType("application/json")
+                        .cookie(new jakarta.servlet.http.Cookie(SessionAuthFilter.SESSION_COOKIE_NAME, adminToken))
                         .content(colorPayload))
                 .andExpect(status().isOk());
 
