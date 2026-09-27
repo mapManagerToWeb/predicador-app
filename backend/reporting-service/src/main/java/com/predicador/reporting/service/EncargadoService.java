@@ -73,9 +73,15 @@ public class EncargadoService {
 
         if (encontrado.isPresent()) {
             Encargado encargado = encontrado.get();
-            if (encargado.tienePin() || Boolean.FALSE.equals(encargado.getActivo())) {
+            // Con el nombre de otro no se entra a su cuenta ni se le cambia el
+            // teléfono: solo se "reclama" una cuenta sin teléfono (creada por el
+            // administrador) o con el mismo teléfono.
+            String telefonoActual = PhoneUtil.normalize(encargado.getTelefono());
+            boolean otroTelefono = telefonoActual != null && !telefonoActual.isBlank()
+                    && !telefonoActual.equals(telefonoLimpio);
+            if (encargado.tienePin() || Boolean.FALSE.equals(encargado.getActivo()) || otroTelefono) {
                 throw new EncargadoLoginException(HttpStatus.CONFLICT, EncargadoLoginException.YA_REGISTRADO,
-                        "Ya existe un encargado con ese nombre. Ingresá con tu número de teléfono.");
+                        "Ya existe un encargado con ese nombre. Entra con tu número de teléfono.");
             }
             if (telefonoLimpio != null && !telefonoLimpio.isBlank()) {
                 encargado.setTelefono(telefonoLimpio);
@@ -171,7 +177,7 @@ public class EncargadoService {
                         "Encargado no encontrado con el teléfono proporcionado"));
         if (Boolean.FALSE.equals(encargado.getActivo())) {
             throw new EncargadoLoginException(HttpStatus.FORBIDDEN, EncargadoLoginException.INACTIVO,
-                    "Tu cuenta está desactivada. Hablá con el administrador.");
+                    "Tu cuenta está desactivada. Habla con el administrador.");
         }
         if (encargado.tienePin()) {
             verificarPin(encargado, pin);
@@ -185,11 +191,11 @@ public class EncargadoService {
         if (encargado.getPinBloqueadoHasta() != null && encargado.getPinBloqueadoHasta().isAfter(ahora)) {
             long minutos = Math.max(1, Duration.between(ahora, encargado.getPinBloqueadoHasta()).toMinutes());
             throw new EncargadoLoginException(HttpStatus.LOCKED, EncargadoLoginException.PIN_BLOQUEADO,
-                    "Demasiados intentos. Probá de nuevo en " + minutos + " minuto(s) o pedí un PIN nuevo.");
+                    "Demasiados intentos. Prueba de nuevo en " + minutos + " minuto(s) o pide un PIN nuevo.");
         }
         if (pin == null || pin.isBlank()) {
             throw new EncargadoLoginException(HttpStatus.UNAUTHORIZED, EncargadoLoginException.PIN_REQUERIDO,
-                    "Ingresá tu PIN");
+                    "Ingresa tu PIN");
         }
         if (!pinEncoder.matches(pin, encargado.getPinHash())) {
             int intentos = encargado.getPinIntentosFallidos() + 1;

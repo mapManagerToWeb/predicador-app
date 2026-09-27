@@ -203,7 +203,7 @@ class EncargadoControllerTest {
     @Test
     void login_conPin_pasaElPinAlServicio_yExponeCodigoSiFalta() throws Exception {
         when(encargadoService.autenticar("56911111111", null)).thenThrow(new EncargadoLoginException(
-                HttpStatus.UNAUTHORIZED, EncargadoLoginException.PIN_REQUERIDO, "Ingresá tu PIN"));
+                HttpStatus.UNAUTHORIZED, EncargadoLoginException.PIN_REQUERIDO, "Ingresa tu PIN"));
         when(encargadoService.autenticar("56911111111", "123456")).thenReturn(createDto(7L, "Ana", "Perez"));
 
         mockMvc.perform(post("/api/v1/encargados/login")

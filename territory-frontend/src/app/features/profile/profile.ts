@@ -1,5 +1,6 @@
 import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthTokenService } from '../../core/services/auth-token';
 import { Profile } from '../../core/services/profile';
 import { codigoLogin, EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
@@ -15,7 +16,9 @@ import { normalizePhone } from '../../core/utils/phone';
 export class ProfilePage implements OnInit {
   private profileService = inject(Profile);
   private encargadoService = inject(EncargadoService);
+  private authToken = inject(AuthTokenService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private toast = inject(Toast);
 
   name = signal('');
@@ -36,9 +39,15 @@ export class ProfilePage implements OnInit {
   ];
 
   ngOnInit(): void {
-    if (this.profileService.hasProfile()) {
+    // Solo con sesión: un perfil guardado sin sesión (p. ej. vencida) no debe
+    // impedir llegar a este formulario.
+    if (this.authToken.hasToken() && this.profileService.hasProfile()) {
       void this.router.navigate(['/map']);
+      return;
     }
+    // El número que se escribió en el login, para no tener que repetirlo.
+    const tel = this.route.snapshot.queryParamMap.get('telefono');
+    if (tel) this.telefono.set(tel);
   }
 
   onNameInput(event: Event): void {
@@ -81,20 +90,15 @@ export class ProfilePage implements OnInit {
     } catch (err: unknown) {
       const { code, detail } = codigoLogin(err);
       if (code === 'registro_cerrado' || code === 'ya_registrado') {
-        // No es un fallo de red: el servidor rechazó el alta y un perfil local
-        // no podría enviar reportes. Se queda en el formulario con el motivo.
+        // El servidor rechazó el alta: se queda en el formulario con el motivo.
         this.toast.show(detail ?? 'No se pudo crear el perfil', 6000, 'warning');
-        this.loading.set(false);
-        return;
+      } else {
+        // Sin cuenta en el servidor no se puede entrar ni enviar reportes: no
+        // se guarda un perfil "local" (dejaba al usuario dando vueltas entre
+        // el login y esta pantalla).
+        this.toast.show('No se pudo crear el perfil. Revisa tu conexión e intenta de nuevo.', 5000, 'error');
       }
-      const tel = this.telefono().trim();
-      this.profileService.save({
-        name: this.name(),
-        lastName: this.lastName(),
-        avatar: this.selectedAvatar(),
-        telefono: tel ? normalizePhone(tel) : undefined,
-      });
-      this.toast.show('Perfil guardado localmente', 3000, 'warning');
+      return;
     } finally {
       this.loading.set(false);
     }

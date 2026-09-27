@@ -50,8 +50,8 @@ export interface VistaMapa {
   encuadrarManzana?(id: string): void;
   /** Centro del mapa [lng, lat], para elegir un territorio de práctica cercano. */
   centro?(): [number, number];
-  /** Lo que tapan la tarjeta del tutorial (arriba) y el panel (abajo), en px. */
-  ajustarMargenes?(m: { arriba?: number; abajo?: number }): void;
+  /** Lo que tapan la tarjeta del tutorial (arriba) y el panel (abajo, o a la derecha con el teléfono de lado), en px. */
+  ajustarMargenes?(m: { arriba?: number; abajo?: number; derecha?: number }): void;
 }
 
 interface PropsManzanaApi {
@@ -184,6 +184,7 @@ export class MapaStore {
         territorios: [...this.salida().values()],
         predicacion: this.predicacion(),
         inicioSesion: this.inicioSesion(),
+        dueno: this.dueno(),
       };
       const enPractica = this.practica();
       untracked(() => {
@@ -305,8 +306,20 @@ export class MapaStore {
     this.estados.set(new Map((datos.estados ?? []).map(e => [e.territorio, e])));
   }
 
+  /** Quién tiene la sesión: el borrador queda a su nombre. */
+  private dueno(): string | null {
+    const p = this.perfil.currentUser();
+    return p?.encargadoId != null ? String(p.encargadoId) : (p?.telefono ?? null);
+  }
+
   private restaurarBorrador(): void {
-    const b = leerBorrador(this.borrador.cargar());
+    let b = leerBorrador(this.borrador.cargar());
+    // Lo dejó marcado otra persona (su sesión venció y entró alguien más): no se hereda.
+    const dueno = this.dueno();
+    if (b?.dueno && dueno && b.dueno !== dueno) {
+      this.borrador.clear();
+      b = null;
+    }
     if (b) {
       const existentes = b.territorios.filter(t => this.manzanasPorTerritorio.has(t.numero));
       this.salida.set(new Map(existentes.map(t => [t.numero, t])));
@@ -501,7 +514,7 @@ export class MapaStore {
     this.vista?.encuadrarManzana?.(id);
   }
 
-  ajustarMargenes(m: { arriba?: number; abajo?: number }): void {
+  ajustarMargenes(m: { arriba?: number; abajo?: number; derecha?: number }): void {
     this.vista?.ajustarMargenes?.(m);
   }
 

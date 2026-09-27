@@ -274,8 +274,16 @@ svg .grueso {
   font-weight: 700;
 }
 
+/* Con letra grande la cuenta pasa a otra línea por partes, sin meterse bajo la ✕. */
 .territorio-cuenta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 5px;
   font-size: 16px;
+}
+
+.territorio-cuenta span {
   white-space: nowrap;
 }
 
@@ -500,6 +508,9 @@ svg .grueso {
   bottom: max(16px, env(safe-area-inset-bottom));
   z-index: 31;
   max-width: 480px;
+  /* Un resumen largo (o el teléfono de lado) no deja los botones fuera de la pantalla. */
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
   margin: 0 auto;
   padding: 20px;
   border-radius: 20px;
@@ -569,5 +580,53 @@ svg .grueso {
 @media (max-height: 640px) {
   .territorio-nota {
     display: none;
+  }
+}
+
+/* Teléfono de lado: el panel pasa a una columna a la derecha y el mapa queda a
+   la izquierda (abajo tapaba casi toda la pantalla). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .barra {
+    right: calc(min(340px, 46vw) + 22px);
+  }
+
+  .panel {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    left: auto;
+    width: min(340px, 46vw);
+    max-width: none;
+    margin: 0;
+    padding: 10px;
+    gap: 8px;
+    overflow-y: auto;
+  }
+
+  .panel > .enviar-fila {
+    margin-top: auto;
+  }
+
+  .modo .largo {
+    display: none;
+  }
+
+  :host ::ng-deep .maplibregl-ctrl-top-right {
+    right: calc(min(340px, 46vw) + 12px);
+  }
+
+  .modo,
+  .turno button {
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .boton.enviar {
+    height: 50px;
+  }
+
+  .dialogo {
+    bottom: auto;
+    top: 50%;
+    transform: translateY(-50%);
   }
 }

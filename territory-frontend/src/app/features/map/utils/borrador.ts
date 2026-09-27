@@ -10,6 +10,12 @@ export interface Borrador {
   territorios: TerritorioSalida[];
   predicacion: 'mañana' | 'tarde';
   inicioSesion: string | null;
+  /**
+   * De quién es (id del encargado o su teléfono). Si la sesión vence, lo
+   * marcado se conserva; si después entra otra persona en el mismo teléfono,
+   * no hereda las marcas ajenas.
+   */
+  dueno?: string | null;
 }
 
 interface ZonasGuardadas {
@@ -30,6 +36,7 @@ interface BorradorV2 {
   territorios: TerritorioGuardado[];
   predicacion: string;
   inicioSesion: string | null;
+  dueno?: string | null;
   savedAt: number;
 }
 
@@ -60,6 +67,7 @@ export function serializarBorrador(b: Borrador, ahora = Date.now()): BorradorV2 
     })),
     predicacion: b.predicacion,
     inicioSesion: b.inicioSesion,
+    dueno: b.dueno ?? null,
     savedAt: ahora,
   };
 }
@@ -97,6 +105,7 @@ export function leerBorrador(valor: unknown): Borrador | null {
       territorios,
       predicacion: turno(v['predicacion']),
       inicioSesion: typeof v['inicioSesion'] === 'string' ? v['inicioSesion'] : null,
+      dueno: typeof v['dueno'] === 'string' ? v['dueno'] : null,
     };
   }
 

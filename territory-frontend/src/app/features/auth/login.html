@@ -6,14 +6,14 @@
           <img src="logo.jpeg" alt="Territory Logo" width="48" height="48" loading="lazy" />
         </div>
         <h1>Territory</h1>
-        <p class="tagline">Gestion de territorios</p>
+        <p class="tagline">Gestión de territorios</p>
       </div>
 
       <div class="auth-body">
-        <p class="section-label">Inicia sesion con tu telefono</p>
+        <p class="section-label">Inicia sesión con tu teléfono</p>
 
         <div class="field">
-          <label for="telefono">Telefono</label>
+          <label for="telefono">Teléfono</label>
           <div class="input-phone">
             <span class="prefix">+56</span>
             <input
@@ -45,7 +45,7 @@
               [disabled]="loading()"
               autocomplete="current-password"
             />
-            <p class="field-hint">Te lo da el administrador. Si lo perdiste, pedile uno nuevo.</p>
+            <p class="field-hint">Te lo da el administrador. Si lo perdiste, pídele uno nuevo.</p>
           </div>
         }
 
@@ -56,7 +56,7 @@
         >
           @if (loading()) {
             <span class="spinner"></span>
-            <span>Conectando...</span>
+            <span>Conectando…</span>
           } @else {
             <span>Conectar</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -76,8 +76,8 @@
       </a>
 
       <div class="auth-footer">
-        <span>No tienes cuenta?</span>
-        <a routerLink="/profile">Crear perfil</a>
+        <span>¿No tienes cuenta?</span>
+        <a routerLink="/profile" [queryParams]="telefono() ? { telefono: telefono() } : {}">Crear perfil</a>
       </div>
     </div>
   </div>

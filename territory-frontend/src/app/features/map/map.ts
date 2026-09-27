@@ -142,7 +142,14 @@ export class MapPage {
 
   private medirPanel(panel: HTMLElement): void {
     const contenedor = this.contenedor().nativeElement.getBoundingClientRect();
-    this.vista?.ajustarMargenes({ abajo: Math.max(0, contenedor.bottom - panel.getBoundingClientRect().top) });
+    const p = panel.getBoundingClientRect();
+    // Con el teléfono de lado el panel es una columna a la derecha (ver map.css).
+    const columna = p.top - contenedor.top < 40 && p.width < contenedor.width * 0.6;
+    this.vista?.ajustarMargenes(
+      columna
+        ? { abajo: 0, derecha: Math.max(0, contenedor.right - p.left) }
+        : { abajo: Math.max(0, contenedor.bottom - p.top), derecha: 0 },
+    );
   }
 
   protected reintentar(): void {

@@ -218,21 +218,21 @@ export function registroDe(
 }
 
 /**
- * Qué va en el mensaje de WhatsApp: un único territorio completado se anuncia
- * con la imagen oficial (sin captura); si hay incompletos, se mandan esos con
- * captura del mapa y los completados se omiten del mensaje.
+ * Qué va en el mensaje de WhatsApp: todos los territorios enviados, cada uno
+ * como terminado o incompleto. Un único territorio completado se anuncia con
+ * la imagen oficial (sin captura); en los demás casos va la captura del mapa.
+ * (Antes se omitían los completados cuando iban con otros: si todos estaban
+ * completos, el mensaje quedaba vacío, el servidor lo rechazaba y el reporte
+ * no se podía enviar.)
  */
 export function envioDe(resumenes: ResumenTerritorio[]): TerritoriosEnvio {
-  const unico = resumenes.length === 1;
-  const territorios: TerritorioReporteEnvio[] = resumenes
-    .filter(r => unico || !r.completo)
-    .map(r => ({
-      numero: r.numero,
-      finalizado: r.completo,
-      totalManzanas: r.total,
-      manzanasMarcadas: r.enteras + r.porCalles,
-    }));
-  const soloUnoCompleto = unico && territorios.length === 1 && territorios[0].finalizado;
+  const territorios: TerritorioReporteEnvio[] = resumenes.map(r => ({
+    numero: r.numero,
+    finalizado: r.completo,
+    totalManzanas: r.total,
+    manzanasMarcadas: r.enteras + r.porCalles,
+  }));
+  const soloUnoCompleto = territorios.length === 1 && territorios[0].finalizado;
   return { territorios, requiereScreenshot: territorios.length > 0 && !soloUnoCompleto };
 }
 

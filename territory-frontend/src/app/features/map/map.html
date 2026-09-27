@@ -91,7 +91,10 @@
                 <span class="territorio-linea">
                   <span class="territorio-nombre">{{ store.practica() ? 'Práctica' : 'Territorio' }} {{ r.numero }}</span>
                   <span class="territorio-cuenta">
-                    {{ r.enteras }} de {{ r.total }} manzanas@if (r.porCalles) { · {{ r.porCalles }} por calles}
+                    <span>{{ r.enteras }} de {{ r.total }} manzanas</span>
+                    @if (r.porCalles) {
+                      <span>y {{ r.porCalles }} por calles</span>
+                    }
                   </span>
                 </span>
                 @if (r.completo) {
