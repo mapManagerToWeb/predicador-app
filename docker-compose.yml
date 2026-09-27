@@ -162,6 +162,8 @@ services:
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-asignacion_territorio}
       - WHATSAPP_DESTINATION=${WHATSAPP_DESTINATION:-}
+      # Opcional: imagen para anunciar un territorio completado (vacía = la de siempre).
+      - WHATSAPP_DEFAULT_IMAGE_URL=${WHATSAPP_DEFAULT_IMAGE_URL:-}
       # Debe coincidir con el api-gateway para que los tokens que éste emite
       # sean verificables aquí cuando activemos enforcement server-side.
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}

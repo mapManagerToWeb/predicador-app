@@ -113,7 +113,7 @@ public class ReportSendService {
                     PARAMETERS, List.of(
                         Map.of(
                             "type", IMAGE,
-                            IMAGE, Map.of("link", props.defaultImageUrl())
+                            IMAGE, Map.of("link", imagenPorDefecto())
                         )
                     )
                 ));
@@ -183,6 +183,20 @@ public class ReportSendService {
             sendTimer.record(elapsed, TimeUnit.NANOSECONDS);
         }
     }
+
+    /**
+     * Imagen del encabezado cuando se anuncia un territorio completado (va sin
+     * captura). Si {@code WHATSAPP_DEFAULT_IMAGE_URL} no está configurada, la
+     * propiedad llega vacía y WhatsApp rechazaba el mensaje (el envío fallaba y
+     * el reporte no se guardaba): se usa la imagen de siempre.
+     */
+    String imagenPorDefecto() {
+        String url = props.defaultImageUrl();
+        return url == null || url.isBlank() ? IMAGEN_POR_DEFECTO : url.strip();
+    }
+
+    static final String IMAGEN_POR_DEFECTO =
+            "https://res.cloudinary.com/g2opllmf/image/upload/v1785035850/Gemini_Generated_Image_ru504bru504bru50_czjivy.png";
 
     Reservation reserve(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) return new Reservation(null, null);

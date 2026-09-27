@@ -245,4 +245,41 @@ class ReportSendServiceTest {
         verify(txTemplate).execute(any(org.springframework.transaction.support.TransactionCallback.class));
         verify(deliveryRepository, times(2)).findById("idempotent-key");
     }
+
+    /** El caso de producción: WHATSAPP_DEFAULT_IMAGE_URL sin configurar (vacía o ausente). */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"   "})
+    void territorioCompletadoSinImagenConfigurada_usaLaImagenDeSiempre(String configurada) {
+        var request = new WhatsAppSendRequest(
+            "Ana", "Soto", "27-09-2026", "tarde",
+            List.of(new WhatsAppSendRequest.TerritorioReporte(71L, true, 4, 4)),
+            null, null
+        );
+        when(messageService.generarParametrosTemplate(request)).thenReturn(Map.of(
+            "fecha", "27-09-2026", "encargado", "Ana Soto", "territorio", "71", "estado", "tarde"));
+        when(messageService.requiereScreenshot(request)).thenReturn(false);
+        when(props.phoneNumberId()).thenReturn("123");
+        when(props.templateName()).thenReturn("asignacion_territorio");
+        when(props.languageCode()).thenReturn("es_CL");
+        when(props.destinationNumber()).thenReturn("56900000000");
+        when(props.defaultImageUrl()).thenReturn(configurada);
+        when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
+            .thenReturn(new WhatsAppMessageResponse(null, "msg_ok"));
+
+        WhatsAppSendResponse response = sendService.sendReport(request);
+
+        assertTrue(response.success());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Map<String, Object>>> componentes = ArgumentCaptor.forClass(List.class);
+        verify(messageClient).sendTemplateMessage(anyString(), anyString(), anyString(), componentes.capture());
+        assertTrue(componentes.getValue().toString().contains("link=" + ReportSendService.IMAGEN_POR_DEFECTO),
+            "el encabezado debe llevar la imagen de siempre");
+    }
+
+    @Test
+    void imagenConfiguradaTienePrioridad() {
+        when(props.defaultImageUrl()).thenReturn(" https://example.com/otra.png ");
+        assertEquals("https://example.com/otra.png", sendService.imagenPorDefecto());
+    }
 }

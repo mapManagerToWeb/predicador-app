@@ -173,4 +173,6 @@ whatsapp:
   template-name: ${WHATSAPP_TEMPLATE:-asignacion_territorio}
   language-code: ${WHATSAPP_LANG:es_CL}
   destination-number: ${WHATSAPP_DESTINATION:}
+  # Imagen del encabezado al anunciar un territorio completado (sin captura).
+  # Vacía = la imagen de siempre (ReportSendService.IMAGEN_POR_DEFECTO).
   default-image-url: ${WHATSAPP_DEFAULT_IMAGE_URL:}
