@@ -1,0 +1,61 @@
+name: Respaldo de la base de datos
+
+# Copia diaria de la base de producción FUERA del VPS (si Oracle da de baja la
+# máquina, la base sigue a salvo). GitHub entra por SSH con una llave que solo
+# puede ejecutar scripts/db/respaldo.sh (comando forzado en authorized_keys): el
+# respaldo sale del VPS ya cifrado con age para las llaves de
+# .github/backup/age.pub, así que ni GitHub ni quien descargue el artefacto
+# (el repo es público) puede leerlo sin una llave privada.
+# Restaurar: scripts/db/restaurar.sh (ver README, "Respaldo de la base de datos").
+
+on:
+  schedule:
+    - cron: "30 7 * * *" # 04:30 en Chile (horario de verano: 03:30)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: respaldo-bdd
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Traer el respaldo cifrado desde el VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for v in VPS_HOST VPS_USER VPS_SSH_KEY VPS_SSH_KNOWN_HOSTS; do
+            [ -n "${!v}" ] || { echo "::error::Falta el secret $v (Settings > Secrets and variables > Actions)"; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/respaldo && chmod 600 ~/.ssh/respaldo
+          # known_hosts fijo: si la huella del VPS cambia, el respaldo falla en vez de mandarse a otro equipo.
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ARCHIVO="predicador-$(date -u +%Y%m%d-%H%M%S).dump.age"
+          ssh -i ~/.ssh/respaldo -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
+            "$VPS_USER@$VPS_HOST" respaldo > "$ARCHIVO"
+          rm -f ~/.ssh/respaldo
+          # Un respaldo sano está cifrado con age y no es casi vacío (la base pesa ~400 KB).
+          head -c 21 "$ARCHIVO" | grep -q '^age-encryption.org/v1' || { echo "::error::El respaldo no está cifrado o llegó vacío"; exit 1; }
+          TAMANO=$(stat -c%s "$ARCHIVO")
+          [ "$TAMANO" -gt 50000 ] || { echo "::error::El respaldo pesa solo $TAMANO bytes"; exit 1; }
+          echo "Respaldo: $ARCHIVO ($TAMANO bytes)"
+          echo "ARCHIVO=$ARCHIVO" >> "$GITHUB_ENV"
+
+      - name: Guardar el respaldo (90 días)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ARCHIVO }}
+          path: ${{ env.ARCHIVO }}
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0
