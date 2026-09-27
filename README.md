@@ -309,7 +309,7 @@ Además, en el VPS se pueden guardar copias locales (las últimas 14) con
 En el VPS:
 
 ```bash
-sudo apt-get install -y age
+scripts/db/instalar-age.sh        # age (cifrado) dentro del proyecto, sin sudo
 # Llave SSH solo para los respaldos (sin contraseña: la usa GitHub).
 ssh-keygen -t ed25519 -N "" -C github-respaldo -f ~/.ssh/respaldo_github
 # Autorizarla SOLO para respaldar (comando forzado, sin terminal ni túneles).

@@ -79,4 +79,6 @@ backend/reporting-service/src/main/java/com/predicador/reporting/dto/EncargadoBu
 
 # Dumps de la base (contienen datos personales: nombres, teléfonos)
 backups/
+# age instalado por scripts/db/instalar-age.sh
+.herramientas/
 *.dump

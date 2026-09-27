@@ -31,9 +31,14 @@ LLAVES="${RESPALDO_LLAVES:-$RAIZ/.github/backup/age.pub}"
 CONSERVAR="${RESPALDO_CONSERVAR:-14}"
 CARPETA="${RESPALDO_CARPETA:-$RAIZ/backups}"
 
+# age del sistema o el instalado en el proyecto por scripts/db/instalar-age.sh.
 if ! command -v age >/dev/null 2>&1; then
-  echo "Falta 'age' (cifrado). Instálalo con: sudo apt-get install -y age" >&2
-  exit 1
+  if [ -x "$RAIZ/.herramientas/age/age" ]; then
+    PATH="$RAIZ/.herramientas/age:$PATH"
+  else
+    echo "Falta 'age' (cifrado) en el VPS. Instálalo con: $RAIZ/scripts/db/instalar-age.sh" >&2
+    exit 1
+  fi
 fi
 if ! grep -q '^age1' "$LLAVES" 2>/dev/null; then
   echo "No hay llaves públicas de age en $LLAVES" >&2

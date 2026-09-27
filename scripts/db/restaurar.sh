@@ -25,7 +25,15 @@ REEMPLAZAR="${3:-}"
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$RAIZ"
 
-command -v age >/dev/null 2>&1 || { echo "Falta 'age': sudo apt-get install -y age" >&2; exit 1; }
+# age del sistema o el instalado en el proyecto por scripts/db/instalar-age.sh.
+if ! command -v age >/dev/null 2>&1; then
+  if [ -x "$RAIZ/.herramientas/age/age" ]; then
+    PATH="$RAIZ/.herramientas/age:$PATH"
+  else
+    echo "Falta 'age' (cifrado) en el VPS. Instálalo con: $RAIZ/scripts/db/instalar-age.sh" >&2
+    exit 1
+  fi
+fi
 [ -s "$RESPALDO" ] || { echo "No existe o está vacío: $RESPALDO" >&2; exit 1; }
 # Antes de tocar nada: la llave abre el respaldo y el contenido es un volcado válido.
 age -d -i "$LLAVE" "$RESPALDO" | docker compose exec -T postgres pg_restore --list >/dev/null \
