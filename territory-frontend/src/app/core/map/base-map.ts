@@ -8,20 +8,29 @@ type ColeccionManzanas = FeatureCollection<Polygon | MultiPolygon, { territorio:
 export type FondoMapa = 'mapa' | 'satelite';
 export type MapLibre = typeof import('maplibre-gl');
 
+export const ZOOM_MAXIMO = 20;
+
 /** Encuadre inicial si todavía no hay manzanas cargadas (Curanilahue). */
 const ENCUADRE_INICIAL: LngLatBoundsLike = [
   [-73.45, -37.61],
   [-73.24, -37.38],
 ];
 
+/**
+ * `maxzoom` es el último nivel con imagen real: más cerca, MapLibre amplía esa
+ * imagen en vez de pedir otra. En Curanilahue el satélite de Esri llega al 18;
+ * en el 19 devuelve un cuadro gris "Map data not yet available".
+ */
 const FONDOS = {
   mapa: {
     tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxzoom: 19,
   },
   satelite: {
     tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
     attribution: '© Esri, Maxar, Earthstar Geographics',
+    maxzoom: 18,
   },
 } as const;
 
@@ -43,7 +52,7 @@ export function estiloBase(fondo: FondoMapa, oscuro: boolean): StyleSpecificatio
     // Fuentes para los rótulos de territorio (las teselas de fondo son imágenes).
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
     sources: {
-      fondo: { type: 'raster', tiles: [...f.tiles], tileSize: 256, maxzoom: 19, attribution: f.attribution },
+      fondo: { type: 'raster', tiles: [...f.tiles], tileSize: 256, maxzoom: f.maxzoom, attribution: f.attribution },
     },
     layers: [{ id: 'fondo', type: 'raster', source: 'fondo', paint: pinturaFondo(fondo, oscuro) }],
   };
@@ -94,6 +103,9 @@ export async function crearMapa(
     container: contenedor,
     style: estiloBase(fondo, temaOscuro()),
     bounds: ENCUADRE_INICIAL,
+    // Más cerca no se ve nada nuevo (una manzana llena la pantalla y el
+    // satélite, que llega al 18, se ve borroso).
+    maxZoom: ZOOM_MAXIMO,
     attributionControl: { compact: true },
     cooperativeGestures: cooperativo,
     locale: { 'CooperativeGesturesHandler.WindowsHelpText': 'Usa Ctrl + rueda para hacer zoom', 'CooperativeGesturesHandler.MacHelpText': 'Usa ⌘ + rueda para hacer zoom', 'CooperativeGesturesHandler.MobileHelpText': 'Usa dos dedos para mover el mapa' },
@@ -104,6 +116,24 @@ export async function crearMapa(
   map.addControl(new maplibre.ScaleControl({ unit: 'metric' }), 'bottom-left');
   await new Promise<void>(resolve => (map.loaded() ? resolve() : map.once('load', () => resolve())));
   return { maplibre, map };
+}
+
+/**
+ * Margen alrededor de los territorios hasta donde se puede mover el mapa: se
+ * ven los territorios y sus alrededores, pero nadie termina por error en otra
+ * ciudad o viendo el mundo entero.
+ */
+const MARGEN_LIMITE_GRADOS = 0.03; // ~3 km
+
+/** Caja de los territorios más el margen, para `maxBounds`. */
+export function limitesDeNavegacion(coleccion: ColeccionManzanas): [[number, number], [number, number]] | null {
+  const caja = limites(coleccion) as [[number, number], [number, number]] | null;
+  if (!caja) return null;
+  const [[oeste, sur], [este, norte]] = caja;
+  return [
+    [oeste - MARGEN_LIMITE_GRADOS, sur - MARGEN_LIMITE_GRADOS],
+    [este + MARGEN_LIMITE_GRADOS, norte + MARGEN_LIMITE_GRADOS],
+  ];
 }
 
 /** Caja que contiene todas las manzanas (o las de un territorio). */

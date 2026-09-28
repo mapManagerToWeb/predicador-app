@@ -361,6 +361,11 @@ export class MapaVista {
       .addTo(this.map);
   }
 
+  /** Hasta dónde se puede mover y alejar el mapa (ver `limitesDeNavegacion`). */
+  limitar(caja: LngLatBoundsLike | null): void {
+    this.map.setMaxBounds(caja ?? undefined);
+  }
+
   encuadrarTodo(caja: LngLatBoundsLike): void {
     this.map.fitBounds(caja, { padding: 24, duration: 0 });
   }

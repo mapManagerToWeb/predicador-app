@@ -11,6 +11,7 @@ const mapa = {
   addLayer: vi.fn(),
   on: vi.fn(),
   fitBounds: vi.fn(),
+  setMaxBounds: vi.fn(),
   setFilter: vi.fn(),
   remove: vi.fn(),
   getCanvas: () => ({ style: {} }),
@@ -86,6 +87,7 @@ describe('VisorPage', () => {
     expect(ficha.textContent).toContain('1 de 2 manzanas');
     expect(ficha.textContent).toContain('hoy');
     expect(mapa.fitBounds).toHaveBeenCalled();
+    expect(mapa.setMaxBounds).toHaveBeenCalled();
   });
 
   it('avisa si el territorio buscado no existe', async () => {
