@@ -115,7 +115,15 @@ export function ladosDeLaBase(t: TerritorioSalida, manzanaId: string, totalLados
 export function alternarManzana(t: TerritorioSalida, manzana: Manzana): TerritorioSalida {
   if (estaMarcada(t, manzana.id)) {
     if (enteraEnLaBase(t, manzana.id)) return t;
-    return { ...t, marcadas: t.marcadas.filter(id => id !== manzana.id) };
+    // Al desmarcarla vuelven las calles que ya vinieron en el último reporte
+    // (marcarla entera las había reemplazado; no se pueden perder por error).
+    const zonasBase = (t.base?.zonas ?? []).filter(z => z.manzanaId === manzana.id);
+    const antiguasBase = zonasAntiguasDentro(t.base?.zonas ?? [], manzana);
+    return {
+      ...t,
+      marcadas: t.marcadas.filter(id => id !== manzana.id),
+      zonas: [...sinZonasDe(t.zonas, manzana), ...zonasBase, ...antiguasBase],
+    };
   }
   // Marcarla entera reemplaza lo que tuviera marcado por calles.
   return { ...t, marcadas: [...t.marcadas, manzana.id].sort(), zonas: sinZonasDe(t.zonas, manzana) };
