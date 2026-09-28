@@ -12,6 +12,7 @@ const vista = {
   mostrar: vi.fn(),
   encuadrar: vi.fn(),
   encuadrarTodo: vi.fn(),
+  limitar: vi.fn(),
   mostrarLados: vi.fn(),
   capturar: vi.fn(),
   alternarUbicacion: vi.fn(),

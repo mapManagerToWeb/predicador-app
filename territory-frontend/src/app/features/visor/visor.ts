@@ -21,6 +21,7 @@ import {
   etiquetasTerritorios,
   type FondoMapa,
   limites,
+  limitesDeNavegacion,
   limitesPrincipales,
   temaOscuro,
 } from '../../core/map/base-map';
@@ -63,6 +64,16 @@ export class VisorPage {
   protected readonly busqueda = signal('');
   protected readonly resumen = signal<Map<number, ResumenTerritorio>>(new Map());
   protected readonly seleccionado = signal<number | null>(null);
+  protected readonly verSugerencias = signal(false);
+  /** Territorios que empiezan con lo escrito, para tocarlos (como en el mapa de encargados). */
+  protected readonly sugerencias = computed(() => {
+    const texto = this.busqueda().trim();
+    if (!texto) return [];
+    return [...this.resumen().keys()]
+      .filter(n => String(n).startsWith(texto))
+      .sort((a, b) => a - b)
+      .slice(0, 8);
+  });
   protected readonly ficha = computed(() => {
     const t = this.seleccionado();
     return t === null ? null : (this.resumen().get(t) ?? null);
@@ -105,6 +116,7 @@ export class VisorPage {
       const { manzanas, zonas } = await datos;
       this.manzanas = manzanas;
       this.agregarCapas(map, manzanas, zonas);
+      map.setMaxBounds(limitesDeNavegacion(manzanas) ?? undefined);
       const caja = limitesPrincipales(manzanas, 0.12);
       if (caja) map.fitBounds(caja, { padding: 24, duration: 0 });
     } catch {
@@ -196,18 +208,36 @@ export class VisorPage {
 
   protected buscar(event: Event): void {
     event.preventDefault();
+    this.verSugerencias.set(false);
     const numero = Number(this.busqueda().trim());
     if (!Number.isInteger(numero) || !this.resumen().has(numero)) {
       this.error.set(this.busqueda().trim() ? `No existe el territorio ${this.busqueda().trim()}` : null);
       return;
     }
     this.error.set(null);
+    this.busqueda.set('');
     this.seleccionar(numero);
     (document.activeElement as HTMLElement | null)?.blur();
   }
 
   protected onBusqueda(event: Event): void {
-    this.busqueda.set((event.target as HTMLInputElement).value.replace(/\D/g, ''));
+    const valor = (event.target as HTMLInputElement).value.replace(/\D/g, '');
+    this.busqueda.set(valor);
+    this.verSugerencias.set(valor.length > 0);
+    this.error.set(null);
+  }
+
+  protected elegir(numero: number): void {
+    // Se limpia, como en el mapa de encargados: el nombre ya se ve en la ficha.
+    this.busqueda.set('');
+    this.verSugerencias.set(false);
+    this.error.set(null);
+    this.seleccionar(numero);
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+
+  protected ocultarSugerencias(): void {
+    setTimeout(() => this.verSugerencias.set(false), 150);
   }
 
   protected alternarFondo(): void {

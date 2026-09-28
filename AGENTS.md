@@ -1,6 +1,6 @@
 # Repository Instructions
 
-> Last verified: 2026-09-27. Whenever a fact here disagrees with the code, the code wins — fix this file.
+> Last verified: 2026-09-28. Whenever a fact here disagrees with the code, the code wins — fix this file.
 
 ## Codebase Memory (Knowledge Graph)
 
@@ -116,6 +116,7 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 ### Common Gotchas
 
 - **MapLibre worker**: `maplibre-gl` 6 resolves its worker from `import.meta.url`, which breaks after bundling. `angular.json` copies `maplibre-gl.css`, `maplibre-gl-worker.mjs` and `maplibre-gl-shared.mjs` to `/vendor/` (cached by the service worker via `ngsw-config.json`), and `core/map/base-map.ts` calls `setWorkerUrl('vendor/maplibre-gl-worker.mjs')` and injects the CSS on demand. CARTO basemaps now return an "API KEY REQUIRED" watermark; the maps use OSM tiles dimmed in dark mode. In MapLibre 6 `GeoJSONSource.setData` returns a promise: prefix with `void` (lint `no-floating-promises`).
+- **Map limits** (`core/map/base-map.ts`): every map has `maxZoom` 20; the satellite source has `maxzoom` 18 (Esri returns a grey "Map data not yet available" tile at 19 over Curanilahue, so MapLibre overzooms the z18 image instead). The field map and the viewer call `setMaxBounds(limitesDeNavegacion(manzanas))` (all territories + ~3 km) so nobody pans to another city or zooms out to the whole world; the admin maps are not bounded.
 - **Territory labels** go at an interior point of one of the territory's own manzanas (`core/map/geometria.ts` `puntoDeRotulo`), never the bbox centre: territory 72 wraps around 71, so its bbox centre is inside 71.
 - **Partial marking by sides (ADR 0008)**: geometry lives in `features/map/utils/lados.ts` (pure GeoJSON, no Leaflet: side detection, inner strip, report format) so it can be reused by the MapLibre map. Reports keep `geometriaParcial` (all zones of the territory) and store `puntosParciales` as `{"v":2,"zonas":[{m,n,l,g}]}`; older reports (point list) are read as zones without a manzana. State lives in `TerritorioSalida.zonas` (`utils/salida.ts`, one zone per manzana) and `MapaStore.edicion`.
 - **Angular template identifiers must be ASCII** (no `ñ`): the template lexer rejects them.

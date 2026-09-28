@@ -11,7 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { limitesPrincipales, etiquetasTerritorios, type FondoMapa } from '../../core/map/base-map';
+import { limitesDeNavegacion, limitesPrincipales, etiquetasTerritorios, type FondoMapa } from '../../core/map/base-map';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Toast } from '../../core/services/toast';
@@ -127,6 +127,7 @@ export class MapPage {
         },
       },
     );
+    this.vista.limitar(limitesDeNavegacion(coleccion));
     this.store.conectar(this.vista);
     const panel = this.panel()?.nativeElement;
     if (panel) this.medirPanel(panel);

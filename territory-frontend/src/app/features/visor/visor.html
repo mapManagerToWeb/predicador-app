@@ -10,15 +10,30 @@
       <input
         type="search"
         inputmode="numeric"
+        enterkeyhint="search"
         placeholder="Buscar territorio"
         aria-label="Número de territorio"
+        autocomplete="off"
         [value]="busqueda()"
         (input)="onBusqueda($event)"
+        (focus)="verSugerencias.set(busqueda().length > 0)"
+        (blur)="ocultarSugerencias()"
       />
     </form>
     <button type="button" class="icono" (click)="alternarLeyenda()" [attr.aria-expanded]="verLeyenda()" aria-label="Qué significan los colores">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
     </button>
+
+    <!-- El teclado numérico del iPhone no tiene tecla Enter: se elige de la lista. -->
+    @if (verSugerencias() && sugerencias().length) {
+      <ul class="sugerencias" role="listbox" aria-label="Territorios">
+        @for (n of sugerencias(); track n) {
+          <li>
+            <button type="button" role="option" aria-selected="false" (mousedown)="$event.preventDefault()" (click)="elegir(n)">Territorio {{ n }}</button>
+          </li>
+        }
+      </ul>
+    }
   </header>
 
   <div class="acciones-mapa">
