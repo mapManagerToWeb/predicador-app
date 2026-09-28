@@ -7,7 +7,7 @@ import type {
   Marker,
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString, Point, Position } from 'geojson';
-import { cambiarFondo, crearMapa, temaOscuro, type FondoMapa, type MapLibre } from '../../core/map/base-map';
+import { cambiarFondo, crearMapa, encuadrarDentroDeLimites, temaOscuro, type FondoMapa, type MapLibre } from '../../core/map/base-map';
 import { franjaDeLados, type GeometriaManzana } from './utils/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import type { EdicionLados } from './mapa.types';
@@ -89,6 +89,8 @@ export class MapaVista {
    * aparece la nota del territorio al terminar de cargarlo) y tapa lo encuadrado.
    */
   private ultimoEncuadre: { repetir: () => void; hora: number } | null = null;
+  /** Límite de navegación (los territorios y alrededores); cada encuadre lo estira si hace falta. */
+  private limiteBase: [[number, number], [number, number]] | null = null;
   private ubicacion: UbicacionMapa | null = null;
   private fondo: FondoMapa = 'mapa';
   private observadorTema: MutationObserver | null = null;
@@ -305,16 +307,20 @@ export class MapaVista {
   ajustarMargenes(m: { arriba?: number; abajo?: number; derecha?: number }): void {
     const antes = this.margen;
     this.margen = { ...antes, ...m };
+    // El panel crece en pasos (la tarjeta y, al llegar el último reporte, su
+    // nota): cualquier crecimiento poco después de encuadrar lo repite.
     const tapaMas =
-      this.margen.abajo - antes.abajo > 24 || this.margen.derecha - antes.derecha > 24 || this.margen.arriba - antes.arriba > 24;
+      this.margen.abajo - antes.abajo > 8 || this.margen.derecha - antes.derecha > 8 || this.margen.arriba - antes.arriba > 8;
     const e = this.ultimoEncuadre;
-    if (tapaMas && e && Date.now() - e.hora < 2000) e.repetir();
+    if (tapaMas && e && Date.now() - e.hora < 3000) e.repetir();
   }
 
   private encuadrarCaja(caja: LngLatBoundsLike, lados: number, maxZoom: number, duracion: number): void {
     this.ubicacion?.dejarDeSeguir();
-    this.map.fitBounds(caja, { padding: this.relleno(lados), maxZoom, duration: duracion });
-    this.ultimoEncuadre = { repetir: () => this.map.fitBounds(caja, { padding: this.relleno(lados), maxZoom, duration: 300 }), hora: Date.now() };
+    const encuadrar = (duration: number) =>
+      encuadrarDentroDeLimites(this.map, this.limiteBase, caja, { padding: this.relleno(lados), maxZoom, duration });
+    encuadrar(duracion);
+    this.ultimoEncuadre = { repetir: () => encuadrar(300), hora: Date.now() };
   }
 
   /** Relleno para fitBounds que deja libre lo tapado, sin pasarse si la pantalla es chica. */
@@ -362,12 +368,13 @@ export class MapaVista {
   }
 
   /** Hasta dónde se puede mover y alejar el mapa (ver `limitesDeNavegacion`). */
-  limitar(caja: LngLatBoundsLike | null): void {
+  limitar(caja: [[number, number], [number, number]] | null): void {
+    this.limiteBase = caja;
     this.map.setMaxBounds(caja ?? undefined);
   }
 
   encuadrarTodo(caja: LngLatBoundsLike): void {
-    this.map.fitBounds(caja, { padding: 24, duration: 0 });
+    encuadrarDentroDeLimites(this.map, this.limiteBase, caja, { padding: 24, duration: 0 });
   }
 
   // ── Calles de una manzana ──

@@ -21,6 +21,7 @@ import {
   etiquetasTerritorios,
   type FondoMapa,
   limites,
+  encuadrarDentroDeLimites,
   limitesDeNavegacion,
   limitesPrincipales,
   temaOscuro,
@@ -64,6 +65,7 @@ export class VisorPage {
   protected readonly busqueda = signal('');
   protected readonly resumen = signal<Map<number, ResumenTerritorio>>(new Map());
   protected readonly seleccionado = signal<number | null>(null);
+  private limiteBase: ReturnType<typeof limitesDeNavegacion> = null;
   protected readonly verSugerencias = signal(false);
   /** Territorios que empiezan con lo escrito, para tocarlos (como en el mapa de encargados). */
   protected readonly sugerencias = computed(() => {
@@ -116,7 +118,8 @@ export class VisorPage {
       const { manzanas, zonas } = await datos;
       this.manzanas = manzanas;
       this.agregarCapas(map, manzanas, zonas);
-      map.setMaxBounds(limitesDeNavegacion(manzanas) ?? undefined);
+      this.limiteBase = limitesDeNavegacion(manzanas);
+      map.setMaxBounds(this.limiteBase ?? undefined);
       const caja = limitesPrincipales(manzanas, 0.12);
       if (caja) map.fitBounds(caja, { padding: 24, duration: 0 });
     } catch {
@@ -202,7 +205,9 @@ export class VisorPage {
     this.map.setFilter('territorio-sel', ['==', ['get', 'territorio'], territorio ?? -1]);
     if (territorio !== null && enfocar && this.manzanas) {
       const caja = limites(this.manzanas, territorio);
-      if (caja) this.map.fitBounds(caja, { padding: { top: 90, left: 32, right: 32, bottom: 230 }, maxZoom: 17.5 });
+      if (caja) {
+        encuadrarDentroDeLimites(this.map, this.limiteBase, caja, { padding: { top: 90, left: 32, right: 32, bottom: 230 }, maxZoom: 17.5 });
+      }
     }
   }
 

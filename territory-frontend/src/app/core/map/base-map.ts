@@ -1,4 +1,4 @@
-import type { LngLatBoundsLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
+import type { FitBoundsOptions, LngLatBoundsLike, LngLatLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { puntoDeRotulo, type Poligonal } from './geometria';
 
@@ -126,7 +126,7 @@ export async function crearMapa(
 const MARGEN_LIMITE_GRADOS = 0.03; // ~3 km
 
 /** Caja de los territorios más el margen, para `maxBounds`. */
-export function limitesDeNavegacion(coleccion: ColeccionManzanas): [[number, number], [number, number]] | null {
+export function limitesDeNavegacion(coleccion: ColeccionManzanas): Caja | null {
   const caja = limites(coleccion) as [[number, number], [number, number]] | null;
   if (!caja) return null;
   const [[oeste, sur], [este, norte]] = caja;
@@ -134,6 +134,57 @@ export function limitesDeNavegacion(coleccion: ColeccionManzanas): [[number, num
     [oeste - MARGEN_LIMITE_GRADOS, sur - MARGEN_LIMITE_GRADOS],
     [este + MARGEN_LIMITE_GRADOS, norte + MARGEN_LIMITE_GRADOS],
   ];
+}
+
+type Caja = [[number, number], [number, number]];
+
+/** Lo que se ve con esa cámara (MapLibre: teselas de 512 px). */
+export function cajaVisible(centro: [number, number], zoom: number, ancho: number, alto: number): Caja {
+  const gradosPorPx = 360 / (512 * 2 ** zoom);
+  const medioAncho = (ancho / 2) * gradosPorPx;
+  const medioAlto = (alto / 2) * gradosPorPx * Math.cos((centro[1] * Math.PI) / 180);
+  return [
+    [centro[0] - medioAncho, centro[1] - medioAlto],
+    [centro[0] + medioAncho, centro[1] + medioAlto],
+  ];
+}
+
+function unir(a: Caja, b: Caja): Caja {
+  return [
+    [Math.min(a[0][0], b[0][0]), Math.min(a[0][1], b[0][1])],
+    [Math.max(a[1][0], b[1][0]), Math.max(a[1][1], b[1][1])],
+  ];
+}
+
+/**
+ * Encuadra `caja` respetando los límites de navegación, pero sin que estos lo
+ * impidan: un territorio en el borde de la zona, con el panel abajo, necesita
+ * correr el mapa más allá del límite para quedar a la vista (si no, el panel lo
+ * tapa). El límite se estira solo lo necesario para esa vista.
+ */
+export function encuadrarDentroDeLimites(
+  map: MapLibreMap,
+  base: Caja | null,
+  caja: LngLatBoundsLike,
+  opciones: FitBoundsOptions,
+): void {
+  if (base) {
+    const camara = map.cameraForBounds(caja, opciones);
+    const { clientWidth: ancho, clientHeight: alto } = map.getContainer();
+    if (camara?.center !== undefined && camara.zoom !== undefined && ancho > 0 && alto > 0) {
+      const c = centroDe(camara.center);
+      // Un poco más, para que el ajuste final de MapLibre no lo recorte.
+      map.setMaxBounds(unir(base, cajaVisible(c, camara.zoom - 0.05, ancho, alto)));
+    } else {
+      map.setMaxBounds(base);
+    }
+  }
+  map.fitBounds(caja, opciones);
+}
+
+function centroDe(c: LngLatLike): [number, number] {
+  if (Array.isArray(c)) return [c[0], c[1]];
+  return 'lng' in c ? [c.lng, c.lat] : [c.lon, c.lat];
 }
 
 /** Caja que contiene todas las manzanas (o las de un territorio). */
