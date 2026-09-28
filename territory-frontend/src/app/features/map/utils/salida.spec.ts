@@ -144,7 +144,13 @@ describe('salida', () => {
       expect(guardarLados(t, B, [], lados).zonas[0].lados).toEqual([0]);
       expect(guardarLados(t, B, [1], lados).zonas[0].lados).toEqual([0, 1]);
       // Completarla entera sí se puede.
-      expect(alternarManzana(t, B).marcadas).toEqual(['5-5.b']);
+      const entera = alternarManzana(t, B);
+      expect(entera.marcadas).toEqual(['5-5.b']);
+      // Y si se desmarca (p. ej. por error), vuelven las calles del último reporte.
+      const desmarcada = alternarManzana(entera, B);
+      expect(desmarcada.marcadas).toEqual([]);
+      expect(ladosElegidos(desmarcada, B.id, lados)).toEqual([0]);
+      expect(hayCambios(desmarcada)).toBe(false);
     });
   });
 
