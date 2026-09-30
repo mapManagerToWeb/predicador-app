@@ -154,6 +154,57 @@ final class SumaDeSalidas {
         return new Resultado(List.copyOf(enteras), List.copyOf(resultado), completo, total, enterasDelTerritorio);
     }
 
+    /**
+     * Lo que aportó {@code reporte} sobre {@code anterior} (el reporte vigente
+     * previo del territorio): manzanas nuevas y, por manzana, calles nuevas.
+     * Sirve para recalcular los reportes que vinieron después de uno que el
+     * administrador corrigió o anuló (ADR 0014).
+     */
+    static ReportDto aporteEntre(Report anterior, Report reporte, Map<Long, String> catalogo) {
+        Set<String> antes = new TreeSet<>();
+        List<Zona> zonasAntes = new ArrayList<>();
+        if (anterior != null && !empiezaVueltaNueva(anterior.getEstado())) {
+            agregarIds(antes, anterior.getManzanasIds(), anterior.getManzanaId(), catalogo);
+            zonasAntes.addAll(leerZonas(anterior.getGeometriaParcial(), anterior.getPuntosParciales(), catalogo));
+        }
+        Set<String> enteras = new TreeSet<>();
+        agregarIds(enteras, reporte.getManzanasIds(), reporte.getManzanaId(), catalogo);
+        enteras.removeAll(antes);
+
+        Set<String> antiguasAntes = new HashSet<>();
+        Map<String, List<Integer>> ladosAntes = new LinkedHashMap<>();
+        for (Zona z : zonasAntes) {
+            if (z.m() == null) antiguasAntes.add(z.g().toString());
+            else ladosAntes.merge(z.m(), z.l(), (a, b) -> { List<Integer> u = new ArrayList<>(a); u.addAll(b); return u; });
+        }
+        List<Zona> zonas = new ArrayList<>();
+        for (Zona z : leerZonas(reporte.getGeometriaParcial(), reporte.getPuntosParciales(), catalogo)) {
+            if (z.m() == null) {
+                if (!antiguasAntes.contains(z.g().toString())) zonas.add(z);
+                continue;
+            }
+            List<Integer> nuevos = new ArrayList<>(z.l());
+            nuevos.removeAll(ladosAntes.getOrDefault(z.m(), List.of()));
+            if (!nuevos.isEmpty()) zonas.add(new Zona(z.m(), z.n(), nuevos, z.t(), z.g()));
+        }
+        Resultado aporte = new Resultado(List.copyOf(enteras), zonas, false, 0, enteras.size());
+        return new ReportDto(null, aporte.manzanaId(), null, reporte.getEncargadoNombre(), reporte.getEncargadoApellido(),
+                null, null, reporte.getTerritorioNumero(), reporte.getEncargadoId(), reporte.getTotalManzanas(), null,
+                null, aporte.geometriaParcial(), aporte.puntosParciales(), aporte.manzanasIds());
+    }
+
+    /** Guarda en el reporte el estado del territorio que resultó de la suma. */
+    static void aplicar(Report destino, Resultado suma) {
+        destino.setEstado(suma.completo() ? "completed" : "incomplete");
+        destino.setTipoSesion(suma.completo() ? "completa" : "parcial");
+        destino.setManzanasIds(suma.manzanasIds());
+        destino.setManzanaId(suma.manzanaId());
+        if (suma.total() > 0) destino.setTotalManzanas(suma.total());
+        destino.setManzanasMarcadas(suma.manzanasMarcadas());
+        destino.setGeometriaParcial(suma.geometriaParcial());
+        destino.setPuntosParciales(suma.puntosParciales());
+    }
+
     static boolean empiezaVueltaNueva(String estado) {
         return "completed".equals(estado) || Report.ESTADO_REINICIADO.equals(estado);
     }

@@ -26,6 +26,9 @@
         <button class="adm-btn small" type="button" (click)="marcarDuplicados()">Ver y seleccionar</button>
       </div>
     }
+    @if (corrigiendo(); as id) {
+      <app-corregir-salida [reporteId]="id" (cerrar)="corrigiendo.set(null)" />
+    }
     <section class="adm-card">
       <div class="filtros">
         <label class="adm-field"><span>Desde</span>
@@ -75,12 +78,12 @@
             <tr>
               <th><input type="checkbox" [checked]="todosMarcados()" (change)="marcarPagina($event)" aria-label="Seleccionar página" /></th>
               <th>Fecha</th><th>Encargado</th><th class="num">Territorio</th><th>Estado</th>
-              <th class="num">Manzanas</th><th class="num">Duración</th>
+              <th class="num">Manzanas</th><th class="num">Duración</th><th aria-label="Acciones"></th>
             </tr>
           </thead>
           <tbody>
             @for (r of visibles(); track r.id) {
-              <tr [class.marcado]="marcados().has(r.id)">
+              <tr [class.marcado]="marcados().has(r.id)" [class.anulado]="!!r.anuladoEn" [class.editando]="corrigiendo() === r.id">
                 <td><input type="checkbox" [checked]="marcados().has(r.id)" (change)="marcar(r.id, $event)" [attr.aria-label]="'Seleccionar reporte ' + r.id" /></td>
                 <td>
                   {{ fmtFechaHora(r.fecha) }}
@@ -90,6 +93,8 @@
                   {{ nombreEncargado(r) }}
                   @if (r.origen === 'correccion') { <span class="adm-badge info" [attr.title]="r.nota ?? ''">corrección</span> }
                   @if (r.origen === 'reinicio') { <span class="adm-badge info" [attr.title]="r.nota ?? ''">reinicio de ciclo</span> }
+                  @if (r.anuladoEn) { <span class="adm-badge critical" [attr.title]="r.nota ?? ''">anulado</span> }
+                  @if (r.reemplazaA) { <span class="adm-badge info" [attr.title]="r.nota ?? ''">corregido</span> }
                 </td>
                 <td class="num">{{ r.territorio }}</td>
                 <td>
@@ -97,9 +102,14 @@
                 </td>
                 <td class="num">{{ r.manzanasMarcadas ?? '—' }}<span class="adm-muted"> / {{ r.totalManzanas ?? '—' }}</span></td>
                 <td class="num adm-muted">{{ minutos(r) !== null ? minutos(r) + ' min' : '—' }}</td>
+                <td class="acciones-fila">
+                  @if (corregible(r)) {
+                    <button class="adm-btn small ghost" type="button" (click)="corrigiendo.set(r.id)">Corregir</button>
+                  }
+                </td>
               </tr>
             } @empty {
-              <tr><td colspan="7" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay reportes con esos filtros.' }}</td></tr>
+              <tr><td colspan="8" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay reportes con esos filtros.' }}</td></tr>
             }
           </tbody>
         </table>

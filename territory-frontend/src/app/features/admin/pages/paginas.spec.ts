@@ -78,7 +78,7 @@ describe('páginas del panel (lógica)', () => {
 
   it('Resumen: KPIs del período, cobertura y sin contar dobles envíos', () => {
     const completo = reporte({ territorio: 2, estado: 'completed', manzanasMarcadas: 1, fecha: iso(3) });
-    store.reportes.set([
+    store.todosLosReportes.set([
       reporte({ territorio: 1, manzanasMarcadas: 2, fecha: iso(1) }),
       completo,
       { ...completo, id: 99, fecha: new Date(new Date(completo.fecha).getTime() + 30_000).toISOString() },
@@ -103,7 +103,7 @@ describe('páginas del panel (lógica)', () => {
   it('Reportes: filtra, marca duplicados y borra los seleccionados', async () => {
     const a = reporte({ territorio: 5, estado: 'completed', fecha: iso(2) });
     const dup = { ...a, id: 50, fecha: new Date(new Date(a.fecha).getTime() + 20_000).toISOString() };
-    store.reportes.set([a, dup, reporte({ territorio: 6, fecha: iso(1) })]);
+    store.todosLosReportes.set([a, dup, reporte({ territorio: 6, fecha: iso(1) })]);
     api.eliminarReportes.mockResolvedValue({ eliminados: 1 });
     const pagina = TestBed.runInInjectionContext(() => new ReportesPage()) as unknown as {
       filtrados: () => ReporteAdmin[];

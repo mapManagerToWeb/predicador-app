@@ -107,12 +107,12 @@ public class ReportService {
         // Cualquier encargado autenticado debe poder leer el progreso de un
         // territorio para restaurar las marcas en el mapa al iniciar sesión.
         authorization.requireAuthenticated(token);
-        return repository.findByTerritorioNumeroOrderByFechaDesc(territorioNumero, pageable).map(this::toDto);
+        return repository.findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaDesc(territorioNumero, pageable).map(this::toDto);
     }
 
     public Page<ReportDto> getReportsByEncargado(Long encargadoId, Pageable pageable, SessionToken token) {
         authorization.authorizeOwner(token, encargadoId);
-        return repository.findByEncargadoIdOrderByFechaDesc(encargadoId, pageable).map(this::toDto);
+        return repository.findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(encargadoId, pageable).map(this::toDto);
     }
 
     public Map<Long, List<ReportDto>> getReportsByMultipleTerritorios(Collection<Long> territorioNumeros,
@@ -171,14 +171,7 @@ public class ReportService {
         report.setFecha(ahora);
         report.setSessionTime(ahora.toString());
         report.setOrigen(Report.ORIGEN_SALIDA);
-        report.setEstado(suma.completo() ? "completed" : "incomplete");
-        report.setTipoSesion(suma.completo() ? "completa" : "parcial");
-        report.setManzanasIds(suma.manzanasIds());
-        report.setManzanaId(suma.manzanaId());
-        if (suma.total() > 0) report.setTotalManzanas(suma.total());
-        report.setManzanasMarcadas(suma.manzanasMarcadas());
-        report.setGeometriaParcial(suma.geometriaParcial());
-        report.setPuntosParciales(suma.puntosParciales());
+        SumaDeSalidas.aplicar(report, suma);
         report.setInicioSesion(inicioSesionPlausible(dto.inicioSesion(), ahora));
         return report;
     }

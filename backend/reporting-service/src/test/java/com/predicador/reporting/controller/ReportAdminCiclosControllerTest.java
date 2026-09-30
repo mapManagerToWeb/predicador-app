@@ -27,12 +27,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReportAdminCiclosControllerTest {
 
     private CicloService ciclos;
+    private com.predicador.reporting.service.CorreccionDeSalidas salidas;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         ciclos = mock(CicloService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new ReportAdminController(mock(ReportAdminService.class), ciclos)).build();
+        salidas = mock(com.predicador.reporting.service.CorreccionDeSalidas.class);
+        mvc = MockMvcBuilders.standaloneSetup(new ReportAdminController(mock(ReportAdminService.class), ciclos, salidas)).build();
     }
 
     @Test
@@ -71,5 +73,18 @@ class ReportAdminCiclosControllerTest {
         mvc.perform(post("/api/v1/reports/admin/correccion").contentType(MediaType.APPLICATION_JSON).content("""
                         {"manzanasIds":"","totalManzanas":3,"manzanasMarcadas":0}"""))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void corregirUnaSalidaDevuelveQueSeAnuloYQueSeRecalculo() throws Exception {
+        when(salidas.corregir(org.mockito.ArgumentMatchers.eq(7), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.predicador.reporting.dto.ResultadoCorreccionSalida(7, 8, 2, false));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reports/admin/7/corregir")
+                        .contentType("application/json")
+                        .content("{\"anular\":false,\"manzanasIds\":\"5-5.a\",\"nota\":\"error\"}"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.reemplazo").value(8))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.recalculados").value(2));
     }
 }

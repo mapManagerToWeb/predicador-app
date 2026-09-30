@@ -66,7 +66,7 @@ public class CicloService {
                 .orElseGet(() -> abrir(ahora.minusSeconds(1)));
 
         List<UltimoReporte> ultimos = ultimosPorTerritorio();
-        List<Report> delCiclo = reportes.findByFechaBetweenOrderByFechaDesc(actual.inicio(), ahora);
+        List<Report> delCiclo = reportes.findByFechaBetweenAndAnuladoEnIsNullOrderByFechaDesc(actual.inicio(), ahora);
         String resumen = resumen(ultimos, delCiclo);
 
         String motivo = limpiar(nota);
@@ -153,7 +153,7 @@ public class CicloService {
                 SELECT DISTINCT ON (territorio_numero)
                        territorio_numero, estado, origen, manzanas_marcadas, total_manzanas
                 FROM registro_predicacion
-                WHERE territorio_numero IS NOT NULL
+                WHERE territorio_numero IS NOT NULL AND anulado_en IS NULL
                 ORDER BY territorio_numero, fecha DESC NULLS LAST, id DESC
                 """)
                 .query((rs, n) -> new UltimoReporte(rs.getLong("territorio_numero"), rs.getString("estado"),

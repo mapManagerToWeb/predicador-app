@@ -1,6 +1,21 @@
-import type { EstadoTerritorioAdmin, ManzanaFeature } from '../admin.models';
+import type { EstadoTerritorioAdmin, ManzanaFeature, SalidaAdmin } from '../admin.models';
 import { serializarZonas } from '../../map/utils/lados';
-import { alternar, estadoDesde, iguales, pedido, quitarZona, situacion, vaciar } from './correccion';
+import {
+  alternar,
+  alternarEnSalida,
+  aporteDeSalida,
+  baseDeSalida,
+  estadoDeSalida,
+  estadoDesde,
+  iguales,
+  pedido,
+  pedidoSalida,
+  quitarZona,
+  quitarZonaEnSalida,
+  situacion,
+  vaciar,
+  zonasDeLaBase,
+} from './correccion';
 
 const manzana = (id: number, nombre: string): ManzanaFeature => ({
   type: 'Feature',
@@ -48,5 +63,56 @@ describe('corrección de un territorio', () => {
     });
     expect(pedido(quitarZona(e, 0), 7, 3, '').geometriaParcial).toBeNull();
     expect(pedido(vaciar(), 7, 3, '')).toMatchObject({ manzanasIds: '', manzanasMarcadas: 0, nota: null });
+  });
+});
+
+describe('corrección del reporte de una salida (ADR 0014)', () => {
+  const zonaC = (lados: number[]) =>
+    serializarZonas([{ manzanaId: '7-7.c', manzanaNombre: '7.c', lados, geometria: cuadro }]);
+
+  function salida(p: Partial<SalidaAdmin>): SalidaAdmin {
+    return {
+      id: 9, fecha: '2026-09-02T10:00:00Z', encargado: 'Luis P', territorio: 7, origen: 'salida', estado: 'incomplete',
+      manzanasIds: null, geometriaParcial: null, puntosParciales: null, totalManzanas: 3, anuladoEn: null,
+      anterior: null, posteriores: 0, ...p,
+    };
+  }
+
+  it('lo que había antes queda fijo; lo que marcó la salida se puede quitar', () => {
+    // Antes: 7.a entera y la calle 0 de 7.c. La salida agregó 7.b y la calle 1 de 7.c.
+    const antes = zonaC([0]);
+    const despues = zonaC([0, 1]);
+    const s = salida({
+      manzanasIds: '7-7.a,7-7.b', ...despues,
+      anterior: { estado: 'incomplete', manzanasIds: '7-7.a', ...antes },
+    });
+    const base = baseDeSalida(s, [A, B, C]);
+    const e = estadoDeSalida(s, [A, B, C]);
+    expect(aporteDeSalida(base, e)).toEqual({ enteras: 1, porCalles: 1 });
+
+    expect(alternarEnSalida(base, e, A)).toBe(e);
+    const sinB = alternarEnSalida(base, e, B);
+    expect(situacion(sinB, B)).toBe('nada');
+    const sinCalle = quitarZonaEnSalida(base, sinB, 0);
+    expect(sinCalle.zonas[0].lados).toEqual([0]);
+    expect(zonasDeLaBase(base, sinCalle)).toEqual(new Set([0]));
+    expect(aporteDeSalida(base, sinCalle)).toEqual({ enteras: 0, porCalles: 0 });
+    // La franja que ya estaba no se quita.
+    expect(quitarZonaEnSalida(base, sinCalle, 0)).toBe(sinCalle);
+  });
+
+  it('después de un territorio completo o reiniciado la salida empezó de cero', () => {
+    for (const estadoAnterior of ['completed', 'reiniciado']) {
+      const s = salida({ manzanasIds: '7-7.a', anterior: { estado: estadoAnterior, manzanasIds: '7-7.a,7-7.b,7-7.c', geometriaParcial: null, puntosParciales: null } });
+      expect(baseDeSalida(s, [A, B, C]).marcadas.size).toBe(0);
+    }
+  });
+
+  it('el pedido lleva el estado corregido, o nada si se anula', () => {
+    const e = { marcadas: new Set(['7-7.b', '7-7.a']), zonas: [] };
+    expect(pedidoSalida(e, false, ' error ')).toEqual({
+      anular: false, manzanasIds: '7-7.a,7-7.b', geometriaParcial: null, puntosParciales: null, nota: 'error',
+    });
+    expect(pedidoSalida(e, true, '')).toEqual({ anular: true, manzanasIds: null, geometriaParcial: null, puntosParciales: null, nota: null });
   });
 });

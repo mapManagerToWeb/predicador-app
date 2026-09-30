@@ -70,6 +70,7 @@ public class ReportAdminService {
         return new ReporteAdminDto(r.getId(), r.getFecha(), r.getInicioSesion(), r.getEncargadoId(),
                 r.getEncargadoNombre(), r.getEncargadoApellido(), r.getTerritorioNumero(), r.getEstado(),
                 r.getTipoSesion(), r.getTotalManzanas(), r.getManzanasMarcadas(), r.getManzanasIds(),
-                r.getGeometriaParcial() != null && !r.getGeometriaParcial().isBlank(), r.getOrigen(), r.getNota());
+                r.getGeometriaParcial() != null && !r.getGeometriaParcial().isBlank(), r.getOrigen(), r.getNota(),
+                r.getAnuladoEn(), r.getReemplazaA());
     }
 }

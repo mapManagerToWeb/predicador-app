@@ -77,7 +77,7 @@ class Task3HardeningTest {
 
         var service = new EncargadoService(encargadoRepository, new AuthorizationService());
 
-        assertEquals(7L, service.buscarOCrear("Daniel", "Uribe", null).orElseThrow().id());
+        assertEquals(7L, service.buscarOCrear("Daniel", "Uribe", "912345678").orElseThrow().id());
     }
 
     @Test

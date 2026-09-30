@@ -17,14 +17,17 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
 
     Page<Report> findAllByOrderByFechaDesc(Pageable pageable);
 
-    Page<Report> findByTerritorioNumeroOrderByFechaDesc(Long territorioNumero, Pageable pageable);
+    Page<Report> findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaDesc(Long territorioNumero, Pageable pageable);
 
-    Page<Report> findByEncargadoIdOrderByFechaDesc(Long encargadoId, Pageable pageable);
+    /** Reportes vigentes de un territorio, del más antiguo al más nuevo (para recalcular su estado). */
+    List<Report> findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaAscIdAsc(Long territorioNumero);
+
+    Page<Report> findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(Long encargadoId, Pageable pageable);
 
     @Query(value = """
             SELECT DISTINCT ON (territorio_numero) *
             FROM registro_predicacion
-            WHERE territorio_numero IN (:territorioNumeros)
+            WHERE territorio_numero IN (:territorioNumeros) AND anulado_en IS NULL
             ORDER BY territorio_numero, fecha DESC NULLS LAST, id DESC
             """, nativeQuery = true)
     List<Report> findLatestByTerritorioNumeroIn(@Param("territorioNumeros") Collection<Long> territorioNumeros);
@@ -32,7 +35,7 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
     @Query(value = """
             SELECT DISTINCT ON (territorio_numero) territorio_numero, id
             FROM registro_predicacion
-            WHERE territorio_numero IN (:territorioNumeros)
+            WHERE territorio_numero IN (:territorioNumeros) AND anulado_en IS NULL
               AND (manzanas_ids IS NOT NULL AND manzanas_ids <> ''
                    OR manzana_id IS NOT NULL
                    OR geometria_parcial IS NOT NULL)
@@ -40,17 +43,20 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
             """, nativeQuery = true)
     List<Object[]> findVersions(@Param("territorioNumeros") Collection<Long> territorioNumeros);
 
-    @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin ORDER BY r.fecha DESC")
+    @Query("SELECT r FROM Report r WHERE r.fecha BETWEEN :inicio AND :fin AND r.anuladoEn IS NULL ORDER BY r.fecha DESC")
     Page<Report> findByFechaRange(@Param("inicio") Instant inicio, @Param("fin") Instant fin, Pageable pageable);
 
+    /** Todos, también los anulados (el panel los muestra en el historial). */
     List<Report> findByFechaBetweenOrderByFechaDesc(Instant desde, Instant hasta);
+
+    List<Report> findByFechaBetweenAndAnuladoEnIsNullOrderByFechaDesc(Instant desde, Instant hasta);
 
     long countByFechaBetween(Instant desde, Instant hasta);
 
     long countByEncargadoId(Long encargadoId);
 
     /** Totales por encargado para el panel: [encargadoId, cantidad, último reporte]. */
-    @Query("SELECT r.encargadoId, count(r), max(r.fecha) FROM Report r WHERE r.encargadoId IS NOT NULL GROUP BY r.encargadoId")
+    @Query("SELECT r.encargadoId, count(r), max(r.fecha) FROM Report r WHERE r.encargadoId IS NOT NULL AND r.anuladoEn IS NULL GROUP BY r.encargadoId")
     List<Object[]> resumenPorEncargado();
 
     /** Pasa todos los reportes de un encargado a otro (fusión de duplicados). */

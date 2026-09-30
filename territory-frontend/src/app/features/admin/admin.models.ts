@@ -56,6 +56,10 @@ export interface ReporteAdmin {
   /** salida (encargado desde el mapa), correccion o reinicio (administrador). Falta en respuestas viejas. */
   origen?: 'salida' | 'correccion' | 'reinicio' | string;
   nota?: string | null;
+  /** El administrador lo anuló (ADR 0014): queda en el historial pero no cuenta. */
+  anuladoEn?: string | null;
+  /** Id del reporte que este corrige. */
+  reemplazaA?: number | null;
 }
 
 /** Ciclo de territorios (GET /reports/admin/ciclos); `resumen` es JSON al cerrarse. */
@@ -134,4 +138,39 @@ export interface EnvioWhatsApp {
   messageId: string | null;
   error: string | null;
   statusCode: number | null;
+}
+
+/** El reporte de una salida con lo que había antes en el territorio (GET /reports/admin/{id}/salida). */
+export interface SalidaAdmin {
+  id: number;
+  fecha: string;
+  encargado: string;
+  territorio: number;
+  origen: string;
+  estado: string | null;
+  manzanasIds: string | null;
+  geometriaParcial: string | null;
+  puntosParciales: string | null;
+  totalManzanas: number | null;
+  anuladoEn: string | null;
+  /** null: no había reportes antes en el territorio. */
+  anterior: { estado: string | null; manzanasIds: string | null; geometriaParcial: string | null; puntosParciales: string | null } | null;
+  /** Reportes del territorio que vinieron después (se recalculan al corregir). */
+  posteriores: number;
+}
+
+export interface CorreccionSalidaRequest {
+  anular: boolean;
+  manzanasIds: string | null;
+  geometriaParcial: string | null;
+  puntosParciales: string | null;
+  nota: string | null;
+}
+
+export interface ResultadoCorreccionSalida {
+  anulado: number;
+  reemplazo: number | null;
+  recalculados: number;
+  /** Después hubo una corrección o un cierre de ciclo: desde ahí el estado no se tocó. */
+  detenido: boolean;
 }

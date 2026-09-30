@@ -217,10 +217,10 @@ class ReportServiceTest {
 
     @Test
     void getReportsByEncargado_shouldAllowMatchingOwner() {
-        when(repository.findByEncargadoIdOrderByFechaDesc(7L, pageable)).thenReturn(Page.empty());
+        when(repository.findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(7L, pageable)).thenReturn(Page.empty());
 
         assertTrue(reportService.getReportsByEncargado(7L, pageable, encargado("7")).getContent().isEmpty());
-        verify(repository).findByEncargadoIdOrderByFechaDesc(7L, pageable);
+        verify(repository).findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(7L, pageable);
     }
 
     @Test
@@ -228,7 +228,7 @@ class ReportServiceTest {
 
         assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportsByEncargado(8L, pageable, encargado("7")));
-        verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L, pageable);
+        verify(repository, never()).findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(8L, pageable);
     }
 
     @Test
@@ -250,7 +250,7 @@ class ReportServiceTest {
 
     @Test
     void getReportsByTerritorio_shouldAllowAnyAuthenticatedAndAdmin() {
-        when(repository.findByTerritorioNumeroOrderByFechaDesc(12L, pageable)).thenReturn(Page.empty());
+        when(repository.findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaDesc(12L, pageable)).thenReturn(Page.empty());
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, encargado("7")).getContent().isEmpty());
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, admin).getContent().isEmpty());
 
