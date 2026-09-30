@@ -131,7 +131,7 @@ Fallbacks: `forward:/fallback/territory` and `forward:/fallback/reporting`. CORS
 ## Backend Conventions
 
 - Layered Spring MVC: `controller/` → `service/` → `repository/` → `model/` + `dto/` (+ `geojson/` in territory-service; `publisher/` + `listener/` in reporting-service for the RabbitMQ WhatsApp flow).
-- Cross-cutting concerns live in `backend/shared/`: security (HMAC session tokens, `SessionAuthFilter`), exceptions (`GlobalExceptionHandler` turns domain exceptions into HTTP errors — do not duplicate ad-hoc exception handling in controllers), and `PhoneUtil` (E.164 normalization, used for login/encargado identity).
+- Cross-cutting concerns live in `backend/shared/`: security (HMAC session tokens, `SessionAuthFilter`), exceptions (`GlobalExceptionHandler` turns domain exceptions into HTTP errors — do not duplicate ad-hoc exception handling in controllers), and `PhoneUtil` (E.164 normalization, used for login/encargado identity; `esCelularChileno` = 9 digits starting with 9, with or without +56 — every create/edit/login path rejects anything else with code `telefono_invalido`, mirrored client-side by `core/utils/phone.ts` `esCelularChileno`; older rows that break it are flagged «Número inválido» in the admin list).
 - Multi-write services use `@Transactional` (TerritoryService, ReportService, EncargadoService, WhatsAppDeliveryRepository). The WhatsApp send endpoint supports an `Idempotency-Key` header.
 - Spatial data is stored via PostGIS (hibernate-spatial) and served as GeoJSON; the frontend parses geometry with its own byte-level code (no GeoTools).
 

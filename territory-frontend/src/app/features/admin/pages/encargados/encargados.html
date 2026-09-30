@@ -94,6 +94,7 @@
                 <strong>{{ e.nombre }} {{ e.apellido }}</strong>
                 @if (!e.activo) { <span class="adm-badge">Inactivo</span> }
                 @if (duplicados().get(e.id); as motivo) { <span class="adm-badge warning" [title]="motivo">¿Duplicado?</span> }
+                @if (telefonoInvalido(e)) { <span class="adm-badge critical" [title]="mensajeTelefonoInvalido">Número inválido</span> }
               </td>
               <td class="adm-muted tel">{{ fmtTelefono(e.telefono) }}</td>
               <td>
@@ -135,6 +136,9 @@
       </dl>
       @if (duplicados().get(e.id); as motivo) {
         <p class="aviso"><span class="adm-badge warning">{{ motivo }}</span> Si es la misma persona, fusionalos.</p>
+      }
+      @if (telefonoInvalido(e)) {
+        <p class="aviso"><span class="adm-badge critical">Número inválido</span> Así no puede entrar a la app: corrígelo en «Editar datos».</p>
       }
 
       <div class="acciones">

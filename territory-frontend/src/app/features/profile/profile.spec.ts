@@ -101,6 +101,18 @@ describe('ProfilePage', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
+  it('un número mal escrito se explica bajo el campo y no crea la cuenta', async () => {
+    component.name.set('Daniel');
+    component.lastName.set('Uribe');
+    component.telefono.set('9123456789');
+
+    await component.save();
+
+    expect(component.errorTelefono()).toContain('9 dígitos');
+    expect(encargadoService.buscarOCrear).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
   it('creates the encargado, saves the profile and navigates to /map', async () => {
     encargadoService.buscarOCrear.mockResolvedValue({
       id: 7,

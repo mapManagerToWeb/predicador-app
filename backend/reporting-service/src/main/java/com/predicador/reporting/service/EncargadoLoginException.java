@@ -15,6 +15,7 @@ public class EncargadoLoginException extends RuntimeException {
     public static final String PIN_BLOQUEADO = "pin_bloqueado";
     public static final String REGISTRO_CERRADO = "registro_cerrado";
     public static final String YA_REGISTRADO = "ya_registrado";
+    public static final String TELEFONO_INVALIDO = "telefono_invalido";
 
     private final HttpStatus status;
     private final String code;

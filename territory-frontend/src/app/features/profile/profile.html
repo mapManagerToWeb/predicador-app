@@ -47,8 +47,13 @@
               (input)="onTelefonoInput($event)"
               placeholder="9 1234 5678"
               autocomplete="tel"
+              [attr.aria-invalid]="errorTelefono() ? 'true' : null"
+              aria-describedby="telefono-error"
             />
           </div>
+          @if (errorTelefono(); as error) {
+            <p id="telefono-error" class="field-error" role="alert">{{ error }}</p>
+          }
         </div>
 
         <fieldset class="field">

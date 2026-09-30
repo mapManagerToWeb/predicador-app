@@ -24,4 +24,18 @@ public final class PhoneUtil {
         }
         return digits;
     }
+
+    /** Mensaje para un número que no es un celular chileno (lo ve el encargado). */
+    public static final String MENSAJE_INVALIDO =
+            "El número debe tener 9 dígitos y empezar con 9 (por ejemplo, 9 1234 5678).";
+
+    /**
+     * ¿Es un celular chileno? 9 dígitos que empiezan con 9, con o sin el
+     * código de país (+56). Todos los números nuevos deben cumplirlo: con un
+     * largo distinto la persona no puede entrar ni recibir el reporte.
+     */
+    public static boolean esCelularChileno(String phone) {
+        String normalizado = normalize(phone);
+        return normalizado != null && normalizado.matches("569\\d{8}");
+    }
 }
