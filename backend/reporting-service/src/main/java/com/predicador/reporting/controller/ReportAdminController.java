@@ -3,11 +3,15 @@ package com.predicador.reporting.controller;
 import com.predicador.reporting.dto.CerrarCicloRequest;
 import com.predicador.reporting.dto.CicloDto;
 import com.predicador.reporting.dto.CorreccionRequest;
+import com.predicador.reporting.dto.CorreccionSalidaRequest;
+import com.predicador.reporting.dto.ResultadoCorreccionSalida;
+import com.predicador.reporting.dto.SalidaAdminDto;
 import com.predicador.reporting.dto.EnvioWhatsAppDto;
 import com.predicador.reporting.dto.EstadoTerritorioAdmin;
 import com.predicador.reporting.dto.ReporteAdminDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.service.CicloService;
+import com.predicador.reporting.service.CorreccionDeSalidas;
 import com.predicador.reporting.service.ReportAdminService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -36,10 +40,12 @@ public class ReportAdminController {
 
     private final ReportAdminService service;
     private final CicloService ciclos;
+    private final CorreccionDeSalidas salidas;
 
-    public ReportAdminController(ReportAdminService service, CicloService ciclos) {
+    public ReportAdminController(ReportAdminService service, CicloService ciclos, CorreccionDeSalidas salidas) {
         this.service = service;
         this.ciclos = ciclos;
+        this.salidas = salidas;
     }
 
     /** Reportes de {@code [desde, hasta)}; por defecto, los últimos 365 días. */
@@ -78,6 +84,19 @@ public class ReportAdminController {
     @GetMapping("/estado/{territorio}")
     public ResponseEntity<EstadoTerritorioAdmin> estado(@PathVariable long territorio) {
         return ciclos.estadoActual(territorio).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** El reporte de una salida y lo que había antes en el territorio, para corregirlo. */
+    @GetMapping("/{id}/salida")
+    public ResponseEntity<SalidaAdminDto> salida(@PathVariable int id) {
+        return ResponseEntity.ok(salidas.detalle(id));
+    }
+
+    /** Corrige o anula el reporte de una salida (ADR 0014); los posteriores se recalculan. */
+    @PostMapping("/{id}/corregir")
+    public ResponseEntity<ResultadoCorreccionSalida> corregirSalida(@PathVariable int id,
+                                                                    @Valid @RequestBody CorreccionSalidaRequest req) {
+        return ResponseEntity.ok(salidas.corregir(id, req));
     }
 
     /** Corrige el estado actual de un territorio; queda como un reporte más. */

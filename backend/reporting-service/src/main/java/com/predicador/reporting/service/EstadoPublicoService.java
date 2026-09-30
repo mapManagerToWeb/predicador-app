@@ -31,7 +31,7 @@ public class EstadoPublicoService {
         jdbc.sql("""
                 SELECT territorio_numero, max(fecha) AS fecha
                 FROM registro_predicacion
-                WHERE estado = 'completed' AND territorio_numero IS NOT NULL
+                WHERE estado = 'completed' AND territorio_numero IS NOT NULL AND anulado_en IS NULL
                 GROUP BY territorio_numero
                 """)
                 .query((rs, n) -> completados.put(rs.getLong("territorio_numero"), instante(rs.getTimestamp("fecha"))))
@@ -40,9 +40,10 @@ public class EstadoPublicoService {
         return jdbc.sql("""
                 SELECT DISTINCT ON (territorio_numero)
                        territorio_numero, fecha, estado, manzanas_marcadas, total_manzanas,
-                       COALESCE(NULLIF(manzanas_ids, ''), manzana_id) AS manzanas_ids, geometria_parcial
+                       COALESCE(NULLIF(manzanas_ids, ''), manzana_id) AS manzanas_ids, geometria_parcial,
+                       puntos_parciales
                 FROM registro_predicacion
-                WHERE territorio_numero IS NOT NULL
+                WHERE territorio_numero IS NOT NULL AND anulado_en IS NULL
                 ORDER BY territorio_numero, fecha DESC NULLS LAST, id DESC
                 """)
                 .query((rs, n) -> {
@@ -55,7 +56,8 @@ public class EstadoPublicoService {
                             (Integer) rs.getObject("manzanas_marcadas"),
                             (Integer) rs.getObject("total_manzanas"),
                             rs.getString("manzanas_ids"),
-                            rs.getString("geometria_parcial"));
+                            rs.getString("geometria_parcial"),
+                            rs.getString("puntos_parciales"));
                 })
                 .list();
     }

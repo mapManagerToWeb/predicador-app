@@ -8,6 +8,12 @@ export interface EstadoTerritorioPublico {
   totalManzanas: number | null;
   manzanasIds: string | null;
   geometriaParcial: string | null;
+  /**
+   * Detalle de las calles marcadas (`{"v":2,"zonas":[{m,n,l,t,g}]}`): con él,
+   * el mapa de los encargados usa este estado como base de cada territorio.
+   * Ausente en servidores anteriores (ADR 0013).
+   */
+  puntosParciales?: string | null;
 }
 
 /**

@@ -7,6 +7,7 @@ import { AdminUi } from '../../services/admin-ui';
 import { completado, deduplicar, diasEntre, duplicados, nombreEncargado, registroTerritorios } from '../../utils/analytics';
 import { aCsv, descargar } from '../../utils/csv';
 import { fmtFecha, fmtFechaHora, fmtNumero } from '../../utils/formato';
+import { CorregirSalida } from './corregir-salida';
 
 type Vista = 'reportes' | 'registro' | 'whatsapp';
 type FiltroEstado = 'todos' | 'completos' | 'parciales';
@@ -16,6 +17,7 @@ const POR_PAGINA = 50;
 @Component({
   selector: 'app-reportes',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CorregirSalida],
   templateUrl: './reportes.html',
   styleUrl: './reportes.css',
 })
@@ -38,14 +40,19 @@ export class ReportesPage {
   protected readonly soloDuplicados = signal(false);
   protected readonly pagina = signal(0);
   protected readonly marcados = signal<Set<number>>(new Set());
+  /** Reporte que se está corrigiendo (ADR 0014). */
+  protected readonly corrigiendo = signal<number | null>(null);
 
   protected readonly envios = signal<EnvioWhatsApp[] | null>(null);
   protected readonly registroTerritorio = signal<number | null>(null);
 
+  /** Todos, también los anulados: el listado es el historial completo. */
   private readonly todos = computed(() =>
-    [...(this.store.reportes() ?? [])].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()),
+    [...(this.store.todosLosReportes() ?? [])].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()),
   );
-  private readonly idsDuplicados = computed(() => new Set(duplicados(this.todos()).map(r => r.id)));
+  /** Los que cuentan (sin anulados). */
+  private readonly vigentes = computed(() => this.todos().filter(r => !r.anuladoEn));
+  private readonly idsDuplicados = computed(() => new Set(duplicados(this.vigentes()).map(r => r.id)));
 
   protected readonly encargados = computed(() => {
     const vistos = new Map<string, string>();
@@ -79,7 +86,7 @@ export class ReportesPage {
 
   protected readonly ciclos = computed(() => {
     const t = this.registroTerritorio();
-    return registroTerritorios(deduplicar(this.todos()))
+    return registroTerritorios(deduplicar(this.vigentes()))
       .filter(c => t === null || c.territorio === t)
       .sort((a, b) => a.territorio - b.territorio || b.inicio.getTime() - a.inicio.getTime());
   });
@@ -206,12 +213,17 @@ export class ReportesPage {
     try {
       const { eliminados } = await this.api.eliminarReportes(ids);
       const borrar = new Set(ids);
-      this.store.reportes.update(l => l?.filter(r => !borrar.has(r.id)) ?? l);
+      this.store.todosLosReportes.update(l => l?.filter(r => !borrar.has(r.id)) ?? l);
       this.marcados.set(new Set());
       this.toast.show(`${eliminados} reporte(s) eliminados`, 3000, 'success');
     } catch (e) {
       this.toast.show(mensajeDeError(e), 6000, 'error');
     }
+  }
+
+  /** Solo las salidas vigentes se corrigen así; el estado actual se corrige en «S-13 y ciclos». */
+  protected corregible(r: ReporteAdmin): boolean {
+    return !r.anuladoEn && (r.origen ?? 'salida') === 'salida';
   }
 
   // ── Exportar ──

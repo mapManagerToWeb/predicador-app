@@ -12,6 +12,8 @@ const mapa = {
   on: vi.fn(),
   fitBounds: vi.fn(),
   setMaxBounds: vi.fn(),
+  cameraForBounds: vi.fn(() => ({ center: [-73.34, -37.48], zoom: 15 })),
+  getContainer: () => ({ clientWidth: 390, clientHeight: 800 }),
   setFilter: vi.fn(),
   remove: vi.fn(),
   getCanvas: () => ({ style: {} }),

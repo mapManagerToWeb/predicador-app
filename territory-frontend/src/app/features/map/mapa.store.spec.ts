@@ -6,7 +6,7 @@ import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
 import { DraftMarksService } from '../../core/services/map-draft';
-import type { Reporte } from '../../core/models/models';
+import type { EstadoTerritorioPublico } from '../../core/map/estado-publico';
 import { WhatsAppService } from './services/whatsapp';
 import { MapaStore, type VistaMapa } from './mapa.store';
 
@@ -27,11 +27,11 @@ const GEOJSON = JSON.stringify({
   ],
 });
 
-function reporte(p: Partial<Reporte>): Reporte {
+/** Estado público del territorio 5: su último reporte trae 5-5.a. */
+function estado(p: Partial<EstadoTerritorioPublico> = {}): EstadoTerritorioPublico {
   return {
-    id: 1, manzanaId: null, fecha: '2026-09-20T12:00:00Z', encargadoId: 1, encargadoNombre: 'Ana', encargadoApellido: 'P',
-    sessionTime: '2026-09-20T12:00:00Z', estado: 'incomplete', territorioNumero: 5, totalManzanas: 3, manzanasMarcadas: 1,
-    tipoSesion: 'parcial', geometriaParcial: null, puntosParciales: null, manzanasIds: '5-5.a', ...p,
+    territorio: 5, ultimoTrabajo: '2026-09-20T12:00:00Z', ultimoCompletado: null, estado: 'incomplete',
+    manzanasMarcadas: 1, totalManzanas: 3, manzanasIds: '5-5.a', geometriaParcial: null, puntosParciales: null, ...p,
   };
 }
 
@@ -41,7 +41,6 @@ describe('MapaStore', () => {
   let territorios: {
     getAllGeoJson: ReturnType<typeof vi.fn>;
     getColores: ReturnType<typeof vi.fn>;
-    getReportesPorTerritorio: ReturnType<typeof vi.fn>;
     crearReportes: ReturnType<typeof vi.fn>;
     eliminarReportes: ReturnType<typeof vi.fn>;
   };
@@ -54,11 +53,17 @@ describe('MapaStore', () => {
     return s;
   }
 
-  async function cargar(s: MapaStore): Promise<void> {
+  async function cargar(s: MapaStore, estados: EstadoTerritorioPublico[] = [estado()]): Promise<void> {
     const listo = s.cargar();
     await Promise.resolve();
-    http.expectOne(r => r.url.endsWith('/reports/public/estado')).flush([]);
+    http.expectOne(r => r.url.endsWith('/reports/public/estado')).flush(estados);
     expect(await listo).toBe(true);
+  }
+
+  /** Antes de enviar, el mapa vuelve a pedir el estado de los territorios. */
+  async function responderEstado(estados: EstadoTerritorioPublico[] = [estado()]): Promise<void> {
+    const pedido = await vi.waitFor(() => http.expectOne(r => r.url.endsWith('/reports/public/estado')));
+    pedido.flush(estados);
   }
 
   beforeEach(() => {
@@ -66,7 +71,6 @@ describe('MapaStore', () => {
     territorios = {
       getAllGeoJson: vi.fn().mockResolvedValue(GEOJSON),
       getColores: vi.fn().mockResolvedValue({ 5: '#ff0000', 6: '#00ff00' }),
-      getReportesPorTerritorio: vi.fn().mockImplementation(async (n: number) => (n === 5 ? [reporte({})] : [])),
       crearReportes: vi.fn().mockImplementation(async regs => regs.map((r: object, i: number) => ({ ...r, id: 500 + i }))),
       eliminarReportes: vi.fn().mockResolvedValue(undefined),
     };
@@ -154,6 +158,7 @@ describe('MapaStore', () => {
     store.pedirEnvio();
     expect(store.pregunta()?.detalle).toEqual(['Territorio 5: 2 de 3 manzanas']);
     store.responder(true);
+    await responderEstado();
     await vi.waitFor(() => expect(store.abiertos()).toEqual([]));
     expect(territorios.crearReportes).toHaveBeenCalledWith([
       expect.objectContaining({ territorioNumero: 5, manzanasIds: '5-5.a,5-5.b', estado: 'incomplete', encargadoId: 3 }),
@@ -169,9 +174,42 @@ describe('MapaStore', () => {
     store.tocar({ manzana: '5-5.b', cercana: null });
     store.pedirEnvio();
     store.responder(true);
+    await responderEstado();
     await vi.waitFor(() => expect(territorios.eliminarReportes).toHaveBeenCalledWith([500]));
     await vi.waitFor(() => expect(store.enviando()).toBe(false));
     expect(store.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
+  });
+
+  it('si otro hermano reportó el territorio mientras tanto, se envía la suma de los dos', async () => {
+    await cargar(store);
+    await store.abrir(5);
+    store.tocar({ manzana: '5-5.b', cercana: null });
+    store.pedirEnvio();
+    store.responder(true);
+    await responderEstado([estado({ manzanasIds: '5-5.a,5-5.c', manzanasMarcadas: 2 })]);
+    await vi.waitFor(() => expect(territorios.crearReportes).toHaveBeenCalled());
+    expect(territorios.crearReportes).toHaveBeenCalledWith([
+      expect.objectContaining({ territorioNumero: 5, manzanasIds: '5-5.a,5-5.b,5-5.c', estado: 'completed' }),
+    ]);
+    // Completo solo: sale con la imagen oficial, sin captura.
+    await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalledWith(expect.objectContaining({ screenshotBase64: null })));
+  });
+
+  it('el WhatsApp dice cómo quedó en el servidor, no la copia del teléfono', async () => {
+    territorios.crearReportes.mockImplementation(async regs =>
+      regs.map((r: object) => ({ ...r, id: 700, estado: 'completed', manzanasIds: '5-5.a,5-5.b,5-5.c', manzanasMarcadas: 3 })),
+    );
+    await cargar(store);
+    await store.abrir(5);
+    store.tocar({ manzana: '5-5.b', cercana: null });
+    store.pedirEnvio();
+    store.responder(true);
+    await responderEstado();
+    await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalled());
+    expect(whatsapp.sendReport).toHaveBeenCalledWith(
+      expect.objectContaining({ territorios: [expect.objectContaining({ numero: 5, finalizado: true })], screenshotBase64: null }),
+    );
+    await vi.waitFor(() => expect(store.estados().get(5)?.estado).toBe('completed'));
   });
 
   it('sin cambios no hay nada que enviar', async () => {
@@ -211,6 +249,35 @@ describe('MapaStore', () => {
     await cargar(otro);
     expect(otro.abiertos()).toEqual([5]);
     expect(otro.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
+  });
+
+  it('un borrador de antes de cerrar el ciclo no trae de vuelta la vuelta anterior', async () => {
+    vi.useFakeTimers();
+    try {
+      await cargar(store);
+      await store.abrir(5); // base: 5-5.a
+      store.tocar({ manzana: '5-5.c', cercana: null });
+      TestBed.tick();
+      await vi.advanceTimersByTimeAsync(400);
+    } finally {
+      vi.useRealTimers();
+    }
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        MapaStore,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: TerritorioService, useValue: territorios },
+        { provide: WhatsAppService, useValue: whatsapp },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const otro = crear();
+    // Mientras tanto el administrador cerró el ciclo: el territorio quedó reiniciado.
+    await cargar(otro, [estado({ estado: 'reiniciado', manzanasIds: '', manzanasMarcadas: 0 })]);
+    expect(otro.salida().get(5)?.marcadas).toEqual(['5-5.c']);
+    expect(otro.resumenes()[0]).toMatchObject({ enteras: 1, cambios: true });
   });
 
   it('si entra otra persona en el mismo teléfono no hereda el borrador ajeno', async () => {

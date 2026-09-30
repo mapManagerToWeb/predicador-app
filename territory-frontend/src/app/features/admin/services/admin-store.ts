@@ -17,7 +17,13 @@ export class AdminStore {
 
   readonly manzanas = signal<ManzanasCollection | null>(null);
   readonly colores = signal<Record<number, string>>({});
-  readonly reportes = signal<ReporteAdmin[] | null>(null);
+  /**
+   * Todos los reportes, también los anulados por el administrador (ADR 0014):
+   * solo para el historial de la página de Reportes.
+   */
+  readonly todosLosReportes = signal<ReporteAdmin[] | null>(null);
+  /** Los que cuentan (sin anulados): estado, cobertura, S-13 e informes. */
+  readonly reportes = computed(() => this.todosLosReportes()?.filter(r => !r.anuladoEn) ?? null);
   readonly encargados = signal<EncargadoAdmin[] | null>(null);
 
   /** Cantidad de manzanas por territorio. */
@@ -48,7 +54,7 @@ export class AdminStore {
     return this.unaVez('reportes', forzar, async () => {
       const hasta = new Date(Date.now() + 60_000);
       const desde = new Date(hasta.getFullYear() - ANIOS_DE_HISTORIAL, hasta.getMonth(), hasta.getDate());
-      this.reportes.set(await this.api.reportesEntre(desde, hasta));
+      this.todosLosReportes.set(await this.api.reportesEntre(desde, hasta));
     });
   }
 
@@ -67,7 +73,7 @@ export class AdminStore {
     this.cargas.clear();
     this.manzanas.set(null);
     this.colores.set({});
-    this.reportes.set(null);
+    this.todosLosReportes.set(null);
     this.encargados.set(null);
   }
 

@@ -66,6 +66,14 @@ public class Report {
     @Column(name = "nota", columnDefinition = "TEXT")
     private String nota;
 
+    /** El administrador lo anuló (error del encargado): queda en el historial pero no cuenta. */
+    @Column(name = "anulado_en")
+    private Instant anuladoEn;
+
+    /** Id del reporte que este corrige (lo guardó el administrador en su lugar). */
+    @Column(name = "reemplaza_a")
+    private Integer reemplazaA;
+
     /** Reporte de un encargado desde el mapa. */
     public static final String ORIGEN_SALIDA = "salida";
     /** El administrador corrigió el estado actual del territorio. */
@@ -142,4 +150,10 @@ public class Report {
 
     public String getNota() { return nota; }
     public void setNota(String nota) { this.nota = nota; }
+
+    public Instant getAnuladoEn() { return anuladoEn; }
+    public void setAnuladoEn(Instant anuladoEn) { this.anuladoEn = anuladoEn; }
+
+    public Integer getReemplazaA() { return reemplazaA; }
+    public void setReemplazaA(Integer reemplazaA) { this.reemplazaA = reemplazaA; }
 }

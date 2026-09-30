@@ -31,6 +31,9 @@ class ReportServiceTest {
     @Mock
     private ReportRepository repository;
 
+    @Mock
+    private CatalogoManzanas catalogo;
+
     private ReportService reportService;
 
     private final AuthorizationService authorization = new AuthorizationService();
@@ -41,7 +44,7 @@ class ReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        reportService = new ReportService(repository, new SimpleMeterRegistry(), authorization);
+        reportService = new ReportService(repository, new SimpleMeterRegistry(), authorization, catalogo);
     }
 
     private Report createReport(Integer id, String manzanaId, String nombre, String apellido,
@@ -58,51 +61,78 @@ class ReportServiceTest {
         return report;
     }
 
+    /** saveAndFlush devuelve lo que se guardó, con id. */
+    private void guardarDevuelveLoGuardado() {
+        java.util.concurrent.atomic.AtomicInteger ids = new java.util.concurrent.atomic.AtomicInteger();
+        when(repository.saveAndFlush(any(Report.class))).thenAnswer(i -> {
+            Report r = i.getArgument(0);
+            r.setId(ids.incrementAndGet());
+            return r;
+        });
+    }
+
     @Test
     void createReports_shouldCreateAndReturnDtos() {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
-        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
-
-        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
+        guardarDevuelveLoGuardado();
 
         List<ReportDto> result = reportService.createReports(List.of(dto), admin);
 
         assertEquals(1, result.size());
         assertEquals("Daniel", result.get(0).encargadoNombre());
         assertEquals("Uribe", result.get(0).encargadoApellido());
-        assertEquals("morning", result.get(0).sessionTime());
-        assertEquals("completed", result.get(0).estado());
+        assertEquals("1-A", result.get(0).manzanasIds());
         assertEquals(1L, result.get(0).territorioNumero());
-        verify(repository, times(1)).saveAll(anyList());
+        verify(catalogo).bloquear(1L);
+        verify(repository, times(1)).saveAndFlush(any(Report.class));
     }
 
     @Test
     void createReports_shouldHandleMultipleReports() {
-        ReportDto dto1 = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
-        ReportDto dto2 = new ReportDto(null, "2-B", Instant.now(), "Maria", "Lopez", "afternoon", "incomplete", 2L);
-
-        Report saved1 = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
-        Report saved2 = createReport(2, "2-B", "Maria", "Lopez", "afternoon", "incomplete", 2L);
-
-        when(repository.saveAll(anyList())).thenReturn(List.of(saved1, saved2));
+        ReportDto dto1 = new ReportDto(null, "2-B", Instant.now(), "Maria", "Lopez", "afternoon", "incomplete", 2L);
+        ReportDto dto2 = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L);
+        guardarDevuelveLoGuardado();
 
         List<ReportDto> result = reportService.createReports(List.of(dto1, dto2), admin);
 
         assertEquals(2, result.size());
-        verify(repository, times(1)).saveAll(anyList());
+        assertEquals(2L, result.get(0).territorioNumero());
+        // Los candados siempre en el mismo orden (por número de territorio).
+        var orden = org.mockito.Mockito.inOrder(catalogo);
+        orden.verify(catalogo).bloquear(1L);
+        orden.verify(catalogo).bloquear(2L);
+        verify(repository, times(2)).saveAndFlush(any(Report.class));
     }
 
     @Test
-    void createReports_shouldUseCurrentTimeWhenFechaIsNull() {
-        ReportDto dto = new ReportDto(null, "1-A", null, "Daniel", "Uribe", "morning", "completed", 1L);
-        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
+    void createReports_usaLaFechaDelServidorYNoLaDelTelefono() {
+        Instant delTelefono = Instant.parse("2030-01-01T00:00:00Z");
+        ReportDto dto = new ReportDto(null, "1-A", delTelefono, "Daniel", "Uribe", "2030-01-01T00:00:00Z", "reiniciado", 1L);
+        guardarDevuelveLoGuardado();
 
-        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
+        ReportDto result = reportService.createReports(List.of(dto), admin).get(0);
 
-        List<ReportDto> result = reportService.createReports(List.of(dto), admin);
+        assertNotNull(result.fecha());
+        assertTrue(result.fecha().isBefore(Instant.now().plusSeconds(5)));
+        assertEquals(result.fecha().toString(), result.sessionTime());
+        assertEquals("incomplete", result.estado());
+    }
 
-        assertEquals(1, result.size());
-        assertNotNull(result.get(0).fecha());
+    @Test
+    void createReports_sumaLaSalidaAlUltimoReporte() {
+        Report ultimo = createReport(9, null, "Ana", "Pérez", "t", "incomplete", 1L);
+        ultimo.setManzanasIds("1-a");
+        when(repository.findLatestByTerritorioNumeroIn(List.of(1L))).thenReturn(List.of(ultimo));
+        when(catalogo.manzanas(1L)).thenReturn(Map.of(10L, "1-a", 11L, "1-b"));
+        guardarDevuelveLoGuardado();
+        ReportDto aporte = new ReportDto(null, "1-b", null, "Luis", "Rojas", "t", "incomplete", 1L,
+                null, 2, 1, "parcial", null, null, "1-b");
+
+        ReportDto result = reportService.createReports(List.of(aporte), admin).get(0);
+
+        assertEquals("1-a,1-b", result.manzanasIds());
+        assertEquals("completed", result.estado());
+        assertEquals(2, result.manzanasMarcadas());
     }
 
     @Test
@@ -154,27 +184,24 @@ class ReportServiceTest {
     void createReports_shouldAllowMatchingOwner() {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
                 7L, null, null, null, null, null, null);
-        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
-        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
+        guardarDevuelveLoGuardado();
 
         List<ReportDto> result = reportService.createReports(List.of(dto), encargado("7"));
 
         assertEquals(1, result.size());
-        verify(repository).saveAll(anyList());
+        verify(repository).saveAndFlush(any(Report.class));
     }
 
     @Test
     void createReports_shouldDefaultNullEncargadoIdToTokenSubjectForEncargado() {
         ReportDto dto = new ReportDto(null, "1-A", Instant.now(), "Daniel", "Uribe", "morning", "completed", 1L,
                 null, null, null, null, null, null, null);
-        Report saved = createReport(1, "1-A", "Daniel", "Uribe", "morning", "completed", 1L);
-        saved.setEncargadoId(7L);
-        when(repository.saveAll(anyList())).thenReturn(List.of(saved));
+        guardarDevuelveLoGuardado();
 
         List<ReportDto> result = reportService.createReports(List.of(dto), encargado("7"));
 
         assertEquals(1, result.size());
-        verify(repository).saveAll(anyList());
+        assertEquals(7L, result.get(0).encargadoId());
     }
 
     @Test
@@ -184,15 +211,16 @@ class ReportServiceTest {
 
         assertThrows(ForbiddenOperationException.class,
                 () -> reportService.createReports(List.of(dto), encargado("7")));
-        verify(repository, never()).saveAll(anyList());
+        verify(repository, never()).saveAndFlush(any(Report.class));
+        verify(catalogo, never()).bloquear(anyLong());
     }
 
     @Test
     void getReportsByEncargado_shouldAllowMatchingOwner() {
-        when(repository.findByEncargadoIdOrderByFechaDesc(7L, pageable)).thenReturn(Page.empty());
+        when(repository.findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(7L, pageable)).thenReturn(Page.empty());
 
         assertTrue(reportService.getReportsByEncargado(7L, pageable, encargado("7")).getContent().isEmpty());
-        verify(repository).findByEncargadoIdOrderByFechaDesc(7L, pageable);
+        verify(repository).findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(7L, pageable);
     }
 
     @Test
@@ -200,7 +228,7 @@ class ReportServiceTest {
 
         assertThrows(ForbiddenOperationException.class,
                 () -> reportService.getReportsByEncargado(8L, pageable, encargado("7")));
-        verify(repository, never()).findByEncargadoIdOrderByFechaDesc(8L, pageable);
+        verify(repository, never()).findByEncargadoIdAndAnuladoEnIsNullOrderByFechaDesc(8L, pageable);
     }
 
     @Test
@@ -222,7 +250,7 @@ class ReportServiceTest {
 
     @Test
     void getReportsByTerritorio_shouldAllowAnyAuthenticatedAndAdmin() {
-        when(repository.findByTerritorioNumeroOrderByFechaDesc(12L, pageable)).thenReturn(Page.empty());
+        when(repository.findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaDesc(12L, pageable)).thenReturn(Page.empty());
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, encargado("7")).getContent().isEmpty());
         assertTrue(reportService.getReportsByTerritorio(12L, pageable, admin).getContent().isEmpty());
 

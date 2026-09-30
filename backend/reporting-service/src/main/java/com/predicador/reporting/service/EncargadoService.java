@@ -67,8 +67,8 @@ public class EncargadoService {
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
         String telefonoLimpio = PhoneUtil.normalize(telefono);
 
-        exigirCelular(telefono);
         exigirRegistroAbierto();
+        exigirCelular(telefono);
         Optional<Encargado> encontrado = repository.findByNaturalIdentity(
                 nombreLimpio, apellidoLimpio);
 
@@ -103,8 +103,8 @@ public class EncargadoService {
     /** Alta pública (desde la app): solo con el registro abierto. */
     @Transactional(noRollbackFor = DataIntegrityViolationException.class)
     public EncargadoDto registrar(EncargadoDto dto) {
-        exigirCelular(dto.telefono());
         exigirRegistroAbierto();
+        exigirCelular(dto.telefono());
         return crear(dto);
     }
 

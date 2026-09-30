@@ -11,10 +11,14 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import type { GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
+import type { ExpressionSpecification, GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
 import type { ManzanaFeature } from '../admin.models';
 import { cambiarFondo, crearMapa, temaOscuro } from '../../../core/map/base-map';
 import { clave, type EstadoCorreccion } from '../utils/correccion';
+
+/** Lo que ya estaba antes de la salida que se corrige va en gris. */
+const GRIS_BLOQUEADO = '#9ca3af';
+const relleno = (color: string): ExpressionSpecification => ['case', ['get', 'bloqueada'], GRIS_BLOQUEADO, color];
 
 /**
  * Mapa de un territorio para corregir su estado: las manzanas marcadas enteras
@@ -44,6 +48,10 @@ export class CorreccionMap {
   readonly estado = input.required<EstadoCorreccion>();
   readonly color = input('#2563eb');
   readonly alto = input(460);
+  /** Manzanas que ya estaban marcadas antes (al corregir una salida): en gris, no se tocan. */
+  readonly bloqueadas = input<ReadonlySet<string>>(new Set());
+  /** Índices de las zonas de calles que ya estaban antes. */
+  readonly zonasBloqueadas = input<ReadonlySet<number>>(new Set());
   readonly manzanaClick = output<ManzanaFeature>();
   readonly zonaClick = output<number>();
 
@@ -76,17 +84,23 @@ export class CorreccionMap {
     effect(() => {
       const estado = this.estado();
       const manzanas = this.manzanas();
+      const zonasBloqueadas = this.zonasBloqueadas();
+      this.bloqueadas();
       if (!this.listo() || !this.map) return;
       this.dibujarManzanas(manzanas, estado);
       void (this.map.getSource('zonas') as GeoJSONSource).setData({
         type: 'FeatureCollection',
-        features: estado.zonas.map((z, i) => ({ type: 'Feature', geometry: z.geometria, properties: { indice: i } })),
+        features: estado.zonas.map((z, i) => ({
+          type: 'Feature',
+          geometry: z.geometria,
+          properties: { indice: i, bloqueada: zonasBloqueadas.has(i) },
+        })),
       });
     });
     effect(() => {
       const color = this.color();
       if (!this.listo() || !this.map) return;
-      for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', color);
+      for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', relleno(color));
       this.map.setPaintProperty('manzanas-line', 'line-color', color);
     });
   }
@@ -100,9 +114,9 @@ export class CorreccionMap {
       id: 'manzanas-fill',
       type: 'fill',
       source: 'manzanas',
-      paint: { 'fill-color': this.color(), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
+      paint: { 'fill-color': relleno(this.color()), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
     });
-    map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': this.color(), 'fill-opacity': 0.75 } });
+    map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': relleno(this.color()), 'fill-opacity': 0.75 } });
     map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': this.color(), 'line-width': 1.5 } });
     map.addLayer({
       id: 'manzanas-nombre',
@@ -116,6 +130,7 @@ export class CorreccionMap {
       const f = map.queryRenderedFeatures(e.point, { layers: ['zonas-fill', 'manzanas-fill'] })[0];
       map.getCanvas().style.cursor = f ? 'pointer' : '';
       if (!f) this.hover.set(null);
+      else if (f.properties['bloqueada']) this.hover.set('Ya estaba marcado antes: no se cambia aquí');
       else if (f.layer.id === 'zonas-fill') this.hover.set('Clic: quitar estas calles');
       else this.hover.set(`Manzana ${f.properties['nombre']}: clic para ${f.properties['marcada'] ? 'desmarcar' : 'cambiar'}`);
     });
@@ -140,7 +155,12 @@ export class CorreccionMap {
       features: manzanas.map(m => ({
         type: 'Feature',
         geometry: m.geometry,
-        properties: { clave: clave(m), nombre: m.properties.nombre, marcada: estado.marcadas.has(clave(m)) },
+        properties: {
+          clave: clave(m),
+          nombre: m.properties.nombre,
+          marcada: estado.marcadas.has(clave(m)),
+          bloqueada: this.bloqueadas().has(clave(m)),
+        },
       })),
     });
   }

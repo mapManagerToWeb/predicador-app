@@ -14,6 +14,9 @@ import type {
   ManzanaRequest,
   ManzanasCollection,
   ReporteAdmin,
+  CorreccionSalidaRequest,
+  ResultadoCorreccionSalida,
+  SalidaAdmin,
 } from '../admin.models';
 
 /**
@@ -130,6 +133,16 @@ export class AdminApi {
 
   corregir(req: CorreccionRequest): Promise<{ id: number }> {
     return this.send(this.http.post<{ id: number }>(`${this.reportes}/correccion`, req, { headers: SIN_SW }));
+  }
+
+  /** Un reporte de salida y lo que había antes en su territorio. */
+  salida(id: number): Promise<SalidaAdmin> {
+    return this.get<SalidaAdmin>(`${this.reportes}/${id}/salida`);
+  }
+
+  /** Corrige o anula el reporte de una salida (ADR 0014). */
+  corregirSalida(id: number, req: CorreccionSalidaRequest): Promise<ResultadoCorreccionSalida> {
+    return this.send(this.http.post<ResultadoCorreccionSalida>(`${this.reportes}/${id}/corregir`, req, { headers: SIN_SW }));
   }
 
   // ── Encargados y credenciales ──

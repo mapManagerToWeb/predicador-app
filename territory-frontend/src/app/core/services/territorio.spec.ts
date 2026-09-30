@@ -42,26 +42,16 @@ describe('TerritorioService', () => {
     httpMock.verify();
   });
 
-  it('does not refetch a territory already known to be empty this session', async () => {
-    service['versionsSeen'].set(99, -1);
+  it('al vencer la sesión borra la caché de reportes de versiones anteriores, no el borrador', () => {
+    localStorage.setItem('territory_reports_cache', '{"savedAt":1,"data":{}}');
+    localStorage.setItem('territory_map_draft', '{"v":2}');
 
-    const result = await service.getReportesPorTerritorio(99);
+    service.olvidarCache();
+    expect(localStorage.getItem('territory_reports_cache')).toBeNull();
+    expect(localStorage.getItem('territory_map_draft')).not.toBeNull();
 
-    httpMock.expectNone(r => r.method === 'GET' && r.url.includes('/reports?territorioNumero='));
-    expect(result).toEqual([]);
-  });
-
-  it('fetches fresh when a saved report is in cache but versionsSeen is stale (‑1)', async () => {
-    service['versionsSeen'].set(98, -1);
-    service['reportCache'].setTerritorio(98, reporte(20, 98));
-
-    const promise = service.getReportesPorTerritorio(98);
-    const req = httpMock.expectOne(r => r.method === 'GET' && r.url.includes('/reports?territorioNumero=98'));
-    req.flush([reporte(20, 98)]);
-
-    const result = await promise;
-    expect(result[0].id).toBe(20);
-    expect(service['versionsSeen'].get(98)).toBe(20);
+    service.logout();
+    expect(localStorage.getItem('territory_map_draft')).toBeNull();
   });
 
   it('crearReportes returns the saved reports with ids', async () => {

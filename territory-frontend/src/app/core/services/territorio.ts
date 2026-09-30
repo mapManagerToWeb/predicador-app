@@ -4,7 +4,6 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MUTATION_RETRY_DELAY_MS, retryTransient } from '../utils/http-retry';
 import type { Reporte, RegistroReporte, EstadoReporte, TipoSesion } from '../models/models';
-import { ReportCacheService } from './report-cache';
 import { DraftMarksService } from './map-draft';
 
 interface ReportDto {
@@ -26,16 +25,15 @@ interface ReportDto {
   inicioSesion?: string | null;
 }
 
+/** Caché de reportes de versiones anteriores de la app (se borra al cerrar sesión). */
+const CACHE_REPORTES_ANTERIOR = 'territory_reports_cache';
+
 @Injectable({ providedIn: 'root' })
 export class TerritorioService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/territories`;
   private readonly reportesUrl = `${environment.apiUrl}/reports`;
-  private readonly reportCache = inject(ReportCacheService);
   private readonly draftMarksService = inject(DraftMarksService);
-
-  /** Versions already validated this session (territorio -> id of last report). */
-  private readonly versionsSeen = new Map<number, number>();
 
   async getAllGeoJson(): Promise<string> {
     return firstValueFrom(
@@ -64,43 +62,23 @@ export class TerritorioService {
     );
   }
 
-  async getReportesPorTerritorio(territorioNumero: number): Promise<Reporte[]> {
-    const cacheado = this.reportCache.getCache().get(territorioNumero);
-    if (this.versionsSeen.get(territorioNumero) === -1 && !cacheado) return [];
-    if (cacheado && this.versionsSeen.get(territorioNumero) === cacheado.id) return [cacheado];
-
-    const dtos = await firstValueFrom(
-      this.http.get<ReportDto[]>(`${this.reportesUrl}?territorioNumero=${territorioNumero}`)
-    );
-    const reportes = (dtos ?? []).map(d => this.toReporte(d, territorioNumero));
-    const ultimo = this.elegirUltimo(reportes);
-    if (ultimo) {
-      this.reportCache.setTerritorio(territorioNumero, ultimo);
-      this.versionsSeen.set(territorioNumero, ultimo.id);
-    } else {
-      this.versionsSeen.set(territorioNumero, -1);
-    }
-    return reportes;
-  }
-
-  /** Sesión vencida: olvida los reportes cacheados, pero no lo marcado sin enviar. */
+  /**
+   * Sesión vencida. El mapa ya no guarda reportes en el teléfono (su base es
+   * el estado público, ADR 0013); se borra la caché de versiones anteriores,
+   * que tenía nombres de encargados. Lo marcado sin enviar se conserva.
+   */
   olvidarCache(): void {
-    this.reportCache.clear();
-    this.versionsSeen.clear();
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(CACHE_REPORTES_ANTERIOR);
+    } catch {
+      // Sin almacenamiento: no hay nada que borrar.
+    }
   }
 
-  /** Logout hygiene: clears report cache + marks draft. */
+  /** Cierre de sesión: también borra lo marcado sin enviar. */
   logout(): void {
     this.olvidarCache();
     this.draftMarksService.clear();
-  }
-
-  private elegirUltimo(reportes: Reporte[]): Reporte | undefined {
-    let ultimo: Reporte | undefined;
-    for (const r of reportes) {
-      if (!ultimo || (r.fecha || '') > (ultimo.fecha || '')) ultimo = r;
-    }
-    return ultimo;
   }
 
   private toReportDto(r: RegistroReporte): ReportDto {

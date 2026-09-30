@@ -1,0 +1,64 @@
+<section class="adm-card corregir-salida" aria-labelledby="corregir-salida-titulo">
+  <div class="cabecera">
+    <div>
+      <h2 id="corregir-salida-titulo">Corregir un reporte</h2>
+      @if (salida(); as s) {
+        <p class="adm-sub">{{ s.encargado || 'Sin nombre' }} · Territorio {{ s.territorio }} · {{ fmtFechaHora(s.fecha) }}</p>
+      }
+    </div>
+    <button class="adm-btn ghost" type="button" (click)="cerrar.emit(false)">Cerrar</button>
+  </div>
+
+  <p class="adm-sub">
+    Si el hermano marcó algo por error, quítalo (o agrega lo que le faltó). Lo que ya estaba marcado antes de esta salida
+    aparece en gris y no se cambia aquí. El reporte original queda anulado en el historial y se guarda uno corregido en su
+    lugar: el estado del territorio, el S-13 y el resumen se actualizan solos.
+  </p>
+
+  @if (error()) {
+    <div class="adm-alert" role="alert">{{ error() }}</div>
+  } @else if (cargando()) {
+    <p class="adm-muted">Cargando…</p>
+  } @else if (salida(); as s) {
+    <div class="grilla">
+      <app-correccion-map
+        [manzanas]="manzanas()"
+        [estado]="edicion()"
+        [color]="color()"
+        [bloqueadas]="base().marcadas"
+        [zonasBloqueadas]="zonasBloqueadas()"
+        [alto]="420"
+        (manzanaClick)="alternar($event)"
+        (zonaClick)="quitarZona($event)"
+      />
+      <div class="lado">
+        <p class="resumen">
+          Esta salida marcó <strong>{{ aporte().enteras }}</strong> manzana(s) entera(s) y
+          <strong>{{ aporte().porCalles }}</strong> por calles.
+          @if (hayCambios()) {
+            <span class="adm-muted">Antes de corregir: {{ aporteOriginal().enteras }} y {{ aporteOriginal().porCalles }}.</span>
+          }
+        </p>
+        <ul class="leyenda">
+          <li><span class="muestra" [style.background]="color()"></span> Marcado en esta salida (clic para quitar)</li>
+          <li><span class="muestra gris"></span> Ya estaba antes (no se cambia aquí)</li>
+        </ul>
+        @if (s.posteriores > 0) {
+          <p class="aviso">
+            Después de esta salida hubo {{ s.posteriores }} reporte(s) en el territorio: se recalculan para que no arrastren el error.
+          </p>
+        }
+        <label class="adm-field"><span>Motivo (queda en el historial)</span>
+          <input type="text" maxlength="500" placeholder="Ej.: la 5.b no la predicó" [value]="nota()" (input)="nota.set($any($event.target).value)" />
+        </label>
+        <div class="acciones">
+          <button class="adm-btn ghost" type="button" (click)="deshacer()" [disabled]="!hayCambios() || guardando()">Deshacer</button>
+          <button class="adm-btn danger" type="button" (click)="guardar(true)" [disabled]="guardando()">Anular el reporte entero</button>
+          <button class="adm-btn primary" type="button" (click)="guardar(false)" [disabled]="!hayCambios() || guardando()">
+            {{ guardando() ? 'Guardando…' : 'Guardar corrección' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

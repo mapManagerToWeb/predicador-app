@@ -26,6 +26,11 @@ export interface ZonaParcialDatos {
   manzanaNombre: string;
   /** Índices de {@link calcularLados}; vacío en zonas antiguas. */
   lados: number[];
+  /**
+   * Cuántas calles tiene la manzana: con él, el servidor sabe que si al sumar
+   * salidas quedan todas, la manzana pasa a entera (ADR 0013).
+   */
+  totalLados?: number;
   geometria: GeometriaManzana;
 }
 
@@ -241,6 +246,7 @@ interface ZonaGuardada {
   m: string | null;
   n: string;
   l: number[];
+  t?: number;
   g: GeometriaManzana;
 }
 
@@ -260,7 +266,13 @@ export function serializarZonas(zonas: ZonaParcialDatos[]): {
   );
   const geometria: GeometriaManzana =
     poligonos.length === 1 ? { type: 'Polygon', coordinates: poligonos[0] } : { type: 'MultiPolygon', coordinates: poligonos };
-  const guardadas: ZonaGuardada[] = zonas.map(z => ({ m: z.manzanaId, n: z.manzanaNombre, l: z.lados, g: z.geometria }));
+  const guardadas: ZonaGuardada[] = zonas.map(z => ({
+    m: z.manzanaId,
+    n: z.manzanaNombre,
+    l: z.lados,
+    ...(z.totalLados ? { t: z.totalLados } : {}),
+    g: z.geometria,
+  }));
   return { geometriaParcial: JSON.stringify(geometria), puntosParciales: JSON.stringify({ v: 2, zonas: guardadas }) };
 }
 
@@ -284,6 +296,7 @@ export function leerZonas(geometriaParcial: string | null, puntosParciales: stri
           manzanaId: typeof z.m === 'string' ? z.m : null,
           manzanaNombre: typeof z.n === 'string' ? z.n : 'Zona parcial',
           lados: Array.isArray(z.l) ? z.l.filter(i => Number.isInteger(i)) : [],
+          ...(Number.isInteger(z.t) && (z.t ?? 0) > 0 ? { totalLados: z.t } : {}),
           geometria: z.g,
         }));
     }

@@ -1,0 +1,17 @@
+:host { display: block; scroll-margin-top: 16px; }
+.corregir-salida { border: 2px solid var(--color-primary); }
+.cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.cabecera h2 { margin: 0; }
+.grilla { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; margin-top: 12px; }
+.lado { display: flex; flex-direction: column; gap: 12px; }
+.resumen { margin: 0; line-height: 1.5; }
+.resumen .adm-muted { display: block; }
+.leyenda { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--text-sm); }
+.leyenda li { display: flex; align-items: center; gap: 8px; }
+.muestra { width: 16px; height: 16px; border-radius: 4px; opacity: 0.75; flex: none; }
+.muestra.gris { background: #9ca3af; }
+.aviso { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: var(--text-sm); }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@media (max-width: 900px) {
+  .grilla { grid-template-columns: 1fr; }
+}

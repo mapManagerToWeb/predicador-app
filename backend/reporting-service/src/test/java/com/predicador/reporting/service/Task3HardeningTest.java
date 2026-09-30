@@ -48,7 +48,7 @@ class Task3HardeningTest {
         var pageable = PageRequest.of(1, 25);
         when(reportRepository.findAllByOrderByFechaDesc(pageable)).thenReturn(new PageImpl<>(List.of()));
 
-        var service = new ReportService(reportRepository, new SimpleMeterRegistry(), new AuthorizationService());
+        var service = new ReportService(reportRepository, new SimpleMeterRegistry(), new AuthorizationService(), null);
 
         assertTrue(service.getAllReports(pageable, admin).isEmpty());
         verify(reportRepository).findAllByOrderByFechaDesc(pageable);
@@ -56,7 +56,7 @@ class Task3HardeningTest {
 
     @Test
     void reportBatchRejectsOversizedInputBeforeRepositoryAccess() {
-        var service = new ReportService(reportRepository, new SimpleMeterRegistry(), new AuthorizationService());
+        var service = new ReportService(reportRepository, new SimpleMeterRegistry(), new AuthorizationService(), null);
         var territories = java.util.stream.LongStream.range(0, 101).boxed().toList();
 
         assertThrows(IllegalArgumentException.class,
@@ -77,7 +77,7 @@ class Task3HardeningTest {
 
         var service = new EncargadoService(encargadoRepository, new AuthorizationService());
 
-        assertEquals(7L, service.buscarOCrear("Daniel", "Uribe", null).orElseThrow().id());
+        assertEquals(7L, service.buscarOCrear("Daniel", "Uribe", "912345678").orElseThrow().id());
     }
 
     @Test

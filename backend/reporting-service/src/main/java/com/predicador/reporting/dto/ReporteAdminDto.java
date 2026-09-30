@@ -22,5 +22,9 @@ public record ReporteAdminDto(
         boolean tieneParcial,
         /** salida (encargado), correccion o reinicio (administrador). */
         String origen,
-        String nota
+        String nota,
+        /** El administrador lo anuló (ADR 0014): se muestra en el historial pero no cuenta. */
+        Instant anuladoEn,
+        /** Id del reporte que este corrige. */
+        Integer reemplazaA
 ) {}

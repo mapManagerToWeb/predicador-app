@@ -1,5 +1,5 @@
 import { contiene, puntoInterior } from '../../../core/map/geometria';
-import { estaEnLista, idsDeLista } from '../../../core/map/estado-publico';
+import { estaEnLista, idsDeLista, type EstadoTerritorioPublico } from '../../../core/map/estado-publico';
 import type {
   RegistroReporte,
   Reporte,
@@ -7,7 +7,7 @@ import type {
   TerritoriosEnvio,
   UserProfile,
 } from '../../../core/models/models';
-import { franjaDeLados, leerZonas, serializarZonas, type GeometriaManzana, type ZonaParcialDatos } from './lados';
+import { calcularLados, franjaDeLados, leerZonas, serializarZonas, type GeometriaManzana, type ZonaParcialDatos } from './lados';
 
 /**
  * La "salida" es lo que un encargado marca en uno o más territorios antes de
@@ -50,21 +50,22 @@ export interface TerritorioSalida {
 
 export const BASE_VACIA: BaseTerritorio = { marcadas: [], zonas: [], fecha: null, vueltaNueva: false };
 
-/** Qué quedó predicado según el último reporte del territorio. */
-export function baseDesdeReporte(ultimo: Reporte | null, manzanas: Manzana[]): BaseTerritorio {
-  // Sin reportes, o reiniciado al cerrar un ciclo desde el panel (ADR 0011): empieza vacío.
-  if (!ultimo || ultimo.estado === 'reiniciado') return BASE_VACIA;
-  const fecha = ultimo.sessionTime || ultimo.fecha || null;
-  if (ultimo.estado === 'completed') return { ...BASE_VACIA, fecha, vueltaNueva: true };
+/**
+ * Qué quedó predicado según el estado público del territorio (su último
+ * reporte, el mismo que ve el visor). Si el último reporte lo completó, la
+ * salida empieza una vuelta nueva; si lo reinició el administrador, vacía.
+ */
+export function baseDesdeEstado(e: EstadoTerritorioPublico | undefined, manzanas: Manzana[]): BaseTerritorio {
+  if (!e || e.estado === 'reiniciado') return BASE_VACIA;
+  const fecha = e.ultimoTrabajo;
+  if (e.estado === 'completed') return { ...BASE_VACIA, fecha, vueltaNueva: true };
 
-  const ids = idsDeLista(ultimo.manzanasIds);
-  if (ultimo.manzanaId) ids.add(String(ultimo.manzanaId));
+  const ids = idsDeLista(e.manzanasIds);
   const marcadas = manzanas.filter(m => estaEnLista(ids, m.id, m.mid)).map(m => m.id).sort();
   const enteras = new Set(marcadas);
-  const zonas = leerZonas(ultimo.geometriaParcial, ultimo.puntosParciales).filter(z => !z.manzanaId || !enteras.has(z.manzanaId));
+  const zonas = leerZonas(e.geometriaParcial, e.puntosParciales ?? null).filter(z => !z.manzanaId || !enteras.has(z.manzanaId));
   return { marcadas, zonas, fecha, vueltaNueva: false };
 }
-
 
 export function abrirTerritorio(numero: number, base: BaseTerritorio | null): TerritorioSalida {
   return {
@@ -151,6 +152,7 @@ export function guardarLados(
     manzanaId: manzana.id,
     manzanaNombre: manzana.nombre,
     lados: [...seleccion].sort((a, b) => a - b),
+    totalLados,
     geometria,
   };
   return { ...sinManzana, zonas: [...sinManzana.zonas, zona] };
@@ -174,6 +176,59 @@ export function hayCambios(t: TerritorioSalida): boolean {
   const base = t.base;
   if (base === null) return t.marcadas.length > 0 || t.zonas.length > 0;
   return t.marcadas.join(',') !== [...base.marcadas].sort().join(',') || claveZonas(t.zonas) !== claveZonas(base.zonas);
+}
+
+/** Lo que marcó esta salida por encima de su base (lo único que es del encargado). */
+export interface Aporte {
+  marcadas: string[];
+  /** Por manzana, solo las calles nuevas (y su franja); zonas antiguas que no estaban en la base. */
+  zonas: ZonaParcialDatos[];
+}
+
+const claveGeometria = (z: ZonaParcialDatos) => JSON.stringify(z.geometria);
+
+export function aporteDe(t: TerritorioSalida, manzanaDe: (id: string) => Manzana | undefined): Aporte {
+  const base = t.base ?? BASE_VACIA;
+  const marcadas = t.marcadas.filter(id => !base.marcadas.includes(id));
+  const antiguasBase = new Set(base.zonas.filter(z => !z.manzanaId).map(claveGeometria));
+  const zonas: ZonaParcialDatos[] = [];
+  for (const z of t.zonas) {
+    if (!z.manzanaId) {
+      if (!antiguasBase.has(claveGeometria(z))) zonas.push(z);
+      continue;
+    }
+    const antes = base.zonas.find(b => b.manzanaId === z.manzanaId)?.lados ?? [];
+    const nuevos = z.lados.filter(i => !antes.includes(i));
+    if (nuevos.length === 0) continue;
+    const m = manzanaDe(z.manzanaId);
+    const geometria = (m && franjaDeLados(m.geometria, nuevos)) ?? z.geometria;
+    const totalLados = z.totalLados ?? (m ? calcularLados(m.geometria).length : undefined);
+    zonas.push({ ...z, lados: nuevos, geometria, ...(totalLados ? { totalLados } : {}) });
+  }
+  return { marcadas, zonas };
+}
+
+/**
+ * Pone lo que marcó esta salida sobre una base más nueva (otro hermano
+ * reportó el territorio, el administrador cerró el ciclo, un borrador de
+ * días): se suman sus marcas a las de la base, sin perder ninguna.
+ */
+export function rebasar(t: TerritorioSalida, base: BaseTerritorio, manzanaDe: (id: string) => Manzana | undefined): TerritorioSalida {
+  const aporte = aporteDe(t, manzanaDe);
+  let r = abrirTerritorio(t.numero, base);
+  for (const id of aporte.marcadas) {
+    const m = manzanaDe(id);
+    if (m && !estaMarcada(r, id)) r = alternarManzana(r, m);
+  }
+  for (const z of aporte.zonas) {
+    const m = z.manzanaId ? manzanaDe(z.manzanaId) : undefined;
+    if (m) {
+      r = guardarLados(r, m, z.lados, calcularLados(m.geometria).length);
+    } else if (!z.manzanaId && !r.zonas.some(y => claveGeometria(y) === claveGeometria(z))) {
+      r = { ...r, zonas: [...r.zonas, z] };
+    }
+  }
+  return r;
 }
 
 export interface ResumenTerritorio {
@@ -239,6 +294,21 @@ export function envioDe(resumenes: ResumenTerritorio[]): TerritoriosEnvio {
     finalizado: r.completo,
     totalManzanas: r.total,
     manzanasMarcadas: r.enteras + r.porCalles,
+  }));
+  const soloUnoCompleto = territorios.length === 1 && territorios[0].finalizado;
+  return { territorios, requiereScreenshot: territorios.length > 0 && !soloUnoCompleto };
+}
+
+/**
+ * El mensaje de WhatsApp según lo que guardó el servidor (que suma la salida
+ * al estado del territorio: puede quedar completo con marcas de otro hermano).
+ */
+export function envioDeReportes(reportes: Reporte[]): TerritoriosEnvio {
+  const territorios: TerritorioReporteEnvio[] = reportes.map(r => ({
+    numero: r.territorioNumero,
+    finalizado: r.estado === 'completed',
+    totalManzanas: r.totalManzanas,
+    manzanasMarcadas: r.manzanasMarcadas,
   }));
   const soloUnoCompleto = territorios.length === 1 && territorios[0].finalizado;
   return { territorios, requiereScreenshot: territorios.length > 0 && !soloUnoCompleto };

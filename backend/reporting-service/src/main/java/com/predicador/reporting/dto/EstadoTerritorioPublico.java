@@ -8,6 +8,8 @@ import java.time.Instant;
  *
  * @param manzanasIds      manzanas marcadas en el último reporte (ids separados por coma)
  * @param geometriaParcial zonas parciales del último reporte (GeoJSON), o null
+ * @param puntosParciales  detalle de esas zonas ({@code {"v":2,"zonas":[{m,n,l,t,g}]}}:
+ *                         manzana, calles marcadas y su franja), o null
  */
 public record EstadoTerritorioPublico(
         long territorio,
@@ -17,5 +19,6 @@ public record EstadoTerritorioPublico(
         Integer manzanasMarcadas,
         Integer totalManzanas,
         String manzanasIds,
-        String geometriaParcial
+        String geometriaParcial,
+        String puntosParciales
 ) {}
