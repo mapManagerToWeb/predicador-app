@@ -22,7 +22,7 @@ class ReportPublicControllerTest {
     void estadoPublico_devuelveLosTerritoriosConCacheCorto() throws Exception {
         EstadoPublicoService service = mock(EstadoPublicoService.class);
         when(service.estados()).thenReturn(List.of(new EstadoTerritorioPublico(
-                12, Instant.parse("2026-09-10T10:00:00Z"), null, "incomplete", 2, 6, "a,b", null)));
+                12, Instant.parse("2026-09-10T10:00:00Z"), null, "incomplete", 2, 6, "a,b", null, null)));
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new ReportPublicController(service)).build();
 
         mvc.perform(get("/api/v1/reports/public/estado"))

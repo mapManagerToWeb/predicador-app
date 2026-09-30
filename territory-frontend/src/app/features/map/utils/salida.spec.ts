@@ -1,10 +1,14 @@
 import type { Polygon } from 'geojson';
 import type { Reporte, UserProfile } from '../../../core/models/models';
+import type { EstadoTerritorioPublico } from '../../../core/map/estado-publico';
 import {
   abrirTerritorio,
   alternarManzana,
-  baseDesdeReporte,
+  aporteDe,
+  baseDesdeEstado,
   envioDe,
+  envioDeReportes,
+  rebasar,
   guardarLados,
   hayCambios,
   ladosElegidos,
@@ -35,6 +39,14 @@ const B = manzana('b', -73.338, 102);
 const C = manzana('c', -73.336, 103);
 const MANZANAS = [A, B, C];
 
+/** Estado público del territorio 5 (su último reporte). */
+function estado(p: Partial<EstadoTerritorioPublico>): EstadoTerritorioPublico {
+  return {
+    territorio: 5, ultimoTrabajo: '2026-09-20T12:00:00Z', ultimoCompletado: null, estado: 'incomplete',
+    manzanasMarcadas: 0, totalManzanas: 3, manzanasIds: null, geometriaParcial: null, puntosParciales: null, ...p,
+  };
+}
+
 function reporte(p: Partial<Reporte>): Reporte {
   return {
     id: 1, manzanaId: null, fecha: '2026-09-20T12:00:00Z', encargadoId: 1, encargadoNombre: 'Ana',
@@ -44,27 +56,29 @@ function reporte(p: Partial<Reporte>): Reporte {
   };
 }
 
+const porId = (id: string) => MANZANAS.find(m => m.id === id);
+
 const perfil: UserProfile = { name: 'Ana', lastName: 'Pérez', avatar: 0, encargadoId: 7 };
 
 describe('salida', () => {
-  describe('base desde el último reporte', () => {
+  describe('base desde el estado público del territorio', () => {
     it('sin reportes parte vacía', () => {
-      expect(baseDesdeReporte(null, MANZANAS)).toEqual({ marcadas: [], zonas: [], fecha: null, vueltaNueva: false });
+      expect(baseDesdeEstado(undefined, MANZANAS)).toEqual({ marcadas: [], zonas: [], fecha: null, vueltaNueva: false });
     });
 
     it('entiende ids "T-bloque" y los numéricos de reportes viejos', () => {
-      const base = baseDesdeReporte(reporte({ manzanasIds: '5-5.a,103' }), MANZANAS);
+      const base = baseDesdeEstado(estado({ manzanasIds: '5-5.a,103' }), MANZANAS);
       expect(base.marcadas).toEqual(['5-5.a', '5-5.c']);
     });
 
     it('un territorio reiniciado al cerrar un ciclo empieza vacío', () => {
-      expect(baseDesdeReporte(reporte({ estado: 'reiniciado', manzanasIds: '' }), MANZANAS)).toEqual({
+      expect(baseDesdeEstado(estado({ estado: 'reiniciado', manzanasIds: '' }), MANZANAS)).toEqual({
         marcadas: [], zonas: [], fecha: null, vueltaNueva: false,
       });
     });
 
     it('un territorio completado empieza una vuelta nueva sin marcas', () => {
-      const base = baseDesdeReporte(reporte({ estado: 'completed', manzanasIds: '5-5.a,5-5.b,5-5.c' }), MANZANAS);
+      const base = baseDesdeEstado(estado({ estado: 'completed', manzanasIds: '5-5.a,5-5.b,5-5.c' }), MANZANAS);
       expect(base.marcadas).toEqual([]);
       expect(base.vueltaNueva).toBe(true);
     });
@@ -73,7 +87,7 @@ describe('salida', () => {
       const lados = calcularLados(B.geometria);
       const t = guardarLados(abrirTerritorio(5, null), B, [0], lados.length);
       const { geometriaParcial, puntosParciales } = serializarZonas(t.zonas);
-      const base = baseDesdeReporte(reporte({ geometriaParcial, puntosParciales }), MANZANAS);
+      const base = baseDesdeEstado(estado({ geometriaParcial, puntosParciales }), MANZANAS);
       expect(base.zonas).toHaveLength(1);
       expect(base.zonas[0]).toMatchObject({ manzanaId: '5-5.b', lados: [0] });
     });
@@ -81,7 +95,7 @@ describe('salida', () => {
 
   describe('marcar y desmarcar', () => {
     it('un toque marca y otro toque desmarca', () => {
-      const t0 = abrirTerritorio(5, baseDesdeReporte(null, MANZANAS));
+      const t0 = abrirTerritorio(5, baseDesdeEstado(undefined, MANZANAS));
       const t1 = alternarManzana(t0, A);
       expect(t1.marcadas).toEqual(['5-5.a']);
       const t2 = alternarManzana(t1, A);
@@ -116,7 +130,7 @@ describe('salida', () => {
 
   describe('cambios', () => {
     it('no hay cambios hasta que se marca algo distinto del último reporte', () => {
-      const base = baseDesdeReporte(reporte({ manzanasIds: '5-5.a' }), MANZANAS);
+      const base = baseDesdeEstado(estado({ manzanasIds: '5-5.a' }), MANZANAS);
       const t = abrirTerritorio(5, base);
       expect(hayCambios(t)).toBe(false);
       expect(hayCambios(alternarManzana(t, B))).toBe(true);
@@ -125,7 +139,7 @@ describe('salida', () => {
     });
 
     it('lo que vino en el último reporte no se puede desmarcar (lo corrige el administrador)', () => {
-      const t = abrirTerritorio(5, baseDesdeReporte(reporte({ manzanasIds: '5-5.a' }), MANZANAS));
+      const t = abrirTerritorio(5, baseDesdeEstado(estado({ manzanasIds: '5-5.a' }), MANZANAS));
       expect(enteraEnLaBase(t, A.id)).toBe(true);
       expect(alternarManzana(t, A)).toBe(t);
       expect(guardarLados(t, A, [0], 4)).toBe(t);
@@ -138,7 +152,7 @@ describe('salida', () => {
       const lados = calcularLados(B.geometria).length;
       const conZona = guardarLados(abrirTerritorio(5, null), B, [0], lados);
       const { geometriaParcial, puntosParciales } = serializarZonas(conZona.zonas);
-      const t = abrirTerritorio(5, baseDesdeReporte(reporte({ manzanasIds: '', geometriaParcial, puntosParciales }), MANZANAS));
+      const t = abrirTerritorio(5, baseDesdeEstado(estado({ manzanasIds: '', geometriaParcial, puntosParciales }), MANZANAS));
       expect(ladosDeLaBase(t, B.id, lados)).toEqual([0]);
       // Intentar dejarla sin la calle 0 la conserva; agregar la 1 suma.
       expect(guardarLados(t, B, [], lados).zonas[0].lados).toEqual([0]);
@@ -197,6 +211,86 @@ describe('salida', () => {
       const otroCompleto = { ...completo, numero: 7 };
       expect(envioDe([completo, otroCompleto]).territorios.map(t => t.numero)).toEqual([5, 7]);
       expect(envioDe([completo, otroCompleto]).requiereScreenshot).toBe(true);
+    });
+  });
+
+  describe('aporte de la salida y base más nueva (ADR 0013)', () => {
+    const ladosB = calcularLados(B.geometria).length;
+
+    it('el aporte es solo lo que marcó esta salida: manzanas nuevas y calles nuevas', () => {
+      const conB0 = guardarLados(abrirTerritorio(5, null), B, [0], ladosB);
+      const { geometriaParcial, puntosParciales } = serializarZonas(conB0.zonas);
+      const base = baseDesdeEstado(estado({ manzanasIds: '5-5.a', geometriaParcial, puntosParciales }), MANZANAS);
+      let t = abrirTerritorio(5, base);
+      t = alternarManzana(t, C);
+      t = guardarLados(t, B, [1], ladosB);
+
+      const aporte = aporteDe(t, porId);
+
+      expect(aporte.marcadas).toEqual(['5-5.c']);
+      expect(aporte.zonas).toHaveLength(1);
+      expect(aporte.zonas[0]).toMatchObject({ manzanaId: '5-5.b', lados: [1], totalLados: ladosB });
+    });
+
+    it('sin cambios no aporta nada', () => {
+      const t = abrirTerritorio(5, baseDesdeEstado(estado({ manzanasIds: '5-5.a' }), MANZANAS));
+      expect(aporteDe(t, porId)).toEqual({ marcadas: [], zonas: [] });
+    });
+
+    it('sobre una base más nueva se suman las marcas de los dos hermanos', () => {
+      // Yo marqué B con el territorio vacío; mientras tanto otro reportó A.
+      const mio = alternarManzana(abrirTerritorio(5, baseDesdeEstado(undefined, MANZANAS)), B);
+      const nueva = baseDesdeEstado(estado({ manzanasIds: '5-5.a' }), MANZANAS);
+
+      const r = rebasar(mio, nueva, porId);
+
+      expect(r.marcadas).toEqual(['5-5.a', '5-5.b']);
+      expect(r.base).toBe(nueva);
+      expect(enteraEnLaBase(r, A.id)).toBe(true);
+      expect(hayCambios(r)).toBe(true);
+    });
+
+    it('tras cerrarse el ciclo no vuelven las marcas de la vuelta anterior', () => {
+      // El borrador tenía A del ciclo anterior (base) y B nueva; el administrador reinició.
+      const viejo = alternarManzana(abrirTerritorio(5, baseDesdeEstado(estado({ manzanasIds: '5-5.a' }), MANZANAS)), B);
+      const reiniciado = baseDesdeEstado(estado({ estado: 'reiniciado', manzanasIds: '' }), MANZANAS);
+
+      expect(rebasar(viejo, reiniciado, porId).marcadas).toEqual(['5-5.b']);
+    });
+
+    it('las calles nuevas se suman a las que ya reportó otro en la misma manzana', () => {
+      const mio = guardarLados(abrirTerritorio(5, null), B, [1], ladosB);
+      const deOtro = guardarLados(abrirTerritorio(5, null), B, [0], ladosB);
+      const { geometriaParcial, puntosParciales } = serializarZonas(deOtro.zonas);
+      const nueva = baseDesdeEstado(estado({ manzanasIds: '', geometriaParcial, puntosParciales }), MANZANAS);
+
+      const r = rebasar(mio, nueva, porId);
+
+      expect(ladosElegidos(r, B.id, ladosB)).toEqual([0, 1]);
+      expect(ladosDeLaBase(r, B.id, ladosB)).toEqual([0]);
+    });
+
+    it('si ya estaba todo reportado, no queda nada nuevo', () => {
+      const mio = alternarManzana(abrirTerritorio(5, baseDesdeEstado(undefined, MANZANAS)), A);
+      const nueva = baseDesdeEstado(estado({ manzanasIds: '5-5.a' }), MANZANAS);
+      expect(hayCambios(rebasar(mio, nueva, porId))).toBe(false);
+    });
+
+    it('el total de calles viaja con la zona, para que el servidor sepa si quedó entera', () => {
+      const t = guardarLados(abrirTerritorio(5, null), B, [0], ladosB);
+      const { puntosParciales } = serializarZonas(t.zonas);
+      expect(JSON.parse(puntosParciales!).zonas[0].t).toBe(ladosB);
+      const leida = baseDesdeEstado(estado({ manzanasIds: '', puntosParciales }), MANZANAS).zonas[0];
+      expect(leida.totalLados).toBe(ladosB);
+    });
+
+    it('el WhatsApp dice cómo quedó en el servidor (completo con marcas de otro)', () => {
+      const envio = envioDeReportes([reporte({ estado: 'completed', manzanasMarcadas: 3 })]);
+      expect(envio).toEqual({
+        territorios: [{ numero: 5, finalizado: true, totalManzanas: 3, manzanasMarcadas: 3 }],
+        requiereScreenshot: false,
+      });
+      expect(envioDeReportes([reporte({}), reporte({ territorioNumero: 6 })]).requiereScreenshot).toBe(true);
     });
   });
 

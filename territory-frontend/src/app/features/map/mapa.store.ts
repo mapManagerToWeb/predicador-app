@@ -6,12 +6,10 @@ import { environment } from '../../../environments/environment';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
-import { ReportCacheService } from '../../core/services/report-cache';
 import { DraftMarksService } from '../../core/services/map-draft';
 import { estaEnLista, idsDeLista, type EstadoTerritorioPublico } from '../../core/map/estado-publico';
-import type { Reporte, RegistroReporte } from '../../core/models/models';
+import type { Reporte } from '../../core/models/models';
 import { WhatsAppService } from './services/whatsapp';
-import { elegirUltimoReporte } from './utils/report-utils';
 import { getColorForTerritorio } from './utils/territory-colors';
 import { calcularLados, leerZonas, type GeometriaManzana } from './utils/lados';
 import { comodidadDeToque } from '../../core/map/geometria';
@@ -20,13 +18,15 @@ import {
   abrirTerritorio,
   alternarManzana,
   BASE_VACIA,
-  baseDesdeReporte,
+  baseDesdeEstado,
   envioDe,
+  envioDeReportes,
   guardarLados,
   hayCambios,
   ladosElegidos,
   ladosDeLaBase,
   enteraEnLaBase,
+  rebasar,
   registroDe,
   resumir,
   turnoPorHora,
@@ -68,6 +68,8 @@ export interface ResumenAbierto extends ResumenTerritorio {
 }
 
 const CACHE_DATOS = 'mapa.datos.v1';
+/** Al abrir un territorio se vuelve a pedir el estado si el que hay tiene más que esto. */
+const EDAD_MAXIMA_ESTADO_MS = 15_000;
 const INTENTOS_CARGA = 6;
 const ESPERA_REINTENTO_MS = 3000;
 
@@ -86,7 +88,6 @@ export class MapaStore {
   private readonly perfil = inject(Profile);
   private readonly toast = inject(Toast);
   private readonly whatsapp = inject(WhatsAppService);
-  private readonly cacheReportes = inject(ReportCacheService);
   private readonly borrador = inject(DraftMarksService);
 
   private vista: VistaMapa | null = null;
@@ -94,6 +95,8 @@ export class MapaStore {
   private readonly manzanasPorTerritorio = new Map<number, Manzana[]>();
   private colores: Record<number, string> = {};
   private restaurado = false;
+  /** Último pedido del estado de los territorios (se reusa unos segundos). */
+  private refresco: { hora: number; promesa: Promise<boolean> } | null = null;
   private temporizadorBorrador: ReturnType<typeof setTimeout> | null = null;
 
   readonly cargando = signal(true);
@@ -230,9 +233,12 @@ export class MapaStore {
     this.errorCarga.set(false);
     try {
       let datos: { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] } | null = null;
+      let deLaRed = false;
       for (let intento = 1; intento <= INTENTOS_CARGA && !datos; intento++) {
         try {
           datos = await this.descargar();
+          deLaRed = true;
+          this.refresco = { hora: Date.now(), promesa: Promise.resolve(true) };
           this.guardarCopia(datos);
         } catch (e) {
           const copia = this.leerCopia();
@@ -247,7 +253,7 @@ export class MapaStore {
         }
       }
       this.procesar(datos!);
-      this.restaurarBorrador();
+      this.restaurarBorrador(deLaRed);
       return true;
     } catch {
       this.errorCarga.set(true);
@@ -312,7 +318,7 @@ export class MapaStore {
     return p?.encargadoId != null ? String(p.encargadoId) : (p?.telefono ?? null);
   }
 
-  private restaurarBorrador(): void {
+  private restaurarBorrador(estadoAlDia: boolean): void {
     let b = leerBorrador(this.borrador.cargar());
     // Lo dejó marcado otra persona (su sesión venció y entró alguien más): no se hereda.
     const dueno = this.dueno();
@@ -321,48 +327,58 @@ export class MapaStore {
       b = null;
     }
     if (b) {
-      const existentes = b.territorios.filter(t => this.manzanasPorTerritorio.has(t.numero));
+      // Lo marcado se pone sobre el estado actual de cada territorio: el
+      // borrador puede ser de días (otro hermano reportó, se cerró el ciclo).
+      // Con la copia sin red no se toca: puede ser más vieja que el borrador.
+      const existentes = b.territorios
+        .filter(t => this.manzanasPorTerritorio.has(t.numero))
+        .map(t => (estadoAlDia || !t.base ? rebasar(t, this.baseActual(t.numero), id => this.manzanasPorId.get(id)) : t));
       this.salida.set(new Map(existentes.map(t => [t.numero, t])));
       this.abiertos.set(b.abiertos.filter(n => this.manzanasPorTerritorio.has(n)));
       if (existentes.some(hayCambios)) {
         this.predicacion.set(b.predicacion);
         this.inicioSesion.set(b.inicioSesion);
       }
-      // Borradores de la versión anterior: falta saber qué tenía el último reporte.
-      for (const t of existentes) if (!t.base) void this.completarBase(t.numero);
     }
     this.restaurado = true;
   }
 
-  private async completarBase(numero: number): Promise<void> {
-    const base = await this.cargarBase(numero);
-    this.salida.update(s => {
-      const t = s.get(numero);
-      return t ? new Map(s).set(numero, { ...t, base }) : s;
-    });
+  /** Lo predicado del territorio según el último estado descargado. */
+  private baseActual(numero: number): BaseTerritorio {
+    return baseDesdeEstado(this.estados().get(numero), this.manzanasPorTerritorio.get(numero) ?? []);
   }
 
-  /** Qué dice el último reporte del territorio (con alternativas sin red). */
+  /** Qué dice el último reporte del territorio (con el estado recién pedido si se puede). */
   private async cargarBase(numero: number): Promise<BaseTerritorio> {
-    const manzanas = this.manzanasPorTerritorio.get(numero) ?? [];
-    try {
-      const reportes = await this.territorios.getReportesPorTerritorio(numero);
-      return baseDesdeReporte(elegirUltimoReporte(reportes), manzanas);
-    } catch {
-      const cacheado = this.cacheReportes.getCache().get(numero);
-      if (cacheado) return baseDesdeReporte(cacheado, manzanas);
-      const e = this.estados().get(numero);
-      if (!e?.ultimoTrabajo) return BASE_VACIA;
-      return baseDesdeReporte(
-        {
-          id: 0, manzanaId: null, fecha: e.ultimoTrabajo, encargadoId: 0, encargadoNombre: '', encargadoApellido: '',
-          sessionTime: e.ultimoTrabajo, estado: e.estado === 'completed' ? 'completed' : 'incomplete',
-          territorioNumero: numero, totalManzanas: e.totalManzanas ?? 0, manzanasMarcadas: e.manzanasMarcadas ?? 0,
-          tipoSesion: 'parcial', geometriaParcial: e.geometriaParcial, puntosParciales: null, manzanasIds: e.manzanasIds,
-        },
-        manzanas,
-      );
-    }
+    await this.refrescarEstados(EDAD_MAXIMA_ESTADO_MS);
+    return this.baseActual(numero);
+  }
+
+  /**
+   * Vuelve a pedir el estado de los territorios (el mismo del visor; 14 kB)
+   * si el que hay es más viejo que `edadMaximaMs`. Sin red se queda con el
+   * que tenía. Devuelve si quedó al día.
+   */
+  private refrescarEstados(edadMaximaMs: number): Promise<boolean> {
+    if (this.refresco && Date.now() - this.refresco.hora < edadMaximaMs) return this.refresco.promesa;
+    const promesa = firstValueFrom(
+      this.http.get<EstadoTerritorioPublico[]>(`${environment.apiUrl}/reports/public/estado`, {
+        headers: new HttpHeaders({ 'ngsw-bypass': 'true' }),
+        // Sin caché del navegador (el servidor permite 60 s): se quiere el estado de ahora.
+        params: { al: Date.now() },
+      }),
+    ).then(
+      estados => {
+        this.estados.set(new Map((estados ?? []).map(e => [e.territorio, e])));
+        return true;
+      },
+      () => {
+        this.refresco = null;
+        return false;
+      },
+    );
+    this.refresco = { hora: Date.now(), promesa };
+    return promesa;
   }
 
   // ── Territorios ──
@@ -697,10 +713,19 @@ export class MapaStore {
     let guardados: Reporte[] = [];
     let confirmado = false;
     try {
-      const envio = envioDe(resumenes);
-      const captura = envio.requiereScreenshot ? await this.vista?.capturar(envio.territorios.map(t => t.numero)) ?? null : null;
-      const registros = resumenes.map(r => registroDe(this.salida().get(r.numero)!, r.total, perfil, this.inicioSesion()));
+      await this.ponerSobreElEstadoActual(resumenes.map(r => r.numero));
+      const numeros = resumenes.map(r => r.numero);
+      const locales = this.resumenes().filter(r => numeros.includes(r.numero) && r.cambios);
+      if (locales.length === 0) {
+        this.toast.show('Otro hermano ya reportó eso mismo: no quedó nada nuevo que enviar', 4000, 'info');
+        return;
+      }
+      const captura = envioDe(locales).requiereScreenshot ? await this.vista?.capturar(numeros) ?? null : null;
+      const registros = locales.map(r => registroDe(this.salida().get(r.numero)!, r.total, perfil, this.inicioSesion()));
       guardados = await this.territorios.crearReportes(registros);
+      // El servidor suma la salida al estado del territorio (ADR 0013): el
+      // mensaje dice cómo quedó de verdad (p. ej. completo con marcas de otro).
+      const envio = envioDeReportes(guardados);
       const ahora = new Date();
       const respuesta = await this.whatsapp.sendReport({
         encargadoNombre: perfil.name,
@@ -708,7 +733,7 @@ export class MapaStore {
         fechaRegistro: `${String(ahora.getDate()).padStart(2, '0')}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${ahora.getFullYear()}`,
         predicacion: this.predicacion(),
         territorios: envio.territorios,
-        screenshotBase64: captura,
+        screenshotBase64: envio.requiereScreenshot ? captura : null,
         destinationNumber: perfil.telefono || null,
       });
       if (!respuesta.success) {
@@ -717,7 +742,7 @@ export class MapaStore {
         return;
       }
       confirmado = true;
-      this.despuesDeEnviar(registros, guardados);
+      this.despuesDeEnviar(guardados);
       this.toast.show('Reporte enviado', 4000, 'sent', 'El grupo ya fue avisado por WhatsApp');
     } catch (error) {
       if (guardados.length > 0 && !confirmado) {
@@ -744,27 +769,45 @@ export class MapaStore {
     }
   }
 
-  /** Lo enviado pasa a ser el estado del territorio y se cierra. */
-  private despuesDeEnviar(registros: RegistroReporte[], guardados: Reporte[]): void {
-    for (const r of guardados) if (r.territorioNumero) this.cacheReportes.setTerritorio(r.territorioNumero, r);
+  /**
+   * Justo antes de enviar: pide el estado de ahora y pone lo marcado encima
+   * (otro hermano pudo reportar el territorio mientras tanto). Sin red se
+   * envía igual: el servidor también suma.
+   */
+  private async ponerSobreElEstadoActual(numeros: number[]): Promise<void> {
+    if (!(await this.refrescarEstados(0))) return;
+    this.salida.update(s => {
+      const nueva = new Map(s);
+      for (const n of numeros) {
+        const t = s.get(n);
+        if (t) nueva.set(n, rebasar(t, this.baseActual(n), id => this.manzanasPorId.get(id)));
+      }
+      return nueva;
+    });
+  }
+
+  /** Lo que guardó el servidor pasa a ser el estado del territorio, y se cierra. */
+  private despuesDeEnviar(guardados: Reporte[]): void {
     this.estados.update(estados => {
       const nuevos = new Map(estados);
-      for (const r of registros) {
-        const previo = estados.get(r.territorioNumero);
+      for (const r of guardados) {
+        const completo = r.estado === 'completed';
+        const fecha = r.fecha || r.sessionTime;
         nuevos.set(r.territorioNumero, {
           territorio: r.territorioNumero,
-          ultimoTrabajo: r.sessionTime,
-          ultimoCompletado: r.estado === 'completed' ? r.sessionTime : previo?.ultimoCompletado ?? null,
+          ultimoTrabajo: fecha,
+          ultimoCompletado: completo ? fecha : estados.get(r.territorioNumero)?.ultimoCompletado ?? null,
           estado: r.estado,
           manzanasMarcadas: r.manzanasMarcadas,
           totalManzanas: r.totalManzanas,
-          manzanasIds: r.manzanasIds ?? null,
-          geometriaParcial: r.geometriaParcial ?? null,
+          manzanasIds: r.manzanasIds,
+          geometriaParcial: r.geometriaParcial,
+          puntosParciales: r.puntosParciales,
         });
       }
       return nuevos;
     });
-    for (const r of registros) this.quitar(r.territorioNumero);
+    for (const r of guardados) this.quitar(r.territorioNumero);
     this.inicioSesion.set(null);
   }
 }

@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -28,11 +29,14 @@ public class ReportService {
 
     private final ReportRepository repository;
     private final AuthorizationService authorization;
+    private final CatalogoManzanas catalogo;
     private final Timer persistenceTimer;
 
-    public ReportService(ReportRepository repository, MeterRegistry registry, AuthorizationService authorization) {
+    public ReportService(ReportRepository repository, MeterRegistry registry, AuthorizationService authorization,
+                         CatalogoManzanas catalogo) {
         this.repository = repository;
         this.authorization = authorization;
+        this.catalogo = catalogo;
         this.persistenceTimer = Timer.builder("report.persistence.duration")
                 .description("Tiempo para persistir reportes en base de datos")
                 .register(registry);
@@ -72,9 +76,14 @@ public class ReportService {
         dtos.forEach(dto -> authorization.authorizeOwner(token, dto.encargadoId()));
         long start = System.nanoTime();
         try {
-            List<Report> reports = dtos.stream().map(this::toEntity).collect(Collectors.toList());
-            List<Report> saved = repository.saveAll(reports);
-            return saved.stream().map(this::toDto).collect(Collectors.toList());
+            // Un envío por territorio a la vez, y los candados siempre en el mismo
+            // orden para que dos envíos de varios territorios no se traben.
+            dtos.stream().map(ReportDto::territorioNumero).distinct().sorted().forEach(catalogo::bloquear);
+            List<ReportDto> guardados = new ArrayList<>();
+            for (ReportDto dto : dtos) {
+                guardados.add(toDto(repository.saveAndFlush(sumarAlEstado(dto))));
+            }
+            return guardados;
         } finally {
             long elapsed = System.nanoTime() - start;
             persistenceTimer.record(elapsed, TimeUnit.NANOSECONDS);
@@ -145,6 +154,33 @@ public class ReportService {
             authorization.authorizeOwner(token, report.getEncargadoId());
         }
         repository.deleteAll(reports);
+    }
+
+    /**
+     * El reporte que se guarda es el estado del territorio con la salida
+     * sumada (ADR 0013): lo calcula el servidor, no el teléfono. La fecha
+     * también es la del servidor (un teléfono con la hora mal no desordena
+     * cuál es el último reporte).
+     */
+    private Report sumarAlEstado(ReportDto dto) {
+        long territorio = dto.territorioNumero();
+        Report ultimo = repository.findLatestByTerritorioNumeroIn(List.of(territorio)).stream().findFirst().orElse(null);
+        SumaDeSalidas.Resultado suma = SumaDeSalidas.sumar(ultimo, dto, catalogo.manzanas(territorio));
+        Instant ahora = Instant.now();
+        Report report = toEntity(dto);
+        report.setFecha(ahora);
+        report.setSessionTime(ahora.toString());
+        report.setOrigen(Report.ORIGEN_SALIDA);
+        report.setEstado(suma.completo() ? "completed" : "incomplete");
+        report.setTipoSesion(suma.completo() ? "completa" : "parcial");
+        report.setManzanasIds(suma.manzanasIds());
+        report.setManzanaId(suma.manzanaId());
+        if (suma.total() > 0) report.setTotalManzanas(suma.total());
+        report.setManzanasMarcadas(suma.manzanasMarcadas());
+        report.setGeometriaParcial(suma.geometriaParcial());
+        report.setPuntosParciales(suma.puntosParciales());
+        report.setInicioSesion(inicioSesionPlausible(dto.inicioSesion(), ahora));
+        return report;
     }
 
     private Report toEntity(ReportDto dto) {
