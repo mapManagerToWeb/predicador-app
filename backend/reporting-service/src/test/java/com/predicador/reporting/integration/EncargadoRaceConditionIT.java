@@ -81,11 +81,11 @@ class EncargadoRaceConditionIT {
 
         var future1 = executor.submit(() -> {
             startLatch.await();
-            return service.buscarOCrear("Juan", "Pérez", "+5491100000000");
+            return service.buscarOCrear("Juan", "Pérez", "+56 9 1100 0000");
         });
         var future2 = executor.submit(() -> {
             startLatch.await();
-            return service.buscarOCrear("Juan", "Pérez", "+5491100000000");
+            return service.buscarOCrear("Juan", "Pérez", "+56 9 1100 0000");
         });
 
         startLatch.countDown();

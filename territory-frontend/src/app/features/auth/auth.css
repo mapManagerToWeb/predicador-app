@@ -491,3 +491,12 @@
   flex-shrink: 0;
 }
 .auth-visor:hover { color: var(--color-primary); }
+
+/* Dato mal escrito: se explica bajo el campo, en palabras simples. */
+.field-error {
+  margin: 0;
+  padding-left: 2px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-danger);
+}

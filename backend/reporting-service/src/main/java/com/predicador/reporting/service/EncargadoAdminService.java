@@ -61,6 +61,9 @@ public class EncargadoAdminService {
     @Transactional
     public EncargadoAdminDto crear(EncargadoAdminRequest req) {
         String telefono = PhoneUtil.normalize(req.telefono());
+        if (!PhoneUtil.esCelularChileno(telefono)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PhoneUtil.MENSAJE_INVALIDO);
+        }
         exigirIdentidadLibre(req.nombre(), req.apellido(), null);
         exigirTelefonoLibre(telefono, null);
 
@@ -77,6 +80,9 @@ public class EncargadoAdminService {
     public EncargadoAdminDto actualizar(Long id, EncargadoAdminRequest req) {
         Encargado e = buscar(id);
         String telefono = PhoneUtil.normalize(req.telefono());
+        if (!PhoneUtil.esCelularChileno(telefono)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PhoneUtil.MENSAJE_INVALIDO);
+        }
         exigirIdentidadLibre(req.nombre(), req.apellido(), id);
         exigirTelefonoLibre(telefono, id);
 

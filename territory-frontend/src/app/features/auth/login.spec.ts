@@ -67,6 +67,17 @@ describe('LoginPage', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
+  it('un número mal escrito se explica bajo el campo y no se envía', async () => {
+    for (const malo of ['0000 0001', '09 1234 5678', '9123456789']) {
+      component.telefono.set(malo);
+      await component.login();
+      expect(component.errorTelefono()).toContain('9 dígitos');
+    }
+    expect(encargadoService.loginByPhone).not.toHaveBeenCalled();
+    component.onTelefonoInput({ target: { value: '9' } } as unknown as Event);
+    expect(component.errorTelefono()).toBeNull();
+  });
+
   it('logs in by phone, saves the profile and navigates to /map', async () => {
     encargadoService.loginByPhone.mockResolvedValue({
       id: 7,

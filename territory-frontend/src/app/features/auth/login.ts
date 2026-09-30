@@ -4,7 +4,7 @@ import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { codigoLogin, EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
-import { normalizePhone } from '../../core/utils/phone';
+import { esCelularChileno, MENSAJE_TELEFONO_INVALIDO, normalizePhone } from '../../core/utils/phone';
 
 @Component({
   selector: 'app-login',
@@ -25,6 +25,8 @@ export class LoginPage implements OnInit {
   /** El encargado tiene PIN asignado por el administrador: se muestra el campo. */
   pinRequerido = signal(false);
   pin = signal('');
+  /** Número mal escrito: se explica bajo el campo, sin llamar al servidor. */
+  errorTelefono = signal<string | null>(null);
 
   ngOnInit(): void {
     // Tras un refresh (SSR no conoce el rol persistido) la sesión encargado
@@ -37,6 +39,7 @@ export class LoginPage implements OnInit {
 
   onTelefonoInput(event: Event): void {
     this.telefono.set((event.target as HTMLInputElement).value);
+    this.errorTelefono.set(null);
     // Otro número: puede que no tenga PIN.
     this.pinRequerido.set(false);
     this.pin.set('');
@@ -49,6 +52,10 @@ export class LoginPage implements OnInit {
   async login(): Promise<void> {
     const tel = this.telefono().trim();
     if (!tel) return;
+    if (!esCelularChileno(tel)) {
+      this.errorTelefono.set(MENSAJE_TELEFONO_INVALIDO);
+      return;
+    }
 
     this.loading.set(true);
     try {
@@ -69,7 +76,9 @@ export class LoginPage implements OnInit {
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       const { code, detail } = codigoLogin(err);
-      if (code === 'pin_requerido') {
+      if (code === 'telefono_invalido') {
+        this.errorTelefono.set(detail ?? MENSAJE_TELEFONO_INVALIDO);
+      } else if (code === 'pin_requerido') {
         this.pinRequerido.set(true);
         this.toast.show('Ingresa tu PIN', 3000, 'info');
       } else if (code === 'pin_incorrecto') {

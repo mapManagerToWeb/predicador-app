@@ -174,6 +174,25 @@ class EncargadoPinTest {
     }
 
     @Test
+    void numerosQueNoSonCelularChileno_seRechazanConUnMensajeClaro() {
+        for (String malo : List.of("9123456789", "12345678", "812345678", "")) {
+            assertThatThrownBy(() -> service.buscarOCrear("Nuevo", "Encargado", malo))
+                    .isInstanceOfSatisfying(EncargadoLoginException.class,
+                            e -> assertThat(e.getCode()).isEqualTo(EncargadoLoginException.TELEFONO_INVALIDO));
+            assertThatThrownBy(() -> service.autenticar(malo, null))
+                    .isInstanceOfSatisfying(EncargadoLoginException.class,
+                            e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            assertThatThrownBy(() -> admin.crear(new EncargadoAdminRequest("Eva", "Rojas", malo.isEmpty() ? "1" : malo, 1, true)))
+                    .isInstanceOfSatisfying(ResponseStatusException.class,
+                            e -> assertThat(e.getReason()).contains("9 dígitos"));
+        }
+        assertThatThrownBy(() -> service.buscarOCrear("Nuevo", "Encargado", null))
+                .isInstanceOfSatisfying(EncargadoLoginException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(EncargadoLoginException.TELEFONO_INVALIDO));
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void admin_noBorraEncargadosConReportes() {
         when(reportes.countByEncargadoId(7L)).thenReturn(3L);
         assertThatThrownBy(() -> admin.eliminar(7L))

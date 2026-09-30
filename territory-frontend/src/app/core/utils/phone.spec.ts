@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePhone } from './phone';
+import { esCelularChileno, normalizePhone } from './phone';
 
 describe('normalizePhone', () => {
   it('prefixes Chilean 9-digit mobile numbers with 56', () => {
@@ -24,5 +24,19 @@ describe('normalizePhone', () => {
 
   it('returns empty string for input with no digits', () => {
     expect(normalizePhone('(abc)')).toBe('');
+  });
+});
+
+describe('esCelularChileno', () => {
+  it('acepta 9 dígitos que empiezan con 9, con o sin +56 y espacios', () => {
+    for (const ok of ['912345678', '9 1234 5678', '+56 9 1234 5678', '56912345678', '+56912345678']) {
+      expect(esCelularChileno(ok)).toBe(true);
+    }
+  });
+
+  it('rechaza otros largos, números que no empiezan con 9 y vacíos', () => {
+    for (const malo of ['9123456789', '12345678', '812345678', '09 1234 5678', '+54 9 11 1234 5678', '', null, undefined]) {
+      expect(esCelularChileno(malo)).toBe(false);
+    }
   });
 });

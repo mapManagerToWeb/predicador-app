@@ -67,6 +67,7 @@ public class EncargadoService {
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
         String telefonoLimpio = PhoneUtil.normalize(telefono);
 
+        exigirCelular(telefono);
         exigirRegistroAbierto();
         Optional<Encargado> encontrado = repository.findByNaturalIdentity(
                 nombreLimpio, apellidoLimpio);
@@ -102,6 +103,7 @@ public class EncargadoService {
     /** Alta pública (desde la app): solo con el registro abierto. */
     @Transactional(noRollbackFor = DataIntegrityViolationException.class)
     public EncargadoDto registrar(EncargadoDto dto) {
+        exigirCelular(dto.telefono());
         exigirRegistroAbierto();
         return crear(dto);
     }
@@ -145,7 +147,10 @@ public class EncargadoService {
         encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : encargado.getNombre());
         encargado.setApellido(dto.apellido() != null ? dto.apellido().trim() : encargado.getApellido());
         if (dto.avatar() != null) encargado.setAvatar(dto.avatar());
-        if (dto.telefono() != null) encargado.setTelefono(PhoneUtil.normalize(dto.telefono()));
+        if (dto.telefono() != null) {
+            exigirCelular(dto.telefono());
+            encargado.setTelefono(PhoneUtil.normalize(dto.telefono()));
+        }
         if (dto.activo() != null) encargado.setActivo(dto.activo());
         Encargado saved = repository.save(encargado);
         return toDto(saved);
@@ -171,6 +176,7 @@ public class EncargadoService {
      */
     @Transactional(noRollbackFor = EncargadoLoginException.class)
     public EncargadoDto autenticar(String telefono, String pin) {
+        exigirCelular(telefono);
         Encargado encargado = resolverPorTelefono(telefono)
                 .orElseThrow(() -> new EncargadoLoginException(HttpStatus.NOT_FOUND,
                         EncargadoLoginException.NO_ENCONTRADO,
@@ -212,10 +218,18 @@ public class EncargadoService {
         encargado.setPinBloqueadoHasta(null);
     }
 
+    /** Todos los números tienen que ser celulares chilenos (9 dígitos, empiezan con 9). */
+    private void exigirCelular(String telefono) {
+        if (!PhoneUtil.esCelularChileno(telefono)) {
+            throw new EncargadoLoginException(HttpStatus.BAD_REQUEST, EncargadoLoginException.TELEFONO_INVALIDO,
+                    PhoneUtil.MENSAJE_INVALIDO);
+        }
+    }
+
     private void exigirRegistroAbierto() {
         if (configuracion != null && !configuracion.registroAbierto()) {
             throw new EncargadoLoginException(HttpStatus.FORBIDDEN, EncargadoLoginException.REGISTRO_CERRADO,
-                    "El registro de nuevos encargados está cerrado. Pedile al administrador que te dé de alta.");
+                    "El registro de nuevos encargados está cerrado. Pídele al administrador que te dé de alta.");
         }
     }
 
