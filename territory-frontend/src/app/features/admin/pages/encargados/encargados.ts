@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Toast } from '../../../../core/services/toast';
+import { esCelularChileno, MENSAJE_TELEFONO_INVALIDO } from '../../../../core/utils/phone';
 import type { EncargadoAdmin } from '../../admin.models';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
@@ -168,6 +169,10 @@ export class EncargadosPage {
     const req = { nombre: f.nombre.trim(), apellido: f.apellido.trim(), telefono: f.telefono.trim(), activo: f.activo };
     if (!req.nombre || !req.apellido || !req.telefono) {
       this.toast.show('Nombre, apellido y teléfono son obligatorios.', 4000, 'warning');
+      return;
+    }
+    if (!esCelularChileno(req.telefono)) {
+      this.toast.show(MENSAJE_TELEFONO_INVALIDO, 5000, 'warning');
       return;
     }
     this.guardando.set(true);
@@ -342,4 +347,7 @@ export class EncargadosPage {
   protected readonly fmtFechaHora = fmtFechaHora;
   protected readonly fmtRelativo = fmtRelativo;
   protected readonly fmtTelefono = fmtTelefono;
+  /** Números guardados antes de validar el largo: con otro largo no pueden entrar. */
+  protected readonly telefonoInvalido = (e: EncargadoAdmin) => !esCelularChileno(e.telefono);
+  protected readonly mensajeTelefonoInvalido = MENSAJE_TELEFONO_INVALIDO;
 }
