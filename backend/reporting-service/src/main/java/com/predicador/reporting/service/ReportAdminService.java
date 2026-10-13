@@ -71,6 +71,6 @@ public class ReportAdminService {
                 r.getEncargadoNombre(), r.getEncargadoApellido(), r.getTerritorioNumero(), r.getEstado(),
                 r.getTipoSesion(), r.getTotalManzanas(), r.getManzanasMarcadas(), r.getManzanasIds(),
                 r.getGeometriaParcial() != null && !r.getGeometriaParcial().isBlank(), r.getOrigen(), r.getNota(),
-                r.getAnuladoEn(), r.getReemplazaA());
+                r.getAnuladoEn(), r.getReemplazaA(), r.getFechaPredicacion(), r.getTurno());
     }
 }

@@ -4,7 +4,16 @@ import type { EnvioWhatsApp, ReporteAdmin } from '../../admin.models';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import { AdminUi } from '../../services/admin-ui';
-import { completado, deduplicar, diasEntre, duplicados, nombreEncargado, registroTerritorios } from '../../utils/analytics';
+import {
+  completado,
+  deduplicar,
+  diaLocal,
+  diasEntre,
+  duplicados,
+  fechaDeTrabajo,
+  nombreEncargado,
+  registroTerritorios,
+} from '../../utils/analytics';
 import { aCsv, descargar } from '../../utils/csv';
 import { fmtFecha, fmtFechaHora, fmtNumero } from '../../utils/formato';
 import { CorregirSalida } from './corregir-salida';
@@ -64,7 +73,7 @@ export class ReportesPage {
     const desde = this.desde() ? new Date(`${this.desde()}T00:00:00`) : null;
     const hasta = this.hasta() ? new Date(`${this.hasta()}T23:59:59.999`) : null;
     return this.todos().filter(r => {
-      const f = new Date(r.fecha);
+      const f = fechaDeTrabajo(r);
       if (desde && f < desde) return false;
       if (hasta && f > hasta) return false;
       if (this.territorio() !== null && r.territorio !== this.territorio()) return false;
@@ -226,13 +235,26 @@ export class ReportesPage {
     return !r.anuladoEn && (r.origen ?? 'salida') === 'salida';
   }
 
+  /** "12-10-2026 · tarde" (día de la predicación, ADR 0018); en reportes anteriores, fecha y hora del envío. */
+  protected predicacion(r: ReporteAdmin): string {
+    if (!r.fechaPredicacion) return fmtFechaHora(r.fecha);
+    return fmtFecha(fechaDeTrabajo(r)) + (r.turno ? ` · ${r.turno}` : '');
+  }
+
+  /** El hermano informó un día distinto del que envió. */
+  protected enviadoOtroDia(r: ReporteAdmin): boolean {
+    return !!r.fechaPredicacion && r.fechaPredicacion !== diaLocal(new Date(r.fecha));
+  }
+
   // ── Exportar ──
 
   protected exportarReportes(): void {
     const csv = aCsv(
-      ['Id', 'Fecha', 'Encargado', 'Territorio', 'Estado', 'Manzanas marcadas', 'Total manzanas', 'Duración (min)', 'Manzanas'],
+      ['Id', 'Día de predicación', 'Turno', 'Enviado', 'Encargado', 'Territorio', 'Estado', 'Manzanas marcadas', 'Total manzanas', 'Duración (min)', 'Manzanas'],
       this.filtrados().map(r => [
         r.id,
+        fmtFecha(fechaDeTrabajo(r), ''),
+        r.turno ?? '',
         fmtFechaHora(r.fecha, ''),
         nombreEncargado(r),
         r.territorio,

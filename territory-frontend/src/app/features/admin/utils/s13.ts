@@ -1,5 +1,5 @@
 import type { ReporteAdmin } from '../admin.models';
-import { completado, deduplicar, esSalida } from './analytics';
+import { completado, deduplicar, diaLocal, esSalida, fechaDeTrabajo } from './analytics';
 
 /**
  * S-13 (Registro de asignación de territorio) a partir de los reportes.
@@ -69,21 +69,23 @@ export function asignaciones(reportes: ReporteAdmin[]): AsignacionS13[] {
     if (!esSalida(r)) {
       // Corrección del administrador: solo cuenta si deja el territorio completo.
       if (abierta && completado(r)) {
-        abierta.completado = new Date(r.fecha);
+        abierta.completado = fechaDeTrabajo(r);
         abierta = null;
       }
       continue;
     }
     const encargado = nombreS13(r);
     if (!abierta || abierta.encargado !== encargado) {
-      const inicio = r.inicioSesion && ms(r.inicioSesion) <= ms(r.fecha) ? r.inicioSesion : r.fecha;
-      abierta = { territorio: r.territorio, encargado, asignado: new Date(inicio), completado: null };
+      // El día de la predicación manda (ADR 0018); si es el mismo día del envío, la hora de inicio.
+      const trabajo = fechaDeTrabajo(r);
+      const inicio = r.inicioSesion && ms(r.inicioSesion) <= ms(r.fecha) ? new Date(r.inicioSesion) : new Date(r.fecha);
+      abierta = { territorio: r.territorio, encargado, asignado: diaLocal(inicio) === diaLocal(trabajo) ? inicio : trabajo, completado: null };
       if (reiniciado) abierta.trasReinicio = true;
       reiniciado = false;
       resultado.push(abierta);
     }
     if (completado(r)) {
-      abierta.completado = new Date(r.fecha);
+      abierta.completado = fechaDeTrabajo(r);
       abierta = null;
     }
   }

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * Preaching report DTO.
@@ -33,15 +34,28 @@ public record ReportDto(
         String puntosParciales,
         String manzanasIds,
         /** Primera manzana marcada de la salida; null en clientes anteriores a V6. */
-        Instant inicioSesion
+        Instant inicioSesion,
+        /** Día en que se predicó (ADR 0018); null en clientes anteriores: se usa el día del envío. */
+        LocalDate fechaPredicacion,
+        /** "mañana" o "tarde". */
+        String turno
 ) {
+    public ReportDto(Integer id, String manzanaId, Instant fecha, String encargadoNombre,
+                     String encargadoApellido, String sessionTime, String estado, Long territorioNumero,
+                     Long encargadoId, Integer totalManzanas, Integer manzanasMarcadas, String tipoSesion,
+                     String geometriaParcial, String puntosParciales, String manzanasIds, Instant inicioSesion) {
+        this(id, manzanaId, fecha, encargadoNombre, encargadoApellido, sessionTime, estado, territorioNumero,
+                encargadoId, totalManzanas, manzanasMarcadas, tipoSesion, geometriaParcial, puntosParciales,
+                manzanasIds, inicioSesion, null, null);
+    }
+
     public ReportDto(Integer id, String manzanaId, Instant fecha, String encargadoNombre,
                      String encargadoApellido, String sessionTime, String estado, Long territorioNumero,
                      Long encargadoId, Integer totalManzanas, Integer manzanasMarcadas, String tipoSesion,
                      String geometriaParcial, String puntosParciales, String manzanasIds) {
         this(id, manzanaId, fecha, encargadoNombre, encargadoApellido, sessionTime, estado, territorioNumero,
                 encargadoId, totalManzanas, manzanasMarcadas, tipoSesion, geometriaParcial, puntosParciales,
-                manzanasIds, null);
+                manzanasIds, (Instant) null);
     }
 
     public ReportDto(Integer id, String manzanaId, Instant fecha, String encargadoNombre,

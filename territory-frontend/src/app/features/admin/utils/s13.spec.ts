@@ -27,6 +27,16 @@ const T64 = [
 const dm = (d: Date | null) => (d ? `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}` : null);
 
 describe('S-13', () => {
+  it('usa el día de la predicación, no el del envío, cuando el hermano informó después (ADR 0018)', () => {
+    const a = asignaciones([
+      reporte(70, '2025-09-17', 'Juan Pérez', 'incomplete', { fechaPredicacion: '2025-09-16', turno: 'tarde' }),
+      reporte(70, '2025-09-20', 'Juan Pérez', 'completed', { fechaPredicacion: '2025-09-19', turno: 'mañana' }),
+    ]);
+    expect(a).toHaveLength(1);
+    expect(dm(a[0].asignado)).toBe('16-09');
+    expect(dm(a[0].completado)).toBe('19-09');
+  });
+
   it('arma las asignaciones como en el papel: cambia de encargado sin completar, completa y vuelve a empezar', () => {
     const a = asignaciones(T64);
     expect(a.map(x => [x.encargado, dm(x.asignado), dm(x.completado)])).toEqual([

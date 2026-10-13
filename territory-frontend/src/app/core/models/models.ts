@@ -44,6 +44,9 @@ export interface RegistroReporte {
   manzanasIds?: string | null;
   /** Primera manzana marcada de la salida (ISO-8601), para medir tiempos en el panel. */
   inicioSesion?: string | null;
+  /** Día en que se predicó, "AAAA-MM-DD" (ADR 0018): puede ser anterior al envío. */
+  fechaPredicacion?: string | null;
+  turno?: 'mañana' | 'tarde' | null;
 }
 
 export interface TerritorioReporteEnvio {

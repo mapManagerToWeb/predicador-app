@@ -259,6 +259,7 @@ export function registroDe(
   perfil: UserProfile,
   inicioSesion: string | null,
   ahora = new Date(),
+  cuando: { fechaPredicacion: string; turno: 'mañana' | 'tarde' } | null = null,
 ): RegistroReporte {
   const r = resumir(t, total);
   const { geometriaParcial, puntosParciales } = serializarZonas(t.zonas);
@@ -277,6 +278,7 @@ export function registroDe(
     puntosParciales,
     manzanasIds: t.marcadas.join(','),
     inicioSesion,
+    ...(cuando ?? {}),
   };
 }
 

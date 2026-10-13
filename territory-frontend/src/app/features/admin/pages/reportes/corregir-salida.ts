@@ -29,6 +29,7 @@ import {
   zonasDeLaBase,
   type EstadoCorreccion,
 } from '../../utils/correccion';
+import { diaLocal } from '../../utils/analytics';
 import { fmtFechaHora } from '../../utils/formato';
 
 /**
@@ -60,6 +61,12 @@ export class CorregirSalida {
   protected readonly guardando = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly nota = signal('');
+  /** Día ("AAAA-MM-DD") y turno de la predicación (ADR 0018). */
+  protected readonly dia = signal('');
+  protected readonly turno = signal('');
+  private readonly diaOriginal = signal('');
+  private readonly turnoOriginal = signal('');
+  protected readonly hoy = diaLocal(new Date());
   protected readonly base = signal<EstadoCorreccion>(vaciar());
   private readonly original = signal<EstadoCorreccion>(vaciar());
   protected readonly edicion = signal<EstadoCorreccion>(vaciar());
@@ -74,7 +81,9 @@ export class CorregirSalida {
   protected readonly zonasBloqueadas = computed(() => zonasDeLaBase(this.base(), this.edicion()));
   protected readonly aporte = computed(() => aporteDeSalida(this.base(), this.edicion()));
   protected readonly aporteOriginal = computed(() => aporteDeSalida(this.base(), this.original()));
-  protected readonly hayCambios = computed(() => !iguales(this.original(), this.edicion()));
+  protected readonly hayCambios = computed(
+    () => !iguales(this.original(), this.edicion()) || this.dia() !== this.diaOriginal() || this.turno() !== this.turnoOriginal(),
+  );
   protected readonly fmtFechaHora = fmtFechaHora;
 
   constructor() {
@@ -98,6 +107,11 @@ export class CorregirSalida {
       this.base.set(baseDeSalida(s, this.manzanas()));
       this.original.set(inicial);
       this.edicion.set(inicial);
+      const dia = s.fechaPredicacion ?? diaLocal(new Date(s.fecha));
+      this.dia.set(dia);
+      this.diaOriginal.set(dia);
+      this.turno.set(s.turno ?? '');
+      this.turnoOriginal.set(s.turno ?? '');
     } catch (e) {
       this.error.set(mensajeDeError(e, 'No se pudo abrir el reporte'));
     } finally {
@@ -115,6 +129,8 @@ export class CorregirSalida {
 
   protected deshacer(): void {
     this.edicion.set(this.original());
+    this.dia.set(this.diaOriginal());
+    this.turno.set(this.turnoOriginal());
   }
 
   protected async guardar(anular: boolean): Promise<void> {
@@ -145,7 +161,11 @@ export class CorregirSalida {
     if (!ok) return;
     this.guardando.set(true);
     try {
-      const r = await this.api.corregirSalida(s.id, pedidoSalida(this.edicion(), anular, this.nota()));
+      const r = await this.api.corregirSalida(s.id, {
+        ...pedidoSalida(this.edicion(), anular, this.nota()),
+        fechaPredicacion: anular ? null : this.dia() || null,
+        turno: anular ? null : this.turno() || null,
+      });
       await this.store.cargarReportes(true);
       const recalculados = r.recalculados ? ` Se recalcularon ${r.recalculados} reporte(s) posteriores.` : '';
       const detenido = r.detenido ? ' Después hubo una corrección o un cierre de ciclo: desde ahí el estado no se tocó.' : '';

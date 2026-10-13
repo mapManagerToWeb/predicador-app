@@ -168,10 +168,6 @@
         }
 
         <div class="enviar-fila">
-          <div class="turno" role="radiogroup" aria-label="Turno" data-tutorial="turno">
-            <button type="button" role="radio" [class.activo]="store.predicacion() === 'mañana'" [attr.aria-checked]="store.predicacion() === 'mañana'" (click)="cambiarTurno('mañana')">Mañana</button>
-            <button type="button" role="radio" [class.activo]="store.predicacion() === 'tarde'" [attr.aria-checked]="store.predicacion() === 'tarde'" (click)="cambiarTurno('tarde')">Tarde</button>
-          </div>
           <button type="button" class="boton enviar" [disabled]="!store.hayCambios() || store.enviando()" (click)="store.pedirEnvio()" data-tutorial="enviar">
             @if (store.enviando()) {
               <span class="spinner chico" aria-hidden="true"></span> Enviando…
@@ -192,6 +188,33 @@
       <h2 id="dialogo-titulo">{{ p.titulo }}</h2>
       @if (p.texto) {
         <p>{{ p.texto }}</p>
+      }
+      @if (p.cuando) {
+        <!-- Muchos informan al día siguiente: el reporte queda con el día en que se predicó. -->
+        <div class="cuando">
+          <p id="cuando-titulo" class="cuando-titulo">¿Cuándo predicaron?</p>
+          <div class="opciones" role="radiogroup" aria-labelledby="cuando-titulo">
+            @for (d of dias().slice(0, 2); track d.iso) {
+              <button type="button" role="radio" class="opcion" [class.activo]="store.diaAtras() === d.atras" [attr.aria-checked]="store.diaAtras() === d.atras" (click)="elegirDia(d.atras)">
+                <strong>{{ d.nombre }}</strong><small>{{ d.corto }}</small>
+              </button>
+            }
+            <button type="button" role="radio" class="opcion" [class.activo]="store.diaAtras() > 1" [attr.aria-checked]="store.diaAtras() > 1" [attr.aria-expanded]="otrosDias()" (click)="otrosDias.set(true)">
+              <strong>Otro día</strong><small>{{ store.diaAtras() > 1 ? dias()[store.diaAtras()].corto : 'antes' }}</small>
+            </button>
+          </div>
+          @if (otrosDias()) {
+            <div class="otros-dias" role="radiogroup" aria-label="Días anteriores">
+              @for (d of dias().slice(2); track d.iso) {
+                <button type="button" role="radio" class="opcion chica" [class.activo]="store.diaAtras() === d.atras" [attr.aria-checked]="store.diaAtras() === d.atras" (click)="elegirDia(d.atras)">{{ d.nombre }}</button>
+              }
+            </div>
+          }
+          <div class="opciones dos" role="radiogroup" aria-label="Turno" data-tutorial="turno">
+            <button type="button" role="radio" class="opcion" [class.activo]="store.predicacion() === 'mañana'" [attr.aria-checked]="store.predicacion() === 'mañana'" (click)="cambiarTurno('mañana')"><strong>Mañana</strong></button>
+            <button type="button" role="radio" class="opcion" [class.activo]="store.predicacion() === 'tarde'" [attr.aria-checked]="store.predicacion() === 'tarde'" (click)="cambiarTurno('tarde')"><strong>Tarde</strong></button>
+          </div>
+        </div>
       }
       @if (p.detalle?.length) {
         <ul>

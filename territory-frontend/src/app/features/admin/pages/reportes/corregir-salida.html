@@ -10,7 +10,7 @@
   </div>
 
   <p class="adm-sub">
-    Si el hermano marcó algo por error, quítalo (o agrega lo que le faltó). Lo que ya estaba marcado antes de esta salida
+    Si el hermano marcó algo por error, quítalo (o agrega lo que le faltó); también puedes cambiar el día y el turno. Lo que ya estaba marcado antes de esta salida
     aparece en gris y no se cambia aquí. El reporte original queda anulado en el historial y se guarda uno corregido en su
     lugar: el estado del territorio, el S-13 y el resumen se actualizan solos.
   </p>
@@ -48,6 +48,18 @@
             Después de esta salida hubo {{ s.posteriores }} reporte(s) en el territorio: se recalculan para que no arrastren el error.
           </p>
         }
+        <div class="cuando">
+          <label class="adm-field"><span>Día de la predicación</span>
+            <input type="date" [max]="hoy" [value]="dia()" (change)="dia.set($any($event.target).value)" />
+          </label>
+          <label class="adm-field"><span>Turno</span>
+            <select (change)="turno.set($any($event.target).value)">
+              <option value="" [selected]="turno() === ''">Sin indicar</option>
+              <option value="mañana" [selected]="turno() === 'mañana'">Mañana</option>
+              <option value="tarde" [selected]="turno() === 'tarde'">Tarde</option>
+            </select>
+          </label>
+        </div>
         <label class="adm-field"><span>Motivo (queda en el historial)</span>
           <input type="text" maxlength="500" placeholder="Ej.: la 5.b no la predicó" [value]="nota()" (input)="nota.set($any($event.target).value)" />
         </label>

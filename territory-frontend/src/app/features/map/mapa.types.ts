@@ -26,5 +26,7 @@ export interface Pregunta {
   no: string;
   /** El "sí" hace algo que no se puede deshacer: se pinta en rojo. */
   peligro?: boolean;
+  /** Es el envío del reporte: se elige qué día se predicó y el turno. */
+  cuando?: boolean;
   alConfirmar: () => void;
 }

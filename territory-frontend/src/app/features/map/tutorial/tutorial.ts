@@ -103,7 +103,7 @@ export const PASOS: PasoTutorial[] = [
   {
     objetivo: 'enviar',
     titulo: 'Envía el reporte',
-    texto: 'Al terminar, elige «Mañana» o «Tarde» y toca «Enviar». Antes te mostramos un resumen para que confirmes. Si cierras la app antes de enviar, lo marcado queda guardado.',
+    texto: 'Al terminar, toca «Enviar». Te preguntamos qué día predicaron (hoy, ayer u otro día) y si fue en la mañana o en la tarde, y te mostramos un resumen para que confirmes. Si cierras la app antes de enviar, lo marcado queda guardado.',
   },
   {
     objetivo: 'ubicacion',
