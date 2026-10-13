@@ -15,5 +15,14 @@ public record CorreccionSalidaRequest(
         String manzanasIds,
         String geometriaParcial,
         String puntosParciales,
-        @Size(max = 500) String nota
-) {}
+        @Size(max = 500) String nota,
+        /** Día de la predicación corregido (ADR 0018); null = se deja el que tenía. */
+        java.time.LocalDate fechaPredicacion,
+        /** "mañana" o "tarde"; null = se deja el que tenía. */
+        String turno
+) {
+    public CorreccionSalidaRequest(boolean anular, String manzanasIds, String geometriaParcial,
+                                   String puntosParciales, String nota) {
+        this(anular, manzanasIds, geometriaParcial, puntosParciales, nota, null, null);
+    }
+}

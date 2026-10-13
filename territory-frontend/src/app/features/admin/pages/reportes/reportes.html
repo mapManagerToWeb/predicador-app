@@ -77,7 +77,7 @@
           <thead>
             <tr>
               <th><input type="checkbox" [checked]="todosMarcados()" (change)="marcarPagina($event)" aria-label="Seleccionar página" /></th>
-              <th>Fecha</th><th>Encargado</th><th class="num">Territorio</th><th>Estado</th>
+              <th>Predicación</th><th>Encargado</th><th class="num">Territorio</th><th>Estado</th>
               <th class="num">Manzanas</th><th class="num">Duración</th><th aria-label="Acciones"></th>
             </tr>
           </thead>
@@ -86,7 +86,8 @@
               <tr [class.marcado]="marcados().has(r.id)" [class.anulado]="!!r.anuladoEn" [class.editando]="corrigiendo() === r.id">
                 <td><input type="checkbox" [checked]="marcados().has(r.id)" (change)="marcar(r.id, $event)" [attr.aria-label]="'Seleccionar reporte ' + r.id" /></td>
                 <td>
-                  {{ fmtFechaHora(r.fecha) }}
+                  {{ predicacion(r) }}
+                  @if (enviadoOtroDia(r)) { <small class="adm-muted enviado">enviado el {{ fmtFechaHora(r.fecha) }}</small> }
                   @if (esDuplicado(r)) { <span class="adm-badge warning">Duplicado</span> }
                 </td>
                 <td>

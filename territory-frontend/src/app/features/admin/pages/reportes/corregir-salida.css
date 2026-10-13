@@ -15,3 +15,5 @@
 @media (max-width: 900px) {
   .grilla { grid-template-columns: 1fr; }
 }
+
+.cuando { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

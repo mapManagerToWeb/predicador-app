@@ -14,3 +14,5 @@ tr.anulado td { color: var(--ink-muted); text-decoration: line-through; }
 tr.anulado td .adm-badge { text-decoration: none; }
 tr.editando td { background: var(--surface-2); }
 .acciones-fila { text-align: right; white-space: nowrap; }
+
+.enviado { display: block; font-size: var(--text-xs); }

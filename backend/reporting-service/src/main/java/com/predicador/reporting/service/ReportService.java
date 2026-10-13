@@ -174,6 +174,8 @@ public class ReportService {
         report.setOrigen(Report.ORIGEN_SALIDA);
         SumaDeSalidas.aplicar(report, suma);
         report.setInicioSesion(inicioSesionPlausible(dto.inicioSesion(), ahora));
+        report.setFechaPredicacion(DiaDePredicacion.delEncargado(dto.fechaPredicacion(), ahora));
+        report.setTurno(DiaDePredicacion.turno(dto.turno()));
         return report;
     }
 
@@ -228,7 +230,9 @@ public class ReportService {
                 report.getGeometriaParcial(),
                 report.getPuntosParciales(),
                 report.getManzanasIds(),
-                report.getInicioSesion()
+                report.getInicioSesion(),
+                report.getFechaPredicacion(),
+                report.getTurno()
         );
     }
 }

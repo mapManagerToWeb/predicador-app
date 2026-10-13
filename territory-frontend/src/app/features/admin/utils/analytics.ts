@@ -40,6 +40,25 @@ export function nombreEncargado(r: Pick<ReporteAdmin, 'encargadoNombre' | 'encar
   return `${r.encargadoNombre ?? ''} ${r.encargadoApellido ?? ''}`.trim() || 'Sin nombre';
 }
 
+/** "AAAA-MM-DD" en la hora local. */
+export function diaLocal(d: Date): string {
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
+/**
+ * Cuándo se predicó (ADR 0018). `fecha` es cuándo se envió el reporte y sigue
+ * ordenándolos; si el encargado informó un día anterior, lo que se muestra y
+ * se cuenta es ese día (a media mañana o media tarde, según el turno).
+ */
+export function fechaDeTrabajo(r: Pick<ReporteAdmin, 'fecha' | 'fechaPredicacion' | 'turno'>): Date {
+  const envio = new Date(r.fecha);
+  if (!r.fechaPredicacion || r.fechaPredicacion === diaLocal(envio)) return envio;
+  const hora = r.turno === 'mañana' ? '10' : r.turno === 'tarde' ? '16' : '12';
+  const dia = new Date(`${r.fechaPredicacion}T${hora}:00:00`);
+  return Number.isNaN(dia.getTime()) ? envio : dia;
+}
+
 function ms(fecha: string): number {
   return new Date(fecha).getTime();
 }
@@ -192,7 +211,7 @@ export function porPeriodo(
     indice.set(p.getTime(), punto);
   }
   for (const r of reportes) {
-    const punto = indice.get(inicioPeriodo(new Date(r.fecha), granularidad).getTime());
+    const punto = indice.get(inicioPeriodo(fechaDeTrabajo(r), granularidad).getTime());
     if (!punto) continue;
     punto.reportes++;
     punto.manzanas += r.manzanasMarcadas ?? 0;
@@ -217,7 +236,7 @@ export function porEncargado(reportes: ReporteAdmin[]): FilaEncargado[] {
   const filas = new Map<string, FilaEncargado & { _territorios: Set<number> }>();
   for (const r of reportes) {
     const clave = r.encargadoId != null ? `id:${r.encargadoId}` : `nombre:${nombreEncargado(r).toLowerCase()}`;
-    const fecha = new Date(r.fecha);
+    const fecha = fechaDeTrabajo(r);
     const f = filas.get(clave) ?? {
       clave,
       encargadoId: r.encargadoId,
@@ -253,7 +272,7 @@ export function porEncargado(reportes: ReporteAdmin[]): FilaEncargado[] {
 export function mapaDeCalor(reportes: ReporteAdmin[]): number[][] {
   const matriz = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
   for (const r of reportes) {
-    const d = new Date(r.fecha);
+    const d = fechaDeTrabajo(r);
     matriz[(d.getDay() + 6) % 7][d.getHours()]++;
   }
   return matriz;
@@ -308,14 +327,14 @@ export function cobertura(
       const ultimaSalida = lista.filter(esSalida).at(-1) ?? null;
       const completos = lista.filter(completado);
       const ultimoCompleto = completos.at(-1) ?? null;
-      const ultimoCompletado = ultimoCompleto ? new Date(ultimoCompleto.fecha) : null;
+      const ultimoCompletado = ultimoCompleto ? fechaDeTrabajo(ultimoCompleto) : null;
       const dias = ultimoCompletado ? diasEntre(ultimoCompletado, hoy) : null;
       const enCurso = !!ultimo && !completado(ultimo) && ultimo.origen !== 'reinicio';
       const total = ultimo?.totalManzanas ?? manzanasPorTerritorio.get(territorio) ?? 0;
       return {
         territorio,
         manzanas: manzanasPorTerritorio.get(territorio) ?? ultimo?.totalManzanas ?? 0,
-        ultimoTrabajo: ultimaSalida ? new Date(ultimaSalida.fecha) : null,
+        ultimoTrabajo: ultimaSalida ? fechaDeTrabajo(ultimaSalida) : null,
         ultimoCompletado,
         ultimoEncargado: ultimaSalida ? nombreEncargado(ultimaSalida) : null,
         diasDesdeCompletado: dias,
@@ -352,17 +371,17 @@ export function registroTerritorios(reportes: ReporteAdmin[]): Ciclo[] {
       continue;
     }
     if (!esSalida(r)) {
-      if (actual?.territorio === r.territorio && actual.fin === null && completado(r)) actual.fin = new Date(r.fecha);
+      if (actual?.territorio === r.territorio && actual.fin === null && completado(r)) actual.fin = fechaDeTrabajo(r);
       continue;
     }
     if (!actual || actual.territorio !== r.territorio || actual.fin !== null) {
-      actual = { territorio: r.territorio, inicio: new Date(r.fecha), fin: null, encargados: [], reportes: 0 };
+      actual = { territorio: r.territorio, inicio: fechaDeTrabajo(r), fin: null, encargados: [], reportes: 0 };
       ciclos.push(actual);
     }
     actual.reportes++;
     const nombre = nombreEncargado(r);
     if (!actual.encargados.includes(nombre)) actual.encargados.push(nombre);
-    if (completado(r)) actual.fin = new Date(r.fecha);
+    if (completado(r)) actual.fin = fechaDeTrabajo(r);
   }
   return ciclos;
 }

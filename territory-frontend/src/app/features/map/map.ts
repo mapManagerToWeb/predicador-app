@@ -15,6 +15,7 @@ import { limitesDeNavegacion, limitesPrincipales, etiquetasTerritorios, type Fon
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Toast } from '../../core/services/toast';
+import { diasElegibles } from './utils/dia';
 import { MapaStore } from './mapa.store';
 import { MapaVista, type EstadoUbicacion } from './mapa-vista';
 import { Tutorial } from './tutorial/tutorial';
@@ -68,6 +69,13 @@ export class MapPage {
   protected readonly fondo = signal<FondoMapa>(leer(CLAVE_FONDO) === 'true' ? 'satelite' : 'mapa');
   protected readonly oscuro = signal(leer(CLAVE_TEMA) === 'dark');
   protected readonly verTutorial = signal(false);
+  /** Días que se pueden informar (se recalculan cada vez que se abre una pregunta). */
+  protected readonly dias = computed(() => {
+    this.store.pregunta();
+    return diasElegibles();
+  });
+  /** "Otro día" abierto: muestra los días anteriores a ayer. */
+  protected readonly otrosDias = signal(false);
 
   protected readonly sugerencias = computed(() => {
     const texto = this.busqueda().trim();
@@ -81,6 +89,9 @@ export class MapPage {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    effect(() => {
+      if (!this.store.pregunta()) this.otrosDias.set(false);
+    });
     effect(() => {
       const estado = this.store.estadoVista();
       this.vista?.mostrar(estado);
@@ -193,6 +204,11 @@ export class MapPage {
 
   protected cambiarTurno(turno: 'mañana' | 'tarde'): void {
     this.store.predicacion.set(turno);
+  }
+
+  protected elegirDia(atras: number): void {
+    this.store.diaAtras.set(atras);
+    if (atras < 2) this.otrosDias.set(false);
   }
 
   protected hace(fecha: string | null): string {

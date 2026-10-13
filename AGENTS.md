@@ -8,7 +8,7 @@
 - `backend/` — Maven reactor (Java 25, Spring Boot **4.1.1**, Spring Cloud **2025.1.3**), modules `shared`, `config-server`, `discovery-server`, `api-gateway`, `territory-service`, `reporting-service`. Run all Maven commands from `backend/`.
 - `territory-frontend/` — Angular 22 zoneless SSR/PWA app. The directory is `territory-frontend/`, **not** `predicador-frontend/` (stale `.gitignore` entries still reference the old name; those paths no longer exist).
 - `docker-compose.yml` runs the 5 backend services plus `postgres` (`imresamu/postgis:18-3.6`), `rabbitmq` (`rabbitmq:4.3.4-management`) and the one-shot `db-import`. `otel-collector`/`jaeger`/`prometheus`/`grafana` are opt-in via `--profile observability`; their configs live in `observability/`.
-- Only `docs/adr/` is tracked (0001–0017). `docs/audit/`, `docs/superpowers/`, `tasks/`, `CAPABILITY-MAP.md`, `SPEC-map-*.md`, `backups/` are gitignored — local only. Record durable decisions as a new `docs/adr/NNNN-*.md`; ADR 0010 supersedes 0001 and 0002.
+- Only `docs/adr/` is tracked (0001–0018). `docs/audit/`, `docs/superpowers/`, `tasks/`, `CAPABILITY-MAP.md`, `SPEC-map-*.md`, `backups/` are gitignored — local only. Record durable decisions as a new `docs/adr/NNNN-*.md`; ADR 0010 supersedes 0001 and 0002.
 - `openspec/` is the SDD workflow (`changes/`, `changes/archive/`, `specs/`). `CHANGES.md` at the root is a plain-language PR review summary.
 
 ## Codebase Memory (Knowledge Graph)
@@ -119,10 +119,11 @@ mvn -pl territory-service test     # one module
 
 ### Migrations
 
-- Flyway runs at startup for both DB services with **separate history tables** (`flyway_schema_history_territory` / `flyway_schema_history_reporting`), `ddl-auto: none`. Territory: `V0`–`V2` in the repo; reporting: `V0`–`V8` plus `V1_1__deduplicate_encargado_identity`.
+- Flyway runs at startup for both DB services with **separate history tables** (`flyway_schema_history_territory` / `flyway_schema_history_reporting`), `ddl-auto: none`. Territory: `V0`–`V2` in the repo; reporting: `V0`–`V9` plus `V1_1__deduplicate_encargado_identity`.
 - ⚠️ **Do not add a territory migration yet.** The database has a territory `V3__add_s2_dissolved_and_meta` applied from unpushed work that is not in the repo; Flyway validation then fails on startup. Reporting migrations are unaffected — a new one there does run.
 - Never edit an applied migration; add a new one.
 - **Reports are never deleted to change a territory's state.** A territory's state is always its last report; a cycle close or an admin correction *adds* a report (ADR 0011). An admin annulment sets `anulado_en` + `reemplaza_a` (V8, ADR 0014) so history is preserved but ignored by state queries.
+- **`fecha` is when a report was sent and orders the reports; `fecha_predicacion` + `turno` (V9, ADR 0018) are the day and shift preached**, chosen in the send dialog (today, yesterday or up to 7 days back; `features/map/utils/dia.ts`, validated by `DiaDePredicacion` in Chile time). The S-13, admin panel (`fechaDeTrabajo`), public state and WhatsApp show the preaching day. Never back-date `fecha`: it would reorder the cumulative state (ADR 0013).
 
 ## Verification Checklist
 

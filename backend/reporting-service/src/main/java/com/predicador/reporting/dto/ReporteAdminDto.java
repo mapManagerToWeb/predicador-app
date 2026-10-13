@@ -26,5 +26,9 @@ public record ReporteAdminDto(
         /** El administrador lo anuló (ADR 0014): se muestra en el historial pero no cuenta. */
         Instant anuladoEn,
         /** Id del reporte que este corrige. */
-        Integer reemplazaA
+        Integer reemplazaA,
+        /** Día de la predicación (ADR 0018); null en reportes anteriores: se usa el día de {@code fecha}. */
+        java.time.LocalDate fechaPredicacion,
+        /** "mañana" o "tarde"; null en reportes anteriores. */
+        String turno
 ) {}

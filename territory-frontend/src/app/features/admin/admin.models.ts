@@ -60,6 +60,9 @@ export interface ReporteAdmin {
   anuladoEn?: string | null;
   /** Id del reporte que este corrige. */
   reemplazaA?: number | null;
+  /** Día en que se predicó, "AAAA-MM-DD" (ADR 0018); falta en reportes anteriores: es el día de `fecha`. */
+  fechaPredicacion?: string | null;
+  turno?: 'mañana' | 'tarde' | string | null;
 }
 
 /** Ciclo de territorios (GET /reports/admin/ciclos); `resumen` es JSON al cerrarse. */
@@ -157,6 +160,8 @@ export interface SalidaAdmin {
   anterior: { estado: string | null; manzanasIds: string | null; geometriaParcial: string | null; puntosParciales: string | null } | null;
   /** Reportes del territorio que vinieron después (se recalculan al corregir). */
   posteriores: number;
+  fechaPredicacion?: string | null;
+  turno?: string | null;
 }
 
 export interface CorreccionSalidaRequest {
@@ -165,6 +170,9 @@ export interface CorreccionSalidaRequest {
   geometriaParcial: string | null;
   puntosParciales: string | null;
   nota: string | null;
+  /** Día y turno corregidos; null = se dejan como estaban. */
+  fechaPredicacion?: string | null;
+  turno?: string | null;
 }
 
 export interface ResultadoCorreccionSalida {

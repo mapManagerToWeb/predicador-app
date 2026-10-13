@@ -23,6 +23,8 @@ interface ReportDto {
   puntosParciales?: string | null;
   manzanasIds?: string | null;
   inicioSesion?: string | null;
+  fechaPredicacion?: string | null;
+  turno?: string | null;
 }
 
 /** Caché de reportes de versiones anteriores de la app (se borra al cerrar sesión). */
@@ -96,7 +98,9 @@ export class TerritorioService {
       geometriaParcial: r.geometriaParcial ?? null,
       puntosParciales: r.puntosParciales ?? null,
       manzanasIds: r.manzanasIds ?? null,
-      inicioSesion: r.inicioSesion ?? null
+      inicioSesion: r.inicioSesion ?? null,
+      fechaPredicacion: r.fechaPredicacion ?? null,
+      turno: r.turno ?? null,
     };
   }
 

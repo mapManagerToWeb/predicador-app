@@ -74,6 +74,17 @@ public class Report {
     @Column(name = "reemplaza_a")
     private Integer reemplazaA;
 
+    /** Día en que se predicó (lo elige el encargado al enviar); null en reportes anteriores a V9. */
+    @Column(name = "fecha_predicacion")
+    private java.time.LocalDate fechaPredicacion;
+
+    /** {@link #TURNO_MANANA} o {@link #TURNO_TARDE}; null en reportes anteriores a V9. */
+    @Column(name = "turno", length = 10)
+    private String turno;
+
+    public static final String TURNO_MANANA = "mañana";
+    public static final String TURNO_TARDE = "tarde";
+
     /** Reporte de un encargado desde el mapa. */
     public static final String ORIGEN_SALIDA = "salida";
     /** El administrador corrigió el estado actual del territorio. */
@@ -156,4 +167,10 @@ public class Report {
 
     public Integer getReemplazaA() { return reemplazaA; }
     public void setReemplazaA(Integer reemplazaA) { this.reemplazaA = reemplazaA; }
+
+    public java.time.LocalDate getFechaPredicacion() { return fechaPredicacion; }
+    public void setFechaPredicacion(java.time.LocalDate fechaPredicacion) { this.fechaPredicacion = fechaPredicacion; }
+
+    public String getTurno() { return turno; }
+    public void setTurno(String turno) { this.turno = turno; }
 }

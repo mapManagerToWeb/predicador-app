@@ -120,6 +120,20 @@ class ReportServiceTest {
     }
 
     @Test
+    void createReports_guardaElDiaDePredicacionYElTurno_yLaFechaSigueSiendoLaDelEnvio() {
+        java.time.LocalDate ayer = java.time.LocalDate.now(java.time.ZoneId.of("America/Santiago")).minusDays(1);
+        ReportDto dto = new ReportDto(null, "1-A", null, "Daniel", "Uribe", null, "incomplete", 1L,
+                null, 2, 1, "parcial", null, null, "1-A", null, ayer, "tarde");
+        guardarDevuelveLoGuardado();
+
+        ReportDto result = reportService.createReports(List.of(dto), admin).get(0);
+
+        assertEquals(ayer, result.fechaPredicacion());
+        assertEquals("tarde", result.turno());
+        assertTrue(result.fecha().isAfter(Instant.now().minusSeconds(60)));
+    }
+
+    @Test
     void createReports_sumaLaSalidaAlUltimoReporte() {
         Report ultimo = createReport(9, null, "Ana", "Pérez", "t", "incomplete", 1L);
         ultimo.setManzanasIds("1-a");

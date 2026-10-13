@@ -35,6 +35,7 @@ import {
   type ResumenTerritorio,
   type TerritorioSalida,
 } from './utils/salida';
+import { DIAS_ATRAS, diaElegible, fechaParaMensaje } from './utils/dia';
 import type { EdicionLados, ModoMarcado, Pregunta } from './mapa.types';
 import type { EstadoVista, Toque } from './mapa-vista';
 
@@ -110,6 +111,8 @@ export class MapaStore {
   readonly modo = signal<ModoMarcado>('manzana');
   readonly edicion = signal<EdicionLados | null>(null);
   readonly predicacion = signal<'mañana' | 'tarde'>(turnoPorHora());
+  /** Qué día se predicó: 0 = hoy, 1 = ayer… Se elige al enviar (ADR 0018). */
+  readonly diaAtras = signal(0);
   readonly inicioSesion = signal<string | null>(null);
   readonly enviando = signal(false);
   readonly pregunta = signal<Pregunta | null>(null);
@@ -682,9 +685,10 @@ export class MapaStore {
       this.toast.show('No hay perfil configurado', 3000, 'error');
       return;
     }
+    this.diaAtras.set(0);
     this.pregunta.set({
       titulo: '¿Enviar el reporte?',
-      texto: `Turno de la ${this.predicacion()}. Se avisa al grupo por WhatsApp.`,
+      cuando: true,
       detalle: conCambios.map(r => {
         const calles = r.porCalles ? ` y ${r.porCalles} por calles` : '';
         return `Territorio ${r.numero}: ${r.enteras} de ${r.total} manzanas${calles}${r.completo ? ' — ¡completo!' : ''}`;
@@ -721,16 +725,19 @@ export class MapaStore {
         return;
       }
       const captura = envioDe(locales).requiereScreenshot ? await this.vista?.capturar(numeros) ?? null : null;
-      const registros = locales.map(r => registroDe(this.salida().get(r.numero)!, r.total, perfil, this.inicioSesion()));
+      const dia = diaElegible(Math.min(Math.max(this.diaAtras(), 0), DIAS_ATRAS));
+      const cuando = { fechaPredicacion: dia.iso, turno: this.predicacion() };
+      const registros = locales.map(r =>
+        registroDe(this.salida().get(r.numero)!, r.total, perfil, this.inicioSesion(), new Date(), cuando),
+      );
       guardados = await this.territorios.crearReportes(registros);
       // El servidor suma la salida al estado del territorio (ADR 0013): el
       // mensaje dice cómo quedó de verdad (p. ej. completo con marcas de otro).
       const envio = envioDeReportes(guardados);
-      const ahora = new Date();
       const respuesta = await this.whatsapp.sendReport({
         encargadoNombre: perfil.name,
         encargadoApellido: perfil.lastName,
-        fechaRegistro: `${String(ahora.getDate()).padStart(2, '0')}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${ahora.getFullYear()}`,
+        fechaRegistro: fechaParaMensaje(dia.iso),
         predicacion: this.predicacion(),
         territorios: envio.territorios,
         screenshotBase64: envio.requiereScreenshot ? captura : null,

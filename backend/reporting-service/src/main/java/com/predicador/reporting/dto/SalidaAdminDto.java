@@ -22,7 +22,10 @@ public record SalidaAdminDto(
         Integer totalManzanas,
         Instant anuladoEn,
         EstadoPrevio anterior,
-        int posteriores
+        int posteriores,
+        /** Día de la predicación (null en reportes anteriores a V9: es el día de {@code fecha}). */
+        java.time.LocalDate fechaPredicacion,
+        String turno
 ) {
     /** Lo que había en el territorio antes de la salida (vacío si empezó una vuelta nueva). */
     public record EstadoPrevio(String estado, String manzanasIds, String geometriaParcial, String puntosParciales) {}

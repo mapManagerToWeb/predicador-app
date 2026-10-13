@@ -93,6 +93,18 @@ class CorreccionDeSalidasTest {
     }
 
     @Test
+    void elReemplazoConservaElDiaYElTurno_yElAdministradorPuedeCambiarlos() {
+        r2.setFechaPredicacion(java.time.LocalDate.of(2026, 9, 19));
+        r2.setTurno("tarde");
+        servicio.corregir(2, new CorreccionSalidaRequest(false, "5-5.a,5-5.b", null, null, null,
+                java.time.LocalDate.of(2026, 9, 18), null));
+
+        Report nuevo = guardados.stream().filter(r -> Integer.valueOf(2).equals(r.getReemplazaA())).findFirst().orElseThrow();
+        assertThat(nuevo.getFechaPredicacion()).isEqualTo(java.time.LocalDate.of(2026, 9, 18));
+        assertThat(nuevo.getTurno()).isEqualTo("tarde");
+    }
+
+    @Test
     void anularUnaSalidaEntera_elTerritorioQuedaComoSiNoHubieraExistido() {
         ResultadoCorreccionSalida res = servicio.corregir(2, new CorreccionSalidaRequest(true, null, null, null, null));
 

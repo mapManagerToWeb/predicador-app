@@ -56,7 +56,8 @@ public class CorreccionDeSalidas {
                 + (salida.getEncargadoApellido() == null ? "" : salida.getEncargadoApellido())).trim();
         return new SalidaAdminDto(salida.getId(), salida.getFecha(), encargado, salida.getTerritorioNumero(),
                 salida.getOrigen(), salida.getEstado(), salida.getManzanasIds(), salida.getGeometriaParcial(),
-                salida.getPuntosParciales(), salida.getTotalManzanas(), salida.getAnuladoEn(), previo, posteriores);
+                salida.getPuntosParciales(), salida.getTotalManzanas(), salida.getAnuladoEn(), previo, posteriores,
+                salida.getFechaPredicacion(), salida.getTurno());
     }
 
     @Transactional
@@ -89,6 +90,10 @@ public class CorreccionDeSalidas {
                     null, null, territorio, salida.getEncargadoId(), salida.getTotalManzanas(), null, null,
                     req.geometriaParcial(), req.puntosParciales(), req.manzanasIds());
             Report nuevo = reemplazoDe(salida);
+            if (req.fechaPredicacion() != null) {
+                nuevo.setFechaPredicacion(DiaDePredicacion.delAdministrador(req.fechaPredicacion(), Instant.now()));
+            }
+            if (DiaDePredicacion.turno(req.turno()) != null) nuevo.setTurno(DiaDePredicacion.turno(req.turno()));
             nuevo.setNota(motivo == null ? "Corregido por el administrador" : "Corregido por el administrador: " + motivo);
             SumaDeSalidas.aplicar(nuevo, SumaDeSalidas.sumar(anterior, corregido, manzanas));
             nuevo = reportes.saveAndFlush(nuevo);
@@ -136,6 +141,8 @@ public class CorreccionDeSalidas {
         r.setFecha(salida.getFecha());
         r.setSessionTime(salida.getSessionTime());
         r.setInicioSesion(salida.getInicioSesion());
+        r.setFechaPredicacion(salida.getFechaPredicacion());
+        r.setTurno(salida.getTurno());
         r.setEncargadoId(salida.getEncargadoId());
         r.setEncargadoNombre(salida.getEncargadoNombre());
         r.setEncargadoApellido(salida.getEncargadoApellido());

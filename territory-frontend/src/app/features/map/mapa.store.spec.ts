@@ -212,6 +212,30 @@ describe('MapaStore', () => {
     await vi.waitFor(() => expect(store.estados().get(5)?.estado).toBe('completed'));
   });
 
+  it('el reporte lleva el día de la predicación y el turno elegidos al enviar (por si se informa después)', async () => {
+    await cargar(store);
+    await store.abrir(5);
+    store.tocar({ manzana: '5-5.b', cercana: null });
+    store.diaAtras.set(3);
+    store.pedirEnvio();
+    // Cada envío empieza en "Hoy": no queda pegado el día de un envío anterior.
+    expect(store.diaAtras()).toBe(0);
+    expect(store.pregunta()?.cuando).toBe(true);
+    store.diaAtras.set(1);
+    store.predicacion.set('mañana');
+    store.responder(true);
+    await responderEstado();
+    await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalled());
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    const dos = (n: number) => String(n).padStart(2, '0');
+    const iso = `${ayer.getFullYear()}-${dos(ayer.getMonth() + 1)}-${dos(ayer.getDate())}`;
+    expect(territorios.crearReportes).toHaveBeenCalledWith([expect.objectContaining({ fechaPredicacion: iso, turno: 'mañana' })]);
+    expect(whatsapp.sendReport).toHaveBeenCalledWith(
+      expect.objectContaining({ fechaRegistro: `${dos(ayer.getDate())}-${dos(ayer.getMonth() + 1)}-${ayer.getFullYear()}`, predicacion: 'mañana' }),
+    );
+  });
+
   it('sin cambios no hay nada que enviar', async () => {
     const toast = TestBed.inject(Toast);
     const aviso = vi.spyOn(toast, 'show');
