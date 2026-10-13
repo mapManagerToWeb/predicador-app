@@ -4,6 +4,7 @@ import com.predicador.reporting.dto.WhatsAppDeliveryDto;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.model.WhatsAppDeliveryStatus;
 import com.predicador.reporting.service.WhatsAppSendService;
+import com.predicador.reporting.service.DestinoWhatsApp;
 import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.RequestTokens;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,11 +18,14 @@ public class WhatsAppController {
 
     private final WhatsAppSendService whatsAppSendService;
     private final AuthorizationService authorization;
+    private final DestinoWhatsApp destino;
 
     public WhatsAppController(WhatsAppSendService whatsAppSendService,
-                              AuthorizationService authorization) {
+                              AuthorizationService authorization,
+                              DestinoWhatsApp destino) {
         this.whatsAppSendService = whatsAppSendService;
         this.authorization = authorization;
+        this.destino = destino;
     }
 
     @PostMapping("/send")
@@ -29,8 +33,10 @@ public class WhatsAppController {
             @Valid @RequestBody WhatsAppSendRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest httpRequest) {
-        authorization.requireAuthenticated(RequestTokens.token(httpRequest));
-        WhatsAppDeliveryDto delivery = whatsAppSendService.submit(request, idempotencyKey);
+        var token = RequestTokens.token(httpRequest);
+        authorization.requireAuthenticated(token);
+        // Le llega al encargado que envía (su teléfono registrado), no al que diga la app.
+        WhatsAppDeliveryDto delivery = whatsAppSendService.submit(request, idempotencyKey, destino.para(token));
         if (WhatsAppDeliveryStatus.IN_PROGRESS.name().equals(delivery.status())) {
             return ResponseEntity.accepted().body(delivery);
         }
