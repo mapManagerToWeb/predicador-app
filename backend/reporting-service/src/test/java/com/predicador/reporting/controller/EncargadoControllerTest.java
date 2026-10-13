@@ -119,6 +119,15 @@ class EncargadoControllerTest {
     }
 
     @Test
+    void registro_esPublicoYDiceSiSePuedeCrearCuenta() throws Exception {
+        when(encargadoService.registroAbierto()).thenReturn(false);
+
+        mockMvc.perform(get("/api/v1/encargados/registro"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.abierto").value(false));
+    }
+
+    @Test
     void buscarOCrear_shouldReturn200_conCookieCuandoConfigurado() throws Exception {
         EncargadoDto dto = createDto(1L, "Daniel", "Uribe");
 

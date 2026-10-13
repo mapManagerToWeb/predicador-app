@@ -1,4 +1,4 @@
-import type { FitBoundsOptions, LngLatBoundsLike, LngLatLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, FitBoundsOptions, LngLatBoundsLike, LngLatLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { puntoDeRotulo, type Poligonal } from './geometria';
 
@@ -9,6 +9,12 @@ export type FondoMapa = 'mapa' | 'satelite';
 export type MapLibre = typeof import('maplibre-gl');
 
 export const ZOOM_MAXIMO = 20;
+
+/**
+ * Tamaño de los números de territorio en los mapas (encargados y visor):
+ * grandes para quien tiene poca vista, y más al acercarse.
+ */
+export const TAMANO_NUMERO_TERRITORIO: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 12, 15, 15, 18, 18, 21];
 
 /** Encuadre inicial si todavía no hay manzanas cargadas (Curanilahue). */
 const ENCUADRE_INICIAL: LngLatBoundsLike = [

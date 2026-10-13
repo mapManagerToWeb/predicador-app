@@ -9,7 +9,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 describe('LoginPage', () => {
   let fixture: ComponentFixture<LoginPage>;
   let component: LoginPage;
-  let encargadoService: { loginByPhone: ReturnType<typeof vi.fn> };
+  let encargadoService: { loginByPhone: ReturnType<typeof vi.fn>; registroAbierto: ReturnType<typeof vi.fn> };
   let profile: { save: ReturnType<typeof vi.fn>; hasProfile: ReturnType<typeof vi.fn> };
   let toast: { show: ReturnType<typeof vi.fn> };
   let router: {
@@ -21,7 +21,7 @@ describe('LoginPage', () => {
 
   beforeEach(async () => {
     localStorage.clear();
-    encargadoService = { loginByPhone: vi.fn() };
+    encargadoService = { loginByPhone: vi.fn(), registroAbierto: vi.fn().mockResolvedValue(true) };
     profile = { save: vi.fn(), hasProfile: vi.fn().mockReturnValue(false) };
     toast = { show: vi.fn() };
     router = {
@@ -56,6 +56,19 @@ describe('LoginPage', () => {
     component.ngOnInit();
 
     expect(router.navigate).toHaveBeenCalledWith(['/map']);
+  });
+
+  it('con el registro cerrado no ofrece «Crear perfil»; abierto, sí', async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    await component.cargarRegistro();
+    fixture.detectChanges();
+    expect(el.querySelector('.auth-footer a')?.textContent).toContain('Crear perfil');
+
+    encargadoService.registroAbierto.mockResolvedValue(false);
+    await component.cargarRegistro();
+    fixture.detectChanges();
+    expect(el.querySelector('.auth-footer a')).toBeNull();
+    expect(el.querySelector('.auth-footer')?.textContent).toContain('administrador');
   });
 
   it('does nothing when the phone is empty', async () => {
@@ -109,7 +122,7 @@ describe('LoginPage', () => {
 
     await component.login();
 
-    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no está registrado'), 4000, 'warning');
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no está registrado'), 5000, 'warning');
     expect(router.navigate).not.toHaveBeenCalled();
   });
 

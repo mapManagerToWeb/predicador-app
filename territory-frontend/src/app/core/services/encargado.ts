@@ -30,6 +30,22 @@ export class EncargadoService {
   private authToken = inject(AuthTokenService);
   private apiUrl = `${environment.apiUrl}/encargados`;
 
+  /**
+   * ¿Se puede crear una cuenta desde la app? Lo decide el administrador en el
+   * panel. Si no se puede saber (sin red), se asume que sí: el servidor igual
+   * rechaza el alta cuando está cerrado.
+   */
+  async registroAbierto(): Promise<boolean> {
+    try {
+      const r = await firstValueFrom(
+        this.http.get<{ abierto: boolean }>(`${this.apiUrl}/registro`, { headers: { 'ngsw-bypass': 'true' } }),
+      );
+      return r?.abierto !== false;
+    } catch {
+      return true;
+    }
+  }
+
   async buscarOCrear(
     nombre: string,
     apellido: string,

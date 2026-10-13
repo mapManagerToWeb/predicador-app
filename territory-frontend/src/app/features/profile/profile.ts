@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { afterNextRender, Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Profile } from '../../core/services/profile';
@@ -39,6 +39,17 @@ export class ProfilePage implements OnInit {
     { id: 6, emoji: '👱', color: '#f97316' },
     { id: 7, emoji: '👲', color: '#6366f1' },
   ];
+
+  constructor() {
+    afterNextRender(() => void this.salirSiElRegistroEstaCerrado());
+  }
+
+  /** Con el registro cerrado esta pantalla no tiene sentido (p. ej. un enlace guardado): vuelve al login. */
+  async salirSiElRegistroEstaCerrado(): Promise<void> {
+    if (await this.encargadoService.registroAbierto()) return;
+    this.toast.show('El registro de cuentas está cerrado. Pídele al administrador que te registre.', 6000, 'warning');
+    void this.router.navigate(['/login']);
+  }
 
   ngOnInit(): void {
     // Solo con sesión: un perfil guardado sin sesión (p. ej. vencida) no debe
