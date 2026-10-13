@@ -745,16 +745,16 @@ export class MapaStore {
       });
       if (!respuesta.success) {
         await this.revertir(guardados);
-        this.toast.show('No se pudo avisar por WhatsApp: el reporte no se guardó. Tus marcas siguen acá.', 5000, 'error');
+        this.toast.show('No se pudo enviar el WhatsApp: el reporte no se guardó. Tus marcas siguen acá.', 5000, 'error');
         return;
       }
       confirmado = true;
       this.despuesDeEnviar(guardados);
-      this.toast.show('Reporte enviado', 4000, 'sent', 'El grupo ya fue avisado por WhatsApp');
+      this.toast.show('Reporte enviado', 4000, 'sent', 'Te lo enviamos por WhatsApp');
     } catch (error) {
       if (guardados.length > 0 && !confirmado) {
         await this.revertir(guardados);
-        this.toast.show('No se pudo avisar por WhatsApp: el reporte no se guardó. Tus marcas siguen acá.', 5000, 'error');
+        this.toast.show('No se pudo enviar el WhatsApp: el reporte no se guardó. Tus marcas siguen acá.', 5000, 'error');
       } else if (!confirmado) {
         const caido = error instanceof HttpErrorResponse && (error.status === 0 || error.status >= 500);
         this.toast.show(

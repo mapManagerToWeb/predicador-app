@@ -115,7 +115,7 @@ mvn -pl territory-service test     # one module
 - Start order matters: `config-server` (8888) → `discovery-server` (8761) → `api-gateway` (8080) → `territory-service` (8081) / `reporting-service` (8082). Management ports 8090/8091/8092. Frontend: `ng serve` on 4200, proxying `/api` → 8080.
 - `config-server` serves from its classpath (`native` profile, the compose default). Pointing `SPRING_PROFILES_ACTIVE` elsewhere makes it try a git repo with no URI.
 - Copy `.env.example` → `.env` before compose (it fails fast on `:?` interpolation). Both `.env` and `application-local.yml` are gitignored and must never be committed.
-- WhatsApp (reporting, Meta Graph **v21.0**) is disabled unless `WHATSAPP_PHONE_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_TEMPLATE` (default `asignacion_territorio`) and `WHATSAPP_DESTINATION` are set.
+- WhatsApp (reporting, Meta Graph **v21.0**) is disabled unless `WHATSAPP_PHONE_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_TEMPLATE` (default `asignacion_territorio`) and `WHATSAPP_DESTINATION` are set. **The report's WhatsApp goes to the logged-in encargado's registered phone** (`DestinoWhatsApp`: looked up in the DB from the session, never the client's `destinationNumber`, which stays ignored — ADR 0016); `WHATSAPP_DESTINATION` is only the fallback (admin session or no valid phone).
 
 ### Migrations
 

@@ -59,6 +59,11 @@ public class WhatsAppSendService {
      * clave, devuelve su resultado en lugar de reenviar.
      */
     public WhatsAppDeliveryDto submit(WhatsAppSendRequest request, String idempotencyKey) {
+        return submit(request, idempotencyKey, null);
+    }
+
+    /** @param destination a quién va (lo resuelve el servidor); null = el número configurado. */
+    public WhatsAppDeliveryDto submit(WhatsAppSendRequest request, String idempotencyKey, String destination) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new WhatsAppIntegrationException(
                     "Se requiere Idempotency-Key para el envío asíncrono", 400, null);
@@ -67,7 +72,7 @@ public class WhatsAppSendService {
         if (existing.isPresent()) {
             return toDto(existing.get());
         }
-        executor.execute(() -> process(request, idempotencyKey));
+        executor.execute(() -> process(request, idempotencyKey, destination));
         return new WhatsAppDeliveryDto(idempotencyKey, WhatsAppDeliveryStatus.IN_PROGRESS.name(), null, null);
     }
 
@@ -82,8 +87,13 @@ public class WhatsAppSendService {
 
     /** Trabajo en segundo plano: delega en el servicio que persiste el resultado. */
     void process(WhatsAppSendRequest request, String idempotencyKey) {
+        process(request, idempotencyKey, null);
+    }
+
+    void process(WhatsAppSendRequest request, String idempotencyKey, String destination) {
         try {
-            sendService.sendReport(request, idempotencyKey);
+            if (destination == null || destination.isBlank()) sendService.sendReport(request, idempotencyKey);
+            else sendService.sendReport(request, idempotencyKey, destination);
         } catch (WhatsAppIntegrationException exception) {
             log.debug("Envío WhatsApp finalizado con error key={} status={} cause={}",
                     idempotencyKey, exception.status(),

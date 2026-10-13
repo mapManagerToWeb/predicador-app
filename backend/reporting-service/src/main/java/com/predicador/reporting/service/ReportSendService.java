@@ -78,6 +78,14 @@ public class ReportSendService {
     }
 
     public WhatsAppSendResponse sendReport(WhatsAppSendRequest request, String idempotencyKey) {
+        return sendReport(request, idempotencyKey, props.destinationNumber());
+    }
+
+    /**
+     * @param destination número al que va el mensaje, resuelto por el servidor
+     *                    ({@link DestinoWhatsApp}); nunca el que manda el cliente.
+     */
+    public WhatsAppSendResponse sendReport(WhatsAppSendRequest request, String idempotencyKey, String destination) {
         Reservation reservation = reserve(idempotencyKey);
         if (reservation.replay() != null) return reservation.replay();
         WhatsAppDelivery delivery = reservation.delivery();
@@ -131,13 +139,9 @@ public class ReportSendService {
 
             components.add(Map.of("type", "body", PARAMETERS, bodyParams));
 
-            // El destino es SIEMPRE el configurado (WHATSAPP_DESTINATION). El
-            // campo `destinationNumber` del request lo manda el cliente, y
-            // cualquier usuario registrado podría usarlo para mandar desde la
-            // cuenta de Meta de la congregación a cualquier número del mundo;
-            // por eso se ignora por completo (ADR 0016).
-            String destination = props.destinationNumber();
-
+            // El destino lo resuelve el servidor (DestinoWhatsApp: el teléfono
+            // registrado del encargado con sesión). El `destinationNumber` del
+            // request lo manda el cliente y se ignora por completo (ADR 0016).
             WhatsAppMessageResponse response = messageClient.sendTemplateMessage(
                     destination, props.templateName(), props.languageCode(), components);
 

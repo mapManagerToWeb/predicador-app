@@ -188,6 +188,28 @@ class ReportSendServiceTest {
         verify(messageClient).sendTemplateMessage(eq("56999999999"), anyString(), anyString(), anyList());
     }
 
+    /** El servidor resuelve el destino (el teléfono registrado del encargado con sesión): va a ese. */
+    @Test
+    void sendReport_vaAlDestinoQueResolvioElServidor_noAlDelCliente() {
+        var request = new WhatsAppSendRequest(
+            "Daniel", "Uribe", "21-07-2026", "tarde",
+            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
+            null, "+15551234567"
+        );
+        when(messageService.generarParametrosTemplate(request)).thenReturn(Map.of(
+            "fecha", "21-07-2026", "encargado", "Daniel Uribe", "territorio", "1", "estado", "tarde"));
+        when(props.templateName()).thenReturn("asignacion_territorio");
+        when(props.languageCode()).thenReturn("es_CL");
+        when(props.defaultImageUrl()).thenReturn("https://example.com/image.png");
+        when(messageClient.sendTemplateMessage(anyString(), anyString(), anyString(), anyList()))
+            .thenReturn(new WhatsAppMessageResponse(null, "msg_1"));
+
+        WhatsAppSendResponse response = sendService.sendReport(request, null, "56912345678");
+
+        assertTrue(response.success());
+        verify(messageClient).sendTemplateMessage(eq("56912345678"), anyString(), anyString(), anyList());
+    }
+
     @Test
     void sendReport_unexpectedRuntimeException_marksFailedAndRethrowsAsWhatsApp() {
         var request = new WhatsAppSendRequest(

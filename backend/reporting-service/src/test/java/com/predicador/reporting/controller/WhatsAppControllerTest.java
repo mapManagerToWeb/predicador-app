@@ -31,13 +31,14 @@ class WhatsAppControllerTest {
     private MockMvc mockMvc;
 
     @Mock private WhatsAppSendService whatsAppSendService;
+    @Mock private com.predicador.reporting.service.DestinoWhatsApp destino;
 
     private WhatsAppController controller;
     private final SessionToken owner = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
 
     @BeforeEach
     void setUp() {
-        controller = new WhatsAppController(whatsAppSendService, new AuthorizationService());
+        controller = new WhatsAppController(whatsAppSendService, new AuthorizationService(), destino);
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -61,7 +62,7 @@ class WhatsAppControllerTest {
 
     @Test
     void sendWhatsAppReport_returns202AcceptedWhileInProgress() throws Exception {
-        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull()))
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull(), any()))
                 .thenReturn(new WhatsAppDeliveryDto("key-1", "IN_PROGRESS", null, null));
 
         mockMvc.perform(post("/api/v1/reports/send")
@@ -74,7 +75,7 @@ class WhatsAppControllerTest {
 
     @Test
     void sendWhatsAppReport_completedKey_replays200() throws Exception {
-        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull()))
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull(), any()))
                 .thenReturn(new WhatsAppDeliveryDto("key-1", "SUCCEEDED", "msg_123", null));
 
         mockMvc.perform(post("/api/v1/reports/send")
@@ -145,7 +146,7 @@ class WhatsAppControllerTest {
     /** El camino de envio vivo sigue en pie y sigue aceptando el body real. */
     @Test
     void syncSendEndpointStillWorks() throws Exception {
-        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull()))
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull(), any()))
                 .thenReturn(new WhatsAppDeliveryDto("key-1", "IN_PROGRESS", null, null));
 
         mockMvc.perform(post("/api/v1/reports/send")

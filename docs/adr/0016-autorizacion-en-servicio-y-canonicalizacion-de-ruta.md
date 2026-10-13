@@ -168,3 +168,11 @@ que la dependencia era ya de una sola direccion y hacia falta.
   Borrarlo es una decision propia, con su propio PR y su propia justificacion;
   el paso siguiente de limpieza (borrar el modulo amqp y el servicio del
   compose) no se hizo aqui.
+
+## Actualizacion (2026-10-13): el destino es el encargado con sesion
+
+El reporte debe llegarle al hermano que lo envia (el bot no puede estar en el
+grupo de predicacion). El destino sigue sin venir del cliente: `DestinoWhatsApp`
+lo busca en la base segun la sesion (telefono registrado del encargado, validado
+como celular chileno). `WHATSAPP_DESTINATION` queda solo como respaldo (sesion de
+administrador o encargado sin celular valido).
