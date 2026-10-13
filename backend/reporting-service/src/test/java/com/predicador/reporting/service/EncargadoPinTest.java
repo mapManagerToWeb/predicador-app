@@ -1,5 +1,6 @@
 package com.predicador.reporting.service;
 
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.reporting.dto.EncargadoAdminRequest;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;

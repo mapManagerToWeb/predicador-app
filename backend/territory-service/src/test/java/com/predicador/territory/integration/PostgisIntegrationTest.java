@@ -2,10 +2,12 @@ package com.predicador.territory.integration;
 
 import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.repository.TerritoryRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -17,16 +19,26 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests that verify PostGIS geometry persistence and spatial
- * query behavior against a real PostgreSQL/PostGIS database via Testcontainers.
+ * Integration tests that verify PostGIS behavior against a real
+ * PostgreSQL/PostGIS database via Testcontainers.
  *
  * <p>H2 cannot represent {@code geometry(GeometryZ,4326)} columns, so these
  * tests only run when Docker is available. They exercise the Flyway schema
- * migrations, JPA entity mapping, and repository queries that depend on
- * real PostGIS support.</p>
+ * migrations and the repository queries (native {@code ST_AsGeoJSON}
+ * projections, JPQL reads) that depend on real PostGIS support.</p>
+ *
+ * <p>Insertion is performed with the <strong>same native SQL used in
+ * production</strong> ({@code ManzanaAdminService.insertar}:
+ * {@code ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326))}). The entity's
+ * {@code geometry} field is a plain {@code String} with no Hibernate spatial
+ * type, so a JPA {@code save()} would bind the column as {@code varchar} and
+ * fail; production only ever writes geometry through native SQL. See
+ * {@code ManzanaTerritorio}.</p>
  *
  * <p>Run with: {@code mvn -pl territory-service test
- * -Dtest=PostgisIntegrationTest -Ddocker.available=true}</p>
+ * -Dtest=PostgisIntegrationTest -Ddocker.available=true} (needs a working
+ * Docker socket; on machines where Testcontainers cannot fetch Ryuk, add
+ * {@code -DTESTCONTAINERS_RYUK_DISABLED=true}).</p>
  *
  * <p>Skip with: {@code mvn -pl territory-service test
  * -Dtest=PostgisIntegrationTest -Ddocker.available=false}</p>
@@ -55,6 +67,7 @@ class PostgisIntegrationTest {
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.flyway.baseline-on-migrate", () -> "true");
         registry.add("spring.flyway.baseline-version", () -> "0");
+        registry.add("app.session.secret", () -> "integration-test-secret-0123456789abcdef");
         registry.add("eureka.client.enabled", () -> "false");
         registry.add("spring.cloud.config.enabled", () -> "false");
     }
@@ -62,20 +75,41 @@ class PostgisIntegrationTest {
     @Autowired
     private TerritoryRepository territoryRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /**
+     * Todos los tests comparten el mismo contenedor PostGIS, así que cada test
+     * parte de una tabla vacía (mismo patrón que
+     * {@code TerritoryAdminIntegrationTest.limpiar}).
+     */
+    @BeforeEach
+    void limpiar() {
+        jdbcTemplate.update("DELETE FROM manzanas_territorio");
+    }
+
+    /**
+     * Inserta una manzana con el mismo SQL nativo que producción
+     * ({@code ManzanaAdminService.insertar}): GeoJSON → {@code ST_GeomFromGeoJSON}
+     * → {@code ST_SetSRID(...,4326)} → {@code ST_Force3D}.
+     */
+    private void insertarManzana(long id, long territorioPadre, String nombre, String geojson) {
+        jdbcTemplate.update("""
+                INSERT INTO manzanas_territorio (id, territorio_padre, nombre_bloque, geometry)
+                VALUES (?, ?, ?, ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)))
+                """, id, territorioPadre, nombre, geojson);
+    }
+
     @Test
     void contextLoads() {
         assertThat(territoryRepository).isNotNull();
+        assertThat(jdbcTemplate).isNotNull();
     }
 
     @Test
     void persistsAndRetrievesManzanaWithGeometry() {
-        ManzanaTerritorio manzana = new ManzanaTerritorio();
-        manzana.setId(1L);
-        manzana.setTerritorioPadre(10L);
-        manzana.setNombreBloque("Manzana A");
-        manzana.setGeometry("SRID=4326;POLYGON Z ((-70.65 -33.45 0, -70.64 -33.45 0, -70.64 -33.44 0, -70.65 -33.44 0, -70.65 -33.45 0))");
-
-        territoryRepository.save(manzana);
+        insertarManzana(1L, 10L, "Manzana A",
+                "{\"type\":\"Polygon\",\"coordinates\":[[[-70.65,-33.45,0],[-70.64,-33.45,0],[-70.64,-33.44,0],[-70.65,-33.44,0],[-70.65,-33.45,0]]]}");
 
         Optional<ManzanaTerritorio> found = territoryRepository.findById(1L);
         assertThat(found).isPresent();
@@ -85,25 +119,9 @@ class PostgisIntegrationTest {
 
     @Test
     void findsManzanasByTerritorioPadre() {
-        ManzanaTerritorio m1 = new ManzanaTerritorio();
-        m1.setId(100L);
-        m1.setTerritorioPadre(5L);
-        m1.setNombreBloque("Bloque 1");
-        m1.setGeometry("SRID=4326;POINT Z (-70.65 -33.45 0)");
-
-        ManzanaTerritorio m2 = new ManzanaTerritorio();
-        m2.setId(101L);
-        m2.setTerritorioPadre(5L);
-        m2.setNombreBloque("Bloque 2");
-        m2.setGeometry("SRID=4326;POINT Z (-70.64 -33.44 0)");
-
-        ManzanaTerritorio m3 = new ManzanaTerritorio();
-        m3.setId(102L);
-        m3.setTerritorioPadre(6L);
-        m3.setNombreBloque("Bloque 3");
-        m3.setGeometry("SRID=4326;POINT Z (-70.63 -33.43 0)");
-
-        territoryRepository.saveAll(List.of(m1, m2, m3));
+        insertarManzana(100L, 5L, "Bloque 1", "{\"type\":\"Point\",\"coordinates\":[-70.65,-33.45,0]}");
+        insertarManzana(101L, 5L, "Bloque 2", "{\"type\":\"Point\",\"coordinates\":[-70.64,-33.44,0]}");
+        insertarManzana(102L, 6L, "Bloque 3", "{\"type\":\"Point\",\"coordinates\":[-70.63,-33.43,0]}");
 
         List<ManzanaTerritorio> result = territoryRepository.findByTerritorioPadreOrderByNombreBloqueAsc(5L);
         assertThat(result).hasSize(2);
@@ -113,25 +131,9 @@ class PostgisIntegrationTest {
 
     @Test
     void findsDistinctTerritorioPadres() {
-        ManzanaTerritorio m1 = new ManzanaTerritorio();
-        m1.setId(200L);
-        m1.setTerritorioPadre(10L);
-        m1.setNombreBloque("A");
-        m1.setGeometry("SRID=4326;POINT Z (-70.65 -33.45 0)");
-
-        ManzanaTerritorio m2 = new ManzanaTerritorio();
-        m2.setId(201L);
-        m2.setTerritorioPadre(20L);
-        m2.setNombreBloque("B");
-        m2.setGeometry("SRID=4326;POINT Z (-70.64 -33.44 0)");
-
-        ManzanaTerritorio m3 = new ManzanaTerritorio();
-        m3.setId(202L);
-        m3.setTerritorioPadre(10L);
-        m3.setNombreBloque("C");
-        m3.setGeometry("SRID=4326;POINT Z (-70.63 -33.43 0)");
-
-        territoryRepository.saveAll(List.of(m1, m2, m3));
+        insertarManzana(200L, 10L, "A", "{\"type\":\"Point\",\"coordinates\":[-70.65,-33.45,0]}");
+        insertarManzana(201L, 20L, "B", "{\"type\":\"Point\",\"coordinates\":[-70.64,-33.44,0]}");
+        insertarManzana(202L, 10L, "C", "{\"type\":\"Point\",\"coordinates\":[-70.63,-33.43,0]}");
 
         List<Long> padres = territoryRepository.findDistinctTerritorioPadres();
         assertThat(padres).containsExactlyInAnyOrder(10L, 20L);
@@ -139,13 +141,8 @@ class PostgisIntegrationTest {
 
     @Test
     void geometryColumnSupportsPostGisSpatialTypes() {
-        ManzanaTerritorio manzana = new ManzanaTerritorio();
-        manzana.setId(300L);
-        manzana.setTerritorioPadre(15L);
-        manzana.setNombreBloque("Spatial Test");
-        manzana.setGeometry("SRID=4326;LINESTRING Z (-70.65 -33.45 100, -70.64 -33.44 200)");
-
-        territoryRepository.save(manzana);
+        insertarManzana(300L, 15L, "Spatial Test",
+                "{\"type\":\"LineString\",\"coordinates\":[[-70.65,-33.45,100],[-70.64,-33.44,200]]}");
 
         Optional<ManzanaTerritorio> found = territoryRepository.findById(300L);
         assertThat(found).isPresent();
@@ -154,13 +151,8 @@ class PostgisIntegrationTest {
 
     @Test
     void geoJsonProjection_producesStAsGeoJsonPolygon() {
-        ManzanaTerritorio manzana = new ManzanaTerritorio();
-        manzana.setId(400L);
-        manzana.setTerritorioPadre(30L);
-        manzana.setNombreBloque("30.a");
-        manzana.setGeometry("SRID=4326;POLYGON ((-70.65 -33.45, -70.64 -33.45, -70.64 -33.44, -70.65 -33.44, -70.65 -33.45))");
-
-        territoryRepository.save(manzana);
+        insertarManzana(400L, 30L, "30.a",
+                "{\"type\":\"Polygon\",\"coordinates\":[[[-70.65,-33.45],[-70.64,-33.45],[-70.64,-33.44],[-70.65,-33.44],[-70.65,-33.45]]]}");
 
         List<TerritoryRepository.ManzanaGeoJsonProjection> rows =
                 territoryRepository.findGeoJsonByTerritorioPadre(30L);
@@ -172,19 +164,8 @@ class PostgisIntegrationTest {
 
     @Test
     void geoJsonProjection_returnsAllTerritories() {
-        ManzanaTerritorio m1 = new ManzanaTerritorio();
-        m1.setId(500L);
-        m1.setTerritorioPadre(40L);
-        m1.setNombreBloque("40.a");
-        m1.setGeometry("SRID=4326;POINT (-70.65 -33.45)");
-
-        ManzanaTerritorio m2 = new ManzanaTerritorio();
-        m2.setId(501L);
-        m2.setTerritorioPadre(50L);
-        m2.setNombreBloque("50.a");
-        m2.setGeometry("SRID=4326;POINT (-70.64 -33.44)");
-
-        territoryRepository.saveAll(List.of(m1, m2));
+        insertarManzana(500L, 40L, "40.a", "{\"type\":\"Point\",\"coordinates\":[-70.65,-33.45]}");
+        insertarManzana(501L, 50L, "50.a", "{\"type\":\"Point\",\"coordinates\":[-70.64,-33.44]}");
 
         List<TerritoryRepository.ManzanaGeoJsonProjection> rows =
                 territoryRepository.findAllGeoJsonGroupedByTerritorio();

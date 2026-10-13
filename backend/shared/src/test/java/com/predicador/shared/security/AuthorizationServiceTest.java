@@ -1,7 +1,6 @@
-package com.predicador.reporting.service;
+package com.predicador.shared.security;
 
 import com.predicador.shared.exception.ForbiddenOperationException;
-import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -29,7 +28,7 @@ class AuthorizationServiceTest {
 
     @Test
     void authorizeOwner_allowsNullTokenInUnenforcedDevMode() {
-        var unconfiguredTokens = new com.predicador.shared.security.SessionTokenService("", 12, false, "local");
+        var unconfiguredTokens = new SessionTokenService("", 12, false, "local");
         var devAuthService = new AuthorizationService(unconfiguredTokens);
         assertDoesNotThrow(() -> devAuthService.authorizeOwner(null, 7L));
         assertDoesNotThrow(() -> devAuthService.requireAuthenticated(null));

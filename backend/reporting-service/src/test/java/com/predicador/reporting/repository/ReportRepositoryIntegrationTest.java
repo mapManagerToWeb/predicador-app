@@ -65,7 +65,13 @@ class ReportRepositoryIntegrationTest {
     @Autowired
     private ReportRepository repository;
 
-    private Report report(int id, Long territorio, Instant fecha, String estado, String manzanasIds) {
+    /**
+     * Helper de fixtures. El id no se pasa aquí: la entidad usa
+     * {@code GenerationType.IDENTITY} y el id lo asigna la secuencia de la DB
+     * (avanza entre tests aunque la transacción haga rollback). Los tests que
+     * necesitan el id lo capturan del retorno de {@code save()}.
+     */
+    private Report report(Long territorio, Instant fecha, String estado, String manzanasIds) {
         Report r = new Report();
         r.setTerritorioNumero(territorio);
         r.setFecha(fecha);
@@ -78,10 +84,10 @@ class ReportRepositoryIntegrationTest {
 
     @Test
     void returnsOnlyLatestReportPerTerritory() {
-        repository.save(report(1, 1L, Instant.parse("2026-08-01T10:00:00Z"), "incomplete", "A,B"));
-        repository.save(report(2, 1L, Instant.parse("2026-08-10T10:00:00Z"), "completed", "A,B,C"));
-        repository.save(report(3, 2L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", "D"));
-        repository.save(report(4, 2L, Instant.parse("2026-08-11T10:00:00Z"), "completed", "D,E"));
+        repository.save(report(1L, Instant.parse("2026-08-01T10:00:00Z"), "incomplete", "A,B"));
+        repository.save(report(1L, Instant.parse("2026-08-10T10:00:00Z"), "completed", "A,B,C"));
+        repository.save(report(2L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", "D"));
+        repository.save(report(2L, Instant.parse("2026-08-11T10:00:00Z"), "completed", "D,E"));
 
         List<Report> result = repository.findLatestByTerritorioNumeroIn(List.of(1L, 2L));
 
@@ -94,8 +100,8 @@ class ReportRepositoryIntegrationTest {
 
     @Test
     void returnsOnlyRequestedTerritoriesWhenSubsetPassed() {
-        repository.save(report(10, 3L, Instant.parse("2026-08-01T10:00:00Z"), "incomplete", "X"));
-        repository.save(report(11, 3L, Instant.parse("2026-08-05T10:00:00Z"), "completed", "Y"));
+        repository.save(report(3L, Instant.parse("2026-08-01T10:00:00Z"), "incomplete", "X"));
+        repository.save(report(3L, Instant.parse("2026-08-05T10:00:00Z"), "completed", "Y"));
 
         List<Report> result = repository.findLatestByTerritorioNumeroIn(List.of(2L, 3L));
 
@@ -111,26 +117,30 @@ class ReportRepositoryIntegrationTest {
 
     @Test
     void findVersionsReturnsLastNonEmptyReportPerTerritory() {
-        // Territorio 1: empty report (older) then non-empty (newer) -> version = id of the non-empty.
-        repository.save(report(100, 1L, Instant.parse("2026-08-01T10:00:00Z"), "completed", null));
-        repository.save(report(101, 1L, Instant.parse("2026-08-10T10:00:00Z"), "completed", "A,B,C"));
-        // Territorio 2: two non-empty -> version = id of the one ordered last by fecha DESC, id DESC.
-        repository.save(report(102, 2L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", "D"));
-        repository.save(report(103, 2L, Instant.parse("2026-08-11T10:00:00Z"), "completed", "D,E"));
+        // Territorio 1: empty report (older) then non-empty (newer) -> version id = the non-empty one.
+        repository.save(report(1L, Instant.parse("2026-08-01T10:00:00Z"), "completed", null));
+        Integer versionTerritorio1 = repository.save(
+                report(1L, Instant.parse("2026-08-10T10:00:00Z"), "completed", "A,B,C")).getId();
+        // Territorio 2: two non-empty -> version id = the one ordered last by fecha DESC, id DESC.
+        repository.save(report(2L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", "D"));
+        Integer versionTerritorio2 = repository.save(
+                report(2L, Instant.parse("2026-08-11T10:00:00Z"), "completed", "D,E")).getId();
 
         List<Object[]> result = repository.findVersions(List.of(1L, 2L, 99L));
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting(row -> ((Number) row[0]).longValue())
                 .containsExactly(1L, 2L);
-        assertThat(((Number) result.get(0)[1]).longValue()).isEqualTo(101L);
-        assertThat(((Number) result.get(1)[1]).longValue()).isEqualTo(103L);
+        // Ids los asigna la secuencia identity: comparar contra los devueltos
+        // por save(), nunca contra constantes (la secuencia avanza entre tests).
+        assertThat(((Number) result.get(0)[1]).longValue()).isEqualTo(versionTerritorio1.longValue());
+        assertThat(((Number) result.get(1)[1]).longValue()).isEqualTo(versionTerritorio2.longValue());
     }
 
     @Test
     void findVersionsExcludesTerritoriesWithOnlyEmptyReports() {
-        repository.save(report(110, 9L, Instant.parse("2026-08-01T10:00:00Z"), "completed", null));
-        repository.save(report(111, 9L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", ""));
+        repository.save(report(9L, Instant.parse("2026-08-01T10:00:00Z"), "completed", null));
+        repository.save(report(9L, Instant.parse("2026-08-05T10:00:00Z"), "incomplete", ""));
 
         assertThat(repository.findVersions(List.of(9L))).isEmpty();
     }

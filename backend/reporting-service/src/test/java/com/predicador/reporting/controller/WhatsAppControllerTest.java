@@ -3,8 +3,7 @@ package com.predicador.reporting.controller;
 import com.predicador.reporting.dto.WhatsAppDeliveryDto;
 import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.service.WhatsAppSendService;
-import com.predicador.reporting.publisher.WhatsAppSendPublisher;
-import com.predicador.reporting.service.AuthorizationService;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.reporting.exception.GlobalExceptionHandler;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
@@ -20,6 +19,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,19 +31,18 @@ class WhatsAppControllerTest {
     private MockMvc mockMvc;
 
     @Mock private WhatsAppSendService whatsAppSendService;
-    @Mock private WhatsAppSendPublisher whatsAppSendPublisher;
 
     private WhatsAppController controller;
     private final SessionToken owner = new SessionToken("7", SessionToken.ROLE_ENCARGADO, 1L, 2L);
 
     @BeforeEach
     void setUp() {
-        controller = new WhatsAppController(whatsAppSendService, whatsAppSendPublisher, new AuthorizationService());
+        controller = new WhatsAppController(whatsAppSendService, new AuthorizationService());
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setValidator(validator)
-                .setControllerAdvice(new GlobalExceptionHandler(), new com.predicador.shared.exception.GlobalExceptionHandler())
+                .setControllerAdvice(new com.predicador.shared.exception.RutaNoEncontradaExceptionHandler(), new GlobalExceptionHandler(), new com.predicador.shared.exception.GlobalExceptionHandler())
                 .build();
     }
 
@@ -107,56 +106,52 @@ class WhatsAppControllerTest {
             .andExpect(jsonPath("$.error").value("Meta rejected"));
     }
 
+    /**
+     * C1 (cierre): el endpoint {@code POST /api/v1/reports/whatsapp/async} ya no
+     * existe. Aceptaba un {@code destinationNumber}, un {@code templateName}, un
+     * {@code languageCode} y unos {@code components} elegidos por el cliente y
+     * los mandaba tal cual con las credenciales de Meta de la congregación, de
+     * modo que cualquier usuario registrado podía enviar a cualquier número con
+     * cualquier plantilla. La regresión vive en
+     * {@code ReportSendServiceTest#sendReport_ignoraElDestinoDelClienteYUsaElConfigurado}:
+     * el único camino de envío usa destino, plantilla e idioma de la configuración.
+     *
+     * <p>Lo que se afirma aquí es que la petición NO se procesa: no hay handler,
+     * el servicio de envío no se toca y Spring no encuentra el recurso, por lo
+     * que la respuesta es 404 Not Found gracias al advice global de
+     * {@code shared}, que mapea la ruta sin handler a 404 con las dos caras del
+     * "no encontrado": {@code NoHandlerFoundException} (lo que resuelve el
+     * {@code TestDispatcherServlet} de {@code MockMvc} standalone en este test)
+     * y {@code NoResourceFoundException} (lo que lanza el resource handler de
+     * {@code /**} en Spring Boot en producción).</p>
+     */
     @Test
-    void sendWhatsAppAsync_returns202Accepted() throws Exception {
-        String validPayload = """
-            {
-              "templateName": "asignacion_territorio",
-              "destinationNumber": "+5491100000000"
-            }
-            """;
+    void asyncSendEndpointNoLongerExists() throws Exception {
         mockMvc.perform(post("/api/v1/reports/whatsapp/async")
                 .contentType(MediaType.APPLICATION_JSON)
                 .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
                 .header("Idempotency-Key", "async-key-1")
-                .content(validPayload))
-            .andExpect(status().isAccepted())
-            .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+                .content("""
+                    {
+                      "templateName": "asignacion_territorio",
+                      "destinationNumber": "+5491100000000"
+                    }
+                    """))
+                .andExpect(status().isNotFound());
+
+        verifyNoInteractions(whatsAppSendService);
     }
 
+    /** El camino de envio vivo sigue en pie y sigue aceptando el body real. */
     @Test
-    void sendWhatsAppAsync_emptyTemplateName_returns400ProblemDetail() throws Exception {
-        String body = """
-            {
-              "templateName": "",
-              "destinationNumber": "+5491100000000"
-            }
-            """;
-        mockMvc.perform(post("/api/v1/reports/whatsapp/async")
-                .contentType(MediaType.APPLICATION_JSON)
-                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
-                .header("Idempotency-Key", "async-key-2")
-                .content(body))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[?(@.field=='templateName')].message")
-                    .value(org.hamcrest.Matchers.hasItem("templateName es obligatorio")));
-    }
+    void syncSendEndpointStillWorks() throws Exception {
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), isNull()))
+                .thenReturn(new WhatsAppDeliveryDto("key-1", "IN_PROGRESS", null, null));
 
-    @Test
-    void sendWhatsAppAsync_invalidE164_returns400ProblemDetail() throws Exception {
-        String body = """
-            {
-              "templateName": "asignacion_territorio",
-              "destinationNumber": "1234"
-            }
-            """;
-        mockMvc.perform(post("/api/v1/reports/whatsapp/async")
+        mockMvc.perform(post("/api/v1/reports/send")
                 .contentType(MediaType.APPLICATION_JSON)
                 .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
-                .header("Idempotency-Key", "async-key-3")
-                .content(body))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[?(@.field=='destinationNumber')].message")
-                    .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("E.164"))));
+                .content(PAYLOAD))
+            .andExpect(status().isAccepted());
     }
 }

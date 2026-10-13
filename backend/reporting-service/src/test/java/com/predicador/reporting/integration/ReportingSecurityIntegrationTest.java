@@ -2,7 +2,7 @@ package com.predicador.reporting.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.predicador.reporting.service.ReportService;
-import com.predicador.reporting.service.AuthorizationService;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.SessionAuthFilter;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;

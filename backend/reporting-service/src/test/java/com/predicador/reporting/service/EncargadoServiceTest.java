@@ -4,6 +4,7 @@ import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import com.predicador.shared.exception.ForbiddenOperationException;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.SessionToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

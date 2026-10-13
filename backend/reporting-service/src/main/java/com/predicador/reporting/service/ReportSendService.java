@@ -8,7 +8,6 @@ import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.dto.WhatsAppSendResponse;
 import com.predicador.reporting.model.WhatsAppDelivery;
 import com.predicador.reporting.repository.WhatsAppDeliveryRepository;
-import com.predicador.shared.util.PhoneUtil;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -132,9 +131,12 @@ public class ReportSendService {
 
             components.add(Map.of("type", "body", PARAMETERS, bodyParams));
 
-            String destination = request.destinationNumber() != null
-                ? PhoneUtil.normalize(request.destinationNumber())
-                : props.destinationNumber();
+            // El destino es SIEMPRE el configurado (WHATSAPP_DESTINATION). El
+            // campo `destinationNumber` del request lo manda el cliente, y
+            // cualquier usuario registrado podría usarlo para mandar desde la
+            // cuenta de Meta de la congregación a cualquier número del mundo;
+            // por eso se ignora por completo (ADR 0016).
+            String destination = props.destinationNumber();
 
             WhatsAppMessageResponse response = messageClient.sendTemplateMessage(
                     destination, props.templateName(), props.languageCode(), components);

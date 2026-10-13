@@ -4,6 +4,7 @@ import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.dto.EncargadoLoginRequest;
 import com.predicador.reporting.dto.LoginResponse;
 import com.predicador.reporting.service.EncargadoService;
+import com.predicador.shared.security.RequestTokens;
 import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
@@ -52,7 +53,7 @@ public class EncargadoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
         }
         return ResponseEntity.ok(encargadoService.listarActivos(
-                PageRequest.of(page, size, Sort.by(NOMBRE).ascending().and(Sort.by("id").ascending())), token(request)).getContent());
+                PageRequest.of(page, size, Sort.by(NOMBRE).ascending().and(Sort.by("id").ascending())), RequestTokens.token(request)).getContent());
     }
 
     @PostMapping
@@ -63,7 +64,7 @@ public class EncargadoController {
     @PutMapping("/{id}")
     public ResponseEntity<EncargadoDto> actualizar(@PathVariable Long id, @Valid @RequestBody EncargadoDto dto,
                                                    HttpServletRequest request) {
-        return ResponseEntity.ok(encargadoService.actualizar(id, dto, token(request)));
+        return ResponseEntity.ok(encargadoService.actualizar(id, dto, RequestTokens.token(request)));
     }
 
     @GetMapping("/buscar")
@@ -75,7 +76,7 @@ public class EncargadoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page/size fuera de rango");
         }
         return ResponseEntity.ok(encargadoService.buscarPorNombre(nombre,
-                PageRequest.of(page, size, Sort.by(NOMBRE).ascending().and(Sort.by("id").ascending())), token(request)).getContent());
+                PageRequest.of(page, size, Sort.by(NOMBRE).ascending().and(Sort.by("id").ascending())), RequestTokens.token(request)).getContent());
     }
 
     @PostMapping("/buscar-crear")
@@ -107,7 +108,7 @@ public class EncargadoController {
 
     @GetMapping("/session")
     public ResponseEntity<?> validateSession(HttpServletRequest request) {
-        SessionToken sessionToken = token(request);
+        SessionToken sessionToken = RequestTokens.token(request);
         if (sessionToken == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -164,7 +165,4 @@ public class EncargadoController {
         return new LoginResponse(dto, token);
     }
 
-    private SessionToken token(HttpServletRequest request) {
-        return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
-    }
 }

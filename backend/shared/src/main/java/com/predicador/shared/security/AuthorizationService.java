@@ -1,11 +1,16 @@
-package com.predicador.reporting.service;
+package com.predicador.shared.security;
 
 import com.predicador.shared.exception.ForbiddenOperationException;
-import com.predicador.shared.security.SessionToken;
-import com.predicador.shared.security.SessionTokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Autorización de servicio: decide si un {@link SessionToken} puede ejecutar
+ * una operación. Es la segunda capa de defensa — la primera son las reglas de
+ * {@link SecurityRules} en el borde — y vive aquí porque los controladores de
+ * administración de los tres servicios (territory y reporting) la necesitan
+ * (ADR 0016).
+ */
 @Service
 public class AuthorizationService {
 

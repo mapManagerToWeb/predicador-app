@@ -6,6 +6,7 @@ import com.predicador.reporting.dto.WhatsAppSendRequest;
 import com.predicador.reporting.repository.ReportRepository;
 import com.predicador.reporting.repository.EncargadoRepository;
 import com.predicador.reporting.model.WhatsAppDelivery;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;

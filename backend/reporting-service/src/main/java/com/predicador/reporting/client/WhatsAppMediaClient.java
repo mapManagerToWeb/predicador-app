@@ -18,6 +18,15 @@ import java.util.Base64;
 public class WhatsAppMediaClient {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppMediaClient.class);
+
+    /**
+     * Tope de la captura codificada en Base64 (2 MB), comprobado ANTES de
+     * decodificar: el string viene del cliente y {@code Base64.getDecoder()}
+     * lo convertiría a bytes en memoria sin límite. Una foto de pantalla de
+     * sobra pesa ~200 KB, así que el margen es amplio.
+     */
+    static final int MAX_BASE64_CHARS = 2 * 1024 * 1024;
+
     private final RestClient restClient;
     private final WhatsAppProperties props;
 
@@ -30,6 +39,9 @@ public class WhatsAppMediaClient {
         String url = String.format("%s/%s/%s/media",
                 props.baseUrl(), props.apiVersion(), props.phoneNumberId());
 
+        if (base64Image == null || base64Image.length() > MAX_BASE64_CHARS) {
+            throw new WhatsAppIntegrationException("La captura supera el tamaño máximo permitido", 413, null);
+        }
         byte[] imageBytes = Base64.getDecoder().decode(base64Image);
 
         MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();

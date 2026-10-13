@@ -2,6 +2,7 @@ package com.predicador.reporting.service;
 
 import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.shared.exception.ResourceNotFoundException;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.util.PhoneUtil;
 import com.predicador.reporting.model.Encargado;

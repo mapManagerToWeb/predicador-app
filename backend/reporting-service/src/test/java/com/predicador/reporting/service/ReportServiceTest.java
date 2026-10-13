@@ -4,6 +4,7 @@ import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
 import com.predicador.shared.exception.ForbiddenOperationException;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

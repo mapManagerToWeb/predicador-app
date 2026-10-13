@@ -19,6 +19,11 @@ public record WhatsAppSendRequest(
     @Valid
     List<TerritorioReporte> territorios,
     String screenshotBase64,
+    /**
+     * No-op: el destino siempre es `whatsapp.destinationNumber` (configuración del servidor).
+     * No re-conectar este campo (residual LOW, seguridad).
+     */
+    @Deprecated
     String destinationNumber
 ) {
     public record TerritorioReporte(

@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -174,6 +176,68 @@ class SessionAuthFilterTest {
         assertEquals("42", req.getAttribute(SessionAuthFilter.ATTR_SUBJECT));
         Object tokenAttr = req.getAttribute(SessionAuthFilter.ATTR_TOKEN);
         assertInstanceOf(SessionToken.class, tokenAttr);
+    }
+
+    // -- H4: rutas equivalentes no esquivan el filtro ------------------------
+
+    /**
+     * Regresión de H4. El filtro comparaba {@code getRequestURI()} (cruda) con
+     * las reglas, pero Spring enruta sobre la ruta decodificada: una misma URL
+     * escrita de varias formas terminaba en el panel de admin sin pasar por la
+     * regla de admin. Todas las formas deben resolverse a la MISMA ruta y, sin
+     * token de admin, seguir denegadas.
+     */
+    @ParameterizedTest(name = "{0} se deniega sin token de admin")
+    @ValueSource(strings = {
+            "/api/v1/territories/admin/manzanas",
+            "/api/v1/territories/%61dmin/manzanas",
+            "/api/v1/territories/a%64min/manzanas",
+            "/api/v1/territories//admin/manzanas",
+            "/api/v1/territories/admin/./manzanas",
+            "/api/v1/territories/admin//manzanas",
+            "/api/v1/territories/%61dmin/%6Danzanas"})
+    void adminRouteWrittenDifferently_isStillDeniedWithoutAdminToken(String obfuscated) throws Exception {
+        SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
+                SecurityRule.any(List.of("GET", "POST", "PUT", "DELETE"),
+                        "^/api/v1/territories/admin(/.*)?$", SessionToken.ROLE_ADMIN)));
+
+        // Sin token: la regla debe ENCONTRARSE y rechazar.
+        MockHttpServletResponse anonymous = doFilter(filter, "GET", obfuscated, null);
+        assertEquals(401, anonymous.getStatus(),
+                "la ruta " + obfuscated + " debe seguir denegada sin token");
+
+        // Con token de encargado: la regla se encuentra y da 401 por rol.
+        MockHttpServletResponse encargado = doFilter(filter, "GET", obfuscated, encargadoToken);
+        assertEquals(401, encargado.getStatus());
+        assertTrue(encargado.getContentAsString().contains("Permisos insuficientes"),
+                "la ruta " + obfuscated + " debe caer en la regla de admin, no pasar de largo");
+
+        // Con token de admin: la ruta es la misma, así que también pasa.
+        MockHttpServletResponse admin = doFilter(filter, "GET", obfuscated, adminToken);
+        assertEquals(200, admin.getStatus(),
+                "la ruta " + obfuscated + " debe ser la misma para un admin");
+    }
+
+    @Test
+    void malformedPercentEscape_isRejectedWith400NotComparedRaw() throws Exception {
+        SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
+                SecurityRule.any(List.of("GET", "POST", "PUT", "DELETE"),
+                        "^/api/v1/territories/admin(/.*)?$", SessionToken.ROLE_ADMIN)));
+
+        MockHttpServletResponse res = doFilter(filter, "GET", "/api/v1/territories/%zzadmin", adminToken);
+
+        assertEquals(400, res.getStatus());
+    }
+
+    @Test
+    void trailingPercentInPath_isRejectedWith400() throws Exception {
+        SessionAuthFilter filter = new SessionAuthFilter(tokens, List.of(
+                SecurityRule.any(List.of("GET"), "^/api/v1/territories/admin(/.*)?$",
+                        SessionToken.ROLE_ADMIN)));
+
+        MockHttpServletResponse res = doFilter(filter, "GET", "/api/v1/territories/admin%", adminToken);
+
+        assertEquals(400, res.getStatus());
     }
 
     // -- helper -------------------------------------------------------------

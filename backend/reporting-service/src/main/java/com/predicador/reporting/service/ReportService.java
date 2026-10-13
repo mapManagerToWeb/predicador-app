@@ -3,6 +3,7 @@ package com.predicador.reporting.service;
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import com.predicador.shared.security.AuthorizationService;
 import com.predicador.shared.security.SessionToken;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

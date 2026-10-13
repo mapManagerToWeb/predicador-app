@@ -13,6 +13,9 @@ import com.predicador.reporting.model.Report;
 import com.predicador.reporting.service.CicloService;
 import com.predicador.reporting.service.CorreccionDeSalidas;
 import com.predicador.reporting.service.ReportAdminService;
+import com.predicador.shared.security.AuthorizationService;
+import com.predicador.shared.security.RequestTokens;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +35,8 @@ import java.util.Map;
 
 /**
  * Reportes para la analítica del panel. Todo {@code /api/v1/reports/admin/**}
- * exige rol admin ({@code SecurityRules}).
+ * exige rol admin: por URL ({@code SecurityRules}) y además en cada handler
+ * ({@code requireAdmin}, ADR 0016).
  */
 @RestController
 @RequestMapping("/api/v1/reports/admin")
@@ -41,67 +45,85 @@ public class ReportAdminController {
     private final ReportAdminService service;
     private final CicloService ciclos;
     private final CorreccionDeSalidas salidas;
+    private final AuthorizationService authorization;
 
-    public ReportAdminController(ReportAdminService service, CicloService ciclos, CorreccionDeSalidas salidas) {
+    public ReportAdminController(ReportAdminService service, CicloService ciclos, CorreccionDeSalidas salidas,
+                                 AuthorizationService authorization) {
         this.service = service;
         this.ciclos = ciclos;
         this.salidas = salidas;
+        this.authorization = authorization;
     }
 
     /** Reportes de {@code [desde, hasta)}; por defecto, los últimos 365 días. */
     @GetMapping
     public ResponseEntity<List<ReporteAdminDto>> listar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant desde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant hasta) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant hasta,
+            HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         Instant fin = hasta != null ? hasta : Instant.now().plus(1, ChronoUnit.MINUTES);
         Instant inicio = desde != null ? desde : fin.minus(365, ChronoUnit.DAYS);
         return ResponseEntity.ok(service.listar(inicio, fin));
     }
 
     @DeleteMapping
-    public ResponseEntity<Map<String, Integer>> eliminar(@RequestParam List<Integer> ids) {
+    public ResponseEntity<Map<String, Integer>> eliminar(@RequestParam List<Integer> ids,
+                                                         HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(Map.of("eliminados", service.eliminar(ids)));
     }
 
     @GetMapping("/whatsapp")
-    public ResponseEntity<List<EnvioWhatsAppDto>> envios() {
+    public ResponseEntity<List<EnvioWhatsAppDto>> envios(HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(service.enviosRecientes());
     }
 
     /** Ciclos de territorios, el en curso primero. */
     @GetMapping("/ciclos")
-    public ResponseEntity<List<CicloDto>> ciclos() {
+    public ResponseEntity<List<CicloDto>> ciclos(HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(ciclos.listar());
     }
 
     /** Cierra el ciclo en curso (guarda su resumen) y todos los territorios vuelven a empezar. */
     @PostMapping("/ciclos/cerrar")
-    public ResponseEntity<CicloDto> cerrarCiclo(@Valid @RequestBody(required = false) CerrarCicloRequest req) {
+    public ResponseEntity<CicloDto> cerrarCiclo(@Valid @RequestBody(required = false) CerrarCicloRequest req,
+                                                HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(ciclos.cerrar(req == null ? null : req.nota()));
     }
 
     /** Estado actual (último reporte) de un territorio; 204 si nunca se trabajó. */
     @GetMapping("/estado/{territorio}")
-    public ResponseEntity<EstadoTerritorioAdmin> estado(@PathVariable long territorio) {
+    public ResponseEntity<EstadoTerritorioAdmin> estado(@PathVariable long territorio,
+                                                        HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ciclos.estadoActual(territorio).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /** El reporte de una salida y lo que había antes en el territorio, para corregirlo. */
     @GetMapping("/{id}/salida")
-    public ResponseEntity<SalidaAdminDto> salida(@PathVariable int id) {
+    public ResponseEntity<SalidaAdminDto> salida(@PathVariable int id, HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(salidas.detalle(id));
     }
 
     /** Corrige o anula el reporte de una salida (ADR 0014); los posteriores se recalculan. */
     @PostMapping("/{id}/corregir")
     public ResponseEntity<ResultadoCorreccionSalida> corregirSalida(@PathVariable int id,
-                                                                    @Valid @RequestBody CorreccionSalidaRequest req) {
+                                                                    @Valid @RequestBody CorreccionSalidaRequest req,
+                                                                    HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(salidas.corregir(id, req));
     }
 
     /** Corrige el estado actual de un territorio; queda como un reporte más. */
     @PostMapping("/correccion")
-    public ResponseEntity<Map<String, Integer>> corregir(@Valid @RequestBody CorreccionRequest req) {
+    public ResponseEntity<Map<String, Integer>> corregir(@Valid @RequestBody CorreccionRequest req,
+                                                         HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
         Report r = ciclos.corregir(req);
         return ResponseEntity.ok(Map.of("id", r.getId()));
     }

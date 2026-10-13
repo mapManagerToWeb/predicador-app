@@ -52,8 +52,22 @@ public class SessionAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
+        // La ruta se canonicaliza UNA vez, en el borde: getRequestURI() viene
+        // sin decodificar y sin normalizar, mientras que Spring enruta sobre la
+        // forma decodificada. Sin esto, %61dmin / // / /./ esquivan las reglas.
+        String path;
+        try {
+            path = RequestPathCanonicalizer.canonicalize(req.getRequestURI());
+        } catch (IllegalArgumentException malformed) {
+            // No se puede decidir qué ruta es: se rechaza en vez de comparar
+            // una ruta que nunca se entendió.
+            log.debug("SessionAuthFilter rechazó una ruta ilegible: {}", malformed.getMessage());
+            writeProblem(res, HttpStatus.BAD_REQUEST, "Ruta inválida.");
+            return;
+        }
+
         // If no rule matches, this is a public endpoint — pass through
-        var matchedRule = validator.findMatchingRule(req.getMethod(), req.getRequestURI());
+        var matchedRule = validator.findMatchingRule(req.getMethod(), path);
         if (matchedRule.isEmpty()) {
             chain.doFilter(req, res);
             return;
@@ -72,14 +86,14 @@ public class SessionAuthFilter extends OncePerRequestFilter {
                 : (validator.isAllowHeaderAuth() ? req.getHeader(HEADER_NAME) : null);
         Optional<SessionToken> parsed = tokens.verify(presented);
         if (parsed.isEmpty()) {
-            writeUnauthorized(res, "Token de sesión ausente o inválido.");
+            writeProblem(res, HttpStatus.UNAUTHORIZED, "Token de sesión ausente o inválido.");
             return;
         }
 
         SessionToken token = parsed.get();
         SecurityRule rule = matchedRule.get();
         if (rule.requiredRole() != null && !token.hasRole(rule.requiredRole())) {
-            writeUnauthorized(res, "Permisos insuficientes para este recurso.");
+            writeProblem(res, HttpStatus.UNAUTHORIZED, "Permisos insuficientes para este recurso.");
             return;
         }
 
@@ -98,12 +112,14 @@ public class SessionAuthFilter extends OncePerRequestFilter {
                 .orElse(null);
     }
 
-    private static void writeUnauthorized(HttpServletResponse res, String detail) throws IOException {
-        res.setStatus(HttpStatus.UNAUTHORIZED.value());
+    private static void writeProblem(HttpServletResponse res, HttpStatus status, String detail)
+            throws IOException {
+        res.setStatus(status.value());
         res.setContentType(MediaType.valueOf("application/problem+json").toString());
         res.getWriter().write("""
-                {"type":"about:blank","title":"No autenticado","status":401,"detail":"%s"}
-                """.formatted(detail.replace("\"", "'")));
+                {"type":"about:blank","title":"%s","status":%d,"detail":"%s"}
+                """.formatted(status == HttpStatus.UNAUTHORIZED ? "No autenticado" : "Solicitud inválida",
+                        status.value(), detail.replace("\"", "'")));
         log.debug("SessionAuthFilter rechazó petición: {}", detail);
     }
 }

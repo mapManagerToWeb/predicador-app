@@ -150,12 +150,18 @@ class ReportSendServiceTest {
         verify(mediaClient, never()).uploadImage(anyString(), anyString());
     }
 
+    /**
+     * C1: el destino lo decide la configuración del servidor. Un
+     * {@code destinationNumber} en el cuerpo de la petición se ignora, para
+     * que ningún usuario registrado pueda mandar desde la cuenta de Meta a un
+     * número arbitrario.
+     */
     @Test
-    void sendReport_numeroDestinoCustom() {
+    void sendReport_ignoraElDestinoDelClienteYUsaElConfigurado() {
         var request = new WhatsAppSendRequest(
             "Daniel", "Uribe", "21-07-2026", "tarde",
             List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
-            "base64image", "56999999999"
+            "base64image", "+15551234567"
         );
 
         Map<String, String> templateParams = Map.of(

@@ -1,11 +1,14 @@
 package com.predicador.territory.controller;
 
+import com.predicador.shared.exception.GlobalExceptionHandler;
+import com.predicador.shared.security.AuthorizationService;
+import com.predicador.shared.security.SessionAuthFilter;
+import com.predicador.shared.security.SessionToken;
 import com.predicador.territory.dto.TerritoryDto;
 import com.predicador.territory.service.TerritoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,12 +30,14 @@ class TerritoryControllerTest {
     @Mock
     private TerritoryService territoryService;
 
-    @InjectMocks
-    private TerritoryController territoryController;
+    private final SessionToken adminToken = new SessionToken("admin", SessionToken.ROLE_ADMIN, 1L, 2L);
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(territoryController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new TerritoryController(territoryService, new AuthorizationService()))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -76,10 +81,17 @@ class TerritoryControllerTest {
             .andExpect(content().string(geoJson));
     }
 
+    /**
+     * `assignColor` exige rol admin desde el propio handler (ADR 0016), no solo
+     * por la regla de URL: por eso esta prueba pasa el token de admin. El caso
+     * de denegación vive en `TerritoryControllerAdminGateTest`, que dispara el
+     * controlador SIN el filtro de URL.
+     */
     @Test
     void assignColor_shouldReturn200() throws Exception {
         mockMvc.perform(put("/api/v1/territories/1/color")
                 .contentType("application/json")
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, adminToken)
                 .content("{\"color\":\"#ff0000\"}"))
             .andExpect(status().isOk());
     }

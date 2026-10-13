@@ -1,5 +1,6 @@
 package com.predicador.gateway.config;
 
+import com.predicador.shared.security.RequestPathCanonicalizer;
 import com.predicador.shared.security.SecurityConstants;
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.TokenValidator;
@@ -44,7 +45,24 @@ public class ReactiveSessionAuthFilter implements WebFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String method = request.getMethod() != null ? request.getMethod().name() : "GET";
-        String path = request.getPath().value();
+        // Misma canonicalización que el filtro de servlet (ADR 0016): la ruta
+        // cruda (%61dmin, //, /./) no es la ruta sobre la que enruta Spring.
+        String path;
+        try {
+            // getURI().getRawPath(), no getPath().value(). En spring-web 7.0.9 los dos
+            // devuelven hoy EXACTAMENTE la misma cadena cruda — RequestPath
+            // decodifica solo en valueToMatch(), que es lo que usa PathPattern,
+            // mientras value() devuelve el original sin decodificar (verificado
+            // contra 7.0.9). El cambio no arregla una doble decodificación: es
+            // explicitar el contrato. getRawPath()GARANTIZA una sola
+            // decodificación aunque Spring cambiara value(), y deja el filtro
+            // reactivo leyendo exactamente lo mismo que el de servlet
+            // (getRequestURI(), que sí es crudo por contrato del contenedor).
+            path = RequestPathCanonicalizer.canonicalize(request.getURI().getRawPath());
+        } catch (IllegalArgumentException malformed) {
+            log.debug("ReactiveSessionAuthFilter rechazó una ruta ilegible: {}", malformed.getMessage());
+            return reject(exchange);
+        }
 
         // If no rule matches, this is a public endpoint — pass through
         if (validator.findMatchingRule(method, path).isEmpty()) {

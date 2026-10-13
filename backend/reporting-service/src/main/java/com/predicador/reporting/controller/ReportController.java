@@ -2,9 +2,9 @@ package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.ReportDto;
 import com.predicador.reporting.service.ReportService;
-import com.predicador.reporting.service.AuthorizationService;
+import com.predicador.shared.security.AuthorizationService;
+import com.predicador.shared.security.RequestTokens;
 import com.predicador.shared.security.SecurityConstants;
-import com.predicador.shared.security.SessionToken;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -41,7 +41,7 @@ public class ReportController {
             problem.setType(URI.create("https://api.predicador.com/errors/bad-request"));
             return ResponseEntity.badRequest().body(problem);
         }
-        return ResponseEntity.ok(reportService.createReports(dtos, token(request)));
+        return ResponseEntity.ok(reportService.createReports(dtos, RequestTokens.token(request)));
     }
 
     @GetMapping
@@ -52,12 +52,12 @@ public class ReportController {
                 boundedSize(request.getParameter("size")), Sort.by(Sort.Direction.DESC, "fecha")
                         .and(Sort.by(Sort.Direction.DESC, "id")));
         if (territorioNumero != null) {
-            return ResponseEntity.ok(reportService.getReportsByTerritorio(territorioNumero, pageable, token(request)).getContent());
+            return ResponseEntity.ok(reportService.getReportsByTerritorio(territorioNumero, pageable, RequestTokens.token(request)).getContent());
         }
         if (encargadoId != null) {
-            return ResponseEntity.ok(reportService.getReportsByEncargado(encargadoId, pageable, token(request)).getContent());
+            return ResponseEntity.ok(reportService.getReportsByEncargado(encargadoId, pageable, RequestTokens.token(request)).getContent());
         }
-        return ResponseEntity.ok(reportService.getAllReports(pageable, token(request)).getContent());
+        return ResponseEntity.ok(reportService.getAllReports(pageable, RequestTokens.token(request)).getContent());
     }
 
     @GetMapping("/today")
@@ -65,21 +65,21 @@ public class ReportController {
         var pageable = PageRequest.of(boundedPage(request.getParameter("page")),
                 boundedSize(request.getParameter("size")), Sort.by(Sort.Direction.DESC, "fecha")
                         .and(Sort.by(Sort.Direction.DESC, "id")));
-        return ResponseEntity.ok(reportService.getReportsForToday(pageable, token(request)).getContent());
+        return ResponseEntity.ok(reportService.getReportsForToday(pageable, RequestTokens.token(request)).getContent());
     }
 
     @GetMapping("/batch")
     public ResponseEntity<Map<Long, List<ReportDto>>> getReportsBatch(
             @RequestParam List<Long> territorios, HttpServletRequest request) {
         if (territorios.size() > ReportService.MAX_BATCH_SIZE) return ResponseEntity.badRequest().build();
-        return ResponseEntity.ok(reportService.getReportsByMultipleTerritorios(territorios, token(request)));
+        return ResponseEntity.ok(reportService.getReportsByMultipleTerritorios(territorios, RequestTokens.token(request)));
     }
 
     @GetMapping("/versions")
     public ResponseEntity<Map<Long, Long>> getReportVersions(
             @RequestParam List<Long> territorios, HttpServletRequest request) {
         if (territorios.size() > ReportService.MAX_BATCH_SIZE) return ResponseEntity.badRequest().build();
-        return ResponseEntity.ok(reportService.getReportVersions(territorios, token(request)));
+        return ResponseEntity.ok(reportService.getReportVersions(territorios, RequestTokens.token(request)));
     }
 
     @DeleteMapping
@@ -92,13 +92,10 @@ public class ReportController {
             problem.setType(URI.create("https://api.predicador.com/errors/bad-request"));
             return ResponseEntity.badRequest().body(problem);
         }
-        reportService.deleteReports(ids, token(request));
+        reportService.deleteReports(ids, RequestTokens.token(request));
         return ResponseEntity.noContent().build();
     }
 
-    private SessionToken token(HttpServletRequest request) {
-        return (SessionToken) request.getAttribute(SecurityConstants.ATTR_TOKEN);
-    }
 
     private int boundedPage(String value) {
         if (value == null) return 0;
