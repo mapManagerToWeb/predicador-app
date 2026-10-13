@@ -42,7 +42,7 @@
             property overrides nothing (this bit us on amqp-client).
         -->
         <httpcore5.version>5.4.3</httpcore5.version>
-        <rabbit-amqp-client.version>5.34.0</rabbit-amqp-client.version>
+        <rabbit-amqp-client.version>5.37.0</rabbit-amqp-client.version>
         <!--
             Found by the Trivy image scan (see docs/adr/0015-baseline-deps-contra-cves.md).
             All five of these were shipping CRITICAL/HIGH CVEs in every published
