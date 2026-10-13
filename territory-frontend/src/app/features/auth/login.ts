@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { afterNextRender, Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
@@ -27,6 +27,16 @@ export class LoginPage implements OnInit {
   pin = signal('');
   /** Número mal escrito: se explica bajo el campo, sin llamar al servidor. */
   errorTelefono = signal<string | null>(null);
+  /** null mientras se consulta: «Crear perfil» solo se ofrece si el registro está abierto. */
+  registroAbierto = signal<boolean | null>(null);
+
+  constructor() {
+    afterNextRender(() => void this.cargarRegistro());
+  }
+
+  async cargarRegistro(): Promise<void> {
+    this.registroAbierto.set(await this.encargadoService.registroAbierto());
+  }
 
   ngOnInit(): void {
     // Tras un refresh (SSR no conoce el rol persistido) la sesión encargado
@@ -89,7 +99,13 @@ export class LoginPage implements OnInit {
       } else if (status === 0) {
         this.toast.show('Sin conexión con el servidor. Intenta de nuevo.', 4000, 'error');
       } else if (status === 404) {
-        this.toast.show('Ese número no está registrado. Crea tu perfil.', 4000, 'warning');
+        this.toast.show(
+          this.registroAbierto() === false
+            ? 'Ese número no está registrado. Pídele al administrador que te registre.'
+            : 'Ese número no está registrado. Crea tu perfil.',
+          5000,
+          'warning',
+        );
       } else {
         this.toast.show('Error al iniciar sesión', 3000, 'error');
       }

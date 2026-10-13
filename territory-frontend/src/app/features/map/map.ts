@@ -23,7 +23,6 @@ import type { ModoMarcado } from './mapa.types';
 
 const CLAVE_TEMA = 'territory_theme';
 const CLAVE_FONDO = 'territory_satellite';
-const CLAVE_TUTORIAL = 'mapa.tutorial.visto';
 
 function leer(clave: string): string | null {
   try {
@@ -149,7 +148,6 @@ export class MapPage {
       const caja = limitesPrincipales(coleccion, 0.12);
       if (caja) this.vista.encuadrarTodo(caja);
     }
-    if (!leer(CLAVE_TUTORIAL)) this.verTutorial.set(true);
   }
 
   private medirPanel(panel: HTMLElement): void {
@@ -253,7 +251,6 @@ export class MapPage {
 
   protected cerrarTutorial(): void {
     this.verTutorial.set(false);
-    escribir(CLAVE_TUTORIAL, '1');
   }
 
   protected salir(): void {

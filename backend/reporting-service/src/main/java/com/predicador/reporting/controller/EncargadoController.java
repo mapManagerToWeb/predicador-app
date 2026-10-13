@@ -106,6 +106,18 @@ public class EncargadoController {
         return withSessionCookie(withToken(encargadoService.autenticar(body.telefono(), body.pin())));
     }
 
+    /**
+     * Público (sin sesión): si el registro está abierto. La app lo consulta
+     * para no ofrecer «Crear perfil» cuando el administrador lo cerró. Solo
+     * devuelve ese dato.
+     */
+    @GetMapping("/registro")
+    public ResponseEntity<Map<String, Boolean>> registro() {
+        return ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(Map.of("abierto", encargadoService.registroAbierto()));
+    }
+
     @GetMapping("/session")
     public ResponseEntity<?> validateSession(HttpServletRequest request) {
         SessionToken sessionToken = RequestTokens.token(request);

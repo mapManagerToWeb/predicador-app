@@ -24,6 +24,7 @@ import {
   encuadrarDentroDeLimites,
   limitesDeNavegacion,
   limitesPrincipales,
+  TAMANO_NUMERO_TERRITORIO,
   temaOscuro,
 } from '../../core/map/base-map';
 import {
@@ -180,8 +181,8 @@ export class VisorPage {
       type: 'symbol',
       source: 'etiquetas',
       minzoom: 12.5,
-      layout: { 'text-field': ['get', 'etiqueta'], 'text-font': ['Open Sans Semibold'], 'text-size': 13 },
-      paint: { 'text-color': '#111111', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 },
+      layout: { 'text-field': ['get', 'etiqueta'], 'text-font': ['Open Sans Semibold'], 'text-size': TAMANO_NUMERO_TERRITORIO, 'text-padding': 4 },
+      paint: { 'text-color': '#000000', 'text-halo-color': '#ffffff', 'text-halo-width': 2.6 },
     });
     map.on('click', 'manzanas-fill', e => {
       const t = e.features?.[0]?.properties?.['territorio'] as number | undefined;

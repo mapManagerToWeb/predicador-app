@@ -75,8 +75,11 @@ describe('MapPage', () => {
     expect(el.querySelector('app-tutorial')).toBeNull();
   });
 
-  it('muestra el tutorial la primera vez', async () => {
-    const { el } = await abrirPagina(false);
+  it('el tutorial no se abre solo, ni la primera vez: solo con el botón «?»', async () => {
+    const { fixture, el } = await abrirPagina(false);
+    expect(el.querySelector('app-tutorial')).toBeNull();
+    (el.querySelector('[data-tutorial="ayuda"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
     expect(el.querySelector('app-tutorial')).not.toBeNull();
   });
 

@@ -227,6 +227,11 @@ public class EncargadoService {
         }
     }
 
+    /** ¿Se puede crear una cuenta desde la app? (lo decide el administrador en el panel). */
+    public boolean registroAbierto() {
+        return configuracion == null || configuracion.registroAbierto();
+    }
+
     private void exigirRegistroAbierto() {
         if (configuracion != null && !configuracion.registroAbierto()) {
             throw new EncargadoLoginException(HttpStatus.FORBIDDEN, EncargadoLoginException.REGISTRO_CERRADO,

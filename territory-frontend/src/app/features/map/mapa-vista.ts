@@ -7,7 +7,7 @@ import type {
   Marker,
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString, Point, Position } from 'geojson';
-import { cambiarFondo, crearMapa, encuadrarDentroDeLimites, temaOscuro, type FondoMapa, type MapLibre } from '../../core/map/base-map';
+import { cambiarFondo, crearMapa, TAMANO_NUMERO_TERRITORIO, encuadrarDentroDeLimites, temaOscuro, type FondoMapa, type MapLibre } from '../../core/map/base-map';
 import { franjaDeLados, type GeometriaManzana } from './utils/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import type { EdicionLados } from './mapa.types';
@@ -216,17 +216,19 @@ export class MapaVista {
       layout: {
         'text-field': ['get', 'etiqueta'],
         'text-font': ['Open Sans Semibold'],
-        'text-size': 14,
+        // Grandes y con buen contraste: hay hermanos con poca vista.
+        'text-size': TAMANO_NUMERO_TERRITORIO,
         'icon-image': 'pildora',
         'icon-text-fit': 'both',
-        'icon-text-fit-padding': [3, 7, 3, 7],
+        'icon-text-fit-padding': [4, 9, 4, 9],
         
         'text-padding': 4,
       },
       paint: {
-        'text-color': '#111827',
-        'text-opacity': ['case', ATENUADA, 0.45, 1],
-        'icon-opacity': ['case', ATENUADA, 0.45, 1],
+        'text-color': '#000000',
+        // Con un territorio abierto los demás se atenúan, pero siguen leyéndose.
+        'text-opacity': ['case', ATENUADA, 0.8, 1],
+        'icon-opacity': ['case', ATENUADA, 0.8, 1],
       },
     });
   }
@@ -240,9 +242,9 @@ export class MapaVista {
     canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.strokeStyle = 'rgba(17,24,39,0.25)';
-    ctx.lineWidth = r;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(17,24,39,0.7)';
+    ctx.lineWidth = 1.5 * r;
     ctx.beginPath();
     ctx.roundRect(r, r, w - 2 * r, h - 2 * r, 10 * r);
     ctx.fill();

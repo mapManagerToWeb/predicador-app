@@ -80,10 +80,17 @@
         Ver territorios sin iniciar sesión
       </a>
 
-      <div class="auth-footer">
-        <span>¿No tienes cuenta?</span>
-        <a routerLink="/profile" [queryParams]="telefono() ? { telefono: telefono() } : {}">Crear perfil</a>
-      </div>
+      @if (registroAbierto() === true) {
+        <div class="auth-footer">
+          <span>¿No tienes cuenta?</span>
+          <a routerLink="/profile" [queryParams]="telefono() ? { telefono: telefono() } : {}">Crear perfil</a>
+        </div>
+      } @else if (registroAbierto() === false) {
+        <!-- El administrador cerró el registro: no se ofrece crear cuenta. -->
+        <div class="auth-footer">
+          <span>¿No tienes cuenta? Pídele al administrador que te registre.</span>
+        </div>
+      }
     </div>
   </div>
 </div>

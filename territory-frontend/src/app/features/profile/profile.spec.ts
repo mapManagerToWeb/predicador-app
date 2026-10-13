@@ -10,7 +10,7 @@ describe('ProfilePage', () => {
   let fixture: ComponentFixture<ProfilePage>;
   let component: ProfilePage;
   let profile: { hasProfile: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
-  let encargadoService: { buscarOCrear: ReturnType<typeof vi.fn> };
+  let encargadoService: { buscarOCrear: ReturnType<typeof vi.fn>; registroAbierto: ReturnType<typeof vi.fn> };
   let toast: { show: ReturnType<typeof vi.fn> };
   let authToken: { hasToken: ReturnType<typeof vi.fn> };
   let queryParams: Record<string, string>;
@@ -23,7 +23,7 @@ describe('ProfilePage', () => {
 
   beforeEach(async () => {
     profile = { hasProfile: vi.fn().mockReturnValue(false), save: vi.fn() };
-    encargadoService = { buscarOCrear: vi.fn() };
+    encargadoService = { buscarOCrear: vi.fn(), registroAbierto: vi.fn().mockResolvedValue(true) };
     toast = { show: vi.fn() };
     authToken = { hasToken: vi.fn().mockReturnValue(true) };
     queryParams = {};
@@ -76,6 +76,16 @@ describe('ProfilePage', () => {
     component.ngOnInit();
 
     expect(component.telefono()).toBe('912345678');
+  });
+
+  it('con el registro cerrado avisa y vuelve al login; abierto, se queda', async () => {
+    await component.salirSiElRegistroEstaCerrado();
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    encargadoService.registroAbierto.mockResolvedValue(false);
+    await component.salirSiElRegistroEstaCerrado();
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('cerrado'), 6000, 'warning');
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
 
   it('updates fields from input events', () => {
