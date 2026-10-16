@@ -16,15 +16,17 @@ import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { ExpressionSpecification, Map as MapLibreMap } from 'maplibre-gl';
 import { environment } from '../../../environments/environment';
 import {
+  agregarPildoras,
   cambiarFondo,
+  conSituacion,
   crearMapa,
+  DISENO_NUMEROS,
   etiquetasTerritorios,
   type FondoMapa,
   limites,
   encuadrarDentroDeLimites,
   limitesDeNavegacion,
   limitesPrincipales,
-  TAMANO_NUMERO_TERRITORIO,
   temaOscuro,
 } from '../../core/map/base-map';
 import {
@@ -152,7 +154,12 @@ export class VisorPage {
     const color: ExpressionSpecification = ['get', 'color'];
     map.addSource('manzanas', { type: 'geojson', data: manzanas });
     map.addSource('zonas', { type: 'geojson', data: zonas });
-    map.addSource('etiquetas', { type: 'geojson', data: etiquetasTerritorios(manzanas) });
+    // El cuadrito de cada número va del color de cómo va el territorio (igual que en el mapa de los encargados).
+    const resumen = this.resumen();
+    map.addSource('etiquetas', {
+      type: 'geojson',
+      data: conSituacion(etiquetasTerritorios(manzanas), t => resumen.get(t)?.situacion ?? 'sin-registro'),
+    });
     map.addLayer({
       id: 'manzanas-fill',
       type: 'fill',
@@ -176,13 +183,13 @@ export class VisorPage {
       filter: ['==', ['get', 'territorio'], -1],
       paint: { 'line-color': '#111827', 'line-width': 3 },
     });
+    agregarPildoras(map);
     map.addLayer({
       id: 'etiquetas',
       type: 'symbol',
       source: 'etiquetas',
-      minzoom: 12.5,
-      layout: { 'text-field': ['get', 'etiqueta'], 'text-font': ['Open Sans Semibold'], 'text-size': TAMANO_NUMERO_TERRITORIO, 'text-padding': 4 },
-      paint: { 'text-color': '#000000', 'text-halo-color': '#ffffff', 'text-halo-width': 2.6 },
+      layout: { ...DISENO_NUMEROS },
+      paint: { 'text-color': '#000000' },
     });
     map.on('click', 'manzanas-fill', e => {
       const t = e.features?.[0]?.properties?.['territorio'] as number | undefined;

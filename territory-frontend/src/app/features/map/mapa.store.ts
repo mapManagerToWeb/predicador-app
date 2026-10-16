@@ -7,7 +7,7 @@ import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
 import { DraftMarksService } from '../../core/services/map-draft';
-import { estaEnLista, idsDeLista, type EstadoTerritorioPublico } from '../../core/map/estado-publico';
+import { estaEnLista, idsDeLista, situacionDe, type EstadoTerritorioPublico, type SituacionTerritorio } from '../../core/map/estado-publico';
 import type { Reporte } from '../../core/models/models';
 import { WhatsAppService } from './services/whatsapp';
 import { getColorForTerritorio } from './utils/territory-colors';
@@ -179,7 +179,15 @@ export class MapaStore {
       marcadas,
       zonas: { type: 'FeatureCollection', features: zonas },
       editando: this.edicion()?.manzanaId ?? null,
+      situaciones: this.situaciones(),
     };
+  });
+
+  /** Cómo va cada territorio según su último reporte (color del cuadrito de su número). */
+  readonly situaciones = computed(() => {
+    const s = new Map<number, SituacionTerritorio>();
+    for (const e of this.estados().values()) s.set(e.territorio, situacionDe(e));
+    return s;
   });
 
   constructor() {

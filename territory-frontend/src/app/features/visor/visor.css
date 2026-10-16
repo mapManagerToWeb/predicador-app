@@ -163,3 +163,23 @@
 :host ::ng-deep .maplibregl-ctrl-top-right {
   top: calc(max(12px, env(safe-area-inset-top)) + 50px);
 }
+
+/* Cuadrito del número de territorio, con el color de cómo va (igual que en el mapa: COLOR_SITUACION). */
+.cuadrito {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border: 1.5px solid rgba(17, 24, 39, 0.7);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+.cuadrito.completado { background: #4ade80; }
+.cuadrito.en-curso { background: #fde047; }

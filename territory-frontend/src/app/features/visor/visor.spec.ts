@@ -9,6 +9,8 @@ const mapa = {
   addControl: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn(),
+  hasImage: vi.fn(() => false),
+  addImage: vi.fn(),
   on: vi.fn(),
   fitBounds: vi.fn(),
   setMaxBounds: vi.fn(),
@@ -71,6 +73,18 @@ describe('VisorPage', () => {
     expect(mapa.addSource).toHaveBeenCalledWith('manzanas', expect.objectContaining({ type: 'geojson' }));
     expect(el.textContent).not.toMatch(/Marcar|Enviar|Guardar/);
     expect(el.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('el cuadrito del número lleva el color de cómo va el territorio', async () => {
+    await abrir();
+
+    const etiquetas = mapa.addSource.mock.calls.find(c => c[0] === 'etiquetas')?.[1] as {
+      data: { features: { properties: { territorio: number; situacion: string } }[] };
+    };
+    expect(etiquetas.data.features.find(f => f.properties.territorio === 5)?.properties.situacion).toBe('en-curso');
+    const capa = mapa.addLayer.mock.calls.map(c => c[0] as { id: string; layout?: Record<string, unknown> })
+      .find(l => l.id === 'etiquetas');
+    expect(capa?.layout?.['icon-image']).toBeDefined();
   });
 
   it('al buscar un territorio muestra su estado y fecha', async () => {

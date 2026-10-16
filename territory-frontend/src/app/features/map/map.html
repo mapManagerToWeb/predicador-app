@@ -82,6 +82,11 @@
         <p class="indicacion">
           <strong>Busca tu territorio</strong> arriba o tócalo en el mapa para empezar.
         </p>
+        <p class="colores" aria-label="Qué significan los colores de los números">
+          <span><span class="cuadrito completado">12</span> Completo</span>
+          <span><span class="cuadrito en-curso">12</span> Empezado</span>
+          <span><span class="cuadrito">12</span> Sin trabajar</span>
+        </p>
       } @else {
         @if (store.resumenes().length === 1) {
           <!-- Un territorio: tarjeta con el detalle. -->
