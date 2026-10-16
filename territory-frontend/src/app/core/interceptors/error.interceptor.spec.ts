@@ -7,6 +7,7 @@ import {
 import { Router, provideRouter } from '@angular/router';
 import { AuthTokenService } from '../services/auth-token';
 import { Profile } from '../services/profile';
+import { Toast } from '../services/toast';
 import { errorInterceptor } from './error.interceptor';
 
 describe('errorInterceptor', () => {
@@ -63,6 +64,19 @@ describe('errorInterceptor', () => {
 
     expect(authToken.role()).toBe('encargado');
     expect(navSpy).not.toHaveBeenCalled();
+  });
+
+  it('un 403 del módulo Sistema (pase vencido) lo maneja la página: sin toast ni cierre de sesión', () => {
+    authToken.set('admin');
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const toastSpy = vi.spyOn(TestBed.inject(Toast), 'show');
+
+    http.get('/api/v1/sistema/estado').subscribe({ error: () => void 0 });
+    httpMock.expectOne('/api/v1/sistema/estado').flush({ code: 'sistema_bloqueado' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(authToken.role()).toBe('admin');
+    expect(navSpy).not.toHaveBeenCalled();
+    expect(toastSpy).not.toHaveBeenCalled();
   });
 
   it('propaga el error para que el caller pueda reaccionar', () => {

@@ -82,17 +82,47 @@ services:
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-12}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-true}
+      # Módulo «Sistema» del panel: contenedores vía el intermediario de solo
+      # lectura y, opcional, el enlace a Portainer (no se guarda en el repo).
+      - DOCKER_LECTURA_URL=http://docker-lectura:2375
+      - PORTAINER_URL=${PORTAINER_URL:-}
       # OpenTelemetry: los exporters OTLP estan deshabilitados por defecto.
       # Para activar tracing con el colector, levantar con el perfil observability
       # y exportar en el shell del host:
       #   export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       #   export OTEL_TRACES_EXPORTER=otlp
+    networks:
+      - default
+      - sistema
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8090/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  # Intermediario de SOLO LECTURA entre el gateway y Docker para el panel
+  # «Sistema» (ver docker-lectura/haproxy.cfg): deja pasar la lista de
+  # contenedores y su memoria, y rechaza todo lo demás (encender, apagar,
+  # ejecutar, «inspect» con las contraseñas). Corre como root solo para poder
+  # leer el socket: sin capacidades, sin escribir en disco y en una red interna
+  # a la que solo llega el gateway (no publica ningún puerto).
+  docker-lectura:
+    image: haproxy:3.2.26-alpine
+    container_name: docker-lectura
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - label:disable
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker-lectura/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - sistema
+    restart: unless-stopped
 
   territory-service:
     build:
@@ -319,3 +349,8 @@ volumes:
   prometheus_data:
   grafana_data:
   rabbitmq_data:
+
+networks:
+  # Solo el gateway y docker-lectura; sin salida a internet.
+  sistema:
+    internal: true

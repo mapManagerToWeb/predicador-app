@@ -22,6 +22,11 @@ app:
     cookie-secure: ${SESSION_COOKIE_SECURE:false}
   csrf:
     cookie-secure: ${CSRF_COOKIE_SECURE:false}
+  # Módulo «Sistema» del panel (solo lectura). Sin DOCKER_LECTURA_URL no muestra
+  # contenedores; sin PORTAINER_URL no muestra el botón «Abrir Portainer».
+  sistema:
+    docker-url: ${DOCKER_LECTURA_URL:}
+    portainer-url: ${PORTAINER_URL:}
 
 server:
   port: 8080

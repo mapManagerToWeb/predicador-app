@@ -182,3 +182,48 @@ export interface ResultadoCorreccionSalida {
   /** Después hubo una corrección o un cierre de ciclo: desde ahí el estado no se tocó. */
   detenido: boolean;
 }
+
+// ── Módulo «Sistema» (estado del VPS, solo lectura) ──
+
+export interface ServidorSistema {
+  memoriaTotal: number;
+  memoriaUsada: number;
+  discoTotal: number;
+  discoUsado: number;
+  /** % de uso de CPU medido en medio segundo, o null si no se pudo leer. */
+  cpu: number | null;
+  nucleos: number;
+  encendidoSegundos: number | null;
+}
+
+export interface ContenedorSistema {
+  nombre: string;
+  imagen: string;
+  /** Estado de Docker: running, exited, restarting, paused, created, dead. */
+  estado: string;
+  /** Texto de Docker, p. ej. "Up 3 hours (healthy)" o "Exited (0) 2 days ago". */
+  detalle: string;
+  /** Cuándo se creó el contenedor: la última vez que se desplegó ese servicio. */
+  creado: string | null;
+  memoriaUsada: number | null;
+  memoriaLimite: number | null;
+  /** Proyecto de Docker Compose (la app es uno; en el servidor puede haber otros). */
+  proyecto: string | null;
+}
+
+export interface RespaldoSistema {
+  fecha: string;
+  resultado: 'ok' | 'fallo' | 'en-curso';
+  tamano: number | null;
+  url: string;
+}
+
+export interface EstadoSistema {
+  hora: string;
+  servidor: ServidorSistema;
+  /** null: no se pudo consultar Docker. */
+  contenedores: ContenedorSistema[] | null;
+  /** null: no se pudo consultar GitHub. */
+  respaldos: RespaldoSistema[] | null;
+  portainerUrl: string | null;
+}

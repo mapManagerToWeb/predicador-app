@@ -1,0 +1,169 @@
+<header class="adm-head">
+  <div>
+    <h1>Sistema</h1>
+    <p>
+      @if (estado(); as e) {
+        Estado del servidor, actualizado cada 15 segundos (última vez {{ fmtFechaHora(e.hora) }}).
+      } @else {
+        Estado del servidor, los servicios y los respaldos. Solo para mirar.
+      }
+    </p>
+  </div>
+  @if (bloqueado() === false) {
+    <div class="adm-toolbar">
+      <button class="adm-btn" type="button" (click)="cargar()" [disabled]="cargando()">Actualizar</button>
+      @if (estado()?.portainerUrl; as url) {
+        <a class="adm-btn primary" [href]="url" target="_blank" rel="noopener noreferrer">Abrir Portainer</a>
+      }
+      <button class="adm-btn" type="button" (click)="salir()">Cerrar</button>
+    </div>
+  }
+</header>
+
+@if (bloqueado() === true) {
+  <section class="adm-card bloqueo">
+    <h2>Vuelve a escribir la contraseña</h2>
+    <p class="adm-sub">
+      Por seguridad, esta sección la pide de nuevo. Se cierra sola tras 15 minutos sin uso, y siempre a la hora.
+    </p>
+    <form (submit)="$event.preventDefault(); entrar()">
+      <label class="adm-field">
+        <span>Contraseña del administrador</span>
+        <input type="password" autocomplete="current-password" [value]="clave()" (input)="escribirClave($event)" required />
+      </label>
+      @if (errorClave(); as e) {
+        <p class="adm-alert" role="alert">{{ e }}</p>
+      }
+      <button class="adm-btn primary" type="submit" [disabled]="!clave() || entrando()">
+        {{ entrando() ? 'Entrando…' : 'Entrar' }}
+      </button>
+    </form>
+  </section>
+} @else if (bloqueado() === null) {
+  <p class="adm-empty">Cargando…</p>
+} @else if (estado(); as e) {
+  @if (error()) {
+    <div class="adm-alert" role="alert">{{ error() }}</div>
+  }
+  @if (problemas().length) {
+    <div class="adm-alert" role="alert">
+      Hay {{ problemas().length === 1 ? 'un servicio' : problemas().length + ' servicios' }} con problemas:
+      {{ nombresConProblemas() }}. Revísalo en Portainer.
+    </div>
+  }
+
+  <section class="adm-kpis" aria-label="Servidor">
+    <div class="adm-kpi">
+      <span>Memoria</span>
+      <strong>{{ memoria() ?? '—' }}%</strong>
+      <div class="barra" [class]="'barra ' + tonoUso(memoria())"><i [style.width.%]="memoria() ?? 0"></i></div>
+      <small>{{ fmtBytes(e.servidor.memoriaUsada) }} de {{ fmtBytes(e.servidor.memoriaTotal) }}</small>
+    </div>
+    <div class="adm-kpi">
+      <span>Disco</span>
+      <strong>{{ disco() ?? '—' }}%</strong>
+      <div class="barra" [class]="'barra ' + tonoUso(disco())"><i [style.width.%]="disco() ?? 0"></i></div>
+      <small>
+        {{ fmtBytes(e.servidor.discoUsado) }} de {{ fmtBytes(e.servidor.discoTotal) }}
+        @if ((disco() ?? 0) >= 85) { · ¡queda poco espacio! }
+      </small>
+    </div>
+    <div class="adm-kpi">
+      <span>CPU</span>
+      <strong>{{ e.servidor.cpu ?? '—' }}%</strong>
+      <div class="barra" [class]="'barra ' + tonoUso(e.servidor.cpu)"><i [style.width.%]="e.servidor.cpu ?? 0"></i></div>
+      <small>{{ e.servidor.nucleos }} {{ e.servidor.nucleos === 1 ? 'núcleo' : 'núcleos' }}</small>
+    </div>
+    <div class="adm-kpi">
+      <span>Encendido hace</span>
+      <strong class="texto">{{ fmtDuracion(e.servidor.encendidoSegundos) }}</strong>
+      <small>sin reiniciarse el servidor</small>
+    </div>
+  </section>
+
+  <section class="adm-card">
+    <h2>Servicios</h2>
+    <p class="adm-sub">Cada contenedor de Docker. «Actualizado» es la última vez que se desplegó.</p>
+    @if (e.contenedores) {
+      <ng-container *ngTemplateOutlet="tabla; context: { $implicit: servicios() }" />
+      @if (otros().length) {
+        <h3 class="otros">Otros contenedores del servidor</h3>
+        <p class="adm-sub">No son parte de la app (por ejemplo Portainer u otros proyectos): se muestran, pero no generan avisos.</p>
+        <ng-container *ngTemplateOutlet="tabla; context: { $implicit: otros() }" />
+      }
+    } @else {
+      <p class="adm-empty">
+        No se pudo consultar Docker. En el VPS, revisa que esté corriendo el contenedor «docker-lectura».
+      </p>
+    }
+  </section>
+
+  <section class="adm-card">
+    <h2>Respaldos de la base de datos</h2>
+    <p class="adm-sub">
+      Se hacen solos cada día en GitHub, cifrados (nadie puede leerlos sin la llave privada), y se guardan 90 días.
+      Para descargar uno, ábrelo en GitHub con tu cuenta.
+    </p>
+    @if (e.respaldos; as lista) {
+      @if (respaldoViejo()) {
+        <p class="adm-alert" role="alert">
+          @if (ultimoRespaldoBueno(); as r) {
+            El último respaldo bueno es del {{ fmtFechaHora(r.fecha) }}: hace más de un día que no se respalda.
+          } @else {
+            No hay ningún respaldo bueno reciente.
+          }
+        </p>
+      }
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr><th>Fecha</th><th>Resultado</th><th class="num">Tamaño</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (r of lista; track r.url) {
+              @let res = resultadoRespaldo(r);
+              <tr>
+                <td>{{ fmtFechaHora(r.fecha) }}</td>
+                <td><span class="adm-badge" [class]="'adm-badge ' + res.tono">{{ res.texto }}</span></td>
+                <td class="num">{{ fmtBytes(r.tamano) }}</td>
+                <td><a [href]="r.url" target="_blank" rel="noopener noreferrer">Ver en GitHub</a></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="adm-empty">Todavía no hay respaldos.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="adm-muted nota">Para restaurar un respaldo se usa <code>scripts/db/restaurar.sh</code> en el VPS (no desde aquí, a propósito).</p>
+    } @else {
+      <p class="adm-empty">No se pudo consultar GitHub. Prueba de nuevo en unos minutos.</p>
+    }
+  </section>
+}
+
+<ng-template #tabla let-lista>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr><th>Servicio</th><th>Estado</th><th class="num">Memoria</th><th>Actualizado</th><th>Imagen</th></tr>
+      </thead>
+      <tbody>
+        @for (c of lista; track c.nombre) {
+          @let est = estadoContenedor(c);
+          <tr>
+            <td><strong>{{ c.nombre }}</strong></td>
+            <td>
+              <span class="adm-badge" [class]="'adm-badge ' + est.tono">{{ est.texto }}</span>
+              <small class="adm-muted detalle">{{ c.detalle }}</small>
+            </td>
+            <td class="num">{{ fmtBytes(c.memoriaUsada) }}</td>
+            <td class="adm-muted">{{ c.creado ? fmtRelativo(c.creado) : '—' }}</td>
+            <td class="adm-muted imagen" [title]="c.imagen">{{ c.imagen }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="5" class="adm-empty">No hay contenedores.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</ng-template>

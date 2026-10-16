@@ -28,5 +28,10 @@ export const ADMIN_ROUTES: Routes = [
     title: 'S-13 y ciclos · Administración',
     loadComponent: () => import('./pages/s13/s13').then(m => m.S13Page),
   },
+  {
+    path: 'sistema',
+    title: 'Sistema · Administración',
+    loadComponent: () => import('./pages/sistema/sistema').then(m => m.SistemaPage),
+  },
   { path: '**', redirectTo: 'resumen' },
 ];
