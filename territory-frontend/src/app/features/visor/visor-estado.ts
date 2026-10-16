@@ -1,7 +1,13 @@
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
-import { estaEnLista, idsDeLista, type EstadoTerritorioPublico } from '../../core/map/estado-publico';
+import {
+  estaEnLista,
+  idsDeLista,
+  situacionDe,
+  type EstadoTerritorioPublico,
+  type SituacionTerritorio,
+} from '../../core/map/estado-publico';
 
-export type { EstadoTerritorioPublico };
+export type { EstadoTerritorioPublico, SituacionTerritorio };
 
 /** Propiedades del GeoJSON público de manzanas (GET /territories/all/geojson). */
 export interface PropsManzanaPublica {
@@ -11,8 +17,6 @@ export interface PropsManzanaPublica {
   territorio_padre: number;
   color: string | null;
 }
-
-export type SituacionTerritorio = 'completado' | 'en-curso' | 'sin-registro';
 
 export interface ResumenTerritorio {
   territorio: number;
@@ -106,9 +110,9 @@ export function resumenTerritorios(
     const e = porEstado.get(r.territorio);
     if (!e?.ultimoTrabajo) continue;
     r.ultimoTrabajo = new Date(e.ultimoTrabajo);
+    // Tras un reinicio de ciclo se conserva cuándo se completó.
     r.ultimoCompletado = e.ultimoCompletado ? new Date(e.ultimoCompletado) : null;
-    // Reinicio de ciclo: vuelve a empezar, sin trabajo todavía (se conserva cuándo se completó).
-    r.situacion = e.estado === 'completed' ? 'completado' : e.estado === 'reiniciado' ? 'sin-registro' : 'en-curso';
+    r.situacion = situacionDe(e);
   }
   return resumen;
 }

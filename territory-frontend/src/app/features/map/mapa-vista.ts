@@ -7,7 +7,18 @@ import type {
   Marker,
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString, Point, Position } from 'geojson';
-import { cambiarFondo, crearMapa, TAMANO_NUMERO_TERRITORIO, encuadrarDentroDeLimites, temaOscuro, type FondoMapa, type MapLibre } from '../../core/map/base-map';
+import {
+  agregarPildoras,
+  cambiarFondo,
+  conSituacion,
+  crearMapa,
+  DISENO_NUMEROS,
+  encuadrarDentroDeLimites,
+  temaOscuro,
+  type FondoMapa,
+  type MapLibre,
+} from '../../core/map/base-map';
+import type { SituacionTerritorio } from '../../core/map/estado-publico';
 import { franjaDeLados, type GeometriaManzana } from './utils/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import type { EdicionLados } from './mapa.types';
@@ -30,6 +41,8 @@ export interface EstadoVista {
   marcadas: Set<string>;
   zonas: FeatureCollection<GeometriaManzana, { territorio: number; color: string }>;
   editando: string | null;
+  /** Cómo va cada territorio (color del cuadrito de su número); los que faltan, sin registro. */
+  situaciones: Map<number, SituacionTerritorio>;
 }
 
 export interface Toque {
@@ -93,6 +106,9 @@ export class MapaVista {
   private limiteBase: [[number, number], [number, number]] | null = null;
   private ubicacion: UbicacionMapa | null = null;
   private fondo: FondoMapa = 'mapa';
+  private etiquetas: FeatureCollection<Point, { territorio: number; etiqueta: string }> = { type: 'FeatureCollection', features: [] };
+  /** Situaciones ya pintadas en los cuadritos (para no reemplazar las etiquetas si no cambiaron). */
+  private firmaSituaciones = '';
   private observadorTema: MutationObserver | null = null;
   private capturando = false;
 
@@ -120,7 +136,8 @@ export class MapaVista {
     const { maplibre, map } = await crearMapa(contenedor, fondo);
     const vista = new MapaVista(maplibre, map, manzanas, eventos);
     vista.fondo = fondo;
-    vista.agregarCapas(etiquetas);
+    vista.etiquetas = etiquetas;
+    vista.agregarCapas();
     vista.agregarUbicacion();
     map.on('click', e => vista.alHacerClick(e));
     // Si el usuario mueve el mapa, ya no se repite el último encuadre.
@@ -140,7 +157,7 @@ export class MapaVista {
 
   // ── Capas ──
 
-  private agregarCapas(etiquetas: FeatureCollection<Point, { territorio: number; etiqueta: string }>): void {
+  private agregarCapas(): void {
     const map = this.map;
     map.addSource('manzanas', {
       type: 'geojson',
@@ -155,10 +172,7 @@ export class MapaVista {
       },
     });
     map.addSource('zonas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addSource('etiquetas', {
-      type: 'geojson',
-      data: { ...etiquetas, features: etiquetas.features.map(f => ({ ...f, id: f.properties.territorio })) },
-    });
+    map.addSource('etiquetas', { type: 'geojson', data: this.datosEtiquetas(new Map()) });
     map.addSource('lados', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addSource('franja', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
@@ -208,22 +222,12 @@ export class MapaVista {
       paint: { 'line-color': '#111827', 'line-width': 5, 'line-dasharray': [0, 1.6, 1.4] },
     });
 
-    this.agregarImagenPildora();
+    agregarPildoras(map);
     map.addLayer({
       id: 'etiquetas',
       type: 'symbol',
       source: 'etiquetas',
-      layout: {
-        'text-field': ['get', 'etiqueta'],
-        'text-font': ['Open Sans Semibold'],
-        // Grandes y con buen contraste: hay hermanos con poca vista.
-        'text-size': TAMANO_NUMERO_TERRITORIO,
-        'icon-image': 'pildora',
-        'icon-text-fit': 'both',
-        'icon-text-fit-padding': [4, 9, 4, 9],
-        
-        'text-padding': 4,
-      },
+      layout: { ...DISENO_NUMEROS },
       paint: {
         'text-color': '#000000',
         // Con un territorio abierto los demás se atenúan, pero siguen leyéndose.
@@ -233,34 +237,29 @@ export class MapaVista {
     });
   }
 
-  /** Fondo blanco redondeado estirable para los números de territorio. */
-  private agregarImagenPildora(): void {
-    const r = 2;
-    const [w, h] = [24 * r, 24 * r];
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = 'rgba(17,24,39,0.7)';
-    ctx.lineWidth = 1.5 * r;
-    ctx.beginPath();
-    ctx.roundRect(r, r, w - 2 * r, h - 2 * r, 10 * r);
-    ctx.fill();
-    ctx.stroke();
-    this.map.addImage('pildora', ctx.getImageData(0, 0, w, h), {
-      pixelRatio: r,
-      stretchX: [[10 * r, 14 * r]],
-      stretchY: [[10 * r, 14 * r]],
-      content: [6 * r, 6 * r, 18 * r, 18 * r],
-    });
+  /** Etiquetas con la situación de cada territorio; el id es el número (feature-state de atenuado). */
+  private datosEtiquetas(situaciones: Map<number, SituacionTerritorio>) {
+    const etiquetas = conSituacion(this.etiquetas, t => situaciones.get(t) ?? 'sin-registro');
+    return { ...etiquetas, features: etiquetas.features.map(f => ({ ...f, id: f.properties.territorio })) };
   }
 
   // ── Estado ──
 
+  /**
+   * Colorea los cuadritos de los números. Solo cambia al cargar el estado o
+   * tras enviar un reporte: se reemplazan los puntos de las etiquetas (pocos),
+   * nunca la geometría de las manzanas.
+   */
+  private mostrarSituaciones(situaciones: Map<number, SituacionTerritorio>): void {
+    const firma = [...situaciones].filter(([, s]) => s !== 'sin-registro').map(([t, s]) => `${t}:${s}`).sort().join(',');
+    if (firma === this.firmaSituaciones) return;
+    this.firmaSituaciones = firma;
+    void (this.map.getSource('etiquetas') as GeoJSONSource | undefined)?.setData(this.datosEtiquetas(situaciones));
+  }
+
   /** Aplica el estado como feature-state: marcar una manzana no vuelve a subir la geometría. */
   mostrar(e: EstadoVista): void {
+    this.mostrarSituaciones(e.situaciones);
     const abiertos = new Set(e.abiertos);
     const hayAbiertos = abiertos.size > 0;
     const nuevo = new Map<number, Record<string, boolean>>();

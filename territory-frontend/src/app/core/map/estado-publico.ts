@@ -34,3 +34,17 @@ export function idsDeLista(lista: string | null | undefined): Set<string> {
 export function estaEnLista(ids: Set<string>, id: string, mid?: number): boolean {
   return ids.has(id) || (mid !== undefined && ids.has(String(mid)));
 }
+
+/**
+ * Cómo va un territorio en la vuelta actual, según su último reporte. Pinta el
+ * cuadrito de su número en los mapas: verde completado, amarillo en curso y
+ * blanco sin trabajar (nunca, o desde que el administrador cerró el ciclo).
+ */
+export type SituacionTerritorio = 'completado' | 'en-curso' | 'sin-registro';
+
+export function situacionDe(e: EstadoTerritorioPublico | null | undefined): SituacionTerritorio {
+  if (!e?.ultimoTrabajo) return 'sin-registro';
+  if (e.estado === 'completed') return 'completado';
+  // Reinicio de ciclo: vuelve a empezar, sin trabajo todavía.
+  return e.estado === 'reiniciado' ? 'sin-registro' : 'en-curso';
+}

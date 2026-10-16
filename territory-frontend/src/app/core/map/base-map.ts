@@ -1,6 +1,15 @@
-import type { ExpressionSpecification, FitBoundsOptions, LngLatBoundsLike, LngLatLike, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
+import type {
+  ExpressionSpecification,
+  FitBoundsOptions,
+  LngLatBoundsLike,
+  LngLatLike,
+  Map as MapLibreMap,
+  StyleSpecification,
+  SymbolLayerSpecification,
+} from 'maplibre-gl';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { puntoDeRotulo, type Poligonal } from './geometria';
+import type { SituacionTerritorio } from './estado-publico';
 
 /** Cualquier colección de manzanas (Polygon/MultiPolygon); el territorio va en `properties.territorio`. */
 type ColeccionManzanas = FeatureCollection<Polygon | MultiPolygon, { territorio: number }>;
@@ -12,9 +21,73 @@ export const ZOOM_MAXIMO = 20;
 
 /**
  * Tamaño de los números de territorio en los mapas (encargados y visor):
- * grandes para quien tiene poca vista, y más al acercarse.
+ * grandes para quien tiene poca vista, y más al acercarse. Con el mapa muy
+ * alejado son algo más chicos, para que quepan más y no desaparezcan tan
+ * luego; desde el zoom 15 tienen el tamaño de siempre.
  */
-export const TAMANO_NUMERO_TERRITORIO: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 12, 15, 15, 18, 18, 21];
+export const TAMANO_NUMERO_TERRITORIO: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 11, 11, 13, 13, 15, 18, 18, 21];
+
+/** Color del cuadrito del número según cómo va el territorio (claros: el número negro se lee bien). */
+export const COLOR_SITUACION: Record<SituacionTerritorio, string> = {
+  completado: '#4ade80',
+  'en-curso': '#fde047',
+  'sin-registro': '#ffffff',
+};
+
+/** Imagen del cuadrito según la propiedad `situacion` de la etiqueta (ver {@link agregarPildoras}). */
+export const ICONO_PILDORA: ExpressionSpecification = [
+  'match',
+  ['get', 'situacion'],
+  'completado',
+  'pildora-completado',
+  'en-curso',
+  'pildora-en-curso',
+  'pildora-sin-registro',
+];
+
+/**
+ * Cuadritos redondeados y estirables para los números de territorio, uno por
+ * situación. El borde fijo es angosto: con el mapa alejado caben más números
+ * sin taparse entre sí.
+ */
+export function agregarPildoras(map: MapLibreMap): void {
+  const r = 2;
+  const [w, h] = [24 * r, 24 * r];
+  for (const [situacion, color] of Object.entries(COLOR_SITUACION)) {
+    const id = `pildora-${situacion}`;
+    if (map.hasImage(id)) continue;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(17,24,39,0.7)';
+    ctx.lineWidth = 1.5 * r;
+    ctx.beginPath();
+    ctx.roundRect(r, r, w - 2 * r, h - 2 * r, 7 * r);
+    ctx.fill();
+    ctx.stroke();
+    map.addImage(id, ctx.getImageData(0, 0, w, h), {
+      pixelRatio: r,
+      stretchX: [[8 * r, 16 * r]],
+      stretchY: [[8 * r, 16 * r]],
+      content: [3 * r, 3 * r, 21 * r, 21 * r],
+    });
+  }
+}
+
+/** Diseño de la capa de números con cuadrito: el mismo en el mapa de los encargados y en el visor. */
+export const DISENO_NUMEROS: NonNullable<SymbolLayerSpecification['layout']> = {
+  'text-field': ['get', 'etiqueta'],
+  'text-font': ['Open Sans Semibold'],
+  // Grandes y con buen contraste: hay hermanos con poca vista.
+  'text-size': TAMANO_NUMERO_TERRITORIO,
+  'icon-image': ICONO_PILDORA,
+  'icon-text-fit': 'both',
+  'icon-text-fit-padding': [2, 5, 2, 5],
+  'text-padding': 1,
+};
 
 /** Encuadre inicial si todavía no hay manzanas cargadas (Curanilahue). */
 const ENCUADRE_INICIAL: LngLatBoundsLike = [
@@ -239,6 +312,20 @@ export function limitesPrincipales(coleccion: ColeccionManzanas, recorte = 0.03)
     [oeste - mx, sur - my],
     [este + mx, norte + my],
   ];
+}
+
+/** Las mismas etiquetas con la situación de cada territorio (para el color del cuadrito). */
+export function conSituacion<P extends { territorio: number }>(
+  etiquetas: GeoJSON.FeatureCollection<GeoJSON.Point, P>,
+  situacion: (territorio: number) => SituacionTerritorio,
+): GeoJSON.FeatureCollection<GeoJSON.Point, P & { situacion: SituacionTerritorio }> {
+  return {
+    ...etiquetas,
+    features: etiquetas.features.map(f => ({
+      ...f,
+      properties: { ...f.properties, situacion: situacion(f.properties.territorio) },
+    })),
+  };
 }
 
 /**
