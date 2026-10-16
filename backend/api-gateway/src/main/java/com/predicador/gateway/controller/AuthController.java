@@ -2,13 +2,13 @@ package com.predicador.gateway.controller;
 
 import com.predicador.shared.security.SessionToken;
 import com.predicador.shared.security.SessionTokenService;
+import com.predicador.gateway.sistema.ClaveAdministrador;
 import com.predicador.shared.security.SessionAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 
@@ -40,10 +39,9 @@ import java.util.Map;
 public class AuthController {
 
     private final String adminUsername;
-    private final String adminPassword;
-    private final String adminPasswordBcrypt;
     private final SessionTokenService tokens;
     private final boolean sessionCookieSecure;
+    private final ClaveAdministrador clave;
 
     public AuthController(
             SessionTokenService tokens,
@@ -53,9 +51,8 @@ public class AuthController {
             @Value("${app.session.cookie-secure:false}") boolean sessionCookieSecure) {
         this.tokens = tokens;
         this.adminUsername = adminUsername;
-        this.adminPassword = adminPassword;
-        this.adminPasswordBcrypt = adminPasswordBcrypt;
         this.sessionCookieSecure = sessionCookieSecure;
+        this.clave = new ClaveAdministrador(adminPassword, adminPasswordBcrypt, tokens.isStrict());
         if (tokens.isStrict() && (adminPasswordBcrypt == null || adminPasswordBcrypt.isBlank())) {
             throw new IllegalArgumentException("app.admin.password-bcrypt es obligatorio fuera del perfil local");
         }
@@ -109,39 +106,6 @@ public class AuthController {
     }
 
     private boolean passwordMatches(String provided) {
-        if (adminPasswordBcrypt != null && !adminPasswordBcrypt.isBlank()) {
-            try {
-                return BCrypt.checkpw(provided, adminPasswordBcrypt);
-            } catch (IllegalArgumentException e) {
-                // Malformed hash — treat as configuration failure, refuse login.
-                return false;
-            }
-        }
-        if (tokens.isStrict() || adminPassword == null || adminPassword.isBlank()) {
-            return false;
-        }
-        return constantTimeEquals(adminPassword, provided);
-    }
-
-    private static boolean constantTimeEquals(String a, String b) {
-        byte[] ab = a.getBytes(StandardCharsets.UTF_8);
-        byte[] bb = b.getBytes(StandardCharsets.UTF_8);
-        if (ab.length != bb.length) {
-            // Walk the shorter array to avoid out-of-bounds; length mismatch
-            // itself leaks via timing but is acceptable for password comparison
-            // (the attacker already knows the expected length from the user field).
-            int len = Math.min(ab.length, bb.length);
-            for (int i = 0; i < len; i++) {
-                // Intentional no-op: burn CPU cycles to equalize branch timing.
-                @SuppressWarnings("unused")
-                int unused = ab[i] ^ bb[i];
-            }
-            return false;
-        }
-        int diff = 0;
-        for (int i = 0; i < ab.length; i++) {
-            diff |= ab[i] ^ bb[i];
-        }
-        return diff == 0;
+        return clave.coincide(provided);
     }
 }

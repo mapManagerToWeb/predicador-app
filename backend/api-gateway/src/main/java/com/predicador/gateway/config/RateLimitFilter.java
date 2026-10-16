@@ -94,6 +94,8 @@ public class RateLimitFilter implements WebFilter, Ordered {
     private final List<Rule> rules = List.of(
             new Rule("POST", "/api/v1/auth/login", ip -> bucket(authBuckets, ip, AUTH_LIMIT)),
             new Rule("POST", "/api/v1/encargados/login", ip -> bucket(authBuckets, ip, AUTH_LIMIT)),
+            // El módulo «Sistema» vuelve a pedir la contraseña del administrador.
+            new Rule("POST", "/api/v1/sistema/entrar", ip -> bucket(authBuckets, ip, AUTH_LIMIT)),
             new Rule("POST", "/api/v1/encargados", ip -> bucket(registerBuckets, ip, REGISTER_LIMIT)),
             new Rule("POST", "/api/v1/encargados/buscar-crear",
                     ip -> bucket(registerBuckets, ip, REGISTER_LIMIT)),

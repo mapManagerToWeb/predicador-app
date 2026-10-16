@@ -10,6 +10,7 @@ import type {
   EncargadoAdmin,
   EncargadoRequest,
   EnvioWhatsApp,
+  EstadoSistema,
   ManzanaGuardada,
   ManzanaRequest,
   ManzanasCollection,
@@ -33,6 +34,7 @@ export class AdminApi {
   private readonly territorios = `${environment.apiUrl}/territories`;
   private readonly reportes = `${environment.apiUrl}/reports/admin`;
   private readonly encargados = `${environment.apiUrl}/encargados/admin`;
+  private readonly sistema = `${environment.apiUrl}/sistema`;
 
   // ── Territorios y manzanas ──
 
@@ -189,6 +191,21 @@ export class AdminApi {
     return this.send(
       this.http.put<{ registroAbierto: boolean }>(`${this.encargados}/config`, { registroAbierto }, { headers: SIN_SW }),
     );
+  }
+
+  // ── Módulo «Sistema» ──
+
+  /** Vuelve a pedir la contraseña del administrador; el pase queda en una cookie HttpOnly. */
+  entrarSistema(clave: string): Promise<void> {
+    return this.send(this.http.post<void>(`${this.sistema}/entrar`, { clave }, { headers: SIN_SW }));
+  }
+
+  estadoSistema(): Promise<EstadoSistema> {
+    return this.get<EstadoSistema>(`${this.sistema}/estado`);
+  }
+
+  salirSistema(): Promise<void> {
+    return this.send(this.http.post<void>(`${this.sistema}/salir`, {}, { headers: SIN_SW }));
   }
 
   private get<T>(url: string, params?: HttpParams): Promise<T> {

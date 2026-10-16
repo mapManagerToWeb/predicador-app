@@ -33,10 +33,10 @@ const SELF_HANDLED_PATTERNS = ['/reports/send', '/reports?'];
 
 /**
  * Endpoints del panel de administración (`/territories/admin`,
- * `/reports/admin`, `/encargados/admin`): cada página muestra el `detail`
- * del ProblemDetail, más útil que un toast genérico.
+ * `/reports/admin`, `/encargados/admin`, `/sistema`): cada página muestra el
+ * `detail` del ProblemDetail, más útil que un toast genérico.
  */
-const ADMIN_URL_PATTERN = /\/(territories|reports|encargados)\/admin(\/|\?|$)/;
+const ADMIN_URL_PATTERN = /\/(territories|reports|encargados)\/admin(\/|\?|$)|\/sistema(\/|\?|$)/;
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(Toast);

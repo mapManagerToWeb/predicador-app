@@ -28,10 +28,15 @@ public final class SecurityRules {
     private static final SecurityRule ENCARGADOS_ADMIN = SecurityRule.any(
             ALL_METHODS, "^/api/v1/encargados/admin(/.*)?$", SessionToken.ROLE_ADMIN);
 
+    /** Módulo «Sistema» del panel (estado del VPS): solo el administrador; el gateway lo atiende directo. */
+    private static final SecurityRule SISTEMA = SecurityRule.any(
+            ALL_METHODS, "^/api/v1/sistema(/.*)?$", SessionToken.ROLE_ADMIN);
+
     private SecurityRules() {}
 
     
     public static final List<SecurityRule> GATEWAY = List.of(
+            SISTEMA,
             TERRITORY_ADMIN,
             REPORTS_ADMIN,
             ENCARGADOS_ADMIN,
