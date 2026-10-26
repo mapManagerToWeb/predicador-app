@@ -50,7 +50,7 @@
             minor line, so no cross-minor upgrade is introduced.
         -->
         <bouncycastle.version>1.85</bouncycastle.version>
-        <jackson2.version>2.21.7</jackson2.version>
+        <jackson2.version>2.22.4</jackson2.version>
         <jackson3.version>3.1.7</jackson3.version>
         <freemarker.version>2.3.35</freemarker.version>
     </properties>
