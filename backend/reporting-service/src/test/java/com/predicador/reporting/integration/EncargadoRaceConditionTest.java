@@ -5,7 +5,7 @@ import com.predicador.reporting.dto.EncargadoDto;
 import com.predicador.reporting.repository.EncargadoRepository;
 import com.predicador.reporting.service.EncargadoService;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -14,6 +14,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -35,11 +38,15 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
  *
  * <p>Requires Docker for Testcontainers PostgreSQL. Run with:
  * {@code mvn -pl reporting-service test
- * -Dtest=EncargadoRaceConditionIT -Ddocker.available=true}
+ * -Dtest=EncargadoRaceConditionTest -Ddocker.available=true}
+ *
+ * <p>The {@code Test} suffix is deliberate: surefire's default includes are
+ * {@code *Test}, {@code Test*}, {@code *Tests} and {@code *TestCase}, so a
+ * class named {@code *IT} never runs and there is no failsafe plugin here.
  */
 @SpringBootTest(classes = ReportingServiceApp.class)
-@EnabledIfEnvironmentVariable(named = "RUN_INTEGRATION_TESTS", matches = "true")
-class EncargadoRaceConditionIT {
+@EnabledIfSystemProperty(named = "docker.available", matches = "true")
+class EncargadoRaceConditionTest {
 
     static PostgreSQLContainer<?> postgres;
 
@@ -69,9 +76,13 @@ class EncargadoRaceConditionIT {
     @Autowired
     private EncargadoRepository repository;
 
+    @Autowired
+    private DataSource dataSource;
+
     @Test
     void buscarOCrear_concurrentInsert_bothReturnSameEncargado() throws Exception {
         repository.deleteAll();
+        crearIndiceUnicoDeProduccion();
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -105,5 +116,21 @@ class EncargadoRaceConditionIT {
         assertThat(r1.get().apellido()).isEqualTo("Pérez");
 
         executor.shutdown();
+    }
+
+    /**
+     * El esquema de este test lo genera Hibernate ({@code create-drop}, Flyway
+     * apagado), así que no trae el índice único funcional que sí tiene
+     * producción ({@code ux_encargados_natural_identity}, migraciones V1_1/V2).
+     * Sin ese índice los dos inserts concurrentes entran los dos y no hay
+     * carrera que resolver: el test estaría midiendo un esquema que no existe.
+     */
+    private void crearIndiceUnicoDeProduccion() throws Exception {
+        try (Connection conexion = dataSource.getConnection(); Statement sentencia = conexion.createStatement()) {
+            sentencia.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_encargados_natural_identity
+                        ON encargados (lower(trim(nombre)), lower(trim(apellido)))
+                    """);
+        }
     }
 }
