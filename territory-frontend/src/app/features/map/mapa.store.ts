@@ -1,7 +1,6 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { environment } from '../../../environments/environment';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
@@ -14,6 +13,7 @@ import { getColorForTerritorio } from './utils/territory-colors';
 import { calcularLados, leerZonas, type GeometriaManzana } from './utils/lados';
 import { comodidadDeToque } from '../../core/map/geometria';
 import { leerBorrador, serializarBorrador } from './utils/borrador';
+import { guardarCopia, indexarManzanas, leerCopia, type DatosMapa } from './mapa.datos';
 import {
   abrirTerritorio,
   alternarManzana,
@@ -55,20 +55,11 @@ export interface VistaMapa {
   ajustarMargenes?(m: { arriba?: number; abajo?: number; derecha?: number }): void;
 }
 
-interface PropsManzanaApi {
-  id: string;
-  mid?: number;
-  nombre_bloque: string;
-  territorio_padre: number;
-  color: string | null;
-}
-
 export interface ResumenAbierto extends ResumenTerritorio {
   color: string;
   base: BaseTerritorio | null;
 }
 
-const CACHE_DATOS = 'mapa.datos.v1';
 /** Al abrir un territorio se vuelve a pedir el estado si el que hay tiene más que esto. */
 const EDAD_MAXIMA_ESTADO_MS = 15_000;
 const INTENTOS_CARGA = 6;
@@ -92,8 +83,8 @@ export class MapaStore {
   private readonly borrador = inject(DraftMarksService);
 
   private vista: VistaMapa | null = null;
-  private readonly manzanasPorId = new Map<string, Manzana>();
-  private readonly manzanasPorTerritorio = new Map<number, Manzana[]>();
+  private manzanasPorId = new Map<string, Manzana>();
+  private manzanasPorTerritorio = new Map<number, Manzana[]>();
   private colores: Record<number, string> = {};
   private restaurado = false;
   /** Último pedido del estado de los territorios (se reusa unos segundos). */
@@ -243,16 +234,16 @@ export class MapaStore {
     this.cargando.set(true);
     this.errorCarga.set(false);
     try {
-      let datos: { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] } | null = null;
+      let datos: DatosMapa | null = null;
       let deLaRed = false;
       for (let intento = 1; intento <= INTENTOS_CARGA && !datos; intento++) {
         try {
           datos = await this.descargar();
           deLaRed = true;
           this.refresco = { hora: Date.now(), promesa: Promise.resolve(true) };
-          this.guardarCopia(datos);
+          guardarCopia(datos);
         } catch (e) {
-          const copia = this.leerCopia();
+          const copia = leerCopia();
           if (copia) {
             datos = copia;
             this.toast.show('Sin conexión: se muestra la última copia guardada', 4000, 'warning');
@@ -274,7 +265,7 @@ export class MapaStore {
     }
   }
 
-  private async descargar(): Promise<{ geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] }> {
+  private async descargar(): Promise<DatosMapa> {
     const [geojson, colores, estados] = await Promise.all([
       this.territorios.getAllGeoJson(),
       this.territorios.getColores(),
@@ -287,39 +278,12 @@ export class MapaStore {
     return { geojson, colores, estados };
   }
 
-  private guardarCopia(datos: object): void {
-    try {
-      localStorage.setItem(CACHE_DATOS, JSON.stringify(datos));
-    } catch {
-      // Sin espacio o sin almacenamiento: la próxima vez sin red no habrá copia.
-    }
-  }
-
-  private leerCopia(): { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] } | null {
-    try {
-      const texto = localStorage.getItem(CACHE_DATOS);
-      return texto ? JSON.parse(texto) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private procesar(datos: { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] }): void {
-    this.colores = datos.colores ?? {};
-    const fc = JSON.parse(datos.geojson) as FeatureCollection<Polygon | MultiPolygon, PropsManzanaApi>;
-    this.manzanasPorId.clear();
-    this.manzanasPorTerritorio.clear();
-    for (const f of fc.features) {
-      const p = f.properties;
-      if (!f.geometry || !p || p.territorio_padre === undefined) continue;
-      const m: Manzana = { id: p.id, mid: p.mid, nombre: p.nombre_bloque, territorio: p.territorio_padre, geometria: f.geometry as GeometriaManzana };
-      if (!this.colores[m.territorio]) this.colores[m.territorio] = getColorForTerritorio(m.territorio, p.color);
-      this.manzanasPorId.set(m.id, m);
-      const lista = this.manzanasPorTerritorio.get(m.territorio) ?? [];
-      lista.push(m);
-      this.manzanasPorTerritorio.set(m.territorio, lista);
-    }
-    this.numeros.set([...this.manzanasPorTerritorio.keys()].sort((a, b) => a - b));
+  private procesar(datos: DatosMapa): void {
+    const { porId, porTerritorio, colores } = indexarManzanas(datos);
+    this.colores = colores;
+    this.manzanasPorId = porId;
+    this.manzanasPorTerritorio = porTerritorio;
+    this.numeros.set([...porTerritorio.keys()].sort((a, b) => a - b));
     this.estados.set(new Map((datos.estados ?? []).map(e => [e.territorio, e])));
   }
 
