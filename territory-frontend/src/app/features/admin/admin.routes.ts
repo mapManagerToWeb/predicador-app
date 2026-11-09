@@ -9,6 +9,11 @@ export const ADMIN_ROUTES: Routes = [
     loadComponent: () => import('./pages/resumen/resumen').then(m => m.ResumenPage),
   },
   {
+    path: 'registrar',
+    title: 'Registrar salida · Administración',
+    loadComponent: () => import('./pages/registrar/registrar').then(m => m.RegistrarPage),
+  },
+  {
     path: 'territorios',
     title: 'Territorios · Administración',
     loadComponent: () => import('./pages/territorios/territorios').then(m => m.TerritoriosPage),

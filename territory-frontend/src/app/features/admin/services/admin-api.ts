@@ -14,10 +14,12 @@ import type {
   ManzanaGuardada,
   ManzanaRequest,
   ManzanasCollection,
+  RegistroSalidaRequest,
   ReporteAdmin,
   CorreccionSalidaRequest,
   ResultadoCorreccionSalida,
   SalidaAdmin,
+  SalidaRegistrada,
 } from '../admin.models';
 
 /**
@@ -124,8 +126,23 @@ export class AdminApi {
     return this.get<CicloAdmin[]>(`${this.reportes}/ciclos`);
   }
 
-  cerrarCiclo(nota: string | null): Promise<CicloAdmin> {
-    return this.send(this.http.post<CicloAdmin>(`${this.reportes}/ciclos/cerrar`, { nota }, { headers: SIN_SW }));
+  /** `desde` ("AAAA-MM-DD"): día en que empieza la vuelta nueva; null = hoy. */
+  cerrarCiclo(nota: string | null, desde: string | null = null): Promise<CicloAdmin> {
+    return this.send(this.http.post<CicloAdmin>(`${this.reportes}/ciclos/cerrar`, { nota, desde }, { headers: SIN_SW }));
+  }
+
+  /** Salida que un hermano informó; queda como suya (S-13, reportes). */
+  registrarSalida(req: RegistroSalidaRequest): Promise<SalidaRegistrada> {
+    return this.send(this.http.post<SalidaRegistrada>(`${this.reportes}/salidas`, req, { headers: SIN_SW }));
+  }
+
+  /** Número al que llega el WhatsApp de lo que se registra desde el panel ("" = el del servidor). */
+  whatsappDestino(): Promise<{ telefono: string }> {
+    return this.get<{ telefono: string }>(`${this.reportes}/whatsapp-destino`);
+  }
+
+  setWhatsappDestino(telefono: string): Promise<{ telefono: string }> {
+    return this.send(this.http.put<{ telefono: string }>(`${this.reportes}/whatsapp-destino`, { telefono }, { headers: SIN_SW }));
   }
 
   /** Estado actual de un territorio; null si nunca se trabajó (204). */

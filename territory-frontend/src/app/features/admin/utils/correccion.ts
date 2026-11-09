@@ -1,6 +1,6 @@
 import type { CorreccionRequest, CorreccionSalidaRequest, EstadoTerritorioAdmin, ManzanaFeature, SalidaAdmin } from '../admin.models';
 // Mismo formato de zonas que el mapa de los encargados (ADR 0008).
-import { leerZonas, serializarZonas, type ZonaParcialDatos } from '../../map/utils/lados';
+import { leerZonas, serializarZonas, type ZonaParcialDatos } from '../../../core/map/lados';
 
 /**
  * Corrección del estado actual de un territorio desde el panel (p. ej. una

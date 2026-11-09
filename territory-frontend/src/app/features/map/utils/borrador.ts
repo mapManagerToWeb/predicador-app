@@ -1,4 +1,4 @@
-import { leerZonas, serializarZonas, type ZonaParcialDatos } from './lados';
+import { leerZonas, serializarZonas, type ZonaParcialDatos } from '../../../core/map/lados';
 import type { BaseTerritorio, TerritorioSalida } from './salida';
 
 /**

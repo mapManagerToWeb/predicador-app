@@ -1,5 +1,13 @@
 package com.predicador.reporting.controller;
 
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PutMapping;
+import com.predicador.shared.util.PhoneUtil;
+import com.predicador.reporting.service.ConfiguracionService;
+import com.predicador.reporting.service.RegistroDeSalidas;
+import com.predicador.reporting.dto.ReportDto;
+import com.predicador.reporting.dto.RegistroSalidaRequest;
 import com.predicador.reporting.dto.CerrarCicloRequest;
 import com.predicador.reporting.dto.CicloDto;
 import com.predicador.reporting.dto.CorreccionRequest;
@@ -47,12 +55,18 @@ public class ReportAdminController {
     private final CorreccionDeSalidas salidas;
     private final AuthorizationService authorization;
 
+    private final RegistroDeSalidas registro;
+    private final ConfiguracionService configuracion;
+
     public ReportAdminController(ReportAdminService service, CicloService ciclos, CorreccionDeSalidas salidas,
-                                 AuthorizationService authorization) {
+                                 AuthorizationService authorization, RegistroDeSalidas registro,
+                                 ConfiguracionService configuracion) {
         this.service = service;
         this.ciclos = ciclos;
         this.salidas = salidas;
         this.authorization = authorization;
+        this.registro = registro;
+        this.configuracion = configuracion;
     }
 
     /** Reportes de {@code [desde, hasta)}; por defecto, los últimos 365 días. */
@@ -92,7 +106,7 @@ public class ReportAdminController {
     public ResponseEntity<CicloDto> cerrarCiclo(@Valid @RequestBody(required = false) CerrarCicloRequest req,
                                                 HttpServletRequest request) {
         authorization.requireAdmin(RequestTokens.token(request));
-        return ResponseEntity.ok(ciclos.cerrar(req == null ? null : req.nota()));
+        return ResponseEntity.ok(ciclos.cerrar(req == null ? null : req.nota(), req == null ? null : req.desde()));
     }
 
     /** Estado actual (último reporte) de un territorio; 204 si nunca se trabajó. */
@@ -126,5 +140,39 @@ public class ReportAdminController {
         authorization.requireAdmin(RequestTokens.token(request));
         Report r = ciclos.corregir(req);
         return ResponseEntity.ok(Map.of("id", r.getId()));
+    }
+
+    /**
+     * Registra una salida que un hermano informó (p. ej. por WhatsApp): queda
+     * como salida de él, igual que si la hubiera enviado desde la app.
+     */
+    @PostMapping("/salidas")
+    public ResponseEntity<ReportDto> registrarSalida(@Valid @RequestBody RegistroSalidaRequest req,
+                                                     HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        return ResponseEntity.ok(registro.registrar(req));
+    }
+
+    /** Número al que llega el WhatsApp de lo que se registra desde el panel. */
+    @GetMapping("/whatsapp-destino")
+    public ResponseEntity<Map<String, String>> whatsappDestino(HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        String telefono = configuracion.whatsappAdministrador();
+        return ResponseEntity.ok(Map.of("telefono", telefono == null ? "" : telefono));
+    }
+
+    /** Vacío: vuelve al número configurado en el servidor. */
+    @PutMapping("/whatsapp-destino")
+    public ResponseEntity<Map<String, String>> cambiarWhatsappDestino(@RequestBody Map<String, String> body,
+                                                                      HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        String telefono = body.getOrDefault("telefono", "");
+        telefono = telefono == null ? "" : telefono.strip();
+        if (!telefono.isEmpty() && !PhoneUtil.esCelularChileno(telefono)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PhoneUtil.MENSAJE_INVALIDO);
+        }
+        configuracion.setWhatsappAdministrador(telefono.isEmpty() ? "" : PhoneUtil.normalize(telefono));
+        String guardado = configuracion.whatsappAdministrador();
+        return ResponseEntity.ok(Map.of("telefono", guardado == null ? "" : guardado));
     }
 }

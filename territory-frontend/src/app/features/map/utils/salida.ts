@@ -7,7 +7,7 @@ import type {
   TerritoriosEnvio,
   UserProfile,
 } from '../../../core/models/models';
-import { calcularLados, franjaDeLados, leerZonas, serializarZonas, type GeometriaManzana, type ZonaParcialDatos } from './lados';
+import { calcularLados, franjaDeLados, leerZonas, serializarZonas, type GeometriaManzana, type ZonaParcialDatos } from '../../../core/map/lados';
 
 /**
  * La "salida" es lo que un encargado marca en uno o más territorios antes de

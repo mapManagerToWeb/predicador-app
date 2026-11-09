@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Ciclos y correcciones contra PostGIS real, con las migraciones de Flyway
@@ -155,5 +156,49 @@ class CicloServiceIntegrationTest {
             assertThat(a.manzanasIds()).isEqualTo("3-3.a,3-3.c");
         });
         assertThat(service.estadoActual(99)).isEmpty();
+    }
+
+    // ── Cerrar desde un día (p. ej. el inicio de una campaña) ──
+
+    private static java.time.LocalDate hoyEnChile() {
+        return java.time.LocalDate.now(java.time.ZoneId.of("America/Santiago"));
+    }
+
+    @Test
+    void cerrarDesdeUnDia_laVueltaNuevaEmpiezaEseDia() {
+        salida(1, "2026-09-01T10:00:00Z", "Ana", "incomplete", "1-1.a");
+        java.time.LocalDate desde = hoyEnChile().minusDays(2);
+        Instant inicio = desde.atStartOfDay(java.time.ZoneId.of("America/Santiago")).toInstant();
+
+        CicloDto nuevo = service.cerrar("Campaña", desde);
+
+        assertThat(nuevo.inicio()).isEqualTo(inicio);
+        assertThat(service.listar().get(1).fin()).isEqualTo(inicio);
+        Report reinicio = repository.findLatestByTerritorioNumeroIn(List.of(1L)).get(0);
+        assertThat(reinicio.getOrigen()).isEqualTo(Report.ORIGEN_REINICIO);
+        assertThat(reinicio.getFechaPredicacion()).isEqualTo(desde);
+        // El orden no cambia: el reinicio se guarda con la hora de ahora.
+        assertThat(reinicio.getFecha()).isAfter(Instant.now().minusSeconds(60));
+    }
+
+    @Test
+    void cerrarDesdeUnDia_conReportesEnviadosDesdeEseDiaSeRechazaSinTocarNada() {
+        salida(1, Instant.now().minusSeconds(3600).toString(), "Ana", "incomplete", "1-1.a");
+        long antes = repository.count();
+
+        assertThatThrownBy(() -> service.cerrar(null, hoyEnChile().minusDays(1)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("1 reporte(s)");
+        assertThat(repository.count()).isEqualTo(antes);
+        assertThat(service.listar()).hasSize(1);
+    }
+
+    @Test
+    void cerrarDesdeUnDiaFuturoOAnteriorALaVueltaActualSeRechaza() {
+        assertThatThrownBy(() -> service.cerrar(null, hoyEnChile().plusDays(1)))
+                .hasMessageContaining("futuro");
+        assertThatThrownBy(() -> service.cerrar(null, java.time.LocalDate.parse("2025-12-01")))
+                .hasMessageContaining("después del inicio");
+        assertThat(service.listar()).hasSize(1);
     }
 }

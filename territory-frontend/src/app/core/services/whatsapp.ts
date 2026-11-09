@@ -5,8 +5,8 @@ import {
   WhatsAppDeliveryDto,
   WhatsAppSendRequest,
   WhatsAppSendResponse,
-} from '../../../core/models/models';
-import { environment } from '../../../../environments/environment';
+} from '../models/models';
+import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class WhatsAppService {

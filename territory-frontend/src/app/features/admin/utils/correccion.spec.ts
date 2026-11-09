@@ -1,5 +1,5 @@
 import type { EstadoTerritorioAdmin, ManzanaFeature, SalidaAdmin } from '../admin.models';
-import { serializarZonas } from '../../map/utils/lados';
+import { serializarZonas } from '../../../core/map/lados';
 import {
   alternar,
   alternarEnSalida,

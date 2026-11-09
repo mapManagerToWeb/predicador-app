@@ -19,7 +19,7 @@ import {
   type MapLibre,
 } from '../../core/map/base-map';
 import type { SituacionTerritorio } from '../../core/map/estado-publico';
-import { franjaDeLados, type GeometriaManzana } from './utils/lados';
+import { franjaDeLados, type GeometriaManzana } from '../../core/map/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import type { EdicionLados } from './mapa.types';
 import { UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from './ubicacion';

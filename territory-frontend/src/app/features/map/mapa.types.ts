@@ -1,4 +1,4 @@
-import type { GeometriaManzana, Lado } from './utils/lados';
+import type { GeometriaManzana, Lado } from '../../core/map/lados';
 
 /** Modo de marcado: la manzana entera con un toque, o eligiendo sus calles. */
 export type ModoMarcado = 'manzana' | 'calles';

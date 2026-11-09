@@ -9,9 +9,9 @@ import { Toast } from '../../core/services/toast';
 import { DraftMarksService } from '../../core/services/map-draft';
 import { estaEnLista, idsDeLista, situacionDe, type EstadoTerritorioPublico, type SituacionTerritorio } from '../../core/map/estado-publico';
 import type { Reporte } from '../../core/models/models';
-import { WhatsAppService } from './services/whatsapp';
+import { WhatsAppService } from '../../core/services/whatsapp';
 import { getColorForTerritorio } from './utils/territory-colors';
-import { calcularLados, leerZonas, type GeometriaManzana } from './utils/lados';
+import { calcularLados, leerZonas, type GeometriaManzana } from '../../core/map/lados';
 import { comodidadDeToque } from '../../core/map/geometria';
 import { leerBorrador, serializarBorrador } from './utils/borrador';
 import {

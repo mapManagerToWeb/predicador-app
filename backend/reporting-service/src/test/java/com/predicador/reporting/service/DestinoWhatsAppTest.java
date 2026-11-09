@@ -55,4 +55,22 @@ class DestinoWhatsAppTest {
         assertThat(destino.para(sesion("admin", SessionToken.ROLE_ADMIN))).isEqualTo(CONFIGURADO);
         assertThat(destino.para(null)).isEqualTo(CONFIGURADO);
     }
+
+    @Test
+    void loQueRegistraElAdministradorLeLlegaAlNumeroQueConfiguroEnElPanel() {
+        ConfiguracionService configuracion = mock(ConfiguracionService.class);
+        WhatsAppProperties props = mock(WhatsAppProperties.class);
+        when(props.destinationNumber()).thenReturn(CONFIGURADO);
+        DestinoWhatsApp conPanel = new DestinoWhatsApp(encargados, props, configuracion);
+        SessionToken admin = sesion("admin", SessionToken.ROLE_ADMIN);
+
+        when(configuracion.whatsappAdministrador()).thenReturn("+56 9 8765 4321");
+        assertThat(conPanel.para(admin)).isEqualTo("56987654321");
+
+        // Sin número en el panel (o uno inválido): el del servidor.
+        when(configuracion.whatsappAdministrador()).thenReturn(null);
+        assertThat(conPanel.para(admin)).isEqualTo(CONFIGURADO);
+        when(configuracion.whatsappAdministrador()).thenReturn("123");
+        assertThat(conPanel.para(admin)).isEqualTo(CONFIGURADO);
+    }
 }
