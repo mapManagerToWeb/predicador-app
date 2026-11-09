@@ -110,4 +110,36 @@ class RegistroDeSalidasTest {
                 .hasMessageContaining("Marca al menos");
         verify(reportes, never()).registrarDelAdministrador(any(), anyString());
     }
+
+    // ── Varios territorios en una salida ──
+
+    private static RegistroSalidaRequest en(long territorio, String manzanas) {
+        return new RegistroSalidaRequest(territorio, null, "Pedro", "Soto", SABADO, "tarde", manzanas, null, null, 4, null);
+    }
+
+    @Test
+    void variosTerritoriosSeGuardanTodosEnOrden() {
+        var guardadas = registro.registrarVarias(java.util.List.of(en(72, "72-72.a"), en(61, "61-61.b")));
+
+        assertThat(guardadas).extracting(ReportDto::territorioNumero).containsExactly(61L, 72L);
+        verify(reportes, org.mockito.Mockito.times(2)).registrarDelAdministrador(any(), eq(RegistroDeSalidas.MARCA));
+    }
+
+    @Test
+    void sinTerritorios_repetidos_oDemasiados_noSeGuardaNada() {
+        assertThatThrownBy(() -> registro.registrarVarias(java.util.List.of()))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("al menos un territorio");
+        assertThatThrownBy(() -> registro.registrarVarias(java.util.List.of(en(72, "72-72.a"), en(72, "72-72.b"))))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("dos veces");
+        var muchos = java.util.stream.LongStream.rangeClosed(1, 21).mapToObj(t -> en(t, t + "-" + t + ".a")).toList();
+        assertThatThrownBy(() -> registro.registrarVarias(muchos))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("hasta 20");
+        verify(reportes, never()).registrarDelAdministrador(any(), anyString());
+    }
+
+    @Test
+    void siUnTerritorioNoTieneNadaMarcado_falla() {
+        assertThatThrownBy(() -> registro.registrarVarias(java.util.List.of(en(72, "72-72.a"), en(61, ""))))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("Marca al menos");
+    }
 }

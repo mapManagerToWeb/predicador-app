@@ -99,6 +99,43 @@ export function resultado(e: EstadoCorreccion, total: number): { enteras: number
   return { enteras: e.marcadas.size, porCalles: e.zonas.length, completo: total > 0 && e.marcadas.size >= total };
 }
 
+// ── Varios territorios en una salida ──
+//
+// Las claves de manzana ("72-72.a") ya dicen de qué territorio son, así que
+// el estado de todos los territorios de la salida vive junto: las funciones de
+// arriba sirven igual. Al guardar se separa por territorio.
+
+/** Territorio de una clave de manzana ("72-72.a" → 72). */
+export function territorioDeClave(k: string): number {
+  return Number(k.slice(0, k.indexOf('-')));
+}
+
+/** Solo lo de un territorio. */
+export function delTerritorio(e: EstadoCorreccion, t: number): EstadoCorreccion {
+  return {
+    marcadas: new Set([...e.marcadas].filter(k => territorioDeClave(k) === t)),
+    zonas: e.zonas.filter(z => z.manzanaId !== null && territorioDeClave(z.manzanaId) === t),
+  };
+}
+
+/** Todo menos un territorio (al quitarlo de la salida). */
+export function sinTerritorio(e: EstadoCorreccion, t: number): EstadoCorreccion {
+  return {
+    marcadas: new Set([...e.marcadas].filter(k => territorioDeClave(k) !== t)),
+    zonas: e.zonas.filter(z => z.manzanaId === null || territorioDeClave(z.manzanaId) !== t),
+  };
+}
+
+export function unir(a: EstadoCorreccion, b: EstadoCorreccion): EstadoCorreccion {
+  return { marcadas: new Set([...a.marcadas, ...b.marcadas]), zonas: [...a.zonas, ...b.zonas] };
+}
+
+/** Todas las manzanas de un territorio predicadas, sin tocar los otros territorios de la salida. */
+export function todoElTerritorioEn(e: EstadoCorreccion, manzanas: ManzanaFeature[], t: number): EstadoCorreccion {
+  const delT = manzanas.filter(m => m.properties.territorio === t);
+  return unir(sinTerritorio(e, t), todoElTerritorio(delT));
+}
+
 export interface Hermano {
   id: number | null;
   nombre: string;

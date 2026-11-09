@@ -153,6 +153,14 @@ public class ReportAdminController {
         return ResponseEntity.ok(registro.registrar(req));
     }
 
+    /** Una salida con varios territorios: se guardan todos o ninguno. */
+    @PostMapping("/salidas/varias")
+    public ResponseEntity<List<ReportDto>> registrarVarias(@Valid @RequestBody List<@Valid RegistroSalidaRequest> salidas,
+                                                          HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        return ResponseEntity.ok(registro.registrarVarias(salidas));
+    }
+
     /** Número al que llega el WhatsApp de lo que se registra desde el panel. */
     @GetMapping("/whatsapp-destino")
     public ResponseEntity<Map<String, String>> whatsappDestino(HttpServletRequest request) {
