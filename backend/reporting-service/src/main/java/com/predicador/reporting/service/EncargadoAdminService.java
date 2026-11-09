@@ -2,6 +2,7 @@ package com.predicador.reporting.service;
 
 import com.predicador.reporting.dto.EncargadoAdminDto;
 import com.predicador.reporting.dto.EncargadoAdminRequest;
+import com.predicador.reporting.dto.ImportacionEncargados;
 import com.predicador.reporting.model.Encargado;
 import com.predicador.reporting.repository.EncargadoRepository;
 import com.predicador.reporting.repository.ReportRepository;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -74,6 +76,107 @@ public class EncargadoAdminService {
         e.setAvatar(req.avatar() != null ? req.avatar() : 1);
         e.setActivo(req.activo() == null || req.activo());
         return toDto(encargados.saveAndFlush(e), null);
+    }
+
+    /** Más de esto de una vez es seguramente un archivo equivocado. */
+    static final int MAXIMO_IMPORTACION = 500;
+
+    /**
+     * Carga una lista de hermanos (nombre, apellido, teléfono). Cada fila se
+     * revisa con las mismas reglas que el alta de uno: celular chileno válido,
+     * nombre y teléfono que no tenga otro. Los que ya están (mismo teléfono y
+     * nombre) se dejan igual; las filas con problemas no se crean y se explica
+     * por qué. Con {@code simular} no se guarda nada.
+     */
+    @Transactional
+    public List<ImportacionEncargados.Resultado> importar(List<ImportacionEncargados.Fila> filas, boolean simular) {
+        if (filas == null || filas.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La lista está vacía.");
+        }
+        if (filas.size() > MAXIMO_IMPORTACION) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La lista tiene " + filas.size() + " filas: el máximo es " + MAXIMO_IMPORTACION + ".");
+        }
+        List<Encargado> existentes = encargados.findAll();
+        Map<String, Encargado> porTelefono = new HashMap<>();
+        Map<String, Encargado> porNombre = new HashMap<>();
+        for (Encargado e : existentes) {
+            String k = claveTelefono(e.getTelefono());
+            if (!k.isEmpty()) porTelefono.putIfAbsent(k, e);
+            porNombre.putIfAbsent(claveNombre(e.getNombre(), e.getApellido()), e);
+        }
+        Map<String, Integer> telefonosDeLaLista = new HashMap<>();
+        Map<String, Integer> nombresDeLaLista = new HashMap<>();
+
+        List<ImportacionEncargados.Resultado> resultados = new ArrayList<>();
+        for (int i = 0; i < filas.size(); i++) {
+            int numero = i + 1;
+            ImportacionEncargados.Fila f = filas.get(i);
+            String nombre = limpio(f == null ? null : f.nombre());
+            String apellido = limpio(f == null ? null : f.apellido());
+            String telefono = PhoneUtil.normalize(f == null ? null : f.telefono());
+            String error = null;
+            String existe = null;
+
+            if (nombre.isEmpty() || apellido.isEmpty()) {
+                error = "Falta el nombre o el apellido.";
+            } else if (nombre.length() > 60 || apellido.length() > 60) {
+                error = "El nombre o el apellido es demasiado largo.";
+            } else if (!PhoneUtil.esCelularChileno(telefono)) {
+                error = "Teléfono inválido: debe tener 9 dígitos y empezar con 9.";
+            } else {
+                String kTel = claveTelefono(telefono);
+                String kNombre = claveNombre(nombre, apellido);
+                Encargado conTelefono = porTelefono.get(kTel);
+                Encargado conNombre = porNombre.get(kNombre);
+                if (telefonosDeLaLista.containsKey(kTel)) {
+                    error = "Teléfono repetido en la lista (fila " + telefonosDeLaLista.get(kTel) + ").";
+                } else if (nombresDeLaLista.containsKey(kNombre)) {
+                    error = "Nombre repetido en la lista (fila " + nombresDeLaLista.get(kNombre) + ").";
+                } else if (conTelefono != null && conTelefono == conNombre) {
+                    existe = "Ya está registrado.";
+                } else if (conTelefono != null) {
+                    error = "El teléfono ya lo usa " + conTelefono.getNombre() + " " + conTelefono.getApellido() + ".";
+                } else if (conNombre != null) {
+                    error = "Ya hay un " + conNombre.getNombre() + " " + conNombre.getApellido()
+                            + " con otro teléfono (" + conNombre.getTelefono() + ").";
+                }
+                telefonosDeLaLista.putIfAbsent(kTel, numero);
+                nombresDeLaLista.putIfAbsent(kNombre, numero);
+            }
+
+            if (error != null) {
+                resultados.add(new ImportacionEncargados.Resultado(numero, nombre, apellido, telefono, "error", error));
+            } else if (existe != null) {
+                resultados.add(new ImportacionEncargados.Resultado(numero, nombre, apellido, telefono, "existe", existe));
+            } else {
+                if (!simular) {
+                    Encargado e = new Encargado();
+                    e.setNombre(nombre);
+                    e.setApellido(apellido);
+                    e.setTelefono(telefono);
+                    e.setAvatar(1);
+                    e.setActivo(true);
+                    encargados.save(e);
+                }
+                resultados.add(new ImportacionEncargados.Resultado(numero, nombre, apellido, telefono, "crear",
+                        simular ? "Se va a crear." : "Creado."));
+            }
+        }
+        if (!simular) encargados.flush();
+        return resultados;
+    }
+
+    /** Nombre y apellido sin tildes, mayúsculas ni espacios de más, para reconocer repetidos. */
+    static String claveNombre(String nombre, String apellido) {
+        String texto = (limpio(nombre) + " " + limpio(apellido)).trim();
+        return java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static String limpio(String s) {
+        return s == null ? "" : s.strip().replaceAll("\\s+", " ");
     }
 
     @Transactional

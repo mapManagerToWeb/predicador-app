@@ -16,11 +16,13 @@ import type {
   ManzanasCollection,
   RegistroSalidaRequest,
   ReporteAdmin,
+  ResultadoImportacion,
   CorreccionSalidaRequest,
   ResultadoCorreccionSalida,
   SalidaAdmin,
   SalidaRegistrada,
 } from '../admin.models';
+import type { FilaLista } from '../utils/lista-hermanos';
 
 /**
  * El service worker cachea /api/v1/territories/** con estrategia
@@ -202,6 +204,13 @@ export class AdminApi {
   fusionarEncargados(origenId: number, destinoId: number): Promise<EncargadoAdmin> {
     return this.send(
       this.http.post<EncargadoAdmin>(`${this.encargados}/${origenId}/fusionar/${destinoId}`, {}, { headers: SIN_SW }),
+    );
+  }
+
+  /** Carga una lista de hermanos; con `simular` solo dice qué pasaría con cada fila. */
+  importarEncargados(filas: FilaLista[], simular: boolean): Promise<ResultadoImportacion[]> {
+    return this.send(
+      this.http.post<ResultadoImportacion[]>(`${this.encargados}/importar`, { filas, simular }, { headers: SIN_SW }),
     );
   }
 

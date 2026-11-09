@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Toast } from '../../../../core/services/toast';
 import { esCelularChileno, MENSAJE_TELEFONO_INVALIDO } from '../../../../core/utils/phone';
-import type { EncargadoAdmin } from '../../admin.models';
+import type { EncargadoAdmin, ResultadoImportacion } from '../../admin.models';
+import { leerLista } from '../../utils/lista-hermanos';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import { AdminUi } from '../../services/admin-ui';
@@ -77,6 +78,20 @@ export class EncargadosPage {
   protected readonly pinMostrado = signal<{ encargado: EncargadoAdmin; pin: string } | null>(null);
   protected readonly destinoFusion = signal<number | null>(null);
 
+  // Cargar una lista de hermanos
+  protected readonly cargandoLista = signal(false);
+  protected readonly textoLista = signal('');
+  protected readonly revision = signal<ResultadoImportacion[] | null>(null);
+  protected readonly procesandoLista = signal(false);
+  protected readonly conteoRevision = computed(() => {
+    const r = this.revision() ?? [];
+    return {
+      crear: r.filter(x => x.resultado === 'crear').length,
+      existe: r.filter(x => x.resultado === 'existe').length,
+      error: r.filter(x => x.resultado === 'error').length,
+    };
+  });
+
   protected readonly lista = computed(() => this.store.encargados() ?? []);
   protected readonly duplicados = computed(() => posiblesDuplicados(this.lista()));
 
@@ -143,6 +158,82 @@ export class EncargadosPage {
       this.registroAbierto.set((await this.api.setRegistroAbierto(abrir)).registroAbierto);
     } catch (e) {
       this.toast.show(mensajeDeError(e), 5000, 'error');
+    }
+  }
+
+  // ── Cargar una lista ──
+
+  protected abrirCargaDeLista(): void {
+    this.formulario.set(null);
+    this.cargandoLista.set(true);
+  }
+
+  protected cerrarCargaDeLista(): void {
+    this.cargandoLista.set(false);
+    this.textoLista.set('');
+    this.revision.set(null);
+  }
+
+  protected escribirLista(texto: string): void {
+    this.textoLista.set(texto);
+    this.revision.set(null);
+  }
+
+  /** Un archivo .csv o .txt (por ejemplo, guardado desde Excel como CSV). */
+  protected async leerArchivo(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    input.value = '';
+    if (!archivo) return;
+    this.escribirLista(await archivo.text());
+  }
+
+  /** Revisa la lista en el servidor sin guardar nada. */
+  protected async revisarLista(): Promise<void> {
+    const filas = leerLista(this.textoLista());
+    if (!filas.length) {
+      this.toast.show('La lista está vacía.', 3000, 'warning');
+      return;
+    }
+    this.procesandoLista.set(true);
+    try {
+      this.revision.set(await this.api.importarEncargados(filas, true));
+    } catch (e) {
+      this.toast.show(mensajeDeError(e, 'No se pudo revisar la lista'), 6000, 'error');
+    } finally {
+      this.procesandoLista.set(false);
+    }
+  }
+
+  protected async crearDeLaLista(): Promise<void> {
+    const { crear, existe, error } = this.conteoRevision();
+    if (!crear) return;
+    const ok = await this.ui.confirmar({
+      titulo: `Crear ${crear} ${crear === 1 ? 'hermano' : 'hermanos'}`,
+      mensaje:
+        `Se crean ${crear} encargado(s) con su teléfono; ya pueden entrar a la app con su número.` +
+        (existe ? ` ${existe} ya estaban y se dejan igual.` : '') +
+        (error ? ` ${error} fila(s) con problemas no se crean: corrígelas y vuelve a cargarlas.` : ''),
+      accion: 'Crear',
+    });
+    if (!ok) return;
+    this.procesandoLista.set(true);
+    try {
+      const resultado = await this.api.importarEncargados(leerLista(this.textoLista()), false);
+      const creados = resultado.filter(x => x.resultado === 'crear').length;
+      await this.store.cargarEncargados(true);
+      this.toast.show(`Se ${creados === 1 ? 'creó 1 hermano' : `crearon ${creados} hermanos`}`, 4000, 'success');
+      // Quedan a la vista solo las filas con problemas, para corregirlas.
+      const conError = resultado.filter(x => x.resultado === 'error');
+      if (conError.length) {
+        this.revision.set(conError);
+      } else {
+        this.cerrarCargaDeLista();
+      }
+    } catch (e) {
+      this.toast.show(mensajeDeError(e, 'No se pudieron crear'), 6000, 'error');
+    } finally {
+      this.procesandoLista.set(false);
     }
   }
 

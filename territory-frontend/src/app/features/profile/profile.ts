@@ -24,21 +24,9 @@ export class ProfilePage implements OnInit {
   name = signal('');
   lastName = signal('');
   telefono = signal('');
-  selectedAvatar = signal(0);
   loading = signal(false);
   /** Número mal escrito: se explica bajo el campo, sin llamar al servidor. */
   errorTelefono = signal<string | null>(null);
-
-  avatars = [
-    { id: 0, emoji: '👨', color: '#3b82f6' },
-    { id: 1, emoji: '👩', color: '#8b5cf6' },
-    { id: 2, emoji: '🧑', color: '#06b6d4' },
-    { id: 3, emoji: '👴', color: '#f59e0b' },
-    { id: 4, emoji: '👵', color: '#ef4444' },
-    { id: 5, emoji: '🧔', color: '#10b981' },
-    { id: 6, emoji: '👱', color: '#f97316' },
-    { id: 7, emoji: '👲', color: '#6366f1' },
-  ];
 
   constructor() {
     afterNextRender(() => void this.salirSiElRegistroEstaCerrado());
@@ -76,10 +64,6 @@ export class ProfilePage implements OnInit {
     this.errorTelefono.set(null);
   }
 
-  selectAvatar(id: number): void {
-    this.selectedAvatar.set(id);
-  }
-
   async save(): Promise<void> {
     if (!this.name() || !this.lastName() || !this.telefono() || this.loading()) return;
     if (!esCelularChileno(this.telefono())) {
@@ -99,7 +83,8 @@ export class ProfilePage implements OnInit {
       this.profileService.save({
         name: this.name(),
         lastName: this.lastName(),
-        avatar: this.selectedAvatar(),
+        // Ya no se elige avatar (no se mostraba en ningún lado): queda el de siempre.
+        avatar: encargado.avatar ?? 1,
         telefono: tel ? normalizePhone(tel) : undefined,
         encargadoId: encargado.id ?? undefined,
       });
