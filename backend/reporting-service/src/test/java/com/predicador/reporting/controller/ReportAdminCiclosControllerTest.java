@@ -35,6 +35,8 @@ class ReportAdminCiclosControllerTest {
     private ReportAdminService service;
     private CicloService ciclos;
     private com.predicador.reporting.service.CorreccionDeSalidas salidas;
+    private com.predicador.reporting.service.RegistroDeSalidas registro;
+    private com.predicador.reporting.service.ConfiguracionService configuracion;
     private MockMvc mvc;
 
     @BeforeEach
@@ -42,8 +44,10 @@ class ReportAdminCiclosControllerTest {
         service = mock(ReportAdminService.class);
         ciclos = mock(CicloService.class);
         salidas = mock(com.predicador.reporting.service.CorreccionDeSalidas.class);
+        registro = mock(com.predicador.reporting.service.RegistroDeSalidas.class);
+        configuracion = mock(com.predicador.reporting.service.ConfiguracionService.class);
         mvc = MockMvcBuilders.standaloneSetup(new ReportAdminController(
-                service, ciclos, salidas, new AuthorizationService()))
+                service, ciclos, salidas, new AuthorizationService(), registro, configuracion))
                 .setControllerAdvice(new com.predicador.shared.exception.GlobalExceptionHandler())
                 .build();
     }
@@ -76,12 +80,12 @@ class ReportAdminCiclosControllerTest {
 
     @Test
     void cerrarCicloPasaLaNota() throws Exception {
-        when(ciclos.cerrar("fin de campaña")).thenReturn(new CicloDto(3L, Instant.now(), null, null, null));
+        when(ciclos.cerrar("fin de campaña", null)).thenReturn(new CicloDto(3L, Instant.now(), null, null, null));
         mvc.perform(post("/api/v1/reports/admin/ciclos/cerrar").with(comoAdmin())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"nota\":\"fin de campaña\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(3));
-        verify(ciclos).cerrar("fin de campaña");
+        verify(ciclos).cerrar("fin de campaña", null);
     }
 
     @Test
@@ -264,5 +268,65 @@ class ReportAdminCiclosControllerTest {
                         {"territorio":5,"manzanasIds":"5-5.a","totalManzanas":3,"manzanasMarcadas":1,"nota":"x"}"""))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(ciclos);
+    }
+
+    // ── Registro de salidas desde el panel y cierre desde una fecha ──
+
+    @Test
+    void cerrarCicloDesdeUnDia() throws Exception {
+        when(ciclos.cerrar(null, java.time.LocalDate.parse("2026-11-07")))
+                .thenReturn(new CicloDto(4L, Instant.parse("2026-11-07T03:00:00Z"), null, null, null));
+        mvc.perform(post("/api/v1/reports/admin/ciclos/cerrar").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"desde\":\"2026-11-07\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(4));
+    }
+
+    @Test
+    void registrarSalida_soloElAdmin() throws Exception {
+        String cuerpo = """
+                {"territorio":72,"encargadoNombre":"Pedro","encargadoApellido":"Soto","fechaPredicacion":"2026-11-07",
+                 "turno":"mañana","manzanasIds":"72-72.a","totalManzanas":4}
+                """;
+        when(registro.registrar(any())).thenReturn(new com.predicador.reporting.dto.ReportDto(
+                9, null, Instant.now(), "Pedro", "Soto", null, "incomplete", 72L));
+
+        mvc.perform(post("/api/v1/reports/admin/salidas").with(comoEncargado())
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(registro);
+
+        mvc.perform(post("/api/v1/reports/admin/salidas").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(9));
+    }
+
+    @Test
+    void registrarSalida_sinDiaEs400() throws Exception {
+        mvc.perform(post("/api/v1/reports/admin/salidas").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"territorio\":72,\"encargadoNombre\":\"Pedro\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(registro);
+    }
+
+    @Test
+    void elNumeroDelAdministradorSeValida_yVacioVuelveAlDelServidor() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/whatsapp-destino")
+                        .with(comoAdmin()).contentType(MediaType.APPLICATION_JSON).content("{\"telefono\":\"123\"}"))
+                .andExpect(status().isBadRequest());
+        verify(configuracion, org.mockito.Mockito.never()).setWhatsappAdministrador(any());
+
+        when(configuracion.whatsappAdministrador()).thenReturn("56912345678");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/whatsapp-destino")
+                        .with(comoAdmin()).contentType(MediaType.APPLICATION_JSON).content("{\"telefono\":\"+56 9 1234 5678\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telefono").value("56912345678"));
+        verify(configuracion).setWhatsappAdministrador("56912345678");
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/whatsapp-destino")
+                        .with(comoAdmin()).contentType(MediaType.APPLICATION_JSON).content("{\"telefono\":\"\"}"))
+                .andExpect(status().isOk());
+        verify(configuracion).setWhatsappAdministrador("");
     }
 }

@@ -7,14 +7,17 @@ import com.predicador.reporting.dto.CorreccionRequest;
 import com.predicador.reporting.dto.EstadoTerritorioAdmin;
 import com.predicador.reporting.model.Report;
 import com.predicador.reporting.repository.ReportRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -59,11 +62,26 @@ public class CicloService {
      */
     @Transactional
     public CicloDto cerrar(String nota) {
+        return cerrar(nota, null);
+    }
+
+    /**
+     * Igual, pero la vuelta nueva empieza el día {@code desde} (en Chile), por
+     * ejemplo el inicio de una campaña, aunque se cierre unos días después.
+     *
+     * <p>Los reinicios se guardan con la hora de ahora (el orden de los
+     * reportes no cambia, ADR 0013) y el día {@code desde} como día de trabajo.
+     * Por eso no puede haber reportes enviados desde ese día: quedarían antes
+     * del reinicio y se perderían de la vuelta nueva. En ese caso se rechaza.</p>
+     */
+    @Transactional
+    public CicloDto cerrar(String nota, LocalDate desde) {
         Instant ahora = Instant.now();
         CicloDto actual = jdbc.sql("SELECT id, inicio, fin, nota, resumen FROM ciclo_territorios WHERE fin IS NULL FOR UPDATE")
                 .query(CicloService::ciclo)
                 .optional()
                 .orElseGet(() -> abrir(ahora.minusSeconds(1)));
+        Instant inicioNuevo = desde == null ? ahora : inicioDelDia(desde, actual, ahora);
 
         List<UltimoReporte> ultimos = ultimosPorTerritorio();
         List<Report> delCiclo = reportes.findByFechaBetweenAndAnuladoEnIsNullOrderByFechaDesc(actual.inicio(), ahora);
@@ -72,15 +90,40 @@ public class CicloService {
         String motivo = limpiar(nota);
         for (UltimoReporte u : ultimos) {
             if (Report.ORIGEN_REINICIO.equals(u.origen())) continue;
-            reportes.save(reinicio(u, ahora, motivo));
+            reportes.save(reinicio(u, ahora, motivo, desde));
         }
         jdbc.sql("UPDATE ciclo_territorios SET fin = :fin, nota = :nota, resumen = :resumen WHERE id = :id")
-                .param("fin", Timestamp.from(ahora))
+                .param("fin", Timestamp.from(inicioNuevo))
                 .param("nota", motivo)
                 .param("resumen", resumen)
                 .param("id", actual.id())
                 .update();
-        return abrir(ahora);
+        return abrir(inicioNuevo);
+    }
+
+    /** Comienzo del día {@code desde} en Chile, validado. */
+    private Instant inicioDelDia(LocalDate desde, CicloDto actual, Instant ahora) {
+        if (desde.isAfter(DiaDePredicacion.hoy(ahora))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La vuelta nueva no puede empezar en un día futuro.");
+        }
+        Instant inicio = desde.atStartOfDay(DiaDePredicacion.ZONA).toInstant();
+        if (!inicio.isAfter(actual.inicio())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La vuelta nueva tiene que empezar después del inicio de la vuelta actual.");
+        }
+        Long posteriores = jdbc.sql("""
+                SELECT count(*) FROM registro_predicacion
+                WHERE fecha >= :inicio AND anulado_en IS NULL AND origen <> 'reinicio'
+                """)
+                .param("inicio", Timestamp.from(inicio))
+                .query(Long.class)
+                .single();
+        if (posteriores > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya hay " + posteriores
+                    + " reporte(s) enviados desde ese día: quedarían en la vuelta anterior. Elige un día posterior,"
+                    + " o anula esos reportes en «Reportes» y regístralos de nuevo después de cerrar.");
+        }
+        return inicio;
     }
 
     /** Último reporte del territorio (su estado actual), si tiene alguno. */
@@ -129,10 +172,11 @@ public class CicloService {
         return new CicloDto(id, inicio, null, null, null);
     }
 
-    private static Report reinicio(UltimoReporte u, Instant ahora, String nota) {
+    private static Report reinicio(UltimoReporte u, Instant ahora, String nota, LocalDate desde) {
         Report r = new Report();
         r.setTerritorioNumero(u.territorio());
         r.setFecha(ahora);
+        r.setFechaPredicacion(desde);
         r.setSessionTime(ahora.toString());
         r.setEncargadoNombre(ADMIN);
         r.setEncargadoApellido("");

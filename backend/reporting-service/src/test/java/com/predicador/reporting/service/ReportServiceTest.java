@@ -23,6 +23,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -374,5 +376,40 @@ class ReportServiceTest {
         assertNull(ReportService.inicioSesionPlausible(Instant.parse("2026-09-20T15:05:00Z"), fecha));
         assertNull(ReportService.inicioSesionPlausible(Instant.parse("2026-09-18T15:00:00Z"), fecha));
         assertNull(ReportService.inicioSesionPlausible(null, fecha));
+    }
+
+    @Test
+    void elAdministradorRegistraUnaSalidaDeCualquierDiaPasado_ySeSumaComoLasDeLaApp() {
+        guardarDevuelveLoGuardado();
+        when(catalogo.manzanas(72L)).thenReturn(Map.of(1L, "72-72.a", 2L, "72-72.b"));
+        Report anterior = createReport(1, null, "Ana", "Soto", null, "incomplete", 72L);
+        anterior.setManzanasIds("72-72.a");
+        when(repository.findLatestByTerritorioNumeroIn(List.of(72L))).thenReturn(List.of(anterior));
+        java.time.LocalDate haceUnMes = java.time.LocalDate.now(java.time.ZoneId.of("America/Santiago")).minusDays(30);
+
+        ReportDto dto = new ReportDto(null, null, null, "Pedro", "Soto", null, "incomplete", 72L, null, 2, null,
+                null, null, null, "72-72.b", null, haceUnMes, "mañana");
+        ReportDto guardado = reportService.registrarDelAdministrador(dto, "Registrado desde el panel");
+
+        assertThat(guardado.estado()).isEqualTo("completed");
+        assertThat(guardado.fechaPredicacion()).isEqualTo(haceUnMes);
+        assertThat(guardado.encargadoNombre()).isEqualTo("Pedro");
+        org.mockito.ArgumentCaptor<Report> captor = org.mockito.ArgumentCaptor.forClass(Report.class);
+        verify(repository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getOrigen()).isEqualTo(Report.ORIGEN_SALIDA);
+        assertThat(captor.getValue().getNota()).isEqualTo("Registrado desde el panel");
+        assertThat(captor.getValue().getManzanasIds()).isEqualTo("72-72.a,72-72.b");
+        verify(catalogo).bloquear(72L);
+    }
+
+    @Test
+    void elAdministradorNoPuedeRegistrarUnDiaFuturo() {
+        java.time.LocalDate manana = java.time.LocalDate.now(java.time.ZoneId.of("America/Santiago")).plusDays(2);
+        ReportDto dto = new ReportDto(null, null, null, "Pedro", "Soto", null, "incomplete", 72L, null, 2, null,
+                null, null, null, "72-72.b", null, manana, null);
+
+        assertThatThrownBy(() -> reportService.registrarDelAdministrador(dto, null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(repository, never()).saveAndFlush(any());
     }
 }

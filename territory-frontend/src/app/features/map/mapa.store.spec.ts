@@ -7,7 +7,7 @@ import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
 import { DraftMarksService } from '../../core/services/map-draft';
 import type { EstadoTerritorioPublico } from '../../core/map/estado-publico';
-import { WhatsAppService } from './services/whatsapp';
+import { WhatsAppService } from '../../core/services/whatsapp';
 import { MapaStore, type VistaMapa } from './mapa.store';
 
 const cuadrado = (x: number, y: number): Polygon => ({

@@ -19,7 +19,7 @@ import {
   turnoPorHora,
   type Manzana,
 } from './salida';
-import { calcularLados, serializarZonas } from './lados';
+import { calcularLados, serializarZonas } from '../../../core/map/lados';
 
 const cuadrado = (x: number, y: number, lado = 0.001): Polygon => ({
   type: 'Polygon',

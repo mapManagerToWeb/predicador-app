@@ -51,6 +51,7 @@ export class AdminPage implements OnInit {
 
   readonly secciones: Seccion[] = [
     { ruta: 'resumen', titulo: 'Resumen', icono: 'M3 3v18h18M7 15l4-4 3 3 5-6' },
+    { ruta: 'registrar', titulo: 'Registrar salida', icono: 'M12 5v14M5 12h14' },
     { ruta: 'territorios', titulo: 'Territorios', icono: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14' },
     {
       ruta: 'encargados',

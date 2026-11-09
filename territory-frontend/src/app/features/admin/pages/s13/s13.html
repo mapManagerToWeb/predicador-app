@@ -144,6 +144,13 @@
       <label class="adm-field"><span>Nota para el informe (opcional)</span>
         <input type="text" maxlength="500" placeholder="Ej.: fin de la campaña, visita del superintendente…" [value]="notaCierre()" (input)="notaCierre.set($any($event.target).value)" />
       </label>
+      <label class="adm-field"><span>La vuelta nueva empieza el</span>
+        <input type="date" [max]="hoy" [min]="minimoCierre()" [value]="desdeCierre()" (input)="desdeCierre.set($any($event.target).value)" />
+      </label>
+      <p class="adm-muted">
+        Normalmente hoy. Si la vuelta nueva empezó unos días antes (por ejemplo, el inicio de una campaña), elige ese día:
+        el S-13 la mostrará desde entonces. Tiene que ser antes de registrar las salidas de esos días.
+      </p>
       <div class="barra">
         <button class="adm-btn danger" type="button" (click)="cerrarCiclo()" [disabled]="cerrando() || !cicloActual()">
           {{ cerrando() ? 'Cerrando…' : 'Cerrar ciclo y reiniciar territorios' }}

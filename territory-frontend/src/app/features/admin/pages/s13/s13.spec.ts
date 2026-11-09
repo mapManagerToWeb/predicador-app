@@ -81,7 +81,27 @@ describe('S13Page', () => {
     expect(ui.confirmacion()?.escribir).toBe('REINICIAR');
     expect(api['cerrarCiclo']).not.toHaveBeenCalled();
     ui.responder(true);
-    await vi.waitFor(() => expect(api['cerrarCiclo']).toHaveBeenCalledWith(null));
+    // Sin elegir otro día, la vuelta nueva empieza hoy (no se manda fecha).
+    await vi.waitFor(() => expect(api['cerrarCiclo']).toHaveBeenCalledWith(null, null));
+  });
+
+  it('cerrar el ciclo desde un día anterior (inicio de una campaña) manda ese día', async () => {
+    const { fixture, el } = await crear();
+    (Array.from(el.querySelectorAll('[role=tab]')).find(b => b.textContent?.includes('Ciclo actual')) as HTMLButtonElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const fecha = el.querySelector('input[type=date]') as HTMLInputElement;
+    const hace3 = new Date();
+    hace3.setDate(hace3.getDate() - 3);
+    const dia = `${hace3.getFullYear()}-${String(hace3.getMonth() + 1).padStart(2, '0')}-${String(hace3.getDate()).padStart(2, '0')}`;
+    fecha.value = dia;
+    fecha.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    (Array.from(el.querySelectorAll('button')).find(b => b.textContent?.includes('Cerrar ciclo y reiniciar')) as HTMLButtonElement).click();
+    expect(ui.confirmacion()?.mensaje).toContain('La vuelta nueva empezará el');
+    ui.responder(true);
+    await vi.waitFor(() => expect(api['cerrarCiclo']).toHaveBeenCalledWith(null, dia));
   });
 
   it('corregir: desmarcar una manzana y guardar manda el nuevo estado', async () => {

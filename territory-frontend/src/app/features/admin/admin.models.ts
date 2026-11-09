@@ -227,3 +227,33 @@ export interface EstadoSistema {
   respaldos: RespaldoSistema[] | null;
   portainerUrl: string | null;
 }
+
+/** Salida que el administrador registra por un hermano (lo nuevo de esa salida; el servidor lo suma). */
+export interface RegistroSalidaRequest {
+  territorio: number;
+  /** Encargado de la lista; null = hermano escrito a mano (sin cuenta). */
+  encargadoId: number | null;
+  encargadoNombre: string;
+  encargadoApellido: string;
+  /** "AAAA-MM-DD". */
+  fechaPredicacion: string;
+  turno: 'mañana' | 'tarde' | null;
+  manzanasIds: string;
+  geometriaParcial: string | null;
+  puntosParciales: string | null;
+  totalManzanas: number;
+  nota: string | null;
+}
+
+/** Lo que devuelve el servidor: cómo quedó el territorio después de la salida. */
+export interface SalidaRegistrada {
+  id: number;
+  territorioNumero: number;
+  estado: string;
+  manzanasMarcadas: number | null;
+  totalManzanas: number | null;
+  encargadoNombre: string;
+  encargadoApellido: string | null;
+  fechaPredicacion: string | null;
+  turno: string | null;
+}
