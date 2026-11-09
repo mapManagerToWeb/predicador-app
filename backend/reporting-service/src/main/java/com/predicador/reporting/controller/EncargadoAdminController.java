@@ -2,6 +2,7 @@ package com.predicador.reporting.controller;
 
 import com.predicador.reporting.dto.EncargadoAdminDto;
 import com.predicador.reporting.dto.EncargadoAdminRequest;
+import com.predicador.reporting.dto.ImportacionEncargados;
 import com.predicador.reporting.service.ConfiguracionService;
 import com.predicador.reporting.service.EncargadoAdminService;
 import com.predicador.shared.security.AuthorizationService;
@@ -97,6 +98,17 @@ public class EncargadoAdminController {
                                                        HttpServletRequest request) {
         authorization.requireAdmin(RequestTokens.token(request));
         return ResponseEntity.ok(service.fusionar(id, destinoId));
+    }
+
+    /**
+     * Carga una lista de hermanos. Con {@code simular} solo dice qué pasaría con
+     * cada fila; sin él, crea los que están bien y deja igual los que ya existen.
+     */
+    @PostMapping("/importar")
+    public ResponseEntity<List<ImportacionEncargados.Resultado>> importar(@RequestBody ImportacionEncargados.Pedido pedido,
+                                                                        HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        return ResponseEntity.ok(service.importar(pedido == null ? null : pedido.filas(), pedido != null && pedido.simular()));
     }
 
     @GetMapping("/config")

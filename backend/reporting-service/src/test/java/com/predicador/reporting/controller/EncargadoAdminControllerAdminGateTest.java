@@ -324,4 +324,19 @@ class EncargadoAdminControllerAdminGateTest {
         verify(configuracion).setRegistroAbierto(true);
         verify(configuracion).registroAbierto();
     }
+
+    @Test
+    void importar_soloElAdmin_yPasaSiEsSimulacion() throws Exception {
+        String cuerpo = "{\"simular\":true,\"filas\":[{\"nombre\":\"Pedro\",\"apellido\":\"Soto\",\"telefono\":\"922223333\"}]}";
+        mvc.perform(post(BASE + "/importar").with(comoEncargado()).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service, configuracion);
+
+        when(service.importar(any(), org.mockito.ArgumentMatchers.eq(true))).thenReturn(List.of(
+                new com.predicador.reporting.dto.ImportacionEncargados.Resultado(1, "Pedro", "Soto", "56922223333", "crear", "Se va a crear.")));
+        mvc.perform(post(BASE + "/importar").with(comoAdmin()).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].resultado").value("crear"));
+        verify(service).importar(any(), org.mockito.ArgumentMatchers.eq(true));
+    }
 }

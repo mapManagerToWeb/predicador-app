@@ -257,3 +257,13 @@ export interface SalidaRegistrada {
   fechaPredicacion: string | null;
   turno: string | null;
 }
+
+/** Qué pasa (o pasó) con una fila de la lista de hermanos que se carga. */
+export interface ResultadoImportacion {
+  fila: number;
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+  resultado: 'crear' | 'existe' | 'error';
+  detalle: string;
+}
