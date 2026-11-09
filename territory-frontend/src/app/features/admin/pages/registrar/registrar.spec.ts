@@ -40,21 +40,24 @@ describe('RegistrarPage', () => {
   let toast: { show: ReturnType<typeof vi.fn> };
   const manzanas = signal<ManzanasCollection | null>({
     type: 'FeatureCollection',
-    features: [manzana('72.a', 0), manzana('72.b', 1)],
+    features: [manzana('72.a', 0), manzana('72.b', 1), { ...manzana('61.a', 2), properties: { id: 2, territorio: 61, nombre: '61.a' } }],
   } as ManzanasCollection);
 
   beforeEach(async () => {
     api = {
       whatsappDestino: vi.fn().mockResolvedValue({ telefono: '56912345678' }),
       setWhatsappDestino: vi.fn(),
-      estadoTerritorio: vi.fn().mockResolvedValue({
+      estadoTerritorio: vi.fn().mockImplementation(async (t: number) => t === 61 ? null : {
         territorio: 72, fecha: '2026-10-01T12:00:00Z', estado: 'incomplete', origen: 'salida', encargado: 'Ana Pérez',
         manzanasIds: '72-72.a', geometriaParcial: null, puntosParciales: null, totalManzanas: 2,
       }),
-      registrarSalida: vi.fn().mockResolvedValue({
-        id: 50, territorioNumero: 72, estado: 'completed', manzanasMarcadas: 2, totalManzanas: 2,
-        encargadoNombre: 'Pedro', encargadoApellido: 'Soto', fechaPredicacion: '2026-11-07', turno: 'mañana',
-      }),
+      registrarSalidas: vi.fn().mockImplementation(async (pedidos: { territorio: number }[]) =>
+        pedidos.map((p, i) => ({
+          id: 50 + i, territorioNumero: p.territorio, estado: p.territorio === 72 ? 'completed' : 'incomplete',
+          manzanasMarcadas: p.territorio === 72 ? 2 : 1, totalManzanas: p.territorio === 72 ? 2 : 3,
+          encargadoNombre: 'Pedro', encargadoApellido: 'Soto', fechaPredicacion: '2026-11-07', turno: 'mañana',
+        })),
+      ),
     };
     whatsapp = { sendReport: vi.fn().mockResolvedValue({ success: true, messageId: 'x', error: null }) };
     ui = { confirmar: vi.fn().mockResolvedValue(true) };
@@ -63,7 +66,7 @@ describe('RegistrarPage', () => {
       encargados: signal(encargados),
       manzanas,
       colores: signal({ 72: '#ec4899' }),
-      territorios: computed(() => [72]),
+      territorios: computed(() => [61, 72]),
       cargarEncargados: vi.fn().mockResolvedValue(undefined),
       cargarManzanas: vi.fn().mockResolvedValue(undefined),
       cargarReportes: vi.fn().mockResolvedValue(undefined),
@@ -88,25 +91,25 @@ describe('RegistrarPage', () => {
     const page = fixture.componentInstance as unknown as {
       hermanoTexto: ReturnType<typeof signal<string>>;
       dia: ReturnType<typeof signal<string>>;
-      elegirTerritorio(e: Event): Promise<void>;
+      agregarTerritorio(t: number): Promise<void>;
       alTocarManzana(m: ManzanaFeature): void;
       registrar(): Promise<void>;
       puedeGuardar(): boolean;
       registrados(): unknown[];
-      territorio(): number | null;
+      territorios(): number[];
     };
     fixture.detectChanges();
 
     page.hermanoTexto.set('Pedro Soto');
     page.dia.set('2026-11-07');
-    await page.elegirTerritorio({ target: { value: '72' } } as unknown as Event);
+    await page.agregarTerritorio(72);
     expect(page.puedeGuardar()).toBe(false);
 
     page.alTocarManzana(manzanas()!.features[1] as ManzanaFeature);
     expect(page.puedeGuardar()).toBe(true);
     await page.registrar();
 
-    expect(api['registrarSalida']).toHaveBeenCalledWith(
+    expect(api['registrarSalidas']).toHaveBeenCalledWith([
       expect.objectContaining({
         territorio: 72,
         encargadoId: null,
@@ -117,7 +120,7 @@ describe('RegistrarPage', () => {
         manzanasIds: '72-72.b',
         totalManzanas: 2,
       }),
-    );
+    ]);
     expect(whatsapp.sendReport).toHaveBeenCalledWith(
       expect.objectContaining({
         encargadoNombre: 'Pedro',
@@ -129,7 +132,7 @@ describe('RegistrarPage', () => {
     );
     expect(page.registrados()).toHaveLength(1);
     // Listo para el siguiente: se limpia el territorio, se mantienen hermano y día.
-    expect(page.territorio()).toBeNull();
+    expect(page.territorios()).toEqual([]);
     expect(page.hermanoTexto()).toBe('Pedro Soto');
   });
 
@@ -138,16 +141,16 @@ describe('RegistrarPage', () => {
     const fixture = TestBed.createComponent(RegistrarPage);
     const page = fixture.componentInstance as unknown as {
       hermanoTexto: ReturnType<typeof signal<string>>;
-      elegirTerritorio(e: Event): Promise<void>;
+      agregarTerritorio(t: number): Promise<void>;
       alTocarManzana(m: ManzanaFeature): void;
       registrar(): Promise<void>;
     };
     page.hermanoTexto.set('Ana Pérez');
-    await page.elegirTerritorio({ target: { value: '72' } } as unknown as Event);
+    await page.agregarTerritorio(72);
     page.alTocarManzana(manzanas()!.features[1] as ManzanaFeature);
     await page.registrar();
 
-    expect(api['registrarSalida']).toHaveBeenCalledWith(expect.objectContaining({ encargadoId: 7 }));
+    expect(api['registrarSalidas']).toHaveBeenCalledWith([expect.objectContaining({ encargadoId: 7 })]);
     expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no se pudo enviar'), 4000, 'warning');
   });
 
@@ -156,16 +159,68 @@ describe('RegistrarPage', () => {
     const fixture = TestBed.createComponent(RegistrarPage);
     const page = fixture.componentInstance as unknown as {
       hermanoTexto: ReturnType<typeof signal<string>>;
-      elegirTerritorio(e: Event): Promise<void>;
+      agregarTerritorio(t: number): Promise<void>;
       alTocarManzana(m: ManzanaFeature): void;
       registrar(): Promise<void>;
     };
     page.hermanoTexto.set('Ana Pérez');
-    await page.elegirTerritorio({ target: { value: '72' } } as unknown as Event);
+    await page.agregarTerritorio(72);
     page.alTocarManzana(manzanas()!.features[1] as ManzanaFeature);
     await page.registrar();
 
-    expect(api['registrarSalida']).not.toHaveBeenCalled();
+    expect(api['registrarSalidas']).not.toHaveBeenCalled();
     expect(whatsapp.sendReport).not.toHaveBeenCalled();
+  });
+
+  it('una salida con varios territorios va junta y manda un solo WhatsApp con todos', async () => {
+    const fixture = TestBed.createComponent(RegistrarPage);
+    const page = fixture.componentInstance as unknown as {
+      hermanoTexto: ReturnType<typeof signal<string>>;
+      agregarTerritorio(t: number): Promise<void>;
+      quitarTerritorio(t: number): void;
+      alTocarManzana(m: ManzanaFeature): void;
+      todo(t: number): void;
+      registrar(): Promise<void>;
+      puedeGuardar(): boolean;
+      sinMarcar(): number[];
+    };
+    page.hermanoTexto.set('Pedro Soto');
+    await page.agregarTerritorio(72);
+    await page.agregarTerritorio(61);
+    page.alTocarManzana(manzanas()!.features[1] as ManzanaFeature);
+    // El 61 todavía no tiene nada: no se puede guardar.
+    expect(page.sinMarcar()).toEqual([61]);
+    expect(page.puedeGuardar()).toBe(false);
+
+    page.todo(61);
+    expect(page.puedeGuardar()).toBe(true);
+    await page.registrar();
+
+    expect(api['registrarSalidas']).toHaveBeenCalledTimes(1);
+    const pedidos = api['registrarSalidas'].mock.calls[0][0] as { territorio: number; manzanasIds: string }[];
+    expect(pedidos.map(p => [p.territorio, p.manzanasIds])).toEqual([[72, '72-72.b'], [61, '61-61.a']]);
+    expect(whatsapp.sendReport).toHaveBeenCalledTimes(1);
+    expect(whatsapp.sendReport.mock.calls[0][0].territorios).toEqual([
+      { numero: 72, finalizado: true, totalManzanas: 2, manzanasMarcadas: 2 },
+      { numero: 61, finalizado: false, totalManzanas: 3, manzanasMarcadas: 1 },
+    ]);
+  });
+
+  it('quitar un territorio borra lo marcado en él', async () => {
+    const fixture = TestBed.createComponent(RegistrarPage);
+    const page = fixture.componentInstance as unknown as {
+      agregarTerritorio(t: number): Promise<void>;
+      quitarTerritorio(t: number): void;
+      todo(t: number): void;
+      edicion(): { marcadas: Set<string> };
+      territorios(): number[];
+    };
+    await page.agregarTerritorio(72);
+    await page.agregarTerritorio(61);
+    page.todo(61);
+    page.quitarTerritorio(61);
+
+    expect(page.territorios()).toEqual([72]);
+    expect([...page.edicion().marcadas]).toEqual(['72-72.a']);
   });
 });

@@ -28,7 +28,9 @@ export interface CalleVisible {
 
 /** Lo que ya estaba antes de la salida que se corrige va en gris. */
 const GRIS_BLOQUEADO = '#9ca3af';
-const relleno = (color: string): ExpressionSpecification => ['case', ['get', 'bloqueada'], GRIS_BLOQUEADO, color];
+/** Color de cada manzana: el de su territorio si viene (varios territorios), si no el color del mapa. */
+const delTerritorio = (color: string): ExpressionSpecification => ['coalesce', ['get', 'color'], color];
+const relleno = (color: string): ExpressionSpecification => ['case', ['get', 'bloqueada'], GRIS_BLOQUEADO, delTerritorio(color)];
 
 /**
  * Mapa de un territorio para corregir su estado: las manzanas marcadas enteras
@@ -62,6 +64,8 @@ export class CorreccionMap {
   readonly bloqueadas = input<ReadonlySet<string>>(new Set());
   /** Índices de las zonas de calles que ya estaban antes. */
   readonly zonasBloqueadas = input<ReadonlySet<number>>(new Set());
+  /** Color por territorio, cuando el mapa muestra varios (si no, todo va con {@link color}). */
+  readonly colores = input<Record<number, string> | null>(null);
   /** Calles de una manzana para marcarlas una a una (null: sin edición de calles). */
   readonly calles = input<CalleVisible[] | null>(null);
   readonly manzanaClick = output<ManzanaFeature>();
@@ -100,6 +104,7 @@ export class CorreccionMap {
       const estado = this.estado();
       const manzanas = this.manzanas();
       const zonasBloqueadas = this.zonasBloqueadas();
+      const colores = this.colores();
       this.bloqueadas();
       if (!this.listo() || !this.map) return;
       this.dibujarManzanas(manzanas, estado);
@@ -108,7 +113,11 @@ export class CorreccionMap {
         features: estado.zonas.map((z, i) => ({
           type: 'Feature',
           geometry: z.geometria,
-          properties: { indice: i, bloqueada: zonasBloqueadas.has(i) },
+          properties: {
+            indice: i,
+            bloqueada: zonasBloqueadas.has(i),
+            color: colores && z.manzanaId ? (colores[Number(z.manzanaId.slice(0, z.manzanaId.indexOf('-')))] ?? null) : null,
+          },
         })),
       });
     });
@@ -121,7 +130,7 @@ export class CorreccionMap {
       const color = this.color();
       if (!this.listo() || !this.map) return;
       for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', relleno(color));
-      this.map.setPaintProperty('manzanas-line', 'line-color', color);
+      this.map.setPaintProperty('manzanas-line', 'line-color', delTerritorio(color));
     });
   }
 
@@ -137,7 +146,7 @@ export class CorreccionMap {
       paint: { 'fill-color': relleno(this.color()), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
     });
     map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': relleno(this.color()), 'fill-opacity': 0.75 } });
-    map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': this.color(), 'line-width': 1.5 } });
+    map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': delTerritorio(this.color()), 'line-width': 1.5 } });
     map.addSource('calles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addSource('calles-numero', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -218,6 +227,7 @@ export class CorreccionMap {
           nombre: m.properties.nombre,
           marcada: estado.marcadas.has(clave(m)),
           bloqueada: this.bloqueadas().has(clave(m)),
+          color: this.colores()?.[m.properties.territorio] ?? null,
         },
       })),
     });

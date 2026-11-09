@@ -25,7 +25,11 @@ and the S-13 are right from the campaign start (Saturday 7 November 2026).
   these apart.
 - **Any non-future day** is allowed (the app's 7-day limit does not apply).
   `fecha` stays the time it was entered and keeps ordering the reports.
-- **One WhatsApp per registered outing**, to the admin's number set in the
+- **Several territories per outing**, like the app: they are saved together
+  (`POST /api/v1/reports/admin/salidas/varias`, all or nothing, territory
+  locks in a fixed order) and share the brother, day and shift. The panel map
+  shows them together, each in its territory's colour.
+- **One WhatsApp per registered outing** (with all its territories), to the admin's number set in the
   panel (`app_config.whatsapp_administrador`); without it, `WHATSAPP_DESTINATION`.
   Incomplete territories carry an image of the panel map.
 - **A cycle can be closed from an earlier day** (`desde`): the new cycle and

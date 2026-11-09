@@ -16,11 +16,14 @@ import {
   aporte,
   baseDeRegistro,
   callesDe,
+  delTerritorio,
   hermanoEscrito,
   ladosDe,
   pedidoRegistro,
   resultado,
-  todoElTerritorio,
+  sinTerritorio,
+  todoElTerritorioEn,
+  unir,
   type Hermano,
 } from '../../utils/registro';
 
@@ -51,18 +54,29 @@ export function fechaParaWhatsApp(iso: string): string {
 }
 
 interface Registrado {
-  salida: SalidaRegistrada;
+  salidas: SalidaRegistrada[];
   hermano: string;
   dia: string;
   turno: Turno;
   whatsapp: 'enviado' | 'fallo' | 'no';
 }
 
+/** Cómo va un territorio de la salida: lo nuevo y cómo queda. */
+export interface ResumenTerritorio {
+  numero: number;
+  color: string;
+  total: number;
+  enteras: number;
+  porCalles: number;
+  queda: { enteras: number; porCalles: number; completo: boolean };
+  estado: EstadoTerritorioAdmin | null;
+}
+
 /**
  * Registrar una salida que un hermano informó (p. ej. por WhatsApp), mientras
- * los hermanos aprenden a usar la app. Queda como salida de él: suma al
- * territorio, sale en el S-13 y en Reportes. El resumen le llega por WhatsApp
- * al administrador.
+ * los hermanos aprenden a usar la app. Puede tener varios territorios, como en
+ * la app. Queda como salida de él: suma a cada territorio, sale en el S-13 y en
+ * Reportes. El resumen (uno por salida) le llega por WhatsApp al administrador.
  */
 @Component({
   selector: 'app-registrar',
@@ -90,12 +104,15 @@ export class RegistrarPage {
   protected readonly hermanoTexto = signal('');
   protected readonly dia = signal(this.hoy);
   protected readonly turno = signal<Turno>('mañana');
-  protected readonly territorio = signal<number | null>(null);
+  /** Territorios de la salida, en el orden en que se agregaron. */
+  protected readonly territorios = signal<number[]>([]);
+  /** El territorio en el que se está trabajando (para «Todo el territorio»). */
+  protected readonly activo = signal<number | null>(null);
   protected readonly nota = signal('');
 
-  // Mapa
-  protected readonly estadoRemoto = signal<EstadoTerritorioAdmin | null>(null);
-  protected readonly cargandoTerritorio = signal(false);
+  // Mapa: el estado de todos los territorios de la salida va junto (las claves dicen el territorio).
+  protected readonly estados = signal<Map<number, EstadoTerritorioAdmin | null>>(new Map());
+  protected readonly cargandoTerritorio = signal<number | null>(null);
   protected readonly base = signal<EstadoCorreccion>(vaciar());
   protected readonly edicion = signal<EstadoCorreccion>(vaciar());
   protected readonly modo = signal<Modo>('entera');
@@ -114,23 +131,41 @@ export class RegistrarPage {
     (this.store.encargados() ?? []).filter(e => e.activo).sort((a, b) => `${a.nombre} ${a.apellido}`.localeCompare(`${b.nombre} ${b.apellido}`)),
   );
   protected readonly hermano = computed(() => resolverHermano(this.hermanoTexto(), this.encargados()));
+  /** Territorios que todavía se pueden agregar. */
+  protected readonly disponibles = computed(() => this.store.territorios().filter(t => !this.territorios().includes(t)));
+  /** Manzanas de todos los territorios de la salida. */
   protected readonly manzanas = computed<ManzanaFeature[]>(() => {
-    const t = this.territorio();
+    const ts = new Set(this.territorios());
     return ((this.store.manzanas()?.features ?? []) as ManzanaFeature[])
-      .filter(m => m.properties.territorio === t)
-      .sort((a, b) => a.properties.nombre.localeCompare(b.properties.nombre));
+      .filter(m => ts.has(m.properties.territorio))
+      .sort((a, b) => a.properties.territorio - b.properties.territorio || a.properties.nombre.localeCompare(b.properties.nombre));
   });
-  protected readonly color = computed(() => this.store.colores()[this.territorio() ?? -1] ?? '#2563eb');
+  protected readonly colores = computed(() => {
+    const c: Record<number, string> = {};
+    for (const t of this.territorios()) c[t] = this.store.colores()[t] ?? '#2563eb';
+    return c;
+  });
   protected readonly zonasBloqueadas = computed(() => zonasDeLaBase(this.base(), this.edicion()));
-  protected readonly nuevo = computed(() => aporte(this.base(), this.edicion()));
-  protected readonly hayAlgo = computed(() => this.nuevo().enteras.length + this.nuevo().zonas.length > 0);
-  protected readonly queda = computed(() => resultado(this.edicion(), this.manzanas().length));
-  protected readonly vueltaNueva = computed(() => {
-    const e = this.estadoRemoto()?.estado;
-    return e === 'completed' || e === 'reiniciado';
-  });
 
-  /** Calles de la manzana elegida en modo «por calles», para el mapa y la lista. */
+  protected readonly resumenes = computed<ResumenTerritorio[]>(() =>
+    this.territorios().map(t => {
+      const manzanas = this.manzanas().filter(m => m.properties.territorio === t);
+      const nuevo = aporte(delTerritorio(this.base(), t), delTerritorio(this.edicion(), t));
+      return {
+        numero: t,
+        color: this.colores()[t],
+        total: manzanas.length,
+        enteras: nuevo.enteras.length,
+        porCalles: nuevo.zonas.length,
+        queda: resultado(delTerritorio(this.edicion(), t), manzanas.length),
+        estado: this.estados().get(t) ?? null,
+      };
+    }),
+  );
+  /** Territorios agregados en los que todavía no se marcó nada. */
+  protected readonly sinMarcar = computed(() => this.resumenes().filter(r => r.enteras + r.porCalles === 0).map(r => r.numero));
+
+  /** Calles de la manzana elegida en modo «por calles», para el mapa. */
   protected readonly calles = computed<CalleVisible[] | null>(() => {
     const m = this.manzanaCalles();
     if (!m || this.modo() !== 'calles') return null;
@@ -145,7 +180,13 @@ export class RegistrarPage {
   });
 
   protected readonly puedeGuardar = computed(
-    () => !!this.hermano().nombre && this.territorio() !== null && !!this.dia() && this.hayAlgo() && !this.guardando(),
+    () =>
+      !!this.hermano().nombre &&
+      this.territorios().length > 0 &&
+      this.sinMarcar().length === 0 &&
+      this.cargandoTerritorio() === null &&
+      !!this.dia() &&
+      !this.guardando(),
   );
 
   constructor() {
@@ -168,29 +209,49 @@ export class RegistrarPage {
     return (event.target as HTMLInputElement).value;
   }
 
-  protected async elegirTerritorio(event: Event): Promise<void> {
-    const valor = (event.target as HTMLSelectElement).value;
-    const t = valor ? Number(valor) : null;
-    this.territorio.set(t);
-    this.manzanaCalles.set(null);
-    this.estadoRemoto.set(null);
-    this.base.set(vaciar());
-    this.edicion.set(vaciar());
-    if (t === null) return;
-    this.cargandoTerritorio.set(true);
+  /** Agrega un territorio a la salida (desde el selector). */
+  protected async alElegirTerritorio(event: Event): Promise<void> {
+    const select = event.target as HTMLSelectElement;
+    const t = select.value ? Number(select.value) : null;
+    select.value = '';
+    if (t !== null) await this.agregarTerritorio(t);
+  }
+
+  async agregarTerritorio(t: number): Promise<void> {
+    if (this.territorios().includes(t)) {
+      this.activo.set(t);
+      return;
+    }
+    this.territorios.update(l => [...l, t]);
+    this.activo.set(t);
+    this.cargandoTerritorio.set(t);
     try {
       await this.store.cargarManzanas();
       const estado = await this.api.estadoTerritorio(t);
-      if (this.territorio() !== t) return;
-      this.estadoRemoto.set(estado);
-      const base = baseDeRegistro(estado, this.manzanas());
-      this.base.set(base);
-      this.edicion.set(base);
+      if (!this.territorios().includes(t)) return;
+      this.estados.update(m => new Map(m).set(t, estado));
+      const base = baseDeRegistro(estado, this.manzanas().filter(m => m.properties.territorio === t));
+      this.base.update(b => unir(sinTerritorio(b, t), base));
+      this.edicion.update(e => unir(sinTerritorio(e, t), base));
     } catch (e) {
-      this.toast.show(mensajeDeError(e, 'No se pudo cargar el territorio'), 5000, 'error');
+      this.quitarTerritorio(t);
+      this.toast.show(mensajeDeError(e, `No se pudo cargar el territorio ${t}`), 5000, 'error');
     } finally {
-      this.cargandoTerritorio.set(false);
+      if (this.cargandoTerritorio() === t) this.cargandoTerritorio.set(null);
     }
+  }
+
+  protected quitarTerritorio(t: number): void {
+    this.territorios.update(l => l.filter(x => x !== t));
+    this.estados.update(m => {
+      const n = new Map(m);
+      n.delete(t);
+      return n;
+    });
+    this.base.update(b => sinTerritorio(b, t));
+    this.edicion.update(e => sinTerritorio(e, t));
+    if (this.manzanaCalles()?.properties.territorio === t) this.manzanaCalles.set(null);
+    if (this.activo() === t) this.activo.set(this.territorios().at(-1) ?? null);
   }
 
   // ── Mapa ──
@@ -201,20 +262,21 @@ export class RegistrarPage {
   }
 
   protected alTocarManzana(m: ManzanaFeature): void {
+    this.activo.set(m.properties.territorio);
     if (this.modo() === 'entera') {
       this.edicion.set(alternarEntera(this.base(), this.edicion(), m));
       return;
     }
     if (this.base().marcadas.has(clave(m))) {
-      this.toast.show(`La manzana ${m.properties.nombre} ya estaba completa en este territorio`, 3000, 'info');
+      this.toast.show(`La manzana ${m.properties.nombre} ya estaba completa`, 3000, 'info');
       return;
     }
     this.manzanaCalles.set(m);
   }
 
   protected alTocarZona(indice: number): void {
+    const zona = this.edicion().zonas[indice];
     if (this.modo() === 'calles') {
-      const zona = this.edicion().zonas[indice];
       const m = zona?.manzanaId ? this.manzanas().find(x => clave(x) === zona.manzanaId) : undefined;
       if (m) this.manzanaCalles.set(m);
       return;
@@ -228,14 +290,16 @@ export class RegistrarPage {
     this.edicion.set(alternarCalle(this.base(), this.edicion(), m, ladosDe(m), indice));
   }
 
-  protected todo(): void {
+  /** «Territorio X completado»: todas sus manzanas (solo el territorio activo). */
+  protected todo(t: number): void {
+    this.activo.set(t);
     this.manzanaCalles.set(null);
-    this.edicion.set(todoElTerritorio(this.manzanas()));
+    this.edicion.set(todoElTerritorioEn(this.edicion(), this.manzanas(), t));
   }
 
-  protected limpiar(): void {
+  protected deshacer(t: number): void {
     this.manzanaCalles.set(null);
-    this.edicion.set(this.base());
+    this.edicion.set(unir(sinTerritorio(this.edicion(), t), delTerritorio(this.base(), t)));
   }
 
   // ── WhatsApp ──
@@ -263,47 +327,66 @@ export class RegistrarPage {
   // ── Guardar ──
 
   protected async registrar(): Promise<void> {
-    const t = this.territorio();
     const hermano = this.hermano();
-    if (t === null || !this.puedeGuardar()) return;
+    const territorios = this.territorios();
+    if (!this.puedeGuardar()) return;
     const nombre = `${hermano.nombre} ${hermano.apellido}`.trim();
-    const n = this.nuevo();
+    const detalle = this.resumenes()
+      .map(
+        r =>
+          `territorio ${r.numero}: ${r.enteras} manzana(s)` +
+          (r.porCalles ? ` y ${r.porCalles} por calles` : '') +
+          (r.queda.completo ? ' (queda completo)' : ''),
+      )
+      .join('; ');
     const ok = await this.ui.confirmar({
       titulo: `Registrar la salida de ${nombre}`,
       mensaje:
-        `Territorio ${t}, ${fmtFecha(this.dia() + 'T12:00:00')} en la ${this.turno()}: ` +
-        `${n.enteras.length} manzana(s) entera(s)` +
-        (n.zonas.length ? ` y ${n.zonas.length} por calles` : '') +
-        (this.queda().completo ? '. El territorio queda completo.' : '.') +
+        `${fmtFecha(this.dia() + 'T12:00:00')} en la ${this.turno()}. ${detalle[0]?.toUpperCase() ?? ''}${detalle.slice(1)}.` +
         (hermano.id === null ? ` ${nombre} no tiene cuenta en la app: el registro queda con su nombre.` : ''),
       accion: 'Registrar',
     });
     if (!ok) return;
 
     this.guardando.set(true);
+    // La imagen del mapa con todos los territorios de la salida.
+    this.manzanaCalles.set(null);
     const captura = this.mapa()?.capturar() ?? null;
     const dia = this.dia();
     const turno = this.turno();
     try {
-      const salida = await this.api.registrarSalida(
-        pedidoRegistro(t, hermano, dia, turno, this.base(), this.edicion(), this.manzanas().length, this.nota()),
+      const pedidos = territorios.map(t =>
+        pedidoRegistro(
+          t,
+          hermano,
+          dia,
+          turno,
+          delTerritorio(this.base(), t),
+          delTerritorio(this.edicion(), t),
+          this.manzanas().filter(m => m.properties.territorio === t).length,
+          this.nota(),
+        ),
       );
+      const salidas = await this.api.registrarSalidas(pedidos);
       let whatsapp: Registrado['whatsapp'] = 'no';
       if (this.enviarWhatsApp()) {
-        whatsapp = (await this.enviarResumen(salida, hermano, dia, turno, captura)) ? 'enviado' : 'fallo';
+        whatsapp = (await this.enviarResumen(salidas, hermano, dia, turno, captura)) ? 'enviado' : 'fallo';
       }
-      this.registrados.update(l => [{ salida, hermano: nombre, dia, turno, whatsapp }, ...l]);
+      this.registrados.update(l => [{ salidas, hermano: nombre, dia, turno, whatsapp }, ...l]);
+      const cuales = salidas.map(x => x.territorioNumero).join(', ');
       this.toast.show(
-        whatsapp === 'fallo' ? 'Salida registrada, pero el WhatsApp no se pudo enviar' : `Salida registrada: territorio ${t}`,
+        whatsapp === 'fallo'
+          ? 'Salida registrada, pero el WhatsApp no se pudo enviar'
+          : `Salida registrada: ${salidas.length === 1 ? 'territorio' : 'territorios'} ${cuales}`,
         4000,
         whatsapp === 'fallo' ? 'warning' : 'success',
       );
       // Para la próxima: se mantienen el hermano, el día y el turno (suelen ser varios del mismo día).
-      this.territorio.set(null);
-      this.estadoRemoto.set(null);
+      this.territorios.set([]);
+      this.activo.set(null);
+      this.estados.set(new Map());
       this.base.set(vaciar());
       this.edicion.set(vaciar());
-      this.manzanaCalles.set(null);
       this.nota.set('');
       void this.store.cargarReportes(true);
     } catch (e) {
@@ -313,36 +396,40 @@ export class RegistrarPage {
     }
   }
 
+  /** Un WhatsApp con todos los territorios, como el que manda la app. */
   private async enviarResumen(
-    salida: SalidaRegistrada,
+    salidas: SalidaRegistrada[],
     hermano: Hermano,
     dia: string,
     turno: Turno,
     captura: string | null,
   ): Promise<boolean> {
-    const completo = salida.estado === 'completed';
+    const territorios = salidas.map(x => ({
+      numero: x.territorioNumero,
+      finalizado: x.estado === 'completed',
+      totalManzanas: x.totalManzanas ?? this.manzanas().filter(m => m.properties.territorio === x.territorioNumero).length,
+      manzanasMarcadas: x.manzanasMarcadas ?? 0,
+    }));
+    // Igual que la app: un solo territorio completo va con la imagen oficial; si no, con el mapa.
+    const imagenOficial = territorios.length === 1 && territorios[0].finalizado;
     try {
       const r = await this.whatsapp.sendReport({
         encargadoNombre: hermano.nombre,
         encargadoApellido: hermano.apellido,
         fechaRegistro: fechaParaWhatsApp(dia),
         predicacion: turno,
-        territorios: [
-          {
-            numero: salida.territorioNumero,
-            finalizado: completo,
-            totalManzanas: salida.totalManzanas ?? this.manzanas().length,
-            manzanasMarcadas: salida.manzanasMarcadas ?? 0,
-          },
-        ],
-        // Un territorio completo va con la imagen oficial; si no, con el mapa.
-        screenshotBase64: completo ? null : captura,
+        territorios,
+        screenshotBase64: imagenOficial ? null : captura,
         destinationNumber: null,
       });
       return r.success;
     } catch {
       return false;
     }
+  }
+
+  protected territoriosDe(r: Registrado): string {
+    return r.salidas.map(x => x.territorioNumero).join(', ');
   }
 
   protected readonly situacion = situacion;

@@ -329,4 +329,25 @@ class ReportAdminCiclosControllerTest {
                 .andExpect(status().isOk());
         verify(configuracion).setWhatsappAdministrador("");
     }
+
+    @Test
+    void registrarVariasSalidas_soloElAdmin() throws Exception {
+        String cuerpo = """
+                [{"territorio":72,"encargadoNombre":"Pedro","fechaPredicacion":"2026-11-07","manzanasIds":"72-72.a","totalManzanas":4},
+                 {"territorio":61,"encargadoNombre":"Pedro","fechaPredicacion":"2026-11-07","manzanasIds":"61-61.a","totalManzanas":4}]
+                """;
+        when(registro.registrarVarias(any())).thenReturn(List.of(
+                new com.predicador.reporting.dto.ReportDto(9, null, Instant.now(), "Pedro", "", null, "incomplete", 61L),
+                new com.predicador.reporting.dto.ReportDto(10, null, Instant.now(), "Pedro", "", null, "incomplete", 72L)));
+
+        mvc.perform(post("/api/v1/reports/admin/salidas/varias").with(comoEncargado())
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(registro);
+
+        mvc.perform(post("/api/v1/reports/admin/salidas/varias").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[1].territorioNumero").value(72));
+    }
 }

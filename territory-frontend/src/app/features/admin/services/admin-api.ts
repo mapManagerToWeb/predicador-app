@@ -136,6 +136,11 @@ export class AdminApi {
     return this.send(this.http.post<SalidaRegistrada>(`${this.reportes}/salidas`, req, { headers: SIN_SW }));
   }
 
+  /** Una salida con varios territorios: se guardan todos o ninguno. */
+  registrarSalidas(req: RegistroSalidaRequest[]): Promise<SalidaRegistrada[]> {
+    return this.send(this.http.post<SalidaRegistrada[]>(`${this.reportes}/salidas/varias`, req, { headers: SIN_SW }));
+  }
+
   /** Número al que llega el WhatsApp de lo que se registra desde el panel ("" = el del servidor). */
   whatsappDestino(): Promise<{ telefono: string }> {
     return this.get<{ telefono: string }>(`${this.reportes}/whatsapp-destino`);

@@ -10,7 +10,12 @@ import {
   ladosDe,
   pedidoRegistro,
   resultado,
+  delTerritorio,
+  sinTerritorio,
+  territorioDeClave,
   todoElTerritorio,
+  todoElTerritorioEn,
+  unir,
 } from './registro';
 
 /** Manzana cuadrada de ~100 m en Curanilahue (4 calles). */
@@ -135,5 +140,23 @@ describe('registrar una salida desde el panel', () => {
     expect(pedido.puntosParciales).toBeNull();
     expect(pedido.encargadoId).toBe(7);
     expect(pedido.nota).toBeNull();
+  });
+
+  it('varios territorios: las claves dicen el territorio y se separan al guardar', () => {
+    const otro = { ...manzana('61.a', 5), properties: { id: 5, territorio: 61, nombre: '61.a' } } as ManzanaFeature;
+    expect(territorioDeClave('72-72.a')).toBe(72);
+    expect(territorioDeClave('100-100.b')).toBe(100);
+
+    let e = unir(alternarEntera(vaciar(), vaciar(), A), alternarCalle(vaciar(), vaciar(), B, ladosDe(B), 0));
+    e = todoElTerritorioEn(e, [...MANZANAS, otro], 61);
+
+    expect([...delTerritorio(e, 61).marcadas]).toEqual(['61-61.a']);
+    expect([...delTerritorio(e, 72).marcadas]).toEqual(['72-72.a']);
+    expect(delTerritorio(e, 72).zonas).toHaveLength(1);
+    expect(delTerritorio(e, 61).zonas).toHaveLength(0);
+    expect([...sinTerritorio(e, 72).marcadas]).toEqual(['61-61.a']);
+    expect(sinTerritorio(e, 72).zonas).toHaveLength(0);
+    // «Todo el territorio» en uno no toca el otro.
+    expect([...todoElTerritorioEn(e, [...MANZANAS, otro], 72).marcadas].sort()).toEqual(['61-61.a', '72-72.a', '72-72.b', '72-72.c']);
   });
 });
