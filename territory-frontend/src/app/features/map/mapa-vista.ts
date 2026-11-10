@@ -254,7 +254,11 @@ export class MapaVista {
    * nunca la geometría de las manzanas.
    */
   private mostrarSituaciones(situaciones: Map<number, SituacionTerritorio>): void {
-    const firma = [...situaciones].filter(([, s]) => s !== 'sin-registro').map(([t, s]) => `${t}:${s}`).sort().join(',');
+    const firma = [...situaciones]
+      .filter(([, s]) => s !== 'sin-registro')
+      .map(([t, s]) => `${t}:${s}`)
+      .sort((a, b) => a.localeCompare(b))
+      .join(',');
     if (firma === this.firmaSituaciones) return;
     this.firmaSituaciones = firma;
     void (this.map.getSource('etiquetas') as GeoJSONSource | undefined)?.setData(this.datosEtiquetas(situaciones));

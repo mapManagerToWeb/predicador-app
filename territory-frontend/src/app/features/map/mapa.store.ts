@@ -543,7 +543,10 @@ export class MapaStore {
     }
     if (!cercana) return null;
     const delTerritorio = this.manzanasPorTerritorio.get(cercana.territorio) ?? [cercana];
-    const comoda = delTerritorio.reduce((a, b) => (comodidadDeToque(b.geometria) > comodidadDeToque(a.geometria) ? b : a));
+    const comoda = delTerritorio.reduce(
+      (a, b) => (comodidadDeToque(b.geometria) > comodidadDeToque(a.geometria) ? b : a),
+      delTerritorio[0],
+    );
     return { territorio: cercana.territorio, manzana: comoda.id };
   }
 

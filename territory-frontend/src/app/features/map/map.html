@@ -194,7 +194,7 @@
 
   <!-- Preguntas: nada se borra ni se envía sin confirmar -->
   @if (store.pregunta(); as p) {
-    <div class="velo" (click)="store.responder(false)" aria-hidden="true"></div>
+    <div class="velo" tabindex="-1" (click)="store.responder(false)" (keydown.escape)="store.responder(false)"></div>
     <div class="dialogo" role="alertdialog" aria-modal="true" aria-labelledby="dialogo-titulo">
       <h2 id="dialogo-titulo">{{ p.titulo }}</h2>
       @if (p.texto) {
