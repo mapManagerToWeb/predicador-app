@@ -37,7 +37,8 @@ El `try/catch` es obligatorio: `isDockerAvailable()` arranca el reaper de Testco
 
 ## `EncargadoRaceConditionTest`
 - Se llamaba `EncargadoRaceConditionIT` y **nunca corría**: surefire no incluye `*IT` y no hay failsafe. Se renombró a `*Test`.
-- Corre con `-Ddocker.available=true`, igual que los otros cuatro. CI lo ejecuta.- El esquema del test lo genera Hibernate (`create-drop`, Flyway apagado), así que el test crea el índice funcional `ux_encargados_natural_identity` antes de la sección concurrente: sin ese índice no hay carrera que resolver y el test mediría un esquema que no existe.
+- Corre con `-Ddocker.available=true`, igual que los otros cuatro. CI lo ejecuta.
+- El esquema del test lo genera Hibernate (`create-drop`, Flyway apagado), así que el test crea el índice funcional `ux_encargados_natural_identity` antes de la sección concurrente: sin ese índice no hay carrera que resolver y el test mediría un esquema que no existe.
 
 ## Pitfalls verificados (2026-10-10)
 - **`PostgisIntegrationTest`** (territory, contenedor propio `postgis/postgis:16-3.4`): usa `@DynamicPropertySource` para inyectar un `app.session.secret` **solo de test** (32 bytes) — no usar `app.session.strict=false`. Los inserts replican el patrón de producción con SQL nativo vía `JdbcTemplate` (`ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(:gj),4326))`); JPA `save()` es imposible porque `ManzanaTerritorio.geometry` es un `String` plano (sin tipo espacial de Hibernate).
