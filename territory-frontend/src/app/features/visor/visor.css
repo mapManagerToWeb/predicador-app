@@ -24,7 +24,15 @@
   box-shadow: var(--elev-2);
   cursor: pointer;
   padding: 0;
+  transition: var(--toque), background-color 0.15s ease, color 0.15s ease;
 }
+/* Se hunde al tocarlo; vale también para el enlace «volver», que no es un <button>. */
+.icono:active {
+  scale: 0.9;
+  filter: brightness(0.93);
+  transition-duration: 0.05s;
+}
+:root[data-theme='dark'] .icono:active { filter: brightness(1.25); }
 .icono svg, .buscar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .buscar {
   flex: 1;
@@ -65,6 +73,7 @@
   box-shadow: var(--elev-3);
   max-height: 50vh;
   overflow-y: auto;
+  animation: caer 0.16s var(--ease-out);
 }
 .sugerencias button {
   width: 100%;
@@ -80,7 +89,8 @@
   cursor: pointer;
 }
 .sugerencias button:hover,
-.sugerencias button:focus-visible {
+.sugerencias button:focus-visible,
+.sugerencias button:active {
   background: var(--surface-2);
 }
 
@@ -128,6 +138,8 @@
   background: var(--surface-1);
   border: 1px solid var(--color-border-solid);
   box-shadow: var(--elev-3);
+  /* La ficha del territorio y la leyenda suben desde abajo en vez de aparecer de golpe. */
+  animation: subir 0.26s var(--ease-out);
 }
 .panel h2 { margin: 0; font-size: 18px; }
 .panel p { margin: 6px 0 0; font-size: 15px; line-height: 1.45; }

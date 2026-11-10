@@ -16,7 +16,7 @@ import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Toast } from '../../core/services/toast';
-import { CLAVE_TEMA } from '../../core/utils/tema';
+import { CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 import { diasElegibles } from './utils/dia';
 import { MapaStore } from './mapa.store';
 import { MapaVista, type EstadoUbicacion } from './mapa-vista';
@@ -153,14 +153,17 @@ export class MapPage {
   }
 
   private medirPanel(panel: HTMLElement): void {
-    const contenedor = this.contenedor().nativeElement.getBoundingClientRect();
-    const p = panel.getBoundingClientRect();
+    // El mapa ocupa toda la página y el panel se ubica dentro de ella. Se mide
+    // con offset* y no con getBoundingClientRect: mientras el panel entra
+    // animado (sube unos píxeles) el rectángulo en pantalla da un lugar que no
+    // es el definitivo.
+    const mapa = this.contenedor().nativeElement;
     // Con el teléfono de lado el panel es una columna a la derecha (ver map.css).
-    const columna = p.top - contenedor.top < 40 && p.width < contenedor.width * 0.6;
+    const columna = panel.offsetTop < 40 && panel.offsetWidth < mapa.clientWidth * 0.6;
     this.vista?.ajustarMargenes(
       columna
-        ? { abajo: 0, derecha: Math.max(0, contenedor.right - p.left) }
-        : { abajo: Math.max(0, contenedor.bottom - p.top), derecha: 0 },
+        ? { abajo: 0, derecha: Math.max(0, mapa.clientWidth - panel.offsetLeft) }
+        : { abajo: Math.max(0, mapa.clientHeight - panel.offsetTop), derecha: 0 },
     );
   }
 
@@ -244,7 +247,7 @@ export class MapPage {
   }
 
   private aplicarTema(): void {
-    document.documentElement.setAttribute('data-theme', this.oscuro() ? 'dark' : 'light');
+    ponerTema(this.oscuro());
   }
 
   protected abrirTutorial(): void {
