@@ -21,7 +21,7 @@
         Arrastrá los vértices. Para agregar uno, arrastrá el punto del medio de un lado. Para borrarlo, clic derecho sobre él.
       </div>
     } @else {
-      <div class="mapa-ayuda sutil">Clic: seleccionar manzana · Shift + clic: seleccionar varias</div>
+      <div class="mapa-ayuda sutil">Clic: abrir una manzana · Shift + clic o las casillas de la lista: elegir varias</div>
     }
     @if (cargando()) {
       <div class="mapa-estado">Cargando mapa…</div>
@@ -146,13 +146,16 @@
 
       @if (seleccion().size > 0) {
         <div class="grupo">
-          <h2>Mover {{ seleccion().size }} seleccionada(s)</h2>
+          <h2>{{ seleccion().size }} seleccionada(s): mover o eliminar</h2>
           <div class="mover">
             <input class="adm-input" type="number" min="0" placeholder="Territorio destino"
                    [value]="destinoMover() ?? ''" (input)="destinoMover.set(numero($event))" aria-label="Territorio destino" />
             <button class="adm-btn primary" type="button" (click)="moverSeleccion()" [disabled]="destinoMover() === null">Mover</button>
           </div>
           <p class="nota">Si el número no existe, se crea un territorio nuevo con esas manzanas.</p>
+          <button class="adm-btn danger small eliminar-sel" type="button" (click)="eliminarSeleccion()">
+            Eliminar {{ seleccion().size === 1 ? 'la seleccionada' : 'las ' + seleccion().size + ' seleccionadas' }}
+          </button>
         </div>
       }
 
@@ -165,6 +168,8 @@
         <h1>Territorios</h1>
         <p class="adm-muted">{{ store.territorios().length }} territorios · {{ store.manzanas()?.features?.length ?? 0 }} manzanas</p>
       </header>
+      <input class="adm-input buscar" type="search" placeholder="Buscar: 85 o 85.c" [value]="busqueda()"
+             (input)="busqueda.set(texto($event))" (keydown.enter)="irAlPrimero()" aria-label="Buscar territorio o manzana" />
       <div class="botones">
         <button class="adm-btn primary" type="button" (click)="nuevaManzana()">+ Nueva manzana</button>
         <button class="adm-btn" type="button" (click)="elegirArchivo()">Importar</button>
@@ -180,6 +185,9 @@
                    [value]="destinoMover() ?? ''" (input)="destinoMover.set(numero($event))" aria-label="Territorio destino" />
             <button class="adm-btn primary" type="button" (click)="moverSeleccion()" [disabled]="destinoMover() === null">Mover</button>
           </div>
+          <button class="adm-btn danger small eliminar-sel" type="button" (click)="eliminarSeleccion()">
+            Eliminar las {{ seleccion().size }} seleccionadas
+          </button>
         </div>
       }
 
@@ -199,8 +207,18 @@
         </details>
       }
 
-      <input class="adm-input buscar" type="search" placeholder="Buscar territorio…" [value]="busqueda()"
-             (input)="busqueda.set(texto($event))" aria-label="Buscar territorio" />
+      @if (manzanasEncontradas().length) {
+        <ul class="lista">
+          @for (f of manzanasEncontradas(); track f.id) {
+            <li>
+              <button type="button" class="lista-item" (click)="seleccionarManzana(f)">
+                <span><span class="swatch" [style.background]="color(f.properties.territorio)"></span> Manzana {{ f.properties.nombre }}</span>
+                <span class="adm-muted">territorio {{ f.properties.territorio }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
       <ul class="lista territorios">
         @for (item of listaTerritorios(); track item.numero) {
           <li>

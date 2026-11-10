@@ -313,4 +313,21 @@ class TerritoryAdminIntegrationTest {
     private long meta(String k) {
         return jdbc.sql("SELECT v FROM app_meta WHERE k = :k").param("k", k).query(Long.class).single();
     }
+
+    @Test
+    void eliminarVarias_borraTodasJuntas_oNingunaSiUnaNoExiste() {
+        ManzanaAdminResponse a = service.crear(new ManzanaAdminRequest(7L, "7.a", cuadrado(-73.65, -37.60)));
+        ManzanaAdminResponse b = service.crear(new ManzanaAdminRequest(7L, "7.b", cuadrado(-73.64, -37.60)));
+        ManzanaAdminResponse c = service.crear(new ManzanaAdminRequest(8L, "8.a", cuadrado(-73.63, -37.60)));
+
+        assertThatThrownBy(() -> service.eliminarVarias(java.util.List.of(a.id(), 999_999L)))
+                .isInstanceOf(com.predicador.shared.exception.ResourceNotFoundException.class);
+        assertThat(service.obtener(a.id()).id()).isEqualTo(a.id());
+
+        assertThat(service.eliminarVarias(java.util.List.of(a.id(), c.id(), a.id()))).isEqualTo(2);
+        assertThatThrownBy(() -> service.obtener(a.id())).isInstanceOf(com.predicador.shared.exception.ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.obtener(c.id())).isInstanceOf(com.predicador.shared.exception.ResourceNotFoundException.class);
+        assertThat(service.obtener(b.id()).nombre()).isEqualTo("7.b");
+        assertThatThrownBy(() -> service.eliminarVarias(java.util.List.of())).isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -79,6 +80,14 @@ public class TerritoryAdminController {
         authorization.requireAdmin(RequestTokens.token(request));
         service.eliminar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Varias manzanas a la vez (todas o ninguna): {@code DELETE /manzanas?ids=1,2,3}. */
+    @DeleteMapping("/manzanas")
+    public ResponseEntity<java.util.Map<String, Integer>> eliminarVarias(@RequestParam java.util.List<Long> ids,
+                                                                        HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        return ResponseEntity.ok(java.util.Map.of("eliminadas", service.eliminarVarias(ids)));
     }
 
     @PostMapping("/manzanas/{id}/reparar")
