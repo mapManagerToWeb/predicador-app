@@ -1,0 +1,43 @@
+<header class="adm-head">
+  <div>
+    <h1>Tarjetas para imprimir</h1>
+    <p>
+      Una hoja por territorio, con su mapa y la lista de manzanas para marcar a mano. Lo ya predicado en esta vuelta
+      sale marcado. Para los hermanos que prefieren el papel.
+    </p>
+  </div>
+</header>
+
+<section class="adm-card elegir" aria-label="Territorios a imprimir">
+  <label class="adm-field"><span>Territorios</span>
+    <input type="text" inputmode="numeric" autocomplete="off" placeholder="Por ejemplo: 72, 61 o 85-90"
+           [value]="texto()" (input)="escribir($event)" (keydown.enter)="imprimir()" />
+  </label>
+  <div class="acciones">
+    <button class="adm-btn" type="button" (click)="todos()">Todos</button>
+    <button class="adm-btn primary" type="button" (click)="imprimir()" [disabled]="!elegidos().length || preparando()">
+      @if (preparando(); as p) {
+        Preparando {{ p.hecho }} de {{ p.total }}…
+      } @else {
+        Imprimir {{ elegidos().length === 1 ? '1 tarjeta' : elegidos().length + ' tarjetas' }}
+      }
+    </button>
+  </div>
+  <p class="nota">
+    @if (elegidos().length) {
+      {{ elegidos().length > 12 ? elegidos().slice(0, 12).join(', ') + '…' : elegidos().join(', ') }}
+    } @else if (texto().trim()) {
+      Ningún territorio con ese número.
+    } @else {
+      Escribe los números separados por coma; «85-90» son del 85 al 90. En la ventana de impresión también puedes
+      elegir «Guardar como PDF» para mandarlas por WhatsApp.
+    }
+  </p>
+</section>
+
+@if (enMapa(); as m) {
+  <section class="adm-card vista" aria-label="Vista previa">
+    <h2>Territorio {{ m.tarjeta.numero }}@if (!preparando()) { <small>· vista previa</small> }</h2>
+    <app-correccion-map [manzanas]="m.manzanas" [estado]="m.tarjeta.marcado" [color]="m.tarjeta.color" [alto]="560" />
+  </section>
+}

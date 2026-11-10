@@ -19,6 +19,11 @@ export const ADMIN_ROUTES: Routes = [
     loadComponent: () => import('./pages/territorios/territorios').then(m => m.TerritoriosPage),
   },
   {
+    path: 'tarjetas',
+    title: 'Tarjetas para imprimir · Administración',
+    loadComponent: () => import('./pages/tarjetas/tarjetas').then(m => m.TarjetasPage),
+  },
+  {
     path: 'encargados',
     title: 'Encargados · Administración',
     loadComponent: () => import('./pages/encargados/encargados').then(m => m.EncargadosPage),

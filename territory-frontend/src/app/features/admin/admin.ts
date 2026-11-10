@@ -53,6 +53,7 @@ export class AdminPage implements OnInit {
     { ruta: 'resumen', titulo: 'Resumen', icono: 'M3 3v18h18M7 15l4-4 3 3 5-6' },
     { ruta: 'registrar', titulo: 'Registrar salida', icono: 'M12 5v14M5 12h14' },
     { ruta: 'territorios', titulo: 'Territorios', icono: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14' },
+    { ruta: 'tarjetas', titulo: 'Tarjetas', icono: 'M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z' },
     {
       ruta: 'encargados',
       titulo: 'Encargados',

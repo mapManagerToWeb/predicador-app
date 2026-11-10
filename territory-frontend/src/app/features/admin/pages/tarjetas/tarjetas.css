@@ -1,0 +1,6 @@
+:host { display: flex; flex-direction: column; gap: 16px; }
+.elegir { display: flex; flex-direction: column; gap: 12px; max-width: 640px; }
+.acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.nota { margin: 0; color: var(--text-2); font-size: var(--text-sm); }
+.vista { max-width: 820px; }
+.vista h2 { margin: 0 0 8px; font-size: var(--text-md, 16px); }
