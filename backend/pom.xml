@@ -228,16 +228,53 @@
                                 <bannedDependencies>
                                     <excludes>
                                         <!--
-                                            amqp-client: tres avisos publicados
-                                            (credenciales en el mensaje de
-                                            excepción <= 5.34.0, shortstr
-                                            malformado <= 5.35.0, JSONReader sin
-                                            fin ante entrada truncada <= 5.36.0).
-                                            El primer release publicado con los
-                                            tres arreglos es 5.37.0 (5.36.1, que
+                                            Un piso por cada pin por CVE de
+                                            `dependencyManagement`. El pin solo
+                                            vale mientras nadie lo pise; esto lo
+                                            hace imposible. El piso es la
+                                            versión ya pinneada, así que no
+                                            prohíbe nada que hoy se resuelva:
+                                            si un módulo nuevo arrastra una
+                                            versión menor, el build falla en
+                                            `validate` y no en producción.
+
+                                            Sólo aparecen aquí los artefactos que
+                                            el Enforcer ve de verdad. Se probó
+                                            subiendo cada techo por encima de la
+                                            versión resuelta: muerde en
+                                            compile-scope, pero NO ve
+                                            `org.postgresql:postgresql` porque se
+                                            resuelve en scope runtime. Ese pin lo
+                                            cubren Trivy y OWASP dependency-check
+                                            en CI, no esta regla: no lo agregues
+                                            aquí para no simular una protección
+                                            que no existe.
+                                        -->
+                                        <!--
+                                            amqp-client: credenciales en el
+                                            mensaje de excepción <= 5.34.0,
+                                            shortstr malformado <= 5.35.0,
+                                            JSONReader sin fin ante entrada
+                                            truncada <= 5.36.0. El primer
+                                            release publicado con los tres
+                                            arreglos es 5.37.0 (5.36.1, que
                                             cita el aviso, nunca se publicó).
                                         -->
                                         <exclude>com.rabbitmq:amqp-client:[,5.37.0)</exclude>
+                                        <!-- CVE-2026-8763 / CVE-2026-13506 -->
+                                        <exclude>org.bouncycastle:bcprov-jdk18on:[,1.85)</exclude>
+                                        <!-- Jackson 2.x: cinco CVE de parsing -->
+                                        <exclude>com.fasterxml.jackson.core:jackson-databind:[,2.21.7)</exclude>
+                                        <exclude>com.fasterxml.jackson.core:jackson-core:[,2.21.7)</exclude>
+                                        <!-- Jackson 3.x (tools.jackson), mismos CVE -->
+                                        <exclude>tools.jackson.core:jackson-databind:[,3.1.7)</exclude>
+                                        <!-- CVE-2026-84939 -->
+                                        <exclude>org.freemarker:freemarker:[,2.3.35)</exclude>
+                                        <!-- CVE-2026-40982 / 22739 / 40981 / 41002 -->
+                                        <exclude>org.springframework.cloud:spring-cloud-config-server:[,5.0.5)</exclude>
+                                        <!-- Pin de httpcore5 -->
+                                        <exclude>org.apache.httpcomponents.core5:httpcore5:[,5.4.3)</exclude>
+                                        <exclude>org.apache.httpcomponents.core5:httpcore5-h2:[,5.4.3)</exclude>
                                     </excludes>
                                 </bannedDependencies>
                             </rules>
