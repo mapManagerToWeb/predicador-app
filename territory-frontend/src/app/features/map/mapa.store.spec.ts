@@ -9,6 +9,7 @@ import { DraftMarksService } from '../../core/services/map-draft';
 import type { EstadoTerritorioPublico } from '../../core/map/estado-publico';
 import { WhatsAppService } from '../../core/services/whatsapp';
 import { MapaStore, type VistaMapa } from './mapa.store';
+import { MODO_PRACTICA } from '../../core/map/modo-practica';
 
 const cuadrado = (x: number, y: number): Polygon => ({
   type: 'Polygon',
@@ -373,7 +374,7 @@ describe('MapaStore', () => {
         const inicio = store.inicioSesion();
 
         store.iniciarPractica(6);
-        expect(store.practica()).toBe(true);
+        expect(store.practicaTutorial()).toBe(true);
         expect(store.abiertos()).toEqual([6]);
         store.tocar({ manzana: '6-6.a', cercana: null });
         expect(store.resumenes()[0]).toMatchObject({ numero: 6, enteras: 1 });
@@ -388,11 +389,213 @@ describe('MapaStore', () => {
         expect(store.pregunta()).toBeNull();
 
         store.terminarPractica();
-        expect(store.practica()).toBe(false);
+        expect(store.practicaTutorial()).toBe(false);
         expect(store.abiertos()).toEqual([5]);
         expect(store.resumenes()[0]).toMatchObject({ numero: 5, enteras: 2, cambios: true });
         expect(store.inicioSesion()).toBe(inicio);
         expect(territorios.crearReportes).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('modo práctica (/practice)', () => {
+    const CLAVE_PRACTICA = 'territory_practice_draft';
+    const DIA = 24 * 60 * 60 * 1000;
+
+    /** Otro TestBed, esta vez con la bandera de /practice encendida. */
+    function enPractica(): MapaStore {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          MapaStore,
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: TerritorioService, useValue: territorios },
+          { provide: WhatsAppService, useValue: whatsapp },
+          { provide: MODO_PRACTICA, useValue: true },
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      return crear();
+    }
+
+    function borradorGuardado(savedAt: number, marcadas: string[], estados: EstadoTerritorioPublico[] = []) {
+      return {
+        v: 1,
+        savedAt,
+        datos: {
+          borrador: {
+            v: 2,
+            abiertos: [5],
+            territorios: [{ n: 5, m: marcadas, z: { g: null, p: null }, b: null }],
+            predicacion: 'mañana',
+            inicioSesion: null,
+            dueno: null,
+            savedAt,
+          },
+          estados,
+        },
+      };
+    }
+
+    it('guarda lo marcado en la clave de práctica, nunca en el borrador real', async () => {
+      vi.useFakeTimers();
+      try {
+        const p = enPractica();
+        await cargar(p);
+        await p.abrir(5);
+        p.tocar({ manzana: '5-5.c', cercana: null });
+        TestBed.tick();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(JSON.parse(localStorage.getItem(CLAVE_PRACTICA)!)).toMatchObject({ v: 1, datos: { borrador: { abiertos: [5] } } });
+        expect(localStorage.getItem('territory_map_draft')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('al volver a entrar restaura lo guardado de la práctica', async () => {
+      localStorage.setItem(CLAVE_PRACTICA, JSON.stringify(borradorGuardado(Date.now() - DIA, ['5-5.c'])));
+      const p = enPractica();
+      await cargar(p);
+      expect(p.abiertos()).toEqual([5]);
+      expect(p.resumenes()[0]).toMatchObject({ numero: 5, enteras: 2, cambios: true });
+    });
+
+    it('recargar la práctica no renueva los 7 días del guardado', async () => {
+      vi.useFakeTimers();
+      try {
+        const p = enPractica();
+        await cargar(p);
+        await p.abrir(5);
+        p.tocar({ manzana: '5-5.c', cercana: null });
+        TestBed.tick();
+        await vi.advanceTimersByTimeAsync(400);
+        const antes = JSON.parse(localStorage.getItem(CLAVE_PRACTICA)!).savedAt;
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        const otro = enPractica();
+        await cargar(otro);
+        TestBed.tick();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(JSON.parse(localStorage.getItem(CLAVE_PRACTICA)!).savedAt).toBe(antes);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('un guardado con más de 7 días no se restaura y se borra', async () => {
+      localStorage.setItem(CLAVE_PRACTICA, JSON.stringify(borradorGuardado(Date.now() - 8 * DIA, ['5-5.c'])));
+      const p = enPractica();
+      await cargar(p);
+      expect(p.abiertos()).toEqual([]);
+      expect(localStorage.getItem(CLAVE_PRACTICA)).toBeNull();
+    });
+
+    it('enviar simula el reporte: actualiza el estado local y no toca la base ni WhatsApp', async () => {
+      const p = enPractica();
+      await cargar(p);
+      await p.abrir(5);
+      p.tocar({ manzana: '5-5.b', cercana: null });
+      p.pedirEnvio();
+      expect(p.pregunta()?.cuando).toBe(true);
+      p.responder(true);
+      await vi.waitFor(() => expect(p.abiertos()).toEqual([]));
+      expect(territorios.crearReportes).not.toHaveBeenCalled();
+      expect(territorios.eliminarReportes).not.toHaveBeenCalled();
+      expect(whatsapp.sendReport).not.toHaveBeenCalled();
+      expect(p.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
+    });
+
+    it('el reporte simulado queda guardado y se ve al volver a entrar', async () => {
+      vi.useFakeTimers();
+      try {
+        const p = enPractica();
+        await cargar(p);
+        await p.abrir(5);
+        p.tocar({ manzana: '5-5.b', cercana: null });
+        p.pedirEnvio();
+        p.responder(true);
+        TestBed.tick();
+        await vi.advanceTimersByTimeAsync(400);
+        const guardado = JSON.parse(localStorage.getItem(CLAVE_PRACTICA)!);
+        expect(guardado.datos.estados).toContainEqual(
+          expect.objectContaining({ territorio: 5, manzanasIds: '5-5.a,5-5.b' }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+      const otro = enPractica();
+      await cargar(otro);
+      expect(otro.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
+    });
+
+    it('el reporte simulado guarda el día elegido, no el momento del envío', async () => {
+      const p = enPractica();
+      await cargar(p);
+      await p.abrir(5);
+      p.tocar({ manzana: '5-5.b', cercana: null });
+      p.pedirEnvio();
+      p.diaAtras.set(1); // «Ayer»
+      p.responder(true);
+      await vi.waitFor(() => expect(p.abiertos()).toEqual([]));
+      const trabajo = Date.parse(p.estados().get(5)!.ultimoTrabajo!);
+      const horas = (Date.now() - trabajo) / 3_600_000;
+      // Ayer al mediodía en Chile queda a más de 12 horas; el momento del envío, a menos de 1.
+      expect(horas).toBeGreaterThan(12);
+    });
+
+    it('practicar no toca el borrador real aunque haya uno guardado', async () => {
+      vi.useFakeTimers();
+      try {
+        const p = enPractica();
+        const real = JSON.stringify({
+          v: 2,
+          abiertos: [6],
+          territorios: [{ n: 6, m: ['6-6.a'], z: { g: null, p: null }, b: null }],
+          predicacion: 'tarde',
+          inicioSesion: null,
+          dueno: '3',
+          savedAt: Date.now(),
+        });
+        localStorage.setItem('territory_map_draft', real);
+        await cargar(p);
+        await p.abrir(5);
+        p.tocar({ manzana: '5-5.c', cercana: null });
+        TestBed.tick();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(localStorage.getItem(CLAVE_PRACTICA)).not.toBeNull();
+        expect(localStorage.getItem('territory_map_draft')).toBe(real);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('el estado simulado se mantiene aunque el servidor devuelva su estado real', async () => {
+      vi.useFakeTimers();
+      try {
+        const p = enPractica();
+        await cargar(p);
+        await p.abrir(5);
+        p.tocar({ manzana: '5-5.b', cercana: null });
+        p.pedirEnvio();
+        p.responder(true);
+        TestBed.tick();
+        await vi.advanceTimersByTimeAsync(400);
+
+        const otro = enPractica();
+        await cargar(otro);
+        expect(otro.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
+
+        // Pasado el caché del estado (15 s), abrir el territorio lo vuelve a pedir.
+        await vi.advanceTimersByTimeAsync(16_000);
+        const abriendo = otro.abrir(5);
+        await Promise.resolve();
+        http.expectOne(r => r.url.endsWith('/reports/public/estado')).flush([estado()]);
+        await abriendo;
+        expect(otro.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
       } finally {
         vi.useRealTimers();
       }

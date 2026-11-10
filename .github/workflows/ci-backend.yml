@@ -10,6 +10,12 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - ".github/workflows/ci-backend.yml"
+
+# El GITHUB_TOKEN no necesita más que leer el repo: sin `permissions:` el
+# token hereda el default del repositorio, que puede incluir escritura.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-backend-${{ github.ref }}
@@ -57,7 +63,10 @@ jobs:
           TERRITORY_IT_DB_URL: jdbc:postgresql://localhost:5432/predicador_test
           TERRITORY_IT_DB_USERNAME: predicador
           TERRITORY_IT_DB_PASSWORD: test
-        run: mvn verify -Pcoverage -B
+        # -Ddocker.available=true turns on the Testcontainers-backed integration
+        # tests. Without it, surefire reports them as skipped and CI goes green
+        # without ever touching PostGIS, the repositories or the report pipeline.
+        run: mvn verify -Pcoverage -B -Ddocker.available=true
 
       - name: Upload JaCoCo reports
         if: always()

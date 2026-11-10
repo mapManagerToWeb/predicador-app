@@ -1,19 +1,21 @@
-import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { computed, DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { environment } from '../../../environments/environment';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
 import { Toast } from '../../core/services/toast';
 import { DraftMarksService } from '../../core/services/map-draft';
+import { PracticeDraftService, leerPracticaDatos } from '../../core/services/practice-draft';
+import { MODO_PRACTICA } from '../../core/map/modo-practica';
 import { estaEnLista, idsDeLista, situacionDe, type EstadoTerritorioPublico, type SituacionTerritorio } from '../../core/map/estado-publico';
 import type { Reporte } from '../../core/models/models';
 import { WhatsAppService } from '../../core/services/whatsapp';
 import { getColorForTerritorio } from './utils/territory-colors';
-import { calcularLados, leerZonas, type GeometriaManzana } from '../../core/map/lados';
+import { calcularLados, leerZonas, serializarZonas, type GeometriaManzana } from '../../core/map/lados';
 import { comodidadDeToque } from '../../core/map/geometria';
-import { leerBorrador, serializarBorrador } from './utils/borrador';
+import { leerBorrador, serializarBorrador, type Borrador } from './utils/borrador';
+import { guardarCopia, indexarManzanas, leerCopia, type DatosMapa } from './mapa.datos';
 import {
   abrirTerritorio,
   alternarManzana,
@@ -35,7 +37,7 @@ import {
   type ResumenTerritorio,
   type TerritorioSalida,
 } from './utils/salida';
-import { DIAS_ATRAS, diaElegible, fechaParaMensaje } from './utils/dia';
+import { DIAS_ATRAS, diaElegible, fechaParaMensaje, mediodiaChile } from './utils/dia';
 import type { EdicionLados, ModoMarcado, Pregunta } from './mapa.types';
 import type { EstadoVista, Toque } from './mapa-vista';
 
@@ -55,20 +57,11 @@ export interface VistaMapa {
   ajustarMargenes?(m: { arriba?: number; abajo?: number; derecha?: number }): void;
 }
 
-interface PropsManzanaApi {
-  id: string;
-  mid?: number;
-  nombre_bloque: string;
-  territorio_padre: number;
-  color: string | null;
-}
-
 export interface ResumenAbierto extends ResumenTerritorio {
   color: string;
   base: BaseTerritorio | null;
 }
 
-const CACHE_DATOS = 'mapa.datos.v1';
 /** Al abrir un territorio se vuelve a pedir el estado si el que hay tiene más que esto. */
 const EDAD_MAXIMA_ESTADO_MS = 15_000;
 const INTENTOS_CARGA = 6;
@@ -90,20 +83,33 @@ export class MapaStore {
   private readonly toast = inject(Toast);
   private readonly whatsapp = inject(WhatsAppService);
   private readonly borrador = inject(DraftMarksService);
+  private readonly borradorPractica = inject(PracticeDraftService);
+  private readonly destruccion = inject(DestroyRef);
+  /** `/practice`: se practica con el mapa real, pero nada sale del teléfono. */
+  readonly modoPractica = inject(MODO_PRACTICA);
 
   private vista: VistaMapa | null = null;
-  private readonly manzanasPorId = new Map<string, Manzana>();
-  private readonly manzanasPorTerritorio = new Map<number, Manzana[]>();
+  private manzanasPorId = new Map<string, Manzana>();
+  private manzanasPorTerritorio = new Map<number, Manzana[]>();
   private colores: Record<number, string> = {};
   private restaurado = false;
   /** Último pedido del estado de los territorios (se reusa unos segundos). */
   private refresco: { hora: number; promesa: Promise<boolean> } | null = null;
   private temporizadorBorrador: ReturnType<typeof setTimeout> | null = null;
+  /** Lo que se guardaría al vencer el temporizador (y al destruir el store). */
+  private pendiente: { datos: Borrador; borrador: unknown; practica: EstadoTerritorioPublico[] } | null = null;
 
   readonly cargando = signal(true);
   readonly errorCarga = signal(false);
   readonly numeros = signal<number[]>([]);
   readonly estados = signal<Map<number, EstadoTerritorioPublico>>(new Map());
+  /**
+   * Reportes simulados de `/practice`: se guardan en el almacén de la práctica
+   * y se ponen encima del estado real (que nunca se toca).
+   */
+  private readonly estadosPractica = signal<Map<number, EstadoTerritorioPublico>>(new Map());
+  /** Lo último guardado en la práctica, para no reescribirlo (ni renovar sus 7 días) al recargar. */
+  private practicaCanonica: string | null = null;
 
   readonly abiertos = signal<number[]>([]);
   readonly salida = signal<Map<number, TerritorioSalida>>(new Map());
@@ -121,7 +127,7 @@ export class MapaStore {
    * no se guarda en el borrador ni se envía, y al terminar todo vuelve a como
    * estaba (incluidos los territorios que el encargado tenía abiertos).
    */
-  readonly practica = signal(false);
+  readonly practicaTutorial = signal(false);
   private antesDePracticar: {
     abiertos: number[];
     salida: Map<number, TerritorioSalida>;
@@ -192,24 +198,63 @@ export class MapaStore {
 
   constructor() {
     // Borrador: lo marcado sin enviar sobrevive a recargas y cierres del navegador.
+    // En `/practice` va a su propio almacén (con los reportes simulados) y se
+    // borra solo a los 7 días.
     effect(() => {
-      const datos = {
-        abiertos: this.abiertos(),
-        territorios: [...this.salida().values()],
-        predicacion: this.predicacion(),
-        inicioSesion: this.inicioSesion(),
-        dueno: this.dueno(),
-      };
-      const enPractica = this.practica();
+      const datos = this.datosBorrador();
+      const practica = this.modoPractica ? [...this.estadosPractica().values()] : [];
+      const borrador = datos.territorios.length > 0 ? serializarBorrador(datos, 0) : null;
+      const canonico = this.modoPractica ? JSON.stringify({ borrador, estados: practica }) : '';
+      const enPracticaTutorial = this.practicaTutorial();
       untracked(() => {
-        if (!this.restaurado || enPractica) return;
+        if (!this.restaurado || enPracticaTutorial) return;
+        if (this.modoPractica) {
+          if (canonico === this.practicaCanonica) return;
+          this.practicaCanonica = canonico;
+        }
         if (this.temporizadorBorrador) clearTimeout(this.temporizadorBorrador);
+        this.pendiente = { datos, borrador, practica };
         this.temporizadorBorrador = setTimeout(() => {
-          if (datos.territorios.length === 0) this.borrador.clear();
-          else this.borrador.guardar(serializarBorrador(datos));
+          this.temporizadorBorrador = null;
+          this.persistirBorrador();
         }, 300);
       });
     });
+
+    // Al salir de la pantalla no se pierde lo marcado en los últimos 300 ms:
+    // se guarda ya, en vez de dejar el temporizador pendiente.
+    this.destruccion.onDestroy(() => {
+      if (this.temporizadorBorrador) clearTimeout(this.temporizadorBorrador);
+      this.temporizadorBorrador = null;
+      this.persistirBorrador();
+    });
+  }
+
+  /** Guarda lo que dejó el temporizador (o la salida de la pantalla). */
+  private persistirBorrador(): void {
+    const pendiente = this.pendiente;
+    this.pendiente = null;
+    if (!pendiente) return;
+    const { datos, borrador, practica } = pendiente;
+    if (this.modoPractica) {
+      if (!borrador && practica.length === 0) this.borradorPractica.clear();
+      else this.borradorPractica.guardar({ borrador, estados: practica });
+    } else if (!borrador) {
+      this.borrador.clear();
+    } else {
+      this.borrador.guardar(serializarBorrador(datos));
+    }
+  }
+
+  /** Lo que se guarda como borrador (en la práctica, sin dueño: es de quien practica). */
+  private datosBorrador(): Borrador {
+    return {
+      abiertos: this.abiertos(),
+      territorios: [...this.salida().values()],
+      predicacion: this.predicacion(),
+      inicioSesion: this.inicioSesion(),
+      dueno: this.modoPractica ? null : this.dueno(),
+    };
   }
 
   conectar(vista: VistaMapa): void {
@@ -243,16 +288,16 @@ export class MapaStore {
     this.cargando.set(true);
     this.errorCarga.set(false);
     try {
-      let datos: { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] } | null = null;
+      let datos: DatosMapa | null = null;
       let deLaRed = false;
       for (let intento = 1; intento <= INTENTOS_CARGA && !datos; intento++) {
         try {
           datos = await this.descargar();
           deLaRed = true;
           this.refresco = { hora: Date.now(), promesa: Promise.resolve(true) };
-          this.guardarCopia(datos);
+          guardarCopia(datos);
         } catch (e) {
-          const copia = this.leerCopia();
+          const copia = leerCopia();
           if (copia) {
             datos = copia;
             this.toast.show('Sin conexión: se muestra la última copia guardada', 4000, 'warning');
@@ -274,7 +319,7 @@ export class MapaStore {
     }
   }
 
-  private async descargar(): Promise<{ geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] }> {
+  private async descargar(): Promise<DatosMapa> {
     const [geojson, colores, estados] = await Promise.all([
       this.territorios.getAllGeoJson(),
       this.territorios.getColores(),
@@ -287,40 +332,21 @@ export class MapaStore {
     return { geojson, colores, estados };
   }
 
-  private guardarCopia(datos: object): void {
-    try {
-      localStorage.setItem(CACHE_DATOS, JSON.stringify(datos));
-    } catch {
-      // Sin espacio o sin almacenamiento: la próxima vez sin red no habrá copia.
-    }
+  private procesar(datos: DatosMapa): void {
+    const { porId, porTerritorio, colores } = indexarManzanas(datos);
+    this.colores = colores;
+    this.manzanasPorId = porId;
+    this.manzanasPorTerritorio = porTerritorio;
+    this.numeros.set([...porTerritorio.keys()].sort((a, b) => a - b));
+    this.estados.set(this.conPractica(new Map((datos.estados ?? []).map(e => [e.territorio, e]))));
   }
 
-  private leerCopia(): { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] } | null {
-    try {
-      const texto = localStorage.getItem(CACHE_DATOS);
-      return texto ? JSON.parse(texto) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private procesar(datos: { geojson: string; colores: Record<number, string>; estados: EstadoTerritorioPublico[] }): void {
-    this.colores = datos.colores ?? {};
-    const fc = JSON.parse(datos.geojson) as FeatureCollection<Polygon | MultiPolygon, PropsManzanaApi>;
-    this.manzanasPorId.clear();
-    this.manzanasPorTerritorio.clear();
-    for (const f of fc.features) {
-      const p = f.properties;
-      if (!f.geometry || !p || p.territorio_padre === undefined) continue;
-      const m: Manzana = { id: p.id, mid: p.mid, nombre: p.nombre_bloque, territorio: p.territorio_padre, geometria: f.geometry as GeometriaManzana };
-      if (!this.colores[m.territorio]) this.colores[m.territorio] = getColorForTerritorio(m.territorio, p.color);
-      this.manzanasPorId.set(m.id, m);
-      const lista = this.manzanasPorTerritorio.get(m.territorio) ?? [];
-      lista.push(m);
-      this.manzanasPorTerritorio.set(m.territorio, lista);
-    }
-    this.numeros.set([...this.manzanasPorTerritorio.keys()].sort((a, b) => a - b));
-    this.estados.set(new Map((datos.estados ?? []).map(e => [e.territorio, e])));
+  /** El estado real, con los reportes simulados de `/practice` encima. */
+  private conPractica(estados: Map<number, EstadoTerritorioPublico>): Map<number, EstadoTerritorioPublico> {
+    if (this.estadosPractica().size === 0) return estados;
+    const nuevos = new Map(estados);
+    for (const [numero, estado] of this.estadosPractica()) nuevos.set(numero, estado);
+    return nuevos;
   }
 
   /** Quién tiene la sesión: el borrador queda a su nombre. */
@@ -330,12 +356,22 @@ export class MapaStore {
   }
 
   private restaurarBorrador(estadoAlDia: boolean): void {
-    let b = leerBorrador(this.borrador.cargar());
-    // Lo dejó marcado otra persona (su sesión venció y entró alguien más): no se hereda.
-    const dueno = this.dueno();
-    if (b?.dueno && dueno && b.dueno !== dueno) {
-      this.borrador.clear();
-      b = null;
+    let b: Borrador | null;
+    if (this.modoPractica) {
+      const guardada = leerPracticaDatos(this.borradorPractica.cargar());
+      this.estadosPractica.set(new Map(guardada.estados.map(e => [e.territorio, e])));
+      this.estados.set(this.conPractica(this.estados()));
+      b = leerBorrador(guardada.borrador);
+    } else {
+      b = leerBorrador(this.borrador.cargar());
+    }
+    if (b && !this.modoPractica) {
+      // Lo dejó marcado otra persona (su sesión venció y entró alguien más): no se hereda.
+      const dueno = this.dueno();
+      if (b.dueno && dueno && b.dueno !== dueno) {
+        this.borrador.clear();
+        b = null;
+      }
     }
     if (b) {
       // Lo marcado se pone sobre el estado actual de cada territorio: el
@@ -351,7 +387,17 @@ export class MapaStore {
         this.inicioSesion.set(b.inicioSesion);
       }
     }
+    // Al recargar no se reescribe la práctica: así sus 7 días cuentan desde el
+    // último cambio de verdad y no desde la última visita.
+    if (this.modoPractica) this.practicaCanonica = this.canonicoPractica();
     this.restaurado = true;
+  }
+
+  /** Serialización estable de la práctica (sin `savedAt`) para detectar cambios reales. */
+  private canonicoPractica(): string {
+    const datos = this.datosBorrador();
+    const borrador = datos.territorios.length > 0 ? serializarBorrador(datos, 0) : null;
+    return JSON.stringify({ borrador, estados: [...this.estadosPractica().values()] });
   }
 
   /** Lo predicado del territorio según el último estado descargado. */
@@ -380,7 +426,7 @@ export class MapaStore {
       }),
     ).then(
       estados => {
-        this.estados.set(new Map((estados ?? []).map(e => [e.territorio, e])));
+        this.estados.set(this.conPractica(new Map((estados ?? []).map(e => [e.territorio, e]))));
         return true;
       },
       () => {
@@ -470,8 +516,8 @@ export class MapaStore {
   // ── Práctica del tutorial ──
 
   private avisarPractica(): boolean {
-    if (this.practica()) this.toast.show('Estás en la práctica: sigue los pasos del tutorial', 2500);
-    return this.practica();
+    if (this.practicaTutorial()) this.toast.show('Estás en la práctica: sigue los pasos del tutorial', 2500);
+    return this.practicaTutorial();
   }
 
   /**
@@ -497,12 +543,15 @@ export class MapaStore {
     }
     if (!cercana) return null;
     const delTerritorio = this.manzanasPorTerritorio.get(cercana.territorio) ?? [cercana];
-    const comoda = delTerritorio.reduce((a, b) => (comodidadDeToque(b.geometria) > comodidadDeToque(a.geometria) ? b : a));
+    const comoda = delTerritorio.reduce(
+      (a, b) => (comodidadDeToque(b.geometria) > comodidadDeToque(a.geometria) ? b : a),
+      delTerritorio[0],
+    );
     return { territorio: cercana.territorio, manzana: comoda.id };
   }
 
   iniciarPractica(territorio: number): void {
-    if (this.practica() || !this.manzanasPorTerritorio.has(territorio)) return;
+    if (this.practicaTutorial() || !this.manzanasPorTerritorio.has(territorio)) return;
     if (this.edicion()) this.cerrarLados();
     this.pregunta.set(null);
     this.antesDePracticar = {
@@ -512,14 +561,14 @@ export class MapaStore {
       predicacion: this.predicacion(),
       inicioSesion: this.inicioSesion(),
     };
-    this.practica.set(true);
+    this.practicaTutorial.set(true);
     this.abiertos.set([territorio]);
     this.salida.set(new Map([[territorio, abrirTerritorio(territorio, BASE_VACIA)]]));
     this.modo.set('manzana');
   }
 
   terminarPractica(): void {
-    if (!this.practica()) return;
+    if (!this.practicaTutorial()) return;
     this.cerrarLados();
     this.vista?.resaltarManzana?.(null);
     const antes = this.antesDePracticar!;
@@ -529,7 +578,7 @@ export class MapaStore {
     this.predicacion.set(antes.predicacion);
     this.inicioSesion.set(antes.inicioSesion);
     this.antesDePracticar = null;
-    this.practica.set(false);
+    this.practicaTutorial.set(false);
     if (antes.abiertos.length) this.vista?.encuadrar(antes.abiertos);
   }
 
@@ -671,7 +720,7 @@ export class MapaStore {
       const t = s.get(numero);
       return t ? new Map(s).set(numero, cambio(t)) : s;
     });
-    if (!this.practica() && !this.inicioSesion() && this.hayCambios()) this.inicioSesion.set(new Date().toISOString());
+    if (!this.practicaTutorial() && !this.inicioSesion() && this.hayCambios()) this.inicioSesion.set(new Date().toISOString());
   }
 
   // ── Envío ──
@@ -679,7 +728,7 @@ export class MapaStore {
   /** Muestra el resumen y pide confirmar antes de enviar. */
   pedirEnvio(): void {
     if (this.enviando()) return;
-    if (this.practica()) {
+    if (this.practicaTutorial()) {
       this.toast.show('Es una práctica: no se envía nada', 2500);
       return;
     }
@@ -689,7 +738,7 @@ export class MapaStore {
       this.toast.show('No hay cambios para enviar', 2500);
       return;
     }
-    if (!this.perfil.currentUser()) {
+    if (!this.modoPractica && !this.perfil.currentUser()) {
       this.toast.show('No hay perfil configurado', 3000, 'error');
       return;
     }
@@ -719,6 +768,10 @@ export class MapaStore {
    * aviso al grupo.
    */
   private async enviar(resumenes: ResumenAbierto[]): Promise<void> {
+    if (this.modoPractica) {
+      this.enviarEnPractica(resumenes);
+      return;
+    }
     const perfil = this.perfil.currentUser();
     if (!perfil || this.enviando()) return;
     this.enviando.set(true);
@@ -774,6 +827,43 @@ export class MapaStore {
     } finally {
       this.enviando.set(false);
     }
+  }
+
+  /**
+   * En `/practice` el reporte no sale del teléfono: se guarda como estado
+   * simulado (el número cambia de color como si se hubiera reportado) y se
+   * cierra el territorio. Nada viaja a la base ni a WhatsApp.
+   */
+  private enviarEnPractica(resumenes: ResumenAbierto[]): void {
+    const numeros = resumenes.map(r => r.numero);
+    // El día elegido en la confirmación también cuenta en la práctica: se
+    // guarda el mediodía de Chile de ese día, igual que el servidor.
+    const dia = diaElegible(Math.min(Math.max(this.diaAtras(), 0), DIAS_ATRAS));
+    const trabajo = mediodiaChile(dia.iso);
+    const previos = this.estadosPractica();
+    const nuevos = new Map(previos);
+    for (const n of numeros) {
+      const t = this.salida().get(n);
+      if (!t) continue;
+      const r = resumir(t, this.total(n));
+      const { geometriaParcial, puntosParciales } = serializarZonas(t.zonas);
+      nuevos.set(n, {
+        territorio: n,
+        ultimoTrabajo: trabajo,
+        ultimoCompletado: r.completo ? trabajo : (previos.get(n)?.ultimoCompletado ?? null),
+        estado: r.completo ? 'completed' : 'incomplete',
+        manzanasMarcadas: r.enteras + r.porCalles,
+        totalManzanas: r.total,
+        manzanasIds: t.marcadas.join(','),
+        geometriaParcial,
+        puntosParciales,
+      });
+    }
+    this.estadosPractica.set(nuevos);
+    this.estados.set(this.conPractica(this.estados()));
+    for (const n of numeros) this.quitar(n);
+    this.inicioSesion.set(null);
+    this.toast.show('Práctica: reporte simulado. No se envió nada.', 4500, 'success', 'Tus marcas viven solo en este teléfono');
   }
 
   private async revertir(guardados: Reporte[]): Promise<void> {

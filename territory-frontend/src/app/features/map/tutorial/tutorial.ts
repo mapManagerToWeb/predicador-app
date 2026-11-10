@@ -108,7 +108,7 @@ export const PASOS: PasoTutorial[] = [
   {
     objetivo: 'ubicacion',
     titulo: '¿Dónde estoy?',
-    texto: 'Este botón muestra dónde estás. Si mueves el mapa deja de seguirte; tócalo otra vez para volver a tu ubicación.',
+    texto: 'Este botón muestra dónde estás y el cono azul hacia dónde apunta el teléfono. Si mueves el mapa deja de seguirte; tócalo otra vez para volver a tu ubicación.',
   },
   {
     titulo: '¡Listo, ya sabes usarla!',

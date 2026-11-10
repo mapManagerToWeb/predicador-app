@@ -10,6 +10,12 @@ on:
     branches: [main, feat/redesign]
     paths:
       - "territory-frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+
+# El GITHUB_TOKEN no necesita más que leer el repo: sin `permissions:` el
+# token hereda el default del repositorio, que puede incluir escritura.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-frontend-${{ github.ref }}
@@ -42,6 +48,12 @@ jobs:
         # sincronizado con package.json. `--ignore-scripts` evita que se
         # ejecuten lifecycle scripts de terceros durante la instalación (S6505).
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # Compuerta de seguridad: si una dependencia de producción vuelve a una
+      # versión con aviso high/critical, el PR no pasa. `--prod` ignora
+      # devDependencies, que no viajan al servidor.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
 
       - name: Lint
         run: pnpm run lint

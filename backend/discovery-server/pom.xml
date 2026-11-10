@@ -23,6 +23,27 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!--
+            CVE-2026-102554 (HIGH) in the Guava version Eureka Server pulls in
+            transitively. It is declared here, explicitly and with a version,
+            for two reasons:
+
+            1. Trivy also reads the pom.xml embedded in the jar. That pom
+               carries no parent, so Trivy cannot see the dependencyManagement
+               override in the root pom and keeps resolving the transitive
+               33.0.0-jre. Naming the version here is what makes the image scan
+               green, and it is the same version the build already resolves.
+            2. A direct, compile-scoped dependency is visible to the Enforcer,
+               which does not evaluate runtime-scope artifacts.
+
+            Keep it in sync with the entry in the root pom's
+            dependencyManagement and with the Enforcer floor.
+        -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>33.8.0-jre</version>
+        </dependency>
     </dependencies>
 
     <build>

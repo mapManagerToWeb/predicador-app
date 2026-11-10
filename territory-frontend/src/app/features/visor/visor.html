@@ -37,6 +37,22 @@
   </header>
 
   <div class="acciones-mapa">
+    <button
+      type="button"
+      class="icono ubicacion"
+      [class.activo]="ubicacion() === 'siguiendo'"
+      [class.fondo]="ubicacion() === 'fondo'"
+      [disabled]="ubicacion() === 'buscando'"
+      (click)="alternarUbicacion()"
+      [attr.aria-label]="ubicacion() === 'siguiendo' ? 'Dejar de seguir mi ubicación' : 'Mi ubicación'"
+      [attr.aria-pressed]="ubicacion() === 'siguiendo'"
+    >
+      @if (ubicacion() === 'buscando') {
+        <span class="spinner chico" aria-hidden="true"></span>
+      } @else {
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="2.5" class="relleno" /></svg>
+      }
+    </button>
     <button type="button" class="icono" (click)="alternarFondo()" [attr.aria-label]="fondo() === 'mapa' ? 'Ver satélite' : 'Ver mapa'">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
     </button>

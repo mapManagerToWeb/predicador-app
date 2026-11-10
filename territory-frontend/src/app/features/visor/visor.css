@@ -94,6 +94,27 @@
   gap: 8px;
 }
 
+/* "Mi ubicación": azul como en Google Maps; relleno mientras sigue al usuario. */
+.icono.ubicacion { color: var(--color-primary); }
+.icono.ubicacion.activo {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.icono:disabled { opacity: 0.6; }
+.icono .relleno { fill: currentColor; stroke: none; }
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-solid);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: girar 0.7s linear infinite;
+}
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
 .panel {
   position: absolute;
   left: 12px;
