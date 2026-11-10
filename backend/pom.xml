@@ -42,7 +42,13 @@
             property overrides nothing (this bit us on amqp-client).
         -->
         <httpcore5.version>5.4.3</httpcore5.version>
-        <rabbit-amqp-client.version>5.34.0</rabbit-amqp-client.version>
+        <!--
+            5.37.0 es el primer release publicado con los tres avisos cerrados
+            (el 5.36.1 que cita el aviso de Dependabot nunca se publicó). 5.37.1
+            es el último parche de esa línea y mantiene compatibilidad con
+            spring-rabbit 4.1.1.
+        -->
+        <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
         <!--
             Found by the Trivy image scan (see docs/adr/0015-baseline-deps-contra-cves.md).
             All five of these were shipping CRITICAL/HIGH CVEs in every published
@@ -196,7 +202,50 @@
     </dependencies>
 
     <build>
-        <plugins/>
+        <plugins>
+            <!--
+                Compuerta de seguridad del reactor: falla el build si una
+                dependencia vuelve a una versión con CVE conocido. Es lo que
+                impide que un bump accidental (o un módulo nuevo) reintroduzca
+                la versión vulnerable que arreglamos aquí.
+
+                Se ejecuta en `validate`, antes de compilar, así el fallo llega
+                en segundos y no después de una suite completa.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.6.2</version>
+                <executions>
+                    <execution>
+                        <id>enforce-dependency-floors</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <!--
+                                            amqp-client: tres avisos publicados
+                                            (credenciales en el mensaje de
+                                            excepción <= 5.34.0, shortstr
+                                            malformado <= 5.35.0, JSONReader sin
+                                            fin ante entrada truncada <= 5.36.0).
+                                            El primer release publicado con los
+                                            tres arreglos es 5.37.0 (5.36.1, que
+                                            cita el aviso, nunca se publicó).
+                                        -->
+                                        <exclude>com.rabbitmq:amqp-client:[,5.37.0)</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <profiles>
