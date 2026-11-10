@@ -45,6 +45,25 @@ export function callesDe(
 }
 
 /**
+ * Las calles de una manzana para dibujarlas en el mapa (modo «por calles»):
+ * marcadas en verde, las de la base en gris (no se pueden quitar).
+ */
+export function callesParaMapa(
+  base: EstadoCorreccion,
+  e: EstadoCorreccion,
+  m: ManzanaFeature,
+): { indice: number; puntos: Lado['puntos']; marcada: boolean; bloqueada: boolean }[] {
+  const lados = ladosDe(m);
+  const { elegidas, deLaBase } = callesDe(base, e, m, lados.length);
+  return lados.map(l => ({
+    indice: l.indice,
+    puntos: l.puntos,
+    marcada: elegidas.includes(l.indice),
+    bloqueada: deLaBase.includes(l.indice),
+  }));
+}
+
+/**
  * Marca o desmarca una calle de la manzana. Las de la base quedan siempre;
  * con todas las calles la manzana pasa a entera, y sin ninguna nueva vuelve a
  * como estaba en la base.

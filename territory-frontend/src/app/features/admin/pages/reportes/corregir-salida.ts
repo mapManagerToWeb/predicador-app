@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { Toast } from '../../../../core/services/toast';
 import type { ManzanaFeature, SalidaAdmin } from '../../admin.models';
-import { CorreccionMap } from '../../map/correccion-map';
+import { CorreccionMap, type CalleVisible } from '../../map/correccion-map';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import { AdminUi } from '../../services/admin-ui';
@@ -21,6 +21,7 @@ import {
   aporteDeSalida,
   alternarEnSalida,
   baseDeSalida,
+  clave,
   estadoDeSalida,
   iguales,
   pedidoSalida,
@@ -30,6 +31,7 @@ import {
   type EstadoCorreccion,
 } from '../../utils/correccion';
 import { diaLocal } from '../../utils/analytics';
+import { alternarCalle, callesParaMapa, ladosDe } from '../../utils/registro';
 import { fmtFechaHora } from '../../utils/formato';
 
 /**
@@ -70,6 +72,13 @@ export class CorregirSalida {
   protected readonly base = signal<EstadoCorreccion>(vaciar());
   private readonly original = signal<EstadoCorreccion>(vaciar());
   protected readonly edicion = signal<EstadoCorreccion>(vaciar());
+  /** Marcar manzanas enteras o elegir calles de una manzana (como al registrar una salida). */
+  protected readonly modo = signal<'entera' | 'calles'>('entera');
+  protected readonly manzanaCalles = signal<ManzanaFeature | null>(null);
+  protected readonly calles = computed<CalleVisible[] | null>(() => {
+    const m = this.manzanaCalles();
+    return m && this.modo() === 'calles' ? callesParaMapa(this.base(), this.edicion(), m) : null;
+  });
 
   protected readonly manzanas = computed<ManzanaFeature[]>(() => {
     const t = this.salida()?.territorio;
@@ -119,15 +128,41 @@ export class CorregirSalida {
     }
   }
 
-  protected alternar(m: ManzanaFeature): void {
-    this.edicion.set(alternarEnSalida(this.base(), this.edicion(), m));
+  protected cambiarModo(modo: 'entera' | 'calles'): void {
+    this.modo.set(modo);
+    if (modo === 'entera') this.manzanaCalles.set(null);
   }
 
-  protected quitarZona(i: number): void {
+  protected alTocarManzana(m: ManzanaFeature): void {
+    if (this.modo() === 'entera') {
+      this.edicion.set(alternarEnSalida(this.base(), this.edicion(), m));
+      return;
+    }
+    if (this.base().marcadas.has(clave(m))) {
+      this.toast.show(`La manzana ${m.properties.nombre} ya estaba completa antes de esta salida`, 3000, 'info');
+      return;
+    }
+    this.manzanaCalles.set(m);
+  }
+
+  /** En modo «por calles», tocar las calles marcadas abre esa manzana; si no, las quita. */
+  protected alTocarZona(i: number): void {
+    if (this.modo() === 'calles') {
+      const id = this.edicion().zonas[i]?.manzanaId;
+      const m = id ? this.manzanas().find(x => clave(x) === id) : undefined;
+      if (m) this.manzanaCalles.set(m);
+      return;
+    }
     this.edicion.set(quitarZonaEnSalida(this.base(), this.edicion(), i));
   }
 
+  protected alTocarCalle(indice: number): void {
+    const m = this.manzanaCalles();
+    if (m) this.edicion.set(alternarCalle(this.base(), this.edicion(), m, ladosDe(m), indice));
+  }
+
   protected deshacer(): void {
+    this.manzanaCalles.set(null);
     this.edicion.set(this.original());
     this.dia.set(this.diaOriginal());
     this.turno.set(this.turnoOriginal());

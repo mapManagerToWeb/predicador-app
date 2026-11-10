@@ -17,3 +17,6 @@
 }
 
 .cuando { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mapa { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mapa .adm-seg { align-self: flex-start; }
+.ayuda { margin: 0; font-size: var(--text-sm); }

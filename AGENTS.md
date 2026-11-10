@@ -88,6 +88,7 @@ mvn -pl territory-service test     # one module
 - **Angular template identifiers must be ASCII — no `ñ`.** The template lexer rejects it. `ñ` is fine in text content (`Contraseña`, `Mañana`) but never in a binding, property or identifier.
 - SSR is on in production builds: guard `window`/`document` behind platform checks or `afterNextRender()`.
 - `styles.css` sets a global `min-height: 44px` on `button`/`input`/`select`; the admin shell resets it under `.adm`.
+- On touch screens (`pointer: coarse`) `styles.css` forces `input`/`select`/`textarea` to at least 16px (`!important`): below 16px iOS zooms in on focus and the zoom stays for the rest of the app. Don't lower it, and don't "fix" it with `maximum-scale=1` — brothers with poor eyesight need pinch zoom.
 - Coverage thresholds in `vitest.config.ts` are `60/58/55/50` (lines/statements/functions/branches), about five points under the measured baseline. Passing coverage ≠ good coverage.
 - `angular.json` budgets: initial bundle warns at **320 kB** and errors at 600 kB; component styles warn at 12 kB and error at 16 kB. A budget **warning** does not fail CI — don't chase it as a bug.
 - Vitest uses `pool: 'threads'` with `isolate` deliberately — the default `vmThreads` pool shares worker state and breaks TestBed. Don't "simplify" it back.

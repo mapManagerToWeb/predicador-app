@@ -15,7 +15,7 @@ import {
   alternarEntera,
   aporte,
   baseDeRegistro,
-  callesDe,
+  callesParaMapa,
   delTerritorio,
   hermanoEscrito,
   ladosDe,
@@ -169,14 +169,7 @@ export class RegistrarPage {
   protected readonly calles = computed<CalleVisible[] | null>(() => {
     const m = this.manzanaCalles();
     if (!m || this.modo() !== 'calles') return null;
-    const lados = ladosDe(m);
-    const { elegidas, deLaBase } = callesDe(this.base(), this.edicion(), m, lados.length);
-    return lados.map(l => ({
-      indice: l.indice,
-      puntos: l.puntos,
-      marcada: elegidas.includes(l.indice),
-      bloqueada: deLaBase.includes(l.indice),
-    }));
+    return callesParaMapa(this.base(), this.edicion(), m);
   });
 
   protected readonly puedeGuardar = computed(

@@ -6,6 +6,7 @@ import {
   aporte,
   baseDeRegistro,
   callesDe,
+  callesParaMapa,
   hermanoEscrito,
   ladosDe,
   pedidoRegistro,
@@ -158,5 +159,24 @@ describe('registrar una salida desde el panel', () => {
     expect(sinTerritorio(e, 72).zonas).toHaveLength(0);
     // «Todo el territorio» en uno no toca el otro.
     expect([...todoElTerritorioEn(e, [...MANZANAS, otro], 72).marcadas].sort()).toEqual(['61-61.a', '72-72.a', '72-72.b', '72-72.c']);
+  });
+});
+
+describe('calles en el mapa (registrar y corregir)', () => {
+  it('marca en verde las elegidas y en gris las que ya estaban', () => {
+    const base = alternarCalle(vaciar(), vaciar(), B, ladosDe(B), 0);
+    const e = alternarCalle(base, base, B, ladosDe(B), 2);
+    const calles = callesParaMapa(base, e, B);
+    expect(calles).toHaveLength(4);
+    expect(calles.map(c => c.marcada)).toEqual([true, false, true, false]);
+    expect(calles.map(c => c.bloqueada)).toEqual([true, false, false, false]);
+  });
+
+  it('corregir sin base: una manzana entera se puede dejar con algunas calles', () => {
+    const entera = alternarEntera(vaciar(), vaciar(), B);
+    expect(callesParaMapa(vaciar(), entera, B).every(c => c.marcada && !c.bloqueada)).toBe(true);
+    const e = alternarCalle(vaciar(), entera, B, ladosDe(B), 3);
+    expect(e.marcadas.has('72-72.b')).toBe(false);
+    expect(e.zonas[0]).toMatchObject({ manzanaId: '72-72.b', lados: [0, 1, 2] });
   });
 });

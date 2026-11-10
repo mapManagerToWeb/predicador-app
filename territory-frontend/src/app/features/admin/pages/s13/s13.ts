@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Toast } from '../../../../core/services/toast';
 import type { CicloAdmin, EstadoTerritorioAdmin, ManzanaFeature, ResumenTerritorioCiclo } from '../../admin.models';
-import { CorreccionMap } from '../../map/correccion-map';
+import { CorreccionMap, type CalleVisible } from '../../map/correccion-map';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import { AdminUi } from '../../services/admin-ui';
@@ -27,6 +27,10 @@ import {
   tiemposPorTerritorio,
 } from '../../utils/s13';
 import { documentoS13 } from '../../utils/s13-docx';
+import { alternarCalle, callesParaMapa, ladosDe } from '../../utils/registro';
+
+/** La corrección del estado no tiene «base»: se puede quitar cualquier calle. */
+const SIN_BASE = vaciar();
 
 type Vista = 's13' | 'ciclo' | 'corregir' | 'historial';
 const TIPO_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -193,6 +197,13 @@ export class S13Page implements OnInit {
       .filter(({ z }) => !z.manzanaId),
   );
   protected readonly situacion = situacion;
+  /** Marcar manzanas enteras o elegir calles de una manzana (como al registrar una salida). */
+  protected readonly modo = signal<'entera' | 'calles'>('entera');
+  protected readonly manzanaCalles = signal<ManzanaFeature | null>(null);
+  protected readonly calles = computed<CalleVisible[] | null>(() => {
+    const m = this.manzanaCalles();
+    return m && this.modo() === 'calles' ? callesParaMapa(SIN_BASE, this.edicion(), m) : null;
+  });
 
   async ngOnInit(): Promise<void> {
     await this.cargar();
@@ -335,6 +346,7 @@ export class S13Page implements OnInit {
   private async cargarEstado(): Promise<void> {
     const t = this.territorioSel();
     this.notaCorreccion.set('');
+    this.manzanaCalles.set(null);
     if (t === null) return;
     this.cargandoTerritorio.set(true);
     try {
@@ -358,11 +370,45 @@ export class S13Page implements OnInit {
     this.edicion.set(quitarZona(this.edicion(), i));
   }
 
+  protected cambiarModo(modo: 'entera' | 'calles'): void {
+    this.modo.set(modo);
+    if (modo === 'entera') this.manzanaCalles.set(null);
+  }
+
+  protected alTocarManzana(m: ManzanaFeature): void {
+    if (this.modo() === 'calles') this.manzanaCalles.set(m);
+    else this.alternar(m);
+  }
+
+  /** En modo «por calles», tocar unas calles marcadas abre esa manzana; si no, las quita. */
+  protected alTocarZona(i: number): void {
+    if (this.modo() === 'calles') {
+      const id = this.edicion().zonas[i]?.manzanaId;
+      const m = id ? this.manzanasSel().find(x => clave(x) === id) : undefined;
+      if (m) this.manzanaCalles.set(m);
+      return;
+    }
+    this.quitarZona(i);
+  }
+
+  protected alTocarCalle(indice: number): void {
+    const m = this.manzanaCalles();
+    if (m) this.edicion.set(alternarCalle(SIN_BASE, this.edicion(), m, ladosDe(m), indice));
+  }
+
+  /** Botón «Calles» de la lista: abre las calles de esa manzana en el mapa. */
+  protected elegirCalles(m: ManzanaFeature): void {
+    this.modo.set('calles');
+    this.manzanaCalles.set(m);
+  }
+
   protected vaciarTerritorio(): void {
+    this.manzanaCalles.set(null);
     this.edicion.set(vaciar());
   }
 
   protected deshacer(): void {
+    this.manzanaCalles.set(null);
     this.edicion.set(this.original());
   }
 
