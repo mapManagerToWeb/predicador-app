@@ -16,6 +16,7 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { csrfInterceptor } from './core/interceptors/csrf.interceptor';
 import { RumService } from './core/services/rum';
 import { PracticeDraftService } from './core/services/practice-draft';
+import { ActualizacionApp } from './core/services/actualizacion';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -44,6 +45,10 @@ export const appConfig: ApplicationConfig = {
     // aunque nadie vuelva a abrir /practice.
     provideAppInitializer(() => {
       inject(PracticeDraftService).limpiarSiVencio();
+    }),
+    // Versiones nuevas: que nadie quede con la app vieja guardada en el teléfono.
+    provideAppInitializer(() => {
+      inject(ActualizacionApp).iniciar();
     }),
   ],
 };

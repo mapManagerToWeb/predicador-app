@@ -187,3 +187,35 @@
     animation: none;
   }
 }
+
+/* ── Aviso de versión nueva (grande: lo leen hermanos mayores) ── */
+.version-nueva {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  width: min(calc(100vw - 24px), 460px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 18px;
+  border-radius: 14px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.version-nueva span { flex: 1; }
+.version-nueva button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 17px;
+  font-weight: 700;
+}

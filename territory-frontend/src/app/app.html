@@ -1,5 +1,12 @@
 <router-outlet />
 
+@if (actualizacion.hayVersionNueva()) {
+  <div class="version-nueva" role="status" aria-live="polite">
+    <span>Hay una versión nueva de la app.</span>
+    <button type="button" (click)="actualizacion.actualizar()">Actualizar</button>
+  </div>
+}
+
 @if (toastService.visible()) {
   <div
     class="toast"
