@@ -1,43 +1,39 @@
 # Cobertura de tests
 
-> Métricas verificadas 2026-11-09. Cambian con cada PR — regenerar con los comandos al final.
+> Verificado 2026-11-10. Cambia con cada PR — regenerar con los comandos al final.
 
 ## Frontend (Vitest) — `pnpm test -- --run --coverage`
 ```
-Statements   : 64.18% (3070/4783)
-Branches     : 55.99% (1397/2495)
-Functions    : 59.41% (710/1195)
-Lines        : 65.98% (2658/4028)
+Statements   : 64.84% (3491/5384)
+Branches     : 56.63% (1610/2843)
+Functions    : 60.77% (826/1359)
+Lines        : 66.51% (3014/4531)
 ```
 - Umbral en `vitest.config.ts`: **60/58/55/50** (lines/statements/functions/branches) → PASS con margen.
-- 46 archivos `*.spec.ts`, 357 tests.
+- 51 archivos `*.spec.ts`, 399 tests.
 
-### Puntos de cobertura por feature (muestral)
-| Feature | Statements | Notas |
+### Puntos de cobertura por archivo (muestral)
+| Archivo | Statements | Notas |
 |---|---|---|
-| `features/auth` | ~92.3% | |
-| `features/profile` | ~94.2% | |
-| `features/visor` | ~79.4% | |
-| `map/mapa.store` | ~83.6% | |
-| `map/mapa.datos` | ~92.3% | índice GeoJSON + cache local |
-| `map/mapa-vista` | **0%** | Líneas 65–588 sin cubrir — el archivo que hace todo el dibujo del mapa |
-| `features/admin` | 28–93% | depende del archivo |
+| `features/map/mapa.store.ts` | ~85.7% | reglas de marcado y envío |
+| `features/map/mapa.datos.ts` | 100% | índice GeoJSON + cache local |
+| `features/map/mapa-vista.ts` | **0%** | líneas 65–592 sin cubrir — el archivo que hace todo el dibujo del mapa |
 
-⚠️ Coverage bajo ≠ buena cobertura. El archivo más crítico del mapa (`mapa-vista.ts`) tiene 0%.
+⚠️ Coverage alto ≠ buena cobertura: el archivo más crítico del mapa (`mapa-vista.ts`) sigue en 0%.
 
-## Backend (JUnit 5) — verificado 2026-10-10
-Corrida completa con IT de DB: `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true` → **BUILD SUCCESS, 242 tests, 0 skipped, todos los gates JaCoCo OK**.
+## Backend (JUnit 5) — verificado 2026-11-10
+Corrida completa con IT de DB: `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true` → **BUILD SUCCESS, 541 tests, 0 skipped, todos los gates JaCoCo OK**.
 
-| Módulo | Line | Instr | Branch | Method |
-|---|---|---|---|---|
-| `shared` | 85.0% | 86.6% | 76.4% | 90.5% |
-| `api-gateway` | 81.0% | 80.5% | 59.4% | 84.7% |
-| `territory-service` | 89.4% | 87.8% | 67.8% | 90.3% |
-| `reporting-service` | 84.0% | 81.9% | 64.0% | 83.7% |
+| Módulo | Tests | Line | Instr | Branch | Method |
+|---|---|---|---|---|---|
+| `shared` | 95 | 85.8% | 86.7% | 76.4% | 90.5% |
+| `api-gateway` | 102 | 88.3% | 88.0% | 69.0% | 89.7% |
+| `territory-service` | 61 | 88.6% | 87.1% | 67.8% | 86.4% |
+| `reporting-service` | 283 | 85.7% | 83.5% | 67.1% | 84.3% |
 
-- 50 archivos de test: `shared` 12, `api-gateway` 7, `territory-service` 7, `reporting-service` 24, `config/discovery` 0 (infra).
+- 58 archivos de test: `shared`, `api-gateway`, `territory-service`, `reporting-service`; `config-server` y `discovery-server` no tienen tests.
 - JaCoCo: gate **40% LINE/INSTRUCTION** (falla el build si baja).
-- ⚠️ **Los números de arriba son CON los IT docker-gated corriendo.** Sin `-Ddocker.available=true` (y Docker respondiendo) se saltan y `territory-service` cae bajo el gate 40% (~25–29%) → el build **falla localmente**. CI pasa `-Ddocker.available=true`, así que ejecuta los seis ITs; SonarCloud pasa `TERRITORY_IT_DB_*`, que basta para el gate. Ver `integration.md`.
+- ⚠️ **Los números de arriba son CON los IT docker-gated corriendo.** Sin `-Ddocker.available=true` (y Docker respondiendo) se saltan y `territory-service` cae bajo el gate 40% (~25–29%) → el build **falla localmente**. CI pasa `-Ddocker.available=true`; SonarCloud pasa `TERRITORY_IT_DB_*`, que basta para el gate. Ver `integration.md`.
 
 ## Cómo regenerar
 ```bash

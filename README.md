@@ -1,587 +1,385 @@
+<div align="center">
+
 # Predicador
 
-PWA para gestión de territorios y reportes de predicación de los Testigos de Jehová.
+**Gestión de territorios y reportes de predicación, en el mapa y en el teléfono.**
 
-## Arquitectura
+PWA para los Testigos de Jehová: marcar manzanas y calles, enviar el reporte por WhatsApp,
+consultar el avance de cada territorio y administrar todo desde un panel.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   Frontend (Angular 22)                      │
-│                  territory-frontend/                         │
-│            PWA + SSR + Service Worker                         │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ /api
-                       ▼
-┌──────────────────────────────────────────────────────────────┐
-│                   API Gateway (Spring Cloud)                  │
-│                       api-gateway:8080                       │
-│         CORS · Rate Limiting · Circuit Breaker · Auth         │
-└─────────┬──────────────────────────────────┬────────────────┘
-          │                                  │
-          ▼                                  ▼
-┌──────────────────────┐           ┌──────────────────────────┐
-│  Territory Service   │           │    Reporting Service      │
-│    territory:8081    │           │     reporting:8082        │
-│  GeoJSON · Colores   │           │  Reports · Encargados    │
-│  PostGIS · Cache     │           │  WhatsApp · RUM           │
-└──────────┬───────────┘           └────────────┬─────────────┘
-           │                                    │
-           ▼                                    ▼
-┌──────────────────────────────────────────────────────────────┐
-│              PostgreSQL 18 + PostGIS 3.6 (contenedor)         │
-└──────────────────────────────────────────────────────────────┘
+[![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)](https://angular.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL%2018-PostGIS%203.6-4169E1?logo=postgresql&logoColor=white)](https://postgis.net/)
+[![License](https://img.shields.io/badge/License-MIT-2ea44f)](LICENSE)
 
-┌──────────────────────────────────────────────────────────────┐
-│  Config Server:8888  ←──  Discovery Server:8761 (Eureka)     │
-└──────────────────────────────────────────────────────────────┘
+</div>
 
-┌──────────────────────────────────────────────────────────────┐
-│  Observability (opcional): Prometheus · Grafana · Jaeger     │
-└──────────────────────────────────────────────────────────────┘
-```
+---
 
-## Tech Stack
+## ¿Qué es?
 
-### Backend
+Predicador reemplaza el mapa de papel y el reporte por mensaje suelto con una sola aplicación:
 
-| Componente | Tecnología |
-|---|---|
-| Runtime | Java 25 (virtual threads) |
-| Framework | Spring Boot 4.1.1 |
-| Microservicios | Spring Cloud 2025.1.3 |
-| Gateway | Spring Cloud Gateway (WebFlux) |
-| Service Discovery | Netflix Eureka |
-| Config Server | Spring Cloud Config (native) |
-| Base de datos | PostgreSQL + PostGIS |
-| Migraciones | Flyway |
-| Cache | Caffeine (10min TTL) |
-| Resiliencia | Resilience4j (Circuit Breaker + Retry) |
-| Rate Limiting | Bucket4j + Caffeine |
-| Seguridad | HMAC-SHA256 tokens, BCrypt |
-| Observabilidad | OpenTelemetry, Micrometer, Prometheus |
-| WhatsApp | Meta Graph API v21.0 |
-| API Docs | SpringDoc OpenAPI |
-| Testing | JUnit 5 + Mockito |
-| Coverage | JaCoCo |
-| Build | Maven 3.9 |
+- El **encargado** abre el mapa, marca lo que se predicó y envía un resumen por WhatsApp.
+- El **administrador** ve el avance de todos los territorios, corrige errores, cierra ciclos y
+  descarga el **S-13** en Word desde el panel.
+- Cualquier hermano puede consultar el **visor público** sin iniciar sesión.
 
-### Frontend
+No se pierde historial: un territorio siempre vale por su **último reporte**. Corregir o anular
+agrega un reporte nuevo; nunca se borra uno para cambiar el estado
+([ADR 0011](docs/adr/0011-s13-ciclos-y-correcciones.md), [ADR 0014](docs/adr/0014-corregir-o-anular-una-salida.md)).
 
-| Componente | Tecnología |
-|---|---|
-| Framework | Angular 22 |
-| Lenguaje | TypeScript 6 |
-| SSR | Angular SSR (Express 5) |
-| PWA | Service Worker (ngsw) |
-| Mapas | MapLibre GL 6 (WebGL) en los tres mapas: encargados, visor y panel |
-| Estado | Angular Signals |
-| Testing | Vitest 4 + jsdom |
-| Coverage | V8 |
-| Linting | ESLint + Prettier |
-| Build | Angular CLI (Vite) |
-| Geometria | polygon-clipping + funciones propias (`core/map/geometria.ts`, `features/map/utils/lados.ts`) |
-| Screenshots | Canvas de MapLibre (`preserveDrawingBuffer`) con solo los territorios del reporte |
-| RUM | web-vitals |
+## Empezar rápido
 
-### Infraestructura
-
-| Componente | Tecnología |
-|---|---|
-| Contenedores | Docker (multi-stage) |
-| Orquestación | Docker Compose |
-| CI/CD | GitHub Actions |
-| Análisis estático | SonarQube |
-| Dependencias | Dependabot |
-| Carga | k6 (load testing) |
-
-## Características
-
-### Frontend
-
-- **Mapa de marcado** (MapLibre, ADR 0010): el primer toque abre el territorio; en un territorio abierto **un toque marca la manzana y otro toque la desmarca**. Tocar otro territorio pregunta si agregarlo a la salida. Fondos OpenStreetMap y satelital (ArcGIS)
-- **Marcado por calles**: modo «Por calles»: tocar una manzana y después las calles que se predicaron; se marca una franja a lo largo de esas calles. Con todas, la manzana queda completa. Se puede retomar y editar después
-- **Lo ya reportado no se deshace desde el mapa**: las manzanas y calles que llegaron en un reporte enviado quedan bloqueadas (se pueden completar, no desmarcar); si hubo un error, lo corrige el administrador en «S-13 y ciclos → Corregir un territorio»
-- **Nada se pierde sin preguntar**: cerrar un territorio con marcas sin enviar, cerrar sesión y enviar piden confirmación; «Enviar» muestra un resumen y solo se habilita si hay cambios respecto del último reporte. Un territorio que se completó empieza una vuelta nueva
-- **Tutorial con práctica**: la primera vez (y con el botón «?») enseña a usar la app practicando de verdad en un territorio de ejemplo: marcar y desmarcar una manzana, marcar por calles, guardar. Solo avanza cuando la persona lo hace (un aro amarillo muestra dónde tocar; a los 20 s ofrece «Hazlo por mí»). Nada de la práctica se guarda ni se envía
-- **Panel compacto**: con varios territorios abiertos se muestran como fichas de una línea, y el mapa encuadra siempre en el espacio que deja libre el panel (probado en pantallas de 320×568)
-- **Mi ubicación** como en Google Maps: si se mueve el mapa deja de seguir (el punto azul sigue actualizándose) y el botón vuelve a centrar
-- **Búsqueda de territorios**: por número, con sugerencias; «71, 72» abre los dos
-- **Gestión de colores**: Colores asignados por territorio para diferenciación visual
-- **Captura de pantalla**: Screenshot automático del mapa para envío por WhatsApp
-- **Envío de reportes**: Generación y envío de reportes vía WhatsApp con plantilla formateada, dirigido al teléfono del encargado logueado. Un territorio único marcado como **completo** se envía **sin captura** (imagen predeterminada), anunciando su cierre; los territorios incompletos/parciales se envían **con captura**. En un reporte multi-territorio, los territorios ya completados se excluyen del mensaje y de la imagen. Cada territorio se lista como `*terminado*` o `*incompleto*`
-- **Borrador**: lo marcado sin enviar se guarda en el teléfono y vuelve al recargar o reabrir la app; sin conexión el mapa usa la última copia de los territorios
-- **Notificaciones responsivas**: Toast notifications adaptables con soporte para multilínea en pantallas móviles y modo claro/oscuro
-- **Modo oscuro**: Soporte completo de temas claro/oscuro
-- **PWA**: Instalable, funciona offline con Service Worker
-- **SSR**: Server-Side Rendering para SEO y performance inicial
-- **RUM**: Core Web Vitals (LCP, INP, CLS, FCP, TTFB) enviados al backend
-- **Autenticación**: Login por teléfono (+56 Chile) y PIN opcional por encargado, tokens HMAC
-- **Visor público** (`/visor`, sin iniciar sesión, enlace en el login): mapa MapLibre de solo lectura para hermanos que no sacan territorio y hermanas que no dirigen grupo. Muestra qué manzanas y calles se predicaron en la vuelta en curso de cada territorio, si está completado o en curso y cuándo se trabajó por última vez; busca por número y ubica al usuario. No muestra nombres ni teléfonos.
-- **Panel de administración** (`/admin`, pensado para escritorio):
-  - **Resumen**: manzanas trabajadas, territorios completados, encargados activos, tiempo por manzana y horas de predicación; cobertura de territorios (al día ≤ 120 días, pendiente, atrasado > 365 días, sin registro) con mapa, territorios en curso, ranking por encargado y mapa de calor día × hora. Filtros por período y encargado; exporta la cobertura a CSV.
-  - **Territorios**: editor sobre MapLibre + terra-draw para crear manzanas (con ajuste a los vértices vecinos), editar vértices, redibujar, mover manzanas entre territorios (o crear uno nuevo), cambiar colores, eliminar, importar/exportar GeoJSON y revisar la calidad de los datos (formas inválidas con reparación automática y superposiciones).
-  - **Encargados**: alta y edición, activar/desactivar, PIN (se muestra una vez, con enlace para mandarlo por WhatsApp), desbloqueo, fusión de duplicados, detección de teléfonos/nombres repetidos y apertura/cierre del auto-registro.
-  - **Reportes**: listado con filtros, detección y borrado de dobles envíos, registro por territorio (equivalente al S-13) y estado de los envíos de WhatsApp; todo exportable a CSV.
-  - **S-13 y ciclos** (ADR 0011): descarga del **S-13-S** (Registro de asignación de territorio) en Word con el formato oficial, por año de servicio, armado a partir de los reportes; tiempo promedio que tarda cada territorio en completarse; **cerrar el ciclo y reiniciar todos los territorios** guardando un informe del ciclo (se puede ver y descargar después); y **corregir un territorio** (desmarcar una manzana o una calle marcada por error). Nada borra reportes: cierres y correcciones quedan como registros del administrador.
-- **Turno** Mañana/Tarde, elegido según la hora
-- **Satellite view**: Toggle entre vista normal y satelital
-
-**Rendimiento del mapa (ADR 0010):** los tres mapas usan MapLibre (WebGL). Marcar una manzana solo cambia su `feature-state` (no se vuelve a subir la geometría); los números de territorio van dentro de una manzana propia y MapLibre oculta los que se superponen. La vista general sale de una sola petición (`/reports/public/estado`).
-
-### Backend
-
-- **Microservicios**: 5 servicios independientes con discovery y config centralizada
-- **API Gateway**: Punto de entrada único con routing, CORS, rate limiting, circuit breaker
-- **Rate Limiting**: Bucket4j por IP (auth: 6/min, registro: 20/min, RUM: 30/min)
-- **Circuit Breaker**: Resilience4j con fallbacks para territory-service y reporting-service
-- **Cache**: Caffeine con 4 regiones (GeoJSON, colores, números, territory individual) + ETags
-- **Seguridad**: Tokens HMAC-SHA256, BCrypt para passwords, constant-time comparison
-- **WhatsApp**: Integración Meta Graph API v21.0 con templates, normalización telefónica chilena
-- **PostGIS**: Almacenamiento y consulta de geometrías espaciales
-- **Flyway**: Migraciones de base de datos versionadas
-- **Virtual Threads**: Java 25 virtual threads para mejor concurrencia
-- **Observability**: OpenTelemetry tracing, Prometheus metrics, Grafana dashboards
-- **Validación**: Bean Validation en todos los DTOs con respuestas ProblemDetail (RFC 7807)
-- **CORS**: Configurable por variable de entorno
-- **Cache Headers**: Cache-Control en endpoints de territorios (5-10 min)
-
-## Quick Start
-
-### Docker (recomendado)
+### 1. Configurar el entorno
 
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url>
-cd predicador-app
-
-# 2. Configurar variables de entorno
 cp .env.example .env
-# Editar .env con tus credenciales de BD y WhatsApp
-
-# 3. Levantar todos los servicios
-docker-compose up --build
-
-# 4. (Opcional) Levantar stack de observabilidad
-docker-compose --profile observability up -d
 ```
 
-### Desarrollo local
+Como mínimo, completa en `.env`:
 
-**Prerequisitos:**
-- Java 25
-- Node.js 22
-- Maven 3.9
-- PostgreSQL 16 + PostGIS
-
-**Backend:**
 ```bash
-cd backend
-
-# Compilar todos los módulos
-mvn clean install
-
-# Iniciar en orden (cada uno en una terminal):
-mvn -pl config-server spring-boot:run          # :8888
-mvn -pl discovery-server spring-boot:run       # :8761
-mvn -pl api-gateway spring-boot:run            # :8080
-mvn -pl territory-service spring-boot:run      # :8081
-mvn -pl reporting-service spring-boot:run      # :8082
+DB_PASSWORD=...                 # openssl rand -hex 24
+SESSION_SECRET=...              # openssl rand -hex 32
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_BCRYPT=...       # htpasswd -bnBC 10 "" 'tu-clave' | tr -d ':\n'
 ```
 
-**Frontend:**
+> `SESSION_SECRET` debe ser **el mismo** en gateway, territory y reporting, o los tokens no
+> verifican entre servicios. Fuera del perfil `local`, `ADMIN_PASSWORD_BCRYPT` es obligatorio.
+
+### 2. Levantar el backend
+
+```bash
+docker compose up --build
+```
+
+Quedan arriba PostgreSQL + PostGIS, RabbitMQ, los cinco servicios y el proxy de solo lectura
+`docker-lectura`. El primer arranque importa la base desde Neon si defines `NEON_URL`.
+
+### 3. Levantar el frontend
+
 ```bash
 cd territory-frontend
-
-# Instalar dependencias (pnpm; se instala automáticamente vía Corepack
-# desde el campo `packageManager` de package.json)
 corepack enable
 pnpm install
-
-# Desarrollo (proxy a :8080)
-pnpm start                   # http://localhost:4200
-
-# SSR producción
-pnpm run build
-pnpm run serve:ssr:territory-frontend  # http://localhost:4000
+pnpm start
 ```
+
+Abre **http://localhost:4200**. El servidor de desarrollo hace proxy de `/api` hacia
+`http://localhost:8080`.
+
+| Pantalla | Ruta | Acceso |
+|---|---|---|
+| App de campo | `/map` | Encargado con perfil |
+| Panel de administración | `/admin` | Administrador |
+| Visor público | `/visor` | Sin sesión |
+| Login | `/login` | — |
+
+## Cómo está armado
+
+```mermaid
+flowchart TD
+    FE["Frontend Angular 22<br/>PWA + SSR"]
+    GW["api-gateway :8080<br/>rutas · CORS · rate limit · circuit breaker"]
+    TS["territory-service :8081<br/>territorios · GeoJSON · PostGIS"]
+    RS["reporting-service :8082<br/>salidas · encargados · WhatsApp · RUM"]
+    DB[("PostgreSQL 18 + PostGIS 3.6")]
+    MQ["RabbitMQ"]
+    WA["Meta Graph API v21.0"]
+    DL["docker-lectura<br/>solo GET"]
+
+    FE -->|"/api"| GW
+    GW --> TS
+    GW --> RS
+    TS --> DB
+    RS --> DB
+    RS --> MQ
+    MQ --> WA
+    GW -->|"/api/v1/sistema"| DL
+```
+
+El gateway es la única entrada HTTP. Sirve él mismo `/api/v1/auth/**` y `/api/v1/sistema/**`;
+el resto lo enruta por Eureka (`lb://`) con circuit breaker y reintento solo en `GET`.
+
+| Servicio | Puerto | Responsabilidad |
+|---|---|---|
+| `config-server` | 8888 | Configuración centralizada (Spring Cloud Config, `native`) |
+| `discovery-server` | 8761 | Registro de servicios (Eureka) |
+| `api-gateway` | 8080 | Entrada única, autenticación, rate limiting, «Sistema» |
+| `territory-service` | 8081 | Territorios, manzanas, geometrías, colores |
+| `reporting-service` | 8082 | Salidas, encargados, ciclos, WhatsApp, RUM |
+
+El orden de arranque importa: `config-server` → `discovery-server` → `api-gateway` →
+`territory-service` / `reporting-service`. Docker Compose lo garantiza con health checks.
+
+## Funciones
+
+### App de campo (`/map`)
+
+- **Marcado por manzana**: un toque abre el territorio; otro marca la manzana y otro la desmarca.
+  Tocar otro territorio pregunta si agregarlo a la salida.
+- **Marcado por calles**: se elige una manzana y las calles predicadas; se marca una franja.
+  Se puede retomar y editar después.
+- **Lo ya reportado no se deshace**: las manzanas y calles de un reporte enviado quedan
+  bloqueadas. Un error lo corrige el administrador desde el panel.
+- **Nada se pierde sin preguntar**: cerrar con marcas sin enviar, cerrar sesión y enviar piden
+  confirmación. «Enviar» solo se habilita si hay cambios desde el último reporte.
+- **Día y turno**: se elige el día en que se predicó (hoy, ayer o hasta 7 días atrás) y el turno
+  mañana/tarde ([ADR 0018](docs/adr/0018-dia-de-predicacion.md)).
+- **Tutorial con práctica**: enseña sobre un territorio de ejemplo y solo avanza cuando la persona
+  hace cada paso. Nada de la práctica se guarda.
+- **Buscador**, **mi ubicación**, **colores por territorio**, **modo oscuro**, **PWA offline** y
+  **borrador local**: lo marcado sin enviar sobrevive a recargas y caídas de conexión.
+- **Envío por WhatsApp** al teléfono del encargado logueado, con captura del mapa. Un territorio
+  completo se anuncia sin captura; los territorios ya completados se excluyen de la imagen.
+
+### Visor público (`/visor`)
+
+Mapa de solo lectura para quien no saca territorio o no dirige grupo: muestra qué manzanas y
+calles se predicaron en la vuelta en curso, si el territorio está completo y cuándo se trabajó
+por última vez. No expone nombres ni teléfonos.
+
+### Panel de administración (`/admin`)
+
+| Módulo | Qué permite |
+|---|---|
+| **Resumen** | Cobertura, manzanas trabajadas, territorios en curso, ranking por encargado, mapa de calor día × hora; exporta CSV |
+| **Territorios** | Crear y editar manzanas, moverlas entre territorios, colores, importar/exportar GeoJSON, revisar y reparar geometrías |
+| **Encargados** | Alta, edición, PIN, desbloqueo, fusión de duplicados y carga de una lista pegada desde Excel/CSV (con simulación previa) |
+| **Reportes** | Listado con filtros, dobles envíos y estado de los WhatsApp; exporta CSV |
+| **S-13 y ciclos** | S-13-S en Word por año de servicio, cierre de ciclo con informe, corrección de un territorio y cambio del día en que empezó el ciclo |
+| **Registrar salida** | Guarda lo que un hermano informó por WhatsApp como una salida normal, de uno o varios territorios ([ADR 0021](docs/adr/0021-registrar-salidas-desde-el-panel.md)) |
+| **Sistema** | Estado del VPS, contenedores y respaldos, en solo lectura y pidiendo la contraseña otra vez ([ADR 0020](docs/adr/0020-panel-sistema-solo-lectura.md)) |
+
+## Stack
+
+| Capa | Tecnologías |
+|---|---|
+| **Backend** | Java 25, Spring Boot 4.1.1, Spring Cloud 2025.1.3, Maven multi-módulo |
+| **Gateway** | Spring Cloud Gateway (WebFlux), Resilience4j, Bucket4j |
+| **Datos** | PostgreSQL 18 + PostGIS 3.6, Flyway, Hibernate Spatial, Caffeine |
+| **Mensajería** | RabbitMQ 4.3.4, Meta Graph API v21.0 |
+| **Frontend** | Angular 22 zoneless, TypeScript 6, Signals, SSR (Express 5), Service Worker |
+| **Mapas** | MapLibre GL 6, terra-draw, `polygon-clipping` |
+| **Testing** | JUnit 5 + Mockito + Testcontainers · Vitest + jsdom |
+| **Infra** | Docker Compose, GitHub Actions, SonarCloud, OpenTelemetry |
 
 ## Comandos
 
 ### Frontend (`territory-frontend/`)
 
-| Comando | Descripción |
-|---|---|
-| `pnpm start` | Servidor de desarrollo (http://localhost:4200) |
-| `pnpm run build` | Build de producción con SSR |
-| `pnpm run watch` | Build en modo watch |
-| `pnpm test` | Ejecutar tests (Vitest) |
-| `pnpm run test:watch` | Tests en modo watch |
-| `pnpm run test:coverage` | Tests con cobertura V8 |
-| `pnpm run lint` | Verificar lint (ESLint) |
-| `pnpm run lint:fix` | Auto-fix lint + Prettier |
-| `pnpm run serve:ssr:territory-frontend` | Servidor SSR producción |
+```bash
+pnpm start                    # desarrollo en :4200 (proxy a :8080)
+pnpm run build                # build de producción con SSR
+pnpm test -- --run --coverage # tests + cobertura
+pnpm run lint                 # ESLint + Prettier
+pnpm run lint:fix             # corrige formato y lint
+pnpm run serve:ssr:territory-frontend  # servidor SSR en :4000
+```
+
+> Solo `pnpm`: `package.json` fija `pnpm@9.15.0` y `pnpm-lock.yaml` es el único lockfile.
 
 ### Backend (`backend/`)
 
-| Comando | Descripción |
-|---|---|
-| `mvn clean install` | Compilar todos los módulos |
-| `mvn clean test` | Ejecutar todos los tests |
-| `mvn clean verify` | Tests + verificaciones |
-| `mvn -pl <module> spring-boot:run` | Iniciar un servicio específico |
-| `mvn -pl <module> test` | Tests de un módulo específico |
-| `mvn verify -Pcoverage` | Tests con reporte JaCoCo |
+```bash
+mvn clean install                          # compila todos los módulos
+mvn verify -Pcoverage -B                   # tests + gate JaCoCo 40%
+mvn -pl reporting-service test             # un módulo
+mvn -pl api-gateway spring-boot:run        # un servicio
+```
+
+Los seis tests de integración con base de datos solo corren con Docker disponible:
+
+```bash
+TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true
+```
+
+> Sin ese entorno, `territory-service` queda bajo el gate de cobertura y el build falla en local.
+> Es esperado, no una regresión. Detalle en [`docs/ai/testing/integration.md`](docs/ai/testing/integration.md).
 
 ### Docker
 
-| Comando | Descripción |
-|---|---|
-| `docker-compose up --build` | Levantar todo (foreground) |
-| `docker-compose up -d` | Levantar todo (background) |
-| `docker-compose down` | Detener todos los servicios |
-| `docker-compose logs -f <service>` | Ver logs de un servicio |
-| `docker-compose --profile observability up -d` | Levantar con observabilidad |
-
-### SonarQube
-
 ```bash
-# Escanear frontend
-cd territory-frontend
-pnpm run build
-npx sonar-scanner
-
-# Escanear backend
-cd backend
-mvn clean verify
-npx sonar-scanner
+docker compose up --build                 # todo el backend
+docker compose up -d                      # en segundo plano
+docker compose down                       # detener
+docker compose logs -f reporting-service  # logs de un servicio
+docker compose --profile observability up -d  # Prometheus, Grafana, Jaeger y OTel
 ```
 
-## Base de datos (PostgreSQL + PostGIS) e importación de territorios
+## API
 
-La base de datos es PostgreSQL 18 + PostGIS 3.6 en el contenedor `postgres` de
-`docker-compose.yml` (antes Neon; ver `docs/adr/0006`). La copia desde Neon es
-automática: con `NEON_URL` definido en `.env` (connection string directa, sin
-`-pooler`), el servicio `db-import` la hace en el primer `docker compose up` si
-la base está vacía, y en los siguientes no hace nada. Para reimportar desde cero:
-`docker compose down && docker volume rm predicador-app_postgres_data`.
+Todas las rutas viven bajo `/api/v1` y se alcanzan por el gateway (`:8080`). La lista completa
+está en [`docs/ai/api-reference/services.md`](docs/ai/api-reference/services.md).
 
-Los territorios
-se importan **externamente** en la tabla `manzanas_territorio`: cada manzana
-guarda su geometría como tipo PostGIS `geometry(GeometryZ, 4326)` (la columna
-`geometry`). No hay un seed automático en el repo; los shapes se cargaron una vez
-con el SRID 4326 (Polygon y MultiPolygon, con coordenadas 2D + Z).
+| Método | Ruta | Acceso | Qué hace |
+|---|---|---|---|
+| `POST` | `/auth/login` | Público | Login del administrador |
+| `POST` | `/encargados/login` | Público (6/min) | Login del encargado por teléfono (+ PIN) |
+| `GET` | `/encargados/registro` | Público | Indica si el auto-registro está abierto |
+| `GET` | `/territories/all/geojson` | Público | GeoJSON de todos los territorios |
+| `GET` | `/territories/colors` | Público | Colores asignados |
+| `POST` | `/reports` | Encargado | Registrar una salida |
+| `POST` | `/reports/send` | Encargado | Enviar el resumen por WhatsApp |
+| `GET` | `/reports/public/estado` | Público | Estado de cada territorio para el visor |
+| `GET` | `/reports/admin` | Admin | Reportes de un rango |
+| `POST` | `/reports/admin/ciclos/cerrar` | Admin | Cerrar ciclo y reiniciar territorios |
+| `POST` | `/reports/admin/salidas` | Admin | Registrar una salida informada por WhatsApp |
+| `GET` | `/territories/admin/calidad` | Admin | Geometrías inválidas y superposiciones |
+| `GET` | `/sistema/estado` | Admin + pase | VPS, contenedores y respaldos (solo lectura) |
+| `POST` | `/rum` | Público (30/min) | Ingesta de Core Web Vitals |
 
-`territory-service` expone esa geometría como GeoJSON generándolo con PostGIS
-(`ST_AsGeoJSON(ST_Force2D(geometry))`), de modo que no se parsea WKB/WKT en Java
-y se soportan Polygon, MultiPolygon y huecos de forma nativa.
+## Base de datos y respaldos
+
+La base es PostgreSQL 18 + PostGIS 3.6 en el contenedor `postgres` del compose
+([ADR 0006](docs/adr/0006-self-hosted-postgres-replaces-neon.md)). Las geometrías se guardan en
+`manzanas_territorio` como `geometry(GeometryZ, 4326)`; `territory-service` las expone como GeoJSON
+con `ST_AsGeoJSON(ST_Force2D(geometry))`, así que no hay parsing de WKB/WKT en Java.
 
 ### Migraciones (Flyway)
 
-Cada servicio que posee base de datos versiona sus migraciones en una tabla de
-historial **propia**, aunque compartan la misma base:
+Cada servicio versiona sus migraciones en una tabla de historial propia:
 
-| Servicio | Tabla de historial | Migraciones |
+| Servicio | Historial | Migraciones |
 |---|---|---|
-| `territory-service` | `flyway_schema_history_territory` | `V0__initial_schema.sql`, `V1__add_indexes.sql`, `V2__add_geometry_gist_index.sql` |
-| `reporting-service` | `flyway_schema_history_reporting` | `V0__initial_schema.sql`, `V1__add_indexes.sql`, `V1_1`, `V2` … `V7` (V6 panel de administración, V7 ciclos y correcciones) |
+| `territory-service` | `flyway_schema_history_territory` | `V0`–`V2` |
+| `reporting-service` | `flyway_schema_history_reporting` | `V0`–`V9` + `V1_1` |
 
-Ambos servicios usan `DB_URL_UNPOOLED` (conexión directa, sin `-pooler`) para
-las migraciones Flyway, ya que PgBouncer en modo transacción no soporta DDL ni
-prepared statements.
+Ambos usan `DB_URL_UNPOOLED` (conexión directa) para Flyway. Nunca se edita una migración
+aplicada: se agrega una nueva.
 
-### Respaldo de la base de datos
+### Respaldo
 
-La base vive en el VPS, así que se respalda **fuera** de él todas las noches
-(`.github/workflows/respaldo-bdd.yml`, ADR 0012):
-
-1. GitHub Actions entra al VPS por SSH con una llave que **solo** puede ejecutar
-   `scripts/db/respaldo.sh` (comando forzado).
-2. El script hace `pg_dump` dentro del contenedor `postgres` y lo cifra con
-   [age](https://age-encryption.org) para las llaves públicas de
-   `.github/backup/age.pub` antes de que salga del VPS.
-3. El archivo cifrado queda 90 días como artefacto del workflow (Actions →
-   "Respaldo de la base de datos" → la ejecución → *Artifacts*). Sin una llave
-   privada no se puede abrir, aunque el repositorio sea público.
-
-Además, en el VPS se pueden guardar copias locales (las últimas 14) con
-`scripts/db/respaldo.sh local`, en `backups/`.
-
-**Configurarlo (una vez)**
-
-En el VPS:
+Un workflow diario entra al VPS por SSH, hace `pg_dump` y lo cifra con `age` **antes** de que el
+archivo salga del servidor ([ADR 0012](docs/adr/0012-respaldo-bdd-fuera-del-vps.md)):
 
 ```bash
-scripts/db/instalar-age.sh        # age (cifrado) dentro del proyecto, sin sudo
-# Llave SSH solo para los respaldos (sin contraseña: la usa GitHub).
-ssh-keygen -t ed25519 -N "" -C github-respaldo -f ~/.ssh/respaldo_github
-# Autorizarla SOLO para respaldar (comando forzado, sin terminal ni túneles).
-echo "command=\"$HOME/predicador-app/scripts/db/respaldo.sh stdout\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty $(cat ~/.ssh/respaldo_github.pub)" >> ~/.ssh/authorized_keys
-# Datos para los secrets de GitHub:
-cat ~/.ssh/respaldo_github                                               # → VPS_SSH_KEY
-echo "IP_DEL_VPS $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"    # → VPS_SSH_KNOWN_HOSTS (con la IP real)
-rm ~/.ssh/respaldo_github                                                # la privada solo debe quedar en GitHub
-# Copia local diaria (opcional):
-(crontab -l 2>/dev/null; echo "0 3 * * * $HOME/predicador-app/scripts/db/respaldo.sh local >> $HOME/predicador-app/backups/respaldo.log 2>&1") | crontab -
-```
-
-En GitHub (Settings → Secrets and variables → Actions → *New repository secret*):
-`VPS_HOST` (IP del VPS), `VPS_USER` (usuario del VPS), `VPS_SSH_KEY` y
-`VPS_SSH_KNOWN_HOSTS`. Después, Actions → "Respaldo de la base de datos" →
-*Run workflow* para probarlo.
-
-**Llaves de cifrado**: cada línea de `.github/backup/age.pub` es una persona
-que puede abrir los respaldos. La llave privada (`AGE-SECRET-KEY-…`, creada con
-`age-keygen`) se guarda en dos lugares seguros **fuera** del VPS y del
-repositorio; si se pierden todas, los respaldos no se pueden abrir.
-
-**Restaurar**
-
-```bash
-# Revisar un respaldo sin tocar producción (lo carga en la base predicador_restaurada):
+# Revisar un respaldo sin tocar producción
 scripts/db/restaurar.sh predicador-AAAAMMDD-HHMMSS.dump.age ~/llave-privada.txt
-# Emergencia / servidor nuevo: reemplaza la base `predicador` (pide escribir REEMPLAZAR):
+# Emergencia o servidor nuevo
 scripts/db/restaurar.sh predicador-AAAAMMDD-HHMMSS.dump.age ~/llave-privada.txt --reemplazar
 ```
 
-En un servidor nuevo: clonar el repo, crear `.env`, `docker compose up -d postgres`,
-restaurar con `--reemplazar` y después `docker compose up -d --build`.
+La configuración completa (llave SSH, secrets, llaves de cifrado) está en
+[`docs/ai/operations/backup.md`](docs/ai/operations/backup.md).
 
-## Variables de Entorno
+## Configuración
 
-Ver `.env.example` para la lista completa.
+Todo se configura por variables de entorno. La lista completa está en `.env.example`.
 
-| Variable | Descripción | Default |
+| Variable | Para qué | Default |
 |---|---|---|
-| `DB_URL` | JDBC URL de PostgreSQL | `jdbc:postgresql://postgres:5432/predicador` (compose) |
-| `DB_URL_UNPOOLED` | JDBC URL directa (sin `-pooler`) para Flyway/backups | `jdbc:postgresql://localhost:5432/predicador` |
-| `DB_USERNAME` | Usuario de BD | `predicador` |
-| `DB_PASSWORD` | Contraseña de BD (obligatoria en compose) | — |
-| `ADMIN_USERNAME` | Usuario admin | `admin` |
-| `ADMIN_PASSWORD` | Contraseña admin (fallback plano) | `admin` |
-| `ADMIN_PASSWORD_BCRYPT` | Contraseña admin (BCrypt, preferido) | — |
-| `SESSION_SECRET` | HMAC secret para tokens (mín. 32 bytes) | — |
-| `SESSION_TTL_HOURS` | Duración del token en horas | `12` |
-| `EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE` | Eureka server | `http://localhost:8761/eureka/` |
-| `SPRING_CLOUD_CONFIG_URI` | Config server | `http://localhost:8888` |
-| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos (CORS) | `http://localhost:4200` |
-| `WHATSAPP_PHONE_ID` | Meta Phone Number ID | — |
-| `WHATSAPP_ACCESS_TOKEN` | Meta Access Token | — |
-| `WHATSAPP_TEMPLATE` | Nombre de plantilla WhatsApp | `asignacion_territorio` |
-| `WHATSAPP_DESTINATION` | Número destino WhatsApp | — |
-| `WHATSAPP_LANG` | Idioma de plantilla | `es_CL` |
-
-## Microservicios
-
-| Servicio | Puerto App | Puerto Management | Descripción |
-|---|---|---|---|
-| `config-server` | 8888 | — | Configuración centralizada (Spring Cloud Config, native) |
-| `discovery-server` | 8761 | — | Registro de servicios (Netflix Eureka) |
-| `api-gateway` | 8080 | 8090 | Punto de entrada único (Spring Cloud Gateway) |
-| `territory-service` | 8081 | 8091 | CRUD de territorios, GeoJSON, colores |
-| `reporting-service` | 8082 | 8092 | Reportes, encargados, WhatsApp, RUM |
-
-## API Endpoints
-
-### API Gateway (`:8080`)
-
-| Método | Ruta | Auth | Rate Limit | Descripción |
-|---|---|---|---|---|
-| `POST` | `/api/v1/auth/login` | — | 6/min | Login admin |
-
-### Territory Service
-
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| `GET` | `/api/v1/territories` | Público | Números de territorios |
-| `GET` | `/api/v1/territories/{n}` | Público | Territorio por número |
-| `GET` | `/api/v1/territories/all/geojson` | Público | GeoJSON de todos los territorios |
-| `GET` | `/api/v1/territories/{n}/geojson` | Público | GeoJSON de un territorio |
-| `GET` | `/api/v1/territories/colors` | Público | Colores asignados |
-| `PUT` | `/api/v1/territories/{n}/color` | Admin | Asignar color |
-| `GET` | `/api/v1/territories/admin/manzanas` | Admin | Todas las manzanas con su id real (GeoJSON) |
-| `POST`/`PUT`/`DELETE` | `/api/v1/territories/admin/manzanas[/{id}]` | Admin | Crear, editar o borrar una manzana |
-| `POST` | `/api/v1/territories/admin/manzanas/{id}/reparar` | Admin | Corregir una geometría inválida |
-| `POST` | `/api/v1/territories/admin/manzanas/reasignar` | Admin | Mover manzanas a otro territorio |
-| `DELETE` | `/api/v1/territories/admin/territorios/{n}` | Admin | Borrar un territorio completo |
-| `POST` | `/api/v1/territories/admin/importar` | Admin | Importar un FeatureCollection (todo o nada) |
-| `GET` | `/api/v1/territories/admin/calidad` | Admin | Geometrías inválidas y superposiciones |
-
-### Reporting Service
-
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| `POST` | `/api/v1/reports` | Autenticado | Crear reportes |
-| `GET` | `/api/v1/reports` | Autenticado | Listar reportes |
-| `GET` | `/api/v1/reports/today` | Autenticado | Reportes del día |
-| `POST` | `/api/v1/reports/send` | Autenticado | Enviar reporte por WhatsApp |
-| `GET` | `/api/v1/encargados` | Autenticado | Listar encargados activos |
-| `POST` | `/api/v1/encargados` | Público | Crear encargado |
-| `PUT` | `/api/v1/encargados/{id}` | Autenticado | Actualizar encargado |
-| `GET` | `/api/v1/encargados/buscar` | Autenticado | Buscar encargados |
-| `POST` | `/api/v1/encargados/buscar-crear` | Público (20/min) | Buscar o crear encargado + token |
-| `POST` | `/api/v1/encargados/login` | Público (6/min) | Login por teléfono (+ PIN si tiene) + token |
-| `GET` | `/api/v1/reports/public/estado` | Público | Estado de cada territorio para el visor (sin datos de personas, caché 60 s) |
-| `GET` | `/api/v1/reports/admin` | Admin | Reportes compactos de un rango (`desde`, `hasta`) |
-| `DELETE` | `/api/v1/reports/admin?ids=` | Admin | Borrar reportes |
-| `GET` | `/api/v1/reports/admin/whatsapp` | Admin | Últimos 200 envíos de WhatsApp |
-| `GET` | `/api/v1/reports/admin/ciclos` | Admin | Ciclos de territorios (con el resumen de los cerrados) |
-| `POST` | `/api/v1/reports/admin/ciclos/cerrar` | Admin | Cerrar el ciclo y reiniciar todos los territorios (`{nota}`) |
-| `GET` | `/api/v1/reports/admin/estado/{n}` | Admin | Estado actual (último reporte) de un territorio |
-| `POST` | `/api/v1/reports/admin/correccion` | Admin | Corregir el estado actual de un territorio |
-| `GET`/`POST`/`PUT`/`DELETE` | `/api/v1/encargados/admin[/{id}]` | Admin | Gestión de encargados |
-| `POST`/`DELETE` | `/api/v1/encargados/admin/{id}/pin` | Admin | Generar o quitar el PIN |
-| `POST` | `/api/v1/encargados/admin/{id}/desbloquear` | Admin | Quitar el bloqueo por intentos |
-| `POST` | `/api/v1/encargados/admin/{id}/fusionar/{destino}` | Admin | Fusionar un duplicado |
-| `GET`/`PUT` | `/api/v1/encargados/admin/config` | Admin | Registro abierto/cerrado |
-| `POST` | `/api/v1/rum` | Público (30/min) | Ingesta Core Web Vitals |
-
-## Testing
-
-### Frontend
-
-```bash
-cd territory-frontend
-
-# Ejecutar tests
-pnpm test                     # Ejecución única
-pnpm run test:watch           # Watch mode
-pnpm run test:coverage        # Con cobertura V8
-
-# Cobertura mínima (vitest.config.ts)
-# Lines: 30% | Statements: 30% | Functions: 30% | Branches: 20%
-```
-
-**Archivos de test (principales):**
-- Core: `profile.ts`, `auth-token.ts`, `auth.service.ts`, `territorio.ts`, `toast.ts`, `csrf-token.ts`, `encargado.ts`, `rum.ts`, `map-draft.service.ts`, `report-cache.service.ts`, `phone.ts`, `core/map/geometria.ts`
-- Interceptors: `auth.interceptor.ts`, `error.interceptor.ts`, `csrf.interceptor.ts`
-- Guards: `admin.guard.ts`, `profile.guard.ts`
-- Map: `map.ts`, `mapa.store.ts`, `ubicacion.ts`, `tutorial.ts`, `utils/salida.ts`, `utils/lados.ts`, `utils/borrador.ts`, `whatsapp.ts`
-- Visor: `visor.ts`, `visor-estado.ts`
-- Auth/Admin/Profile/SSR: `login.ts`, `admin.ts`, `profile.ts`, `server.spec.ts`
-
-### Backend
-
-```bash
-cd backend
-
-# Ejecutar todos los tests
-mvn clean test
-
-# Tests con cobertura JaCoCo
-mvn clean verify -Pcoverage
-
-# Tests de un módulo específico
-mvn -pl territory-service test
-mvn -pl reporting-service test
-mvn -pl shared test
-```
-
-**Cobertura:** JaCoCo habilitado via Maven profile `coverage`.
-
-### Load Testing
-
-```bash
-# k6 load test para API Gateway
-cd tests/load
-k6 run api-gateway.js
-```
-
-### CI/CD
-
-GitHub Actions ejecuta automáticamente:
-
-- **ci-backend.yml**: Build + test con PostgreSQL (PostGIS) + JaCoCo
-- **respaldo-bdd.yml**: Respaldo diario y cifrado de la base del VPS (ver *Respaldo de la base de datos*)
-- **ci-frontend.yml**: Lint + Type check + Test + Build
-- **docker.yml**: Build de imágenes Docker
-- **security.yml**: Análisis de seguridad
-
-## Observability
-
-### Stack (docker-compose profile: `observability`)
-
-| Servicio | Puerto | Descripción |
-|---|---|---|
-| Prometheus | :9090 | Métricas y alertas |
-| Grafana | :3000 | Dashboards (admin/admin) |
-| Jaeger | :16686 | Distributed tracing UI |
-| OTel Collector | :4317/:4318 | Recolección de traces |
-
-### Métricas
-
-- **HTTP**: Requests/sec, errores 5xx, latencia P95
-- **JVM**: Heap usage, GC pause time, threads
-- **Web Vitals**: LCP, INP, CLS, FCP, TTFB (por ruta)
-- **WhatsApp**: Sends/min, duration, success/failure
-- **Circuit Breaker**: State, failure rate
-- **Territory**: GeoJSON load duration, cache hits
-- **Database**: HikariCP connections
-
-### Activar observabilidad
-
-```bash
-# Exportar traces al collector
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-export OTEL_TRACES_EXPORTER=otlp
-
-# Levantar con perfil observability
-docker-compose --profile observability up -d
-```
+| `DB_PASSWORD` | Contraseña de PostgreSQL | obligatoria |
+| `DB_URL` | JDBC del servicio | `jdbc:postgresql://postgres:5432/predicador` |
+| `DB_URL_UNPOOLED` | JDBC directa para Flyway | igual a `DB_URL` |
+| `SESSION_SECRET` | Firma HMAC de los tokens (≥32 bytes) | obligatoria |
+| `SESSION_TTL_HOURS` | Duración de la sesión | `12` |
+| `ADMIN_USERNAME` | Usuario del administrador | `admin` |
+| `ADMIN_PASSWORD_BCRYPT` | Clave del administrador (BCrypt) | obligatoria fuera de `local` |
+| `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | Cookies solo por HTTPS | `true` en compose |
+| `CORS_ALLOWED_ORIGINS` | Origen permitido | `http://localhost:4200` |
+| `EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE` / `SPRING_CLOUD_CONFIG_URI` | Discovery y configuración | `http://localhost:8761/eureka/` / `http://localhost:8888` |
+| `WHATSAPP_PHONE_ID` / `WHATSAPP_ACCESS_TOKEN` | Credenciales de Meta | — |
+| `WHATSAPP_TEMPLATE` | Plantilla del mensaje | `asignacion_territorio` |
+| `WHATSAPP_LANG` | Idioma de la plantilla | `es_CL` |
+| `WHATSAPP_DEFAULT_IMAGE_URL` | Imagen al anunciar un territorio completo | — |
+| `WHATSAPP_DESTINATION` | Destino de respaldo | — |
+| `PORTAINER_URL` | Enlace «Abrir Portainer» del panel | — |
+| `NEON_URL` | Importación inicial desde Neon | — |
 
 ## Seguridad
 
-- **Tokens HMAC-SHA256**: Formato `base64url(subject|role|iat|exp).base64url(sig)`, TTL configurable (default 12h)
-- **Rate Limiting**: Bucket4j por IP con Caffeine storage
-- **Security Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
-- **BCrypt**: Passwords admin y PIN de encargados hasheados con comparación timing-safe
-- **PIN de encargados**: opcional; 5 intentos fallidos bloquean la cuenta 15 minutos (además del rate limit por IP). Con PIN o cuenta desactivada no se puede entrar "por nombre" desde el auto-registro
-- **Panel de administración**: todo `/api/v1/{territories,reports,encargados}/admin/**` exige rol admin en el gateway y en cada servicio
-- **CORS**: Configurable por variable de entorno
-- **Soft rollout**: `SessionAuthFilter` se desactiva si `SESSION_SECRET` está vacío
-- **Constant-time comparison**: Previene timing attacks en verificación de firmas
+- **Tokens HMAC-SHA256** (no JWT): `base64url(subject|role|iat|exp).base64url(firma)`, con
+  comparación en tiempo constante.
+- **Contraseñas y PIN** con BCrypt; 5 intentos fallidos bloquean la cuenta 15 minutos.
+- **Rate limiting por IP** con Bucket4j: login y «Sistema» 6/min, auto-registro 20/min, RUM 30/min.
+- **Doble control de admin**: el gateway y cada servicio verifican el rol en `/admin/**`.
+- **Módulo «Sistema»**: exige la contraseña de nuevo y un pase de 15 min de inactividad / 1 h
+  máximo. Responde 403 (nunca 401) para no cerrar la sesión del panel.
+- **Solo lectura sobre Docker**: `docker-lectura` permite únicamente listar contenedores y leer su
+  consumo; el `inspect` expondría variables de entorno con contraseñas.
+- **Cabeceras de seguridad**, CORS configurable y validación con ProblemDetail (RFC 7807).
 
-## Dominios
+## Observabilidad
 
-| Concepto | Descripción |
-|---|---|
-| **Territorio** | Área geográfica identificada por número, contiene múltiples manzanas |
-| **Manzana** | Manzana/ciudad dentro de un territorio, polígono con ID string |
-| **Encargado** | Coordinador/líder de predicación |
-| **ModoMarcado** | `none` (ver), `completa` (tap para marcar), `parcial` (dibujar polígono) |
-| **TipoSesion** | `predicacion` (predicación) o `otro` (otro) |
-| **Estado** | `completed` (todas marcadas) o `incomplete` |
-| **Predicacion** | Horario: `manana` (mañana) o `tarde` (tarde) |
+Opt-in, sin costo cuando está apagada:
 
-## Estructura del Proyecto
-
+```bash
+docker compose --profile observability up -d
 ```
+
+| Servicio | Puerto | Uso |
+|---|---|---|
+| Prometheus | 9090 | Métricas y alertas |
+| Grafana | 3000 | Dashboards (admin/admin) |
+| Jaeger | 16686 | Trazas distribuidas |
+| OTel Collector | 4317 / 4318 | Recolección de trazas |
+
+El backend expone métricas HTTP, JVM, base de datos, WhatsApp y circuit breakers. El frontend envía
+Core Web Vitals (LCP, INP, CLS, FCP, TTFB) por ruta a `POST /api/v1/rum`.
+
+## Tests y CI
+
+| Suite | Comando | Estado actual |
+|---|---|---|
+| Frontend | `pnpm test -- --run --coverage` | 399 tests, 51 archivos |
+| Backend | `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true` | 541 tests, 0 skipped |
+| Lint | `pnpm run lint` | 0 errores |
+
+Umbrales de cobertura del frontend: **60/58/55/50** (lines/statements/functions/branches).
+Backend: gate JaCoCo de **40%** por módulo. Métricas al día en
+[`docs/ai/metrics/`](docs/ai/metrics/).
+
+CI en GitHub Actions:
+
+| Workflow | Qué hace |
+|---|---|
+| `ci-backend.yml` | Build + tests con PostgreSQL/PostGIS y JaCoCo |
+| `ci-frontend.yml` | `pnpm audit` → lint → build → tests con cobertura |
+| `security.yml` | gitleaks, OWASP dependency-check, Trivy y Semgrep |
+| `sonarcloud.yml` | Análisis SonarCloud con cobertura de ambos stacks |
+| `docker.yml` | Construye y publica las imágenes en GHCR |
+| `respaldo-bdd.yml` | Respaldo diario cifrado de la base |
+| `opencode.yml` | Asistente de IA bajo demanda en issues y PRs |
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | Reglas del repo y gotchas verificados (fuente más actualizada) |
+| [`docs/adr/`](docs/adr/) | Decisiones de arquitectura |
+| [`docs/ai/`](docs/ai/README.md) | Paquete de apoyo para IA: arquitectura, API, pruebas, advertencias |
+| [`CHANGES.md`](CHANGES.md) | Resumen de cambios en lenguaje llano |
+| [`openspec/`](openspec/) | Flujo de trabajo SDD (`changes/`, `specs/`) |
+
+## Estructura
+
+```text
 predicador-app/
 ├── backend/
-│   ├── shared/                    # Librería compartida (seguridad, excepciones)
-│   ├── config-server/             # Spring Cloud Config
-│   ├── discovery-server/          # Netflix Eureka
-│   ├── api-gateway/               # Gateway (WebFlux)
-│   ├── territory-service/         # Servicio de territorios
-│   ├── reporting-service/         # Servicio de reportes
-│   └── pom.xml                    # Parent POM
+│   ├── shared/                    # seguridad, excepciones y utilidades compartidas
+│   ├── config-server/             # configuración centralizada
+│   ├── discovery-server/          # Eureka
+│   ├── api-gateway/               # rutas, auth, rate limit y módulo «Sistema»
+│   ├── territory-service/         # territorios y geometrías
+│   ├── reporting-service/         # salidas, encargados, ciclos y WhatsApp
+│   └── pom.xml
 ├── territory-frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── core/              # Servicios, guards, interceptors, utils
-│   │   │   └── features/          # Auth, Profile, Map, Admin
-│   │   │       └── map/           # Feature principal (10+ servicios)
-│   │   ├── server.ts              # SSR entry
-│   │   └── styles.css             # Estilos globales + design tokens
-│   ├── public/                    # Assets estáticos, manifest, icons
-│   └── angular.json
-├── tests/
-│   └── load/                      # k6 load tests
-├── observability/                 # Prometheus, Grafana, OTel configs
+│   └── src/app/
+│       ├── core/                  # servicios, guards, interceptors, mapas base
+│       └── features/              # auth, map, profile, visor, admin
+├── docker-lectura/                # proxy HAProxy de solo lectura a Docker
+├── observability/                 # Prometheus, Grafana, OTel
+├── scripts/db/                    # respaldo, restauración y age
+├── tests/                         # k6 y smoke test de trazas
+├── docs/                          # ADRs y paquete de documentación AI
 ├── docker-compose.yml
-├── sonar-project.properties
-└── .github/workflows/             # CI/CD pipelines
+└── .github/workflows/             # CI/CD
 ```
 
-## License
+## Licencia
 
-MIT
+MIT.

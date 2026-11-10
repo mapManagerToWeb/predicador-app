@@ -1,16 +1,16 @@
 # Data Flows — cómo funciona el sistema paso a paso
 
-> Narrativa verificada contra el código (2026-10-09). Rutas exactas en `../api-reference/services.md`.
+> Narrativa verificada contra el código (2026-11-10). Rutas exactas en `../api-reference/services.md`.
 
 ## 0 — Precondiciones
 - Backend levantado en orden: config-server (8888) → discovery-server (8761) → api-gateway (8080) → territory-service (8081) / reporting-service (8082).
 - Frontend: `ng serve` (proxy `/api` → `localhost:8080`) o build de producción (`pnpm run build`).
 - DB con datos. Producción = Postgres self-hosted del compose (ADR 0006, **reemplazó Neon**).
-- WhatsApp opcional: requiere `WHATSAPP_PHONE_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_TEMPLATE`, `WHATSAPP_DESTINATION`.
+- WhatsApp opcional: requiere `WHATSAPP_PHONE_ID`, `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_TEMPLATE`; `WHATSAPP_DESTINATION` es solo el respaldo cuando no hay un encargado logueado con teléfono válido (ADR 0016).
 
 ## 1 — Login
-1. `POST /api/v1/auth/login` (api-gateway).
-2. Token HMAC firmado con `SESSION_SECRET` (≥32 bytes fuera del perfil `local`).
+1. Admin: `POST /api/v1/auth/login` (api-gateway). Encargado: `POST /api/v1/encargados/login` (reporting).
+2. Token HMAC-SHA256 firmado con `SESSION_SECRET` (≥32 bytes fuera del perfil `local`). No es un JWT: es un token opaco.
 3. Interceptor `auth` añade el header `Authorization` en cada request.
 4. `SessionTokenService.verify` (fan-in alto) valida en cada servicio.
 
@@ -23,17 +23,18 @@
    `GeoJSONSource.setData` devuelve promise → prefijar con `void`.
 
 ## 3 — Marcar territorio → Reporte (`Salida`)
-1. Click en polígono → formulario (horas, estudios, decisiones, comentarios).
-2. Confirmación obligatoria vía `Pregunta` antes de enviar.
-3. `POST /api/v1/reports` → reporting-service valida (incl. teléfono chileno) y persiste `Salida`.
-4. Estado resultante: `EN_CURSO`. El estado de un territorio es **siempre su último reporte** (ADR 0011).
+1. Al tocar una manzana se marca completa; «Por calles» permite marcar solo las calles predicadas. El resumen se confirma con `Pregunta`.
+2. Se elige el día de predicación (hoy, ayer o hasta 7 días atrás) y el turno (mañana/tarde) en el diálogo de envío.
+3. `POST /api/v1/reports` → reporting-service valida (incl. teléfono chileno) y persiste el `Report`, sumando sus manzanas (`SumaDeSalidas`).
+4. Estado resultante: `completed` si quedaron todas las manzanas, `incomplete` si es parcial. El estado de un territorio es **siempre su último reporte no anulado** (ADR 0011).
 5. Frontend actualiza `feature-state` (toast de éxito).
 
-## 4 — Cierre de ciclo (S13) y corrección
-- **Cierre:** `POST /api/v1/reports/admin/ciclos/cerrar` → el/los territorios pasan a `REPORTADO`.
-- **Corrección:** `POST /api/v1/reports/admin/{id}/corregir` → clona el reporte y marca el original con `reemplaza_a` (ADR 0014).
-- **Anulación:** fija `anulado_en` + `reemplaza_a`; el historial se preserva y se ignora en las consultas de estado.
-- **Batch:** `POST /api/v1/reports/admin/correccion`.
+## 4 — Cierre de ciclo (S-13) y corrección
+- **Cierre:** `POST /api/v1/reports/admin/ciclos/cerrar` → agrega un reporte de reinicio y los territorios vuelven a empezar. Queda un informe del ciclo (descargable).
+- **Inicio elegido:** `POST /api/v1/reports/admin/ciclos/inicio` mueve el día en que empezó el ciclo abierto (p. ej. inicio de campaña) sin cerrar otro.
+- **Corrección de una salida:** `POST /api/v1/reports/admin/{id}/corregir` → anula la salida original (`anulado_en` + `reemplaza_a`) y recalcula las posteriores (ADR 0014).
+- **Corrección de estado:** `POST /api/v1/reports/admin/correccion` → agrega un reporte equivalente al S-13.
+- **Registro desde el panel:** `POST /api/v1/reports/admin/salidas` o `/salidas/varias` (ADR 0021) registra lo que un hermano informó como una salida normal en su nombre.
 - **Regla:** un cierre/corrección/anulación **agrega** un reporte. Nunca se borra un reporte para cambiar el estado (ADR 0011).
 
 ## 5 — Visor público (`/visor`)
@@ -43,14 +44,16 @@
 
 ## 6 — Admin (`/admin`)
 - Requiere `adminGuard`.
-- CRUD de encargados (`/api/v1/encargados/admin/**`), corrección/anulación, ciclos, estado por territorio.
-- Deuda conocida: 2 imports cross-feature `features/admin` → `features/map` (promover a `core/`, no añadir un tercero).
+- CRUD de encargados (`/api/v1/encargados/admin/**`), carga de listas (`/importar`), corrección/anulación, ciclos, registro de salidas (`/reports/admin/salidas`), estado por territorio.
+- **Sistema** (`/admin/sistema`): el gateway vuelve a pedir la contraseña y entrega un pase de 15 min de inactividad / 1 h máximo. Los rechazos del pase son **403** con `code` (nunca 401, que cerraría la sesión del panel). Lee solo a través de `docker-lectura`.
+- Deuda conocida: un import cross-feature `features/admin` → `features/map` (`TERRITORY_COLORS`); promover a `core/`, no añadir otro.
 
 ## 7 — WhatsApp (opcional, reporting-service)
-- `RabbitMQConfig` + `SumaDeSalidas` (publisher/listener) → `WhatsAppMessageClient.sendTemplateMessage`.
-- Header `Idempotency-Key` (UUID) para evitar duplicados.
-- Meta Graph API **v21.0**: `POST /v21.0/{phone_id}/messages`.
-- Plantilla por defecto `asignacion_territorio`. Best-effort: no bloquea el flujo principal.
+- `ReportSendService` / `WhatsAppSendService` orquestan el envío; `SumaDeSalidas` calcula qué quedó completo.
+- `RabbitMQConfig` transporta el envío asíncrono; `WhatsAppMessageClient.sendTemplateMessage` habla con Meta.
+- Header `Idempotency-Key` (UUID) obligatorio para el envío asíncrono: 400 sin él, y una clave completada se reutiliza en lugar de reenviar.
+- Meta Graph API **v21.0** (configurable): `POST {base-url}/{version}/{phone_id}/messages`.
+- Plantilla por defecto `asignacion_territorio`. Destino: el teléfono registrado del encargado logueado; `WHATSAPP_DESTINATION` es solo el fallback (ADR 0016).
 - `GET /api/v1/reports/send/{idempotencyKey}` consulta el estado del envío.
 
 ## 8 — Gateway → Services
@@ -58,6 +61,7 @@
 - `/api/v1/reports/**`, `/encargados/**`, RUM → `lb://reporting-service`.
 - `/api/v1/rum` → **sin retry** (deliberado).
 - `/api/v1/reports/public/**` → unauthenticated (visor).
+- `/api/v1/auth/**` y `/api/v1/sistema/**` → los sirve el propio gateway (no están ruteados).
 - Definido en código: `api-gateway/…/config/RouteConfig.java` (no YAML).
 
 ## 9 — Observabilidad (opt-in)
