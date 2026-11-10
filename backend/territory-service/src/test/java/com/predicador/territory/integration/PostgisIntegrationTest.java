@@ -4,12 +4,13 @@ import com.predicador.territory.model.ManzanaTerritorio;
 import com.predicador.territory.repository.TerritoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -44,8 +45,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  * -Dtest=PostgisIntegrationTest -Ddocker.available=false}</p>
  */
 @SpringBootTest
-@EnabledIfSystemProperty(named = "docker.available", matches = "true")
+@EnabledIf("dockerDisponible")
 class PostgisIntegrationTest {
+
+    /**
+     * Corre sólo si se pidió ({@code -Ddocker.available=true}) <em>y</em> Docker
+     * responde de verdad. En un runner donde Testcontainers no logra hablar con
+     * el daemon, el test se salta en vez de tumbar el build: un fallo de
+     * entorno no es un fallo de negocio, y un build rojo por eso esconde los
+     * fallos que sí importan.
+     */
+    static boolean dockerDisponible() {
+        if (!Boolean.getBoolean("docker.available")) {
+            return false;
+        }
+        try {
+            return DockerClientFactory.instance().isDockerAvailable();
+        } catch (RuntimeException | LinkageError e) {
+            // La sonda arranca el reaper de Testcontainers. Si Docker no es
+            // accesible (p. ej. un runner que rechaza la versión de API) esto
+            // lanza: un fallo de entorno salta el test, no rompe el build.
+            return false;
+        }
+    }
 
     static PostgreSQLContainer<?> postgis;
 
