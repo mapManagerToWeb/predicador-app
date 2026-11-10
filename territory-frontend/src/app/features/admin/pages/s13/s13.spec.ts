@@ -3,6 +3,7 @@ import type { CicloAdmin, ManzanasCollection, ReporteAdmin } from '../../admin.m
 import { AdminApi } from '../../services/admin-api';
 import { AdminUi } from '../../services/admin-ui';
 import { S13Page } from './s13';
+import { Toast } from '../../../../core/services/toast';
 
 const descargar = vi.fn();
 vi.mock('../../utils/csv', async original => ({ ...(await original<typeof import('../../utils/csv')>()), descargar: (...a: unknown[]) => descargar(...a) }));
@@ -55,6 +56,7 @@ describe('S13Page', () => {
       reportesEntre: vi.fn().mockResolvedValue(REPORTES),
       ciclos: vi.fn().mockResolvedValue([CICLO]),
       cerrarCiclo: vi.fn().mockResolvedValue({ ...CICLO, id: 2 }),
+      cambiarInicioCiclo: vi.fn().mockResolvedValue({ ciclo: CICLO, enLaVueltaAnterior: 2 }),
       estadoTerritorio: vi.fn().mockResolvedValue({
         territorio: 9, fecha: iso(5), estado: 'completed', origen: 'salida', encargado: 'Ana Soto',
         manzanasIds: '9-9.a,9-9.b', geometriaParcial: null, puntosParciales: null, totalManzanas: 2,
@@ -120,5 +122,25 @@ describe('S13Page', () => {
     await vi.waitFor(() =>
       expect(api['corregir']).toHaveBeenCalledWith(expect.objectContaining({ territorio: 9, manzanasIds: '9-9.b', totalManzanas: 2, manzanasMarcadas: 1 })),
     );
+  });
+
+  it('corrige el día en que empezó la vuelta actual y avisa si hay reportes que quedaron en la anterior', async () => {
+    const { fixture, el } = await crear();
+    (Array.from(el.querySelectorAll('[role=tab]')).find(b => b.textContent?.includes('Ciclo actual')) as HTMLButtonElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    (Array.from(el.querySelectorAll('button')).find(b => b.textContent?.includes('Cambiar el día en que empezó')) as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const fecha = el.querySelector('.cambiar-inicio input[type=date]') as HTMLInputElement;
+    fecha.value = '2026-11-07';
+    fecha.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    (Array.from(el.querySelectorAll('.cambiar-inicio button')).find(b => b.textContent?.includes('Guardar')) as HTMLButtonElement).click();
+    expect(ui.confirmacion()?.mensaje).toContain('No se cierra otro ciclo');
+    const aviso = vi.spyOn(TestBed.inject(Toast), 'show');
+    ui.responder(true);
+    await vi.waitFor(() => expect(api['cambiarInicioCiclo']).toHaveBeenCalledWith('2026-11-07'));
+    await vi.waitFor(() => expect(aviso).toHaveBeenCalledWith(expect.stringContaining('2 reporte(s)'), 12000, 'warning'));
   });
 });

@@ -350,4 +350,23 @@ class ReportAdminCiclosControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[1].territorioNumero").value(72));
     }
+
+    @Test
+    void cambiarInicioDeLaVuelta_soloElAdmin_yConFechaValida() throws Exception {
+        mvc.perform(post("/api/v1/reports/admin/ciclos/inicio").with(comoEncargado())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"desde\":\"2026-11-07\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/reports/admin/ciclos/inicio").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"desde\":\"7 de noviembre\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(ciclos);
+
+        when(ciclos.cambiarInicio(java.time.LocalDate.parse("2026-11-07"))).thenReturn(new CicloService.CambioDeInicio(
+                new CicloDto(4L, Instant.parse("2026-11-07T03:00:00Z"), null, null, null), 0));
+        mvc.perform(post("/api/v1/reports/admin/ciclos/inicio").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"desde\":\"2026-11-07\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ciclo.id").value(4))
+                .andExpect(jsonPath("$.enLaVueltaAnterior").value(0));
+    }
 }

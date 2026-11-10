@@ -109,6 +109,21 @@ public class ReportAdminController {
         return ResponseEntity.ok(ciclos.cerrar(req == null ? null : req.nota(), req == null ? null : req.desde()));
     }
 
+    /** Corrige el día en que empezó la vuelta actual (sin cerrar otro ciclo). */
+    @PostMapping("/ciclos/inicio")
+    public ResponseEntity<CicloService.CambioDeInicio> cambiarInicio(@RequestBody Map<String, String> body,
+                                                                     HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        String desde = body == null ? null : body.get("desde");
+        java.time.LocalDate dia;
+        try {
+            dia = desde == null || desde.isBlank() ? null : java.time.LocalDate.parse(desde);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fecha inválida.");
+        }
+        return ResponseEntity.ok(ciclos.cambiarInicio(dia));
+    }
+
     /** Estado actual (último reporte) de un territorio; 204 si nunca se trabajó. */
     @GetMapping("/estado/{territorio}")
     public ResponseEntity<EstadoTerritorioAdmin> estado(@PathVariable long territorio,

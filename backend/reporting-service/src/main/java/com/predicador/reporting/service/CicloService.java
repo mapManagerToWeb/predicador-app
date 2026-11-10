@@ -101,6 +101,88 @@ public class CicloService {
         return abrir(inicioNuevo);
     }
 
+    /**
+     * Resultado de corregir el inicio de la vuelta actual.
+     *
+     * @param enLaVueltaAnterior reportes enviados entre el nuevo inicio y el
+     *                           cierre: quedaron antes del reinicio, o sea en la
+     *                           vuelta anterior (si son de esta, hay que anularlos
+     *                           y registrarlos de nuevo)
+     */
+    public record CambioDeInicio(CicloDto ciclo, long enLaVueltaAnterior) {}
+
+    /**
+     * Corrige el día en que empezó la vuelta actual (p. ej. se cerró el ciclo
+     * hoy, pero la campaña empezó el sábado). No cierra otro ciclo ni toca el
+     * orden de los reportes: cambia el inicio del ciclo abierto, el fin del
+     * anterior y el día de trabajo de sus reinicios, que es lo que muestra el
+     * S-13.
+     */
+    @Transactional
+    public CambioDeInicio cambiarInicio(LocalDate desde) {
+        if (desde == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elige el día en que empezó la vuelta.");
+        }
+        Instant ahora = Instant.now();
+        if (desde.isAfter(DiaDePredicacion.hoy(ahora))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La vuelta no puede empezar en un día futuro.");
+        }
+        CicloDto actual = jdbc.sql("SELECT id, inicio, fin, nota, resumen FROM ciclo_territorios WHERE fin IS NULL FOR UPDATE")
+                .query(CicloService::ciclo)
+                .optional()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No hay una vuelta abierta."));
+        Optional<CicloDto> anterior = jdbc.sql("""
+                SELECT id, inicio, fin, nota, resumen FROM ciclo_territorios
+                WHERE fin IS NOT NULL ORDER BY fin DESC, id DESC LIMIT 1 FOR UPDATE
+                """)
+                .query(CicloService::ciclo)
+                .optional();
+        Instant inicio = desde.atStartOfDay(DiaDePredicacion.ZONA).toInstant();
+        if (anterior.isPresent() && !inicio.isAfter(anterior.get().inicio())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Tiene que ser después de que empezó la vuelta anterior.");
+        }
+
+        jdbc.sql("UPDATE ciclo_territorios SET inicio = :inicio WHERE id = :id")
+                .param("inicio", Timestamp.from(inicio))
+                .param("id", actual.id())
+                .update();
+        long enLaVueltaAnterior = 0;
+        if (anterior.isPresent()) {
+            jdbc.sql("UPDATE ciclo_territorios SET fin = :fin WHERE id = :id")
+                    .param("fin", Timestamp.from(inicio))
+                    .param("id", anterior.get().id())
+                    .update();
+            // Los reinicios del último cierre: todos se guardaron con la misma hora (la del cierre).
+            Optional<Instant> ultimoCierre = jdbc.sql("SELECT max(fecha) FROM registro_predicacion WHERE origen = 'reinicio'")
+                    .query(Timestamp.class)
+                    .list()
+                    .stream()
+                    .filter(java.util.Objects::nonNull)
+                    .findFirst()
+                    .map(Timestamp::toInstant);
+            ultimoCierre.ifPresent(hora -> jdbc.sql("""
+                    UPDATE registro_predicacion SET fecha_predicacion = :dia
+                    WHERE origen = 'reinicio' AND fecha = :hora
+                    """)
+                    .param("dia", desde)
+                    .param("hora", Timestamp.from(hora))
+                    .update());
+            Instant cierre = ultimoCierre.orElse(actual.inicio());
+            if (cierre.isAfter(inicio)) {
+                enLaVueltaAnterior = jdbc.sql("""
+                        SELECT count(*) FROM registro_predicacion
+                        WHERE fecha >= :inicio AND fecha < :cierre AND anulado_en IS NULL AND origen <> 'reinicio'
+                        """)
+                        .param("inicio", Timestamp.from(inicio))
+                        .param("cierre", Timestamp.from(cierre))
+                        .query(Long.class)
+                        .single();
+            }
+        }
+        return new CambioDeInicio(new CicloDto(actual.id(), inicio, null, actual.nota(), actual.resumen()), enLaVueltaAnterior);
+    }
+
     /** Comienzo del día {@code desde} en Chile, validado. */
     private Instant inicioDelDia(LocalDate desde, CicloDto actual, Instant ahora) {
         if (desde.isAfter(DiaDePredicacion.hoy(ahora))) {
@@ -109,7 +191,10 @@ public class CicloService {
         Instant inicio = desde.atStartOfDay(DiaDePredicacion.ZONA).toInstant();
         if (!inicio.isAfter(actual.inicio())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "La vuelta nueva tiene que empezar después del inicio de la vuelta actual.");
+                    "La vuelta actual empezó el " + actual.inicio().atZone(DiaDePredicacion.ZONA).toLocalDate()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy"))
+                            + ": la nueva tiene que empezar después. Si lo que quieres es que la vuelta actual"
+                            + " empiece antes, usa «Cambiar el día en que empezó».");
         }
         Long posteriores = jdbc.sql("""
                 SELECT count(*) FROM registro_predicacion
