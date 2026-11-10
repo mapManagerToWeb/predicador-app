@@ -247,6 +247,28 @@ export class CorreccionMap {
     }
   }
 
+  /**
+   * Como `capturar()`, pero espera a que el mapa termine de dibujar lo último
+   * que se le pasó (manzanas nuevas y fondo cargado). Para las tarjetas.
+   */
+  async capturarAlTerminar(maximoMs = 8000): Promise<string | null> {
+    // Espera a que el mapa exista y deja que los effects le pasen las manzanas nuevas.
+    const hasta = Date.now() + maximoMs;
+    while (!this.listo() && Date.now() < hasta) await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 80));
+    const map = this.map;
+    if (!map) return null;
+    await new Promise<void>(resolve => {
+      const listo = setTimeout(resolve, maximoMs);
+      map.once('idle', () => {
+        clearTimeout(listo);
+        resolve();
+      });
+      map.triggerRepaint();
+    });
+    return this.capturar();
+  }
+
   /** La calle bajo el puntero, con un margen para que sea fácil acertarle. */
   private calleEn(map: MapLibreMap, p: { x: number; y: number }): CalleVisible | null {
     const calles = this.calles();
