@@ -9,6 +9,12 @@ on:
   pull_request:
     branches: [main]
 
+# El scanner sólo necesita leer el repo y los metadatos del PR para decorarlo.
+# Sin `permissions:` el GITHUB_TOKEN hereda el default del repositorio.
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: sonarcloud-${{ github.ref }}
   cancel-in-progress: true
@@ -67,6 +73,13 @@ jobs:
           DB_PASSWORD: test
           TESTCONTAINERS_RYUK_DISABLED: "true"
           DOCKER_HOST: unix:///var/run/docker.sock
+          # Sin estas tres variables TerritoryAdminIntegrationTest se salta y
+          # territory-service queda en ~25% de líneas: el gate JaCoCo de 40%
+          # falla y el workflow entero queda rojo. Es el mismo mecanismo que
+          # usa ci-backend.yml.
+          TERRITORY_IT_DB_URL: jdbc:postgresql://localhost:5432/predicador_test
+          TERRITORY_IT_DB_USERNAME: predicador
+          TERRITORY_IT_DB_PASSWORD: test
         run: mvn verify -Pcoverage -B
 
       - name: SonarCloud Scan

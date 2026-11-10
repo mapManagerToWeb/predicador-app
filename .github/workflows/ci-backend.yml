@@ -10,6 +10,12 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - ".github/workflows/ci-backend.yml"
+
+# El GITHUB_TOKEN no necesita más que leer el repo: sin `permissions:` el
+# token hereda el default del repositorio, que puede incluir escritura.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-backend-${{ github.ref }}
