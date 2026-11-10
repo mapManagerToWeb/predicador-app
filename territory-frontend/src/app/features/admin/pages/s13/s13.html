@@ -185,9 +185,9 @@
     <section class="adm-card">
       <h2>Corregir el estado de un territorio</h2>
       <p class="adm-sub">
-        Si un hermano marcó por error una manzana o una calle, quítala acá. La corrección queda registrada (quién y por qué)
-        y no borra ningún reporte. Clic en una manzana: si está marcada entera se desmarca; si tiene calles marcadas, se quitan;
-        si no tenía nada, se marca entera.
+        Si un hermano marcó por error una manzana o una calle, corrígelo acá. La corrección queda registrada (quién y por
+        qué) y no borra ningún reporte. Con «Manzana entera», clic en una manzana la marca o la desmarca entera; con «Por
+        calles», clic en una manzana muestra sus calles y cada clic en una calle la marca o la quita.
       </p>
       <div class="barra">
         <label class="adm-field inline"><span>Territorio</span>
@@ -213,12 +213,27 @@
     @if (territorioSel() !== null) {
       <div class="corregir">
         <section class="adm-card mapa">
+          <div class="adm-seg" role="group" aria-label="Cómo corregir">
+            <button type="button" [class.activo]="modo() === 'entera'" (click)="cambiarModo('entera')">Manzana entera</button>
+            <button type="button" [class.activo]="modo() === 'calles'" (click)="cambiarModo('calles')">Por calles</button>
+          </div>
+          <p class="adm-muted ayuda">
+            @if (modo() === 'entera') {
+              Clic en una manzana para marcarla entera o quitarla; clic en unas calles marcadas para quitarlas.
+            } @else if (manzanaCalles(); as m) {
+              Manzana {{ m.properties.nombre }}: clic en cada calle para marcarla (verde) o quitarla. Con todas, queda entera.
+            } @else {
+              Clic en una manzana para ver sus calles.
+            }
+          </p>
           <app-correccion-map
             [manzanas]="manzanasSel()"
             [estado]="edicion()"
             [color]="colorSel()"
-            (manzanaClick)="alternar($event)"
-            (zonaClick)="quitarZona($event)"
+            [calles]="calles()"
+            (manzanaClick)="alTocarManzana($event)"
+            (zonaClick)="alTocarZona($event)"
+            (calleClick)="alTocarCalle($event)"
           />
         </section>
         <section class="adm-card lista">
@@ -238,6 +253,9 @@
                     @case ('calles') { Quitar calles }
                     @default { Marcar entera }
                   }
+                </button>
+                <button class="adm-btn small ghost" type="button" (click)="elegirCalles(m)" [attr.aria-label]="'Elegir calles de la manzana ' + m.properties.nombre">
+                  Calles
                 </button>
               </li>
             }

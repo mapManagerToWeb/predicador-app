@@ -21,16 +21,33 @@
     <p class="adm-muted">Cargando…</p>
   } @else if (salida(); as s) {
     <div class="grilla">
-      <app-correccion-map
-        [manzanas]="manzanas()"
-        [estado]="edicion()"
-        [color]="color()"
-        [bloqueadas]="base().marcadas"
-        [zonasBloqueadas]="zonasBloqueadas()"
-        [alto]="420"
-        (manzanaClick)="alternar($event)"
-        (zonaClick)="quitarZona($event)"
-      />
+      <div class="mapa">
+        <div class="adm-seg" role="group" aria-label="Cómo corregir">
+          <button type="button" [class.activo]="modo() === 'entera'" (click)="cambiarModo('entera')">Manzana entera</button>
+          <button type="button" [class.activo]="modo() === 'calles'" (click)="cambiarModo('calles')">Por calles</button>
+        </div>
+        <p class="adm-muted ayuda">
+          @if (modo() === 'entera') {
+            Clic en una manzana para marcarla entera o quitarla; clic en unas calles marcadas para quitarlas.
+          } @else if (manzanaCalles(); as m) {
+            Manzana {{ m.properties.nombre }}: clic en cada calle para marcarla (verde) o quitarla. Con todas, queda entera.
+          } @else {
+            Clic en una manzana para ver sus calles.
+          }
+        </p>
+        <app-correccion-map
+          [manzanas]="manzanas()"
+          [estado]="edicion()"
+          [color]="color()"
+          [bloqueadas]="base().marcadas"
+          [zonasBloqueadas]="zonasBloqueadas()"
+          [calles]="calles()"
+          [alto]="420"
+          (manzanaClick)="alTocarManzana($event)"
+          (zonaClick)="alTocarZona($event)"
+          (calleClick)="alTocarCalle($event)"
+        />
+      </div>
       <div class="lado">
         <p class="resumen">
           Esta salida marcó <strong>{{ aporte().enteras }}</strong> manzana(s) entera(s) y
@@ -40,7 +57,7 @@
           }
         </p>
         <ul class="leyenda">
-          <li><span class="muestra" [style.background]="color()"></span> Marcado en esta salida (clic para quitar)</li>
+          <li><span class="muestra" [style.background]="color()"></span> Marcado en esta salida</li>
           <li><span class="muestra gris"></span> Ya estaba antes (no se cambia aquí)</li>
         </ul>
         @if (s.posteriores > 0) {

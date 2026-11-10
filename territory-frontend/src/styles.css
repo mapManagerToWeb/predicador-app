@@ -366,6 +366,19 @@ input, select, textarea {
   min-height: 44px;
 }
 
+/*
+ * En el celular (iPhone sobre todo), tocar un campo con letra menor a 16 px
+ * agranda la pantalla y el zoom se queda puesto en el resto de la app. Con
+ * 16 px no pasa. No se bloquea el zoom con dos dedos: lo usan los hermanos
+ * que ven poco. Va con !important porque los estilos de cada pantalla ponen
+ * 14 px a sus campos.
+ */
+@media (pointer: coarse) {
+  input, select, textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;
