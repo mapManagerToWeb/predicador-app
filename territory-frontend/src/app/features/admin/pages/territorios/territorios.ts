@@ -14,7 +14,8 @@ import {
 import { ActivatedRoute } from '@angular/router';
 import { Toast } from '../../../../core/services/toast';
 import { TERRITORY_COLORS } from '../../../map/utils/territory-colors';
-import type { CalidadDatos, ManzanaFeature, ManzanaGeometry } from '../../admin.models';
+import type { CalidadDatos, EstadoTerritorioAdmin, ManzanaFeature, ManzanaGeometry } from '../../admin.models';
+import { clave, quedaCompletoTrasEliminar } from '../../utils/correccion';
 import type { FondoMapa } from '../../../../core/map/base-map';
 import { EditorMapa } from '../../map/editor-map';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
@@ -72,11 +73,25 @@ export class TerritoriosPage {
   });
 
   protected readonly listaTerritorios = computed(() => {
-    const q = this.busqueda().trim();
+    const q = normalizarBusqueda(this.busqueda());
+    const numero = q.match(/^\d+/)?.[0] ?? '';
     return this.store
       .territorios()
-      .filter(t => !q || String(t).startsWith(q))
+      .filter(t => !q || (numero !== '' && (q === numero ? String(t).startsWith(numero) : String(t) === numero)))
       .map(t => ({ numero: t, manzanas: this.store.manzanasPorTerritorio().get(t) ?? 0, color: this.color(t) }));
+  });
+
+  /**
+   * Manzanas que coinciden con la búsqueda («85.c», «85c» o «85 c»): solo
+   * cuando se escribe algo más que un número de territorio.
+   */
+  protected readonly manzanasEncontradas = computed(() => {
+    const q = normalizarBusqueda(this.busqueda());
+    if (!q || /^\d+$/.test(q)) return [];
+    return [...this.porId().values()]
+      .filter(f => normalizarBusqueda(f.properties.nombre).startsWith(q))
+      .sort((a, b) => a.properties.nombre.localeCompare(b.properties.nombre, 'es', { numeric: true }))
+      .slice(0, 12);
   });
 
   protected readonly manzanasDelTerritorio = computed(() => {
@@ -87,10 +102,15 @@ export class TerritoriosPage {
       .sort((a, b) => a.properties.nombre.localeCompare(b.properties.nombre, 'es', { numeric: true }));
   });
 
-  /** La única manzana seleccionada (para el formulario de edición). */
+  /**
+   * La manzana abierta en su ficha (clic en su nombre o en el mapa). Marcar
+   * casillas solo selecciona: antes, la primera casilla abría la ficha y
+   * escondía la lista, y no se podían elegir varias.
+   */
+  private readonly abierta = signal<number | null>(null);
   protected readonly manzana = computed(() => {
-    const ids = [...this.seleccion()];
-    return ids.length === 1 ? (this.porId().get(ids[0]) ?? null) : null;
+    const id = this.abierta();
+    return id !== null && this.seleccion().has(id) ? (this.porId().get(id) ?? null) : null;
   });
 
   protected readonly problemas = computed(() => {
@@ -156,11 +176,23 @@ export class TerritoriosPage {
     }
   }
 
+  /** Enter en el buscador: va a la primera manzana encontrada, o al territorio. */
+  protected irAlPrimero(): void {
+    const manzana = this.manzanasEncontradas()[0];
+    if (manzana) {
+      this.seleccionarManzana(manzana);
+      return;
+    }
+    const territorio = this.listaTerritorios()[0];
+    if (territorio) this.elegirTerritorio(territorio.numero);
+  }
+
   private clickManzana(id: number, agregar: boolean): void {
     if (this.modo() !== 'ver') return;
     const f = this.porId().get(id);
     if (!f) return;
     if (agregar) {
+      this.abierta.set(null);
       const ids = new Set(this.seleccion());
       if (ids.has(id)) ids.delete(id);
       else ids.add(id);
@@ -174,6 +206,7 @@ export class TerritoriosPage {
   protected seleccionarManzana(f: ManzanaFeature, enfocar = true): void {
     this.cancelarDibujo();
     this.seleccion.set(new Set([Number(f.id)]));
+    this.abierta.set(Number(f.id));
     this.territorio.set(f.properties.territorio);
     this.formTerritorio.set(f.properties.territorio);
     this.formNombre.set(f.properties.nombre);
@@ -181,6 +214,7 @@ export class TerritoriosPage {
   }
 
   protected alternarEnSeleccion(id: number, event: Event): void {
+    this.abierta.set(null);
     const ids = new Set(this.seleccion());
     if ((event.target as HTMLInputElement).checked) ids.add(id);
     else ids.delete(id);
@@ -298,20 +332,69 @@ export class TerritoriosPage {
 
   protected async eliminarManzana(): Promise<void> {
     const f = this.manzana();
-    if (!f) return;
+    if (f) await this.eliminar([f]);
+  }
+
+  /** Las manzanas marcadas en la lista (p. ej. una población demolida). */
+  protected async eliminarSeleccion(): Promise<void> {
+    const manzanas = [...this.seleccion()].map(id => this.porId().get(id)).filter((f): f is ManzanaFeature => !!f);
+    if (manzanas.length) await this.eliminar(manzanas);
+  }
+
+  private async eliminar(manzanas: ManzanaFeature[]): Promise<void> {
+    const nombres = manzanas.map(f => f.properties.nombre).join(', ');
+    const una = manzanas.length === 1;
     const ok = await this.ui.confirmar({
-      titulo: `Eliminar la manzana ${f.properties.nombre}`,
-      mensaje: 'Se borra del mapa para todos. Los reportes anteriores se conservan.',
+      titulo: una ? `Eliminar la manzana ${nombres}` : `Eliminar ${manzanas.length} manzanas`,
+      mensaje:
+        (una ? '' : `${nombres}. `) +
+        'Se borran del mapa para todos y dejan de contar para completar el territorio. Los reportes anteriores se conservan.',
       accion: 'Eliminar',
       peligro: true,
     });
     if (!ok) return;
+    const ids = manzanas.map(f => Number(f.id));
     try {
-      await this.api.eliminarManzana(Number(f.id));
-      this.store.manzanas.update(c => (c ? sinManzanas(c, [Number(f.id)]) : c));
+      if (una) await this.api.eliminarManzana(ids[0]);
+      else await this.api.eliminarManzanas(ids);
+      this.store.manzanas.update(c => (c ? sinManzanas(c, ids) : c));
       this.seleccion.set(new Set());
-      this.toast.show('Manzana eliminada', 3000, 'success');
+      this.toast.show(una ? 'Manzana eliminada' : `${manzanas.length} manzanas eliminadas`, 3000, 'success');
       void this.revisarCalidad();
+      for (const t of new Set(manzanas.map(f => f.properties.territorio))) await this.ofrecerCompletar(t);
+    } catch (e) {
+      this.toast.show(mensajeDeError(e), 5000, 'error');
+    }
+  }
+
+  /** Si lo que queda del territorio ya estaba todo predicado, ofrece marcarlo completo. */
+  private async ofrecerCompletar(t: number): Promise<void> {
+    const quedan = [...this.porId().values()].filter(f => f.properties.territorio === t);
+    let estado: EstadoTerritorioAdmin | null;
+    try {
+      estado = await this.api.estadoTerritorio(t);
+    } catch {
+      return;
+    }
+    if (!quedaCompletoTrasEliminar(estado, quedan)) return;
+    const ok = await this.ui.confirmar({
+      titulo: `¿Marcar el territorio ${t} como completo?`,
+      mensaje: `Todas las manzanas que quedan del territorio ${t} ya estaban predicadas en esta vuelta. Si lo marcas, queda completo en el mapa y en el S-13.`,
+      accion: 'Marcar completo',
+    });
+    if (!ok) return;
+    try {
+      await this.api.corregir({
+        territorio: t,
+        manzanasIds: quedan.map(clave).sort().join(','),
+        geometriaParcial: null,
+        puntosParciales: null,
+        totalManzanas: quedan.length,
+        manzanasMarcadas: quedan.length,
+        nota: 'Completo tras eliminar manzanas que ya no existen',
+      });
+      void this.store.cargarReportes(true);
+      this.toast.show(`Territorio ${t} marcado como completo`, 3000, 'success');
     } catch (e) {
       this.toast.show(mensajeDeError(e), 5000, 'error');
     }
@@ -486,4 +569,10 @@ export class TerritoriosPage {
   }
 
   protected readonly fmtArea = fmtArea;
+}
+
+/** «85 C», «85c» y «85.c» se buscan igual. */
+export function normalizarBusqueda(texto: string): string {
+  const t = texto.trim().toLowerCase().replace(/\s+/g, '');
+  return t.replace(/^(\d+)\.?([a-z])/, '$1.$2');
 }

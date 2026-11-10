@@ -67,7 +67,9 @@ kbd { font-family: var(--font-mono); font-size: var(--text-xs); padding: 1px 4px
   cursor: pointer;
 }
 .lista-item:hover { background: var(--hover); }
-.buscar { width: 100%; box-sizing: border-box; }
+/* flex: none: dentro del panel (columna) el buscador quedaba aplastado a 2 px. */
+.buscar { width: 100%; box-sizing: border-box; flex: none; min-height: 38px; }
+.lista { flex: none; }
 .mover { display: flex; gap: var(--space-2); }
 .mover .adm-input { flex: 1; min-width: 0; }
 .calidad summary { cursor: pointer; font-size: var(--text-sm); display: flex; gap: var(--space-2); align-items: center; }
@@ -76,3 +78,4 @@ kbd { font-family: var(--font-mono); font-size: var(--text-xs); padding: 1px 4px
   .editor { grid-template-columns: 1fr; grid-template-rows: 60dvh auto; height: auto; }
   .panel { border-left: 0; }
 }
+.eliminar-sel { align-self: flex-start; }

@@ -157,6 +157,27 @@ public class ManzanaAdminService {
     }
 
     /**
+     * Elimina varias manzanas de una vez (p. ej. una población demolida): todas
+     * o ninguna. Si alguna no existe, no se borra nada.
+     */
+    @Transactional
+    public int eliminarVarias(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("Elige al menos una manzana");
+        }
+        Set<Long> unicas = new java.util.LinkedHashSet<>(ids);
+        Set<Long> territorios = new HashSet<>();
+        for (Long id : unicas) territorios.add(territorioDe(id));
+        congelarColores();
+        int borradas = 0;
+        for (Long id : unicas) {
+            borradas += jdbc.sql("DELETE FROM manzanas_territorio WHERE id = :id").param("id", id).update();
+        }
+        despuesDeCambiar(territorios, Set.of());
+        return borradas;
+    }
+
+    /**
      * Corrige una geometría inválida (auto-intersecciones, anillos cruzados)
      * con {@code ST_MakeValid}, conservando solo la parte poligonal.
      */

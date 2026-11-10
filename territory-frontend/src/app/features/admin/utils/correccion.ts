@@ -175,3 +175,14 @@ export function pedidoSalida(e: EstadoCorreccion, anular: boolean, nota: string)
     nota: nota.trim() || null,
   };
 }
+
+/**
+ * Tras eliminar manzanas (p. ej. demolidas): ¿quedaron predicadas todas las
+ * que siguen en el territorio, sin que el último reporte lo diga completo?
+ * Entonces conviene marcarlo completo (un reporte de corrección).
+ */
+export function quedaCompletoTrasEliminar(estado: EstadoTerritorioAdmin | null, quedan: ManzanaFeature[]): boolean {
+  if (!estado || estado.estado === 'completed' || estado.estado === 'reiniciado' || quedan.length === 0) return false;
+  const marcadas = estadoDesde(estado, quedan).marcadas;
+  return quedan.every(m => marcadas.has(clave(m)));
+}

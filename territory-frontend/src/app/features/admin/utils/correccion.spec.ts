@@ -10,6 +10,7 @@ import {
   iguales,
   pedido,
   pedidoSalida,
+  quedaCompletoTrasEliminar,
   quitarZona,
   quitarZonaEnSalida,
   situacion,
@@ -114,5 +115,19 @@ describe('corrección del reporte de una salida (ADR 0014)', () => {
       anular: false, manzanasIds: '7-7.a,7-7.b', geometriaParcial: null, puntosParciales: null, nota: 'error',
     });
     expect(pedidoSalida(e, true, '')).toEqual({ anular: true, manzanasIds: null, geometriaParcial: null, puntosParciales: null, nota: null });
+  });
+});
+
+describe('tras eliminar manzanas demolidas', () => {
+  it('ofrece completar si todo lo que queda ya estaba predicado', () => {
+    // Estaban a y b; se demolió c.
+    expect(quedaCompletoTrasEliminar(estado({ manzanasIds: '7-7.a,7-7.b' }), [A, B])).toBe(true);
+    // Falta b.
+    expect(quedaCompletoTrasEliminar(estado({ manzanasIds: '7-7.a' }), [A, B])).toBe(false);
+    // Ya estaba completo, recién reiniciado, nunca trabajado o sin manzanas: nada que ofrecer.
+    expect(quedaCompletoTrasEliminar(estado({ estado: 'completed', manzanasIds: '7-7.a,7-7.b' }), [A, B])).toBe(false);
+    expect(quedaCompletoTrasEliminar(estado({ estado: 'reiniciado' }), [A, B])).toBe(false);
+    expect(quedaCompletoTrasEliminar(null, [A, B])).toBe(false);
+    expect(quedaCompletoTrasEliminar(estado({ manzanasIds: '7-7.a' }), [])).toBe(false);
   });
 });

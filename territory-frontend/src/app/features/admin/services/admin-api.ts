@@ -60,6 +60,12 @@ export class AdminApi {
     return this.send(this.http.delete<void>(`${this.territorios}/admin/manzanas/${id}`, { headers: SIN_SW }));
   }
 
+  /** Varias manzanas a la vez (todas o ninguna), p. ej. una población demolida. */
+  eliminarManzanas(ids: number[]): Promise<{ eliminadas: number }> {
+    const params = new HttpParams().set('ids', ids.join(','));
+    return this.send(this.http.delete<{ eliminadas: number }>(`${this.territorios}/admin/manzanas`, { params, headers: SIN_SW }));
+  }
+
   repararManzana(id: number): Promise<ManzanaGuardada> {
     return this.send(
       this.http.post<ManzanaGuardada>(`${this.territorios}/admin/manzanas/${id}/reparar`, {}, { headers: SIN_SW }),

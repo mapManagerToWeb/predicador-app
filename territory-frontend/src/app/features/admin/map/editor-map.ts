@@ -8,7 +8,17 @@ import type {
 import type { TerraDraw, TerraDrawMouseEvent, SnappableContext } from 'terra-draw';
 import type { Polygon, Position } from 'geojson';
 import type { ManzanaFeature, ManzanasCollection } from '../admin.models';
-import { cambiarFondo, crearMapa, etiquetasTerritorios, type FondoMapa, limites, limitesPrincipales, temaOscuro } from '../../../core/map/base-map';
+import {
+  agregarPildoras,
+  cambiarFondo,
+  crearMapa,
+  DISENO_NUMEROS,
+  etiquetasTerritorios,
+  type FondoMapa,
+  limites,
+  limitesPrincipales,
+  temaOscuro,
+} from '../../../core/map/base-map';
 
 /** Distancia (px) a la que un vértice nuevo se pega al de una manzana vecina. */
 const TOLERANCIA_SNAP_PX = 10;
@@ -92,19 +102,16 @@ export class EditorMapa {
       layout: { 'text-field': ['get', 'nombre'], 'text-font': ['Open Sans Semibold'], 'text-size': 11 },
       paint: { 'text-color': '#111111', 'text-halo-color': '#ffffff', 'text-halo-width': 1.2 },
     });
+    // Los números con el mismo cuadrito que en el mapa de los hermanos: se ven
+    // desde lejos (antes aparecían recién en el zoom 12,5 y el editor abre más lejos).
+    agregarPildoras(this.map);
     this.map.addLayer({
       id: 'etiquetas',
       type: 'symbol',
       source: 'etiquetas',
       maxzoom: 16,
-      minzoom: 12.5,
-      layout: {
-        'text-field': ['get', 'etiqueta'],
-        'text-font': ['Open Sans Semibold'],
-        'text-size': 13,
-        'text-allow-overlap': false,
-      },
-      paint: { 'text-color': '#111111', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
+      layout: { ...DISENO_NUMEROS },
+      paint: { 'text-color': '#111111' },
     });
 
     this.map.on('click', (e: MapMouseEvent) => {
@@ -213,7 +220,8 @@ export class EditorMapa {
   }
 
   enfocar(coleccion: ManzanasCollection, territorio?: number): void {
-    const caja = territorio === undefined ? limitesPrincipales(coleccion) : limites(coleccion, territorio);
+    // Sin territorio: la ciudad, sin los territorios rurales sueltos (igual que el mapa de los hermanos).
+    const caja = territorio === undefined ? limitesPrincipales(coleccion, 0.12) : limites(coleccion, territorio);
     if (caja) this.map.fitBounds(caja, { padding: 60, maxZoom: 18, duration: 500 });
   }
 
