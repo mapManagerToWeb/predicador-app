@@ -53,6 +53,7 @@ yarn-error.log*
 
 # AI tooling (local only, not part of the shared repo)
 .agents/
+.atl/
 .claude/
 .opencode/
 .superpowers/
