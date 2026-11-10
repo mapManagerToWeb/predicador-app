@@ -133,6 +133,13 @@ export class AdminApi {
     return this.send(this.http.post<CicloAdmin>(`${this.reportes}/ciclos/cerrar`, { nota, desde }, { headers: SIN_SW }));
   }
 
+  /** Corrige el día en que empezó la vuelta actual (sin cerrar otro ciclo). */
+  cambiarInicioCiclo(desde: string): Promise<{ ciclo: CicloAdmin; enLaVueltaAnterior: number }> {
+    return this.send(
+      this.http.post<{ ciclo: CicloAdmin; enLaVueltaAnterior: number }>(`${this.reportes}/ciclos/inicio`, { desde }, { headers: SIN_SW }),
+    );
+  }
+
   /** Salida que un hermano informó; queda como suya (S-13, reportes). */
   registrarSalida(req: RegistroSalidaRequest): Promise<SalidaRegistrada> {
     return this.send(this.http.post<SalidaRegistrada>(`${this.reportes}/salidas`, req, { headers: SIN_SW }));
