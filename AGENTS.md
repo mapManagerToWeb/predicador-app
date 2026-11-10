@@ -1,6 +1,6 @@
 # Repository Instructions
 
-> Last verified: 2026-10-10. Whenever a fact here disagrees with the code, the code wins — fix this file.
+> Last verified: 2026-11-10. Whenever a fact here disagrees with the code, the code wins — fix this file.
 
 ## Layout
 
@@ -8,27 +8,14 @@
 - `backend/` — Maven reactor (Java 25, Spring Boot **4.1.1**, Spring Cloud **2025.1.3**), modules `shared`, `config-server`, `discovery-server`, `api-gateway`, `territory-service`, `reporting-service`. Run all Maven commands from `backend/`.
 - `territory-frontend/` — Angular 22 zoneless SSR/PWA app. The directory is `territory-frontend/`, **not** `predicador-frontend/` (stale `.gitignore` entries still reference the old name; those paths no longer exist).
 - `docker-compose.yml` runs the 5 backend services plus `docker-lectura` (read-only Docker proxy for the panel's «Sistema» module, ADR 0020) and `postgres` (`imresamu/postgis:18-3.6`), `rabbitmq` (`rabbitmq:4.3.4-management`) and the one-shot `db-import`. `otel-collector`/`jaeger`/`prometheus`/`grafana` are opt-in via `--profile observability`; their configs live in `observability/`.
-- Only `docs/adr/` is tracked (0001–0018, 0020, 0021). `docs/audit/`, `docs/superpowers/`, `tasks/`, `CAPABILITY-MAP.md`, `SPEC-map-*.md`, `backups/` are gitignored — local only. Record durable decisions as a new `docs/adr/NNNN-*.md`; ADR 0010 supersedes 0001 and 0002.
+- Tracked docs are `docs/adr/` (0001–0018, 0020, 0021) and `docs/ai/` (AI support pack, ADR 0017 — progressive disclosure from `docs/ai/README.md`; `docs/ai/support/references/code-map.md` is a topic → file index, faster than grep for orientation but it lags the code). `tasks/`, `CAPABILITY-MAP.md`, `SPEC-map-*.md`, `backups/`, `.agents/`, `.atl/`, `.claude/`, `.opencode/` are gitignored — local only, never commit them. Record durable decisions as a new `docs/adr/NNNN-*.md`; ADR 0010 supersedes 0001 and 0002.
 - `openspec/` is the SDD workflow (`changes/`, `changes/archive/`, `specs/`). `CHANGES.md` at the root is a plain-language PR review summary.
 
 ## Codebase Memory (Knowledge Graph)
 
-Indexed under project name **`predicador-app`** (`index_repository`, root = repo root). Prefer graph tools over grep for discovery; refresh the index after significant refactors.
+No graph index is committed (`.codegraph/` is absent at the repo root), so graph tools must index first and their output is a hint, not truth. The durable fact an index encodes: `backend/shared/` is the architectural core — `security/` (`SessionTokenService`, `SecurityRules`, `TokenValidator`, `AuthorizationService`) is consumed by gateway, territory and reporting, so changes there are high-risk.
 
-Hot-path fan-in (from the current index — verify with `query_graph` before quoting numbers):
-
-| Symbol | Incoming edges |
-|---|---|
-| `shared.security.SessionTokenService.verify` | 70 |
-| `shared.security.SecurityRule.any` | 40 |
-| `reporting…WhatsAppDelivery.getStatusCode` | 31 |
-| `shared.security.TokenValidator.validate` | 24 |
-| `reporting…client.WhatsAppMessageClient.sendTemplateMessage` | 22 |
-| `shared.security.SessionTokenService.issue` | 21 |
-
-`backend/shared` is the architectural core — changes there are high-risk. 55 routes are indexed.
-
-> ⚠️ This graph is **context, not truth**. It has gone stale before (Leaflet-era symbols survived an index refresh). Verify any graph claim against the source before acting on it.
+> The index has gone stale before (Leaflet-era symbols survived a refresh). Verify every graph claim against the source before acting on it.
 
 ## Verification
 
@@ -45,6 +32,8 @@ pnpm test src/path/to/file.spec.ts   # single spec
 
 CI order is lint → build → test. `pnpm run build` type-checks, so there is no separate `tsc` step.
 
+`tests/` at the repo root holds a manual k6 load script (`tests/load/api-gateway.js`) and `tests/trace-propagation-smoke.sh`. Neither runs in CI.
+
 **Backend** (from `backend/`):
 
 ```bash
@@ -55,27 +44,30 @@ mvn -pl territory-service test     # one module
 
 ### Backend test gotchas (cost me real time — verify before you trust a green run)
 
-- **Four integration tests silently skip unless you pass `-Ddocker.available=true`.** They are gated on `@EnabledIfSystemProperty(named = "docker.available")`: `PostgisIntegrationTest`, `ReportRepositoryIntegrationTest` (reporting), `CicloServiceIntegrationTest`, `EstadoPublicoServiceIntegrationTest`. Nothing in `pom.xml` or any workflow sets that property, so a plain `mvn verify` — **including CI's `mvn verify -Pcoverage -B`** — reports them as skipped. To actually run them: `mvn verify -Pcoverage -Ddocker.available=true` (needs a working Docker socket; in this environment also set `TESTCONTAINERS_RYUK_DISABLED=true` — GHCR 404 on `testcontainers/ryuk:0.11.0`). ⚠️ Consequence: a plain local `mvn verify` skips the ITs and **`territory-service` drops below the JaCoCo 40% gate (~25–29%) → the build fails**. That is expected without the IT environment, not a regression signal.
-- **`TerritoryAdminIntegrationTest`** is gated on `@EnabledIf("baseDisponible")`: either `-Ddocker.available=true` (Testcontainers) or `TERRITORY_IT_DB_URL` + `TERRITORY_IT_DB_USERNAME` / `TERRITORY_IT_DB_PASSWORD`. **It deletes every manzana**, so it refuses any DB whose name does not match `*_test`. This is the only test CI actually executes against its PostGIS service.
-- **`EncargadoRaceConditionIT` never runs.** It is named `*IT`, which surefire's default includes (`*Test`, `Test*`, `*Tests`, `*TestCase`) do not match, and there is no failsafe plugin configured. No `target/surefire-reports` entry exists for it. Do not assume it is covered.
-- There is **no surefire/failsafe configuration anywhere** in `backend/` — naming is the only filter, which is why the two points above matter.
+- **The integration tests only run when `-Ddocker.available=true` is passed *and* Docker actually answers.** They are gated on `@EnabledIf("dockerDisponible")`: `PostgisIntegrationTest`, `ReportRepositoryIntegrationTest` (reporting), `CicloServiceIntegrationTest`, `EstadoPublicoServiceIntegrationTest` and `EncargadoRaceConditionTest`. The check runs `DockerClientFactory.instance().isDockerAvailable()` inside a `try/catch (RuntimeException | LinkageError)`; if Docker is unreachable the test **skips instead of failing the build** — an environment failure must never red the build, because it hides the failures that matter. `ci-backend.yml` passes that property, so **CI runs all of them**; a plain local `mvn verify` still reports them as skipped. To run them locally: `mvn verify -Pcoverage -Ddocker.available=true` (needs a working Docker socket; in this environment also set `TESTCONTAINERS_RYUK_DISABLED=true` — GHCR 404 on `testcontainers/ryuk:0.11.0`). ⚠️ Consequence: a plain local `mvn verify` skips the ITs and **`territory-service` drops below the JaCoCo 40% gate (~25–29%) → the build fails**. That is expected without the IT environment, not a regression signal.
+- **`TerritoryAdminIntegrationTest`** is gated on `@EnabledIf("baseDisponible")`: `TERRITORY_IT_DB_URL` + `TERRITORY_IT_DB_USERNAME` / `TERRITORY_IT_DB_PASSWORD` first, otherwise `-Ddocker.available=true` **plus a Docker probe**. **It deletes every manzana**, so it refuses any DB whose name does not match `*_test`. CI sets `-Ddocker.available=true`, so it runs there through Testcontainers; `sonarcloud.yml` sets `TERRITORY_IT_DB_*` instead, and that alone is what keeps `territory-service` above the 40% gate there.
+- **`EncargadoRaceConditionTest` runs only with `-Ddocker.available=true` and Docker reachable.** It used to be `EncargadoRaceConditionIT`, a name surefire's default includes (`*Test`, `Test*`, `*Tests`, `*TestCase`) never matched, so it silently never ran. The `Test` suffix is deliberate — do not rename it back.
+- **`maven-enforcer-plugin` guards dependency floors at `validate`.** A `bannedDependencies` rule in `backend/pom.xml` fails fast on every CVE pin (`com.rabbitmq:amqp-client:[,5.37.0)` and nine more). When you pin a transitive dependency for a CVE, add the Enforcer entry too: the pin alone is only a promise. **Prove the floor bites before adding it** — the rule only sees compile scope, so `org.postgresql:postgresql` (runtime) and `tools.jackson.core:jackson-core` were tried and removed. Raise the ceiling one version and require the `banned via the exclude/include list` failure. Note Dependabot's `first_patched_version` can name a release that was never published (`amqp-client` 5.36.1 does not exist on Maven Central; 5.37.0 is the first release with the fix) — check `maven-metadata.xml` before trusting it.
+- **A `dependencyManagement` pin does not reach Trivy.** The image scan parses the `pom.xml` embedded in the jar, which has no `<parent>` and therefore no root overrides, so it resolves the vulnerable transitive version again. `guava` 33.0.0-jre arrived through Eureka Server and kept failing the scan until it was declared as a **direct dependency with an explicit version** in `discovery-server/pom.xml`. That also moves it to compile scope, which is what lets the Enforcer guard it.
+- There is **no surefire/failsafe configuration anywhere** in `backend/` — naming is the only filter, which is why the points above matter.
 - Run a single backend test with `-Dtest=ClassName` (e.g. `TESTCONTAINERS_RYUK_DISABLED=true mvn -pl reporting-service test -B -Ddocker.available=true -Dtest=ReportRepositoryIntegrationTest`).
 - **Identity-id trap in reporting tests:** `Report.id` is `GenerationType.IDENTITY` — the DB sequence advances across tests even with rollback, so never assert absolute ids (`expected: 101L but was: 8L`); capture ids from `save()` returns instead.
 
 ## CI (`.github/workflows/`)
 
 - `ci-backend.yml` — Java 25 + a `postgis/postgis:16-3.4` service on db `predicador_test`; runs `mvn verify -Pcoverage -B` with `DB_*`, `TERRITORY_IT_DB_*`, `TESTCONTAINERS_RYUK_DISABLED=true` and `DOCKER_HOST` set. Note the CI DB image (PostGIS 16) is **older** than the compose one (PostGIS 18).
-- `ci-frontend.yml` — pnpm 9.15.0 + Node 22; `pnpm install --frozen-lockfile --ignore-scripts`; lint → build → `pnpm test -- --run --coverage`. Push branches: `main`, `chore/production-quality-hardening`, `feat/redesign`; PR base: `main`, `feat/redesign`.
+- `ci-frontend.yml` — pnpm 9.15.0 + Node 22; `pnpm install --frozen-lockfile --ignore-scripts`; **`pnpm audit --prod --audit-level=high`** → lint → build → `pnpm test -- --run --coverage`. Push branches: `main`, `chore/production-quality-hardening`, `feat/redesign`; PR base: `main`, `feat/redesign`. The audit step is the gate: `--prod` skips dev-only advisories, which never ship.
+- Every workflow declares minimal `permissions:` and lists its own file in `pull_request.paths`.
 - `respaldo-bdd.yml` — daily 07:30 UTC + manual. SSHes to the VPS with a key whose `authorized_keys` forces `scripts/db/respaldo.sh stdout`; the dump is age-encrypted for every recipient in `.github/backup/age.pub` **before** leaving the VPS (the repo is public). 90-day artifact. Restore with `scripts/db/restaurar.sh`.
 - `docker.yml` — builds/pushes the 5 backend images to GHCR on `main` and `v*`; PRs build without pushing. Branch/PR events are path-filtered to `backend/**`; tag pushes are not.
 - `security.yml` — gitleaks, OWASP dependency-check (`-DfailBuildOnCVSS=7`), Trivy image scan (`CRITICAL,HIGH`, `ignore-unfixed`), Semgrep SAST (ERROR gate + SARIF). gitleaks and Semgrep skip dependabot runs. Weekly Sun 03:00.
-- `sonarcloud.yml` — project key `mapManagerToWeb_predicador-app`; settings in `sonar-project.properties` (lcov from `territory-frontend/coverage/lcov.info`, JaCoCo from `backend/**/target/site/jacoco/`).
+- `sonarcloud.yml` — project key `mapManagerToWeb_predicador-app`; settings in `sonar-project.properties` (lcov from `territory-frontend/coverage/lcov.info`, JaCoCo from `backend/**/target/site/jacoco/`). It runs `mvn verify -Pcoverage -B` **with `TERRITORY_IT_DB_*`**: without them `TerritoryAdminIntegrationTest` skips, `territory-service` lands at ~0.25 lines against the 0.40 gate, and the whole workflow goes red.
 - `opencode.yml` — `/oc` or `/opencode` comment triggers the opencode action (model `opencode/mimo-v2.5-free`), restricted to `OWNER`/`MEMBER`/`COLLABORATOR`.
 
 ## Frontend Conventions
 
 - Feature layout under `territory-frontend/src/app/`: `core/` (services, guards, interceptors, models, `map/`, `utils/`), `features/` (`auth`, `map`, `profile`, `admin`, `visor`). No `shared/` directory.
-- Route guards: `profileGuard` → `/map`, `adminGuard` → `/admin`. `/visor` is **intentionally public**. `**` → `/login`. All routes lazy-load via `loadComponent`.
+- Route guards: `profileGuard` → `/map`, `adminGuard` → `/admin`. `/visor` and `/practice` are **intentionally public**. `/practice` is the field map with the `MODO_PRACTICA` token (`core/map/modo-practica.ts`): real territories, but nothing is sent or saved server-side; marks live in `PracticeDraftService` (local storage, wiped after 7 days). `**` → `/login`. All routes lazy-load via `loadComponent`.
 - Selector prefixes are enforced by ESLint: components `app-` (kebab-case), directives `app` (camelCase).
 - Strict TypeScript: `strict`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noPropertyAccessFromIndexSignature`. `no-explicit-any` is `warn`; **`no-floating-promises` is `error`** — `await` or `void` every promise. `no-console` allows only `warn`/`error`.
 - Zoneless (`provideZonelessChangeDetection`); state in plain signals in `providedIn: 'root'` services. HTTP via `HttpClient` + `firstValueFrom` — `httpResource`/`resource`/`linkedSignal` are deliberately unused.
@@ -86,7 +78,7 @@ mvn -pl territory-service test     # one module
 ### Maps (all MapLibre GL 6 — ADR 0010 replaced Leaflet and `@turf/*`)
 
 - **`maplibre-gl` 6 resolves its worker from `import.meta.url`, which breaks after bundling.** `angular.json` copies `maplibre-gl.css`, `maplibre-gl-worker.mjs`, `maplibre-gl-shared.mjs` to `/vendor/`; `core/map/base-map.ts` calls `setWorkerUrl(...)` and injects the CSS. Removing that asset glob breaks the map at runtime, not at build time.
-- `core/map/base-map.ts` is shared by the field map, the viewer and the admin maps. `maxZoom` is 20; the satellite source is capped at `maxzoom` 18 (Esri serves a grey tile at 19 over Curanilahue, so MapLibre overzooms instead).
+- `core/map/base-map.ts` is shared by the field map, the viewer and the admin maps. The «my location» control (`core/map/ubicacion.ts`) and the heading cone (`core/map/rumbo.ts`, iOS asks for permission) are shared by the field map and the viewer; the field map's offline data cache lives in `features/map/mapa.datos.ts`. `maxZoom` is 20; the satellite source is capped at `maxzoom` 18 (Esri serves a grey tile at 19 over Curanilahue, so MapLibre overzooms instead).
 - In MapLibre 6 `GeoJSONSource.setData` returns a promise → prefix with `void`.
 - Marking must only change `feature-state`; never re-upload geometry (ADR 0010 perf rule).
 - `features/map/` split: `map.ts` wires the screen, `mapa.store.ts` holds the rules, `mapa-vista.ts` does all drawing, `utils/salida.ts` + `utils/borrador.ts` (and `core/map/lados.ts`) are pure and tested without a map. **Nothing may discard marks or send a report without a `Pregunta` confirmation.**
@@ -96,8 +88,10 @@ mvn -pl territory-service test     # one module
 - **Angular template identifiers must be ASCII — no `ñ`.** The template lexer rejects it. `ñ` is fine in text content (`Contraseña`, `Mañana`) but never in a binding, property or identifier.
 - SSR is on in production builds: guard `window`/`document` behind platform checks or `afterNextRender()`.
 - `styles.css` sets a global `min-height: 44px` on `button`/`input`/`select`; the admin shell resets it under `.adm`.
-- Coverage thresholds in `vitest.config.ts` are low (30/30/30/20). Passing coverage ≠ good coverage.
+- Coverage thresholds in `vitest.config.ts` are `60/58/55/50` (lines/statements/functions/branches), about five points under the measured baseline. Passing coverage ≠ good coverage.
+- `angular.json` budgets: initial bundle warns at **320 kB** and errors at 600 kB; component styles warn at 12 kB and error at 16 kB. A budget **warning** does not fail CI — don't chase it as a bug.
 - Vitest uses `pool: 'threads'` with `isolate` deliberately — the default `vmThreads` pool shares worker state and breaks TestBed. Don't "simplify" it back.
+- **`@analogjs/vite-plugin-angular` is pinned at 2.8.1 and must not be raised to 2.9.x without re-measuring.** Angular 22.2 changed `SourceFileCache` from a `Map` to a class with `typeScriptFileCache`, so 2.6.x dies with `cache.has is not a function`; 2.8.1 is the minimum that handles it. But 2.9.x made `mapa.store.spec.ts` fail intermittently (**4 of 10 runs**, at both Angular 22.2.5 and 22.2.1) on real timestamps in `localStorage` snapshots despite `vi.useFakeTimers()`; 2.8.1 gave **0 of 7**. Verify with at least 7 consecutive `pnpm test -- --run --coverage` runs before moving.
 - `pnpm` only. `package.json` pins `packageManager: pnpm@9.15.0`, `angular.json` sets `cli.packageManager: "pnpm"`, `pnpm-lock.yaml` is the only lockfile and `package-lock.json` is gitignored. pnpm 9 has no `pnpm ci`.
 - Before any perf work, `pnpm install --frozen-lockfile` — a stale `node_modules` is the usual cause of local-vs-CI divergence.
 
@@ -108,11 +102,11 @@ mvn -pl territory-service test     # one module
 - **Auth is strict by default.** `SessionTokenService` throws at startup unless `app.session.secret` is ≥32 bytes; the only escape is the `local` profile (or `app.session.strict=false`) with an empty secret. `ADMIN_PASSWORD_BCRYPT` is likewise mandatory outside `local`. Generate with `openssl rand -hex 32` and `htpasswd -bnBC 10 "" '<pass>' | tr -d ':\n'`.
 - `SESSION_SECRET` must be **identical** across gateway, territory and reporting, or HMAC tokens won't verify between services.
 - Phone numbers: `PhoneUtil.esCelularChileno` = 9 digits starting with 9, `+56` optional. Enforced on every create/edit/login with code `telefono_invalido`, mirrored client-side in `core/utils/phone.ts` `esCelularChileno`. Change one, change the other.
-- Multi-write services are `@Transactional`; the WhatsApp send endpoint honours an `Idempotency-Key` header.
+- Multi-write services are `@Transactional`. The async WhatsApp send **requires** an `Idempotency-Key` header — 400 without it, and a replayed completed key returns the stored delivery instead of resending.
 - **«Sistema» module (ADR 0020):** `api-gateway/…/sistema/` serves `/api/v1/sistema/**` itself (not routed): admin session + the admin password again (`PaseSistema`, 15 min idle / 1 h max, 403 `sistema_bloqueado`, never 401). It reads containers only through `docker-lectura` (`docker-lectura/haproxy.cfg` allows just `GET /containers/json` and `/containers/<id>/stats`; never widen it to inspect — env vars hold the passwords), host metrics from `/proc`, and backups from GitHub's public API. It never commands Docker; Portainer (`PORTAINER_URL`) does that.
 - Gateway routes live in **`api-gateway/…/config/RouteConfig.java`, not YAML**. All URIs are `lb://<service>` (Eureka), each with a Resilience4j circuit breaker + fallback, and a retry on GET only. `/api/v1/rum` deliberately has no retry.
 - `SecurityRules.REPORTS_PATH` excludes `/api/v1/reports/public/**` — the only unauthenticated reports path. The public viewer (`/visor`) depends on it; do not widen the exclusion.
-- Production DB is the self-hosted `postgres` compose container (ADR 0006, replaced Neon). Only `DB_PASSWORD` is required in `.env`; `DB_URL`/`DB_USERNAME` default to the container. `db-import` runs once before territory/reporting and is a no-op when data already exists.
+- Production DB is the self-hosted `postgres` compose container (ADR 0006, replaced Neon). `docker-compose.yml` refuses to start without `DB_PASSWORD`, `SESSION_SECRET` and `ADMIN_USERNAME`; `DB_URL`/`DB_USERNAME` default to the container. `db-import` runs once before territory/reporting and is a no-op when data already exists.
 - Start order matters: `config-server` (8888) → `discovery-server` (8761) → `api-gateway` (8080) → `territory-service` (8081) / `reporting-service` (8082). Management ports 8090/8091/8092. Frontend: `ng serve` on 4200, proxying `/api` → 8080.
 - `config-server` serves from its classpath (`native` profile, the compose default). Pointing `SPRING_PROFILES_ACTIVE` elsewhere makes it try a git repo with no URI.
 - Copy `.env.example` → `.env` before compose (it fails fast on `:?` interpolation). Both `.env` and `application-local.yml` are gitignored and must never be committed.
@@ -136,6 +130,6 @@ mvn -pl territory-service test     # one module
 Before declaring work done:
 
 1. Frontend: `pnpm run lint` && `pnpm run build` && `pnpm test -- --run` all pass.
-2. Backend: `mvn verify -Pcoverage` passes. If you touched DB/migration/security code, run the full IT set: `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true`. Note: a plain local run skips the docker-gated ITs and `territory-service` then fails the 40% gate — expected without the IT environment.
+2. Backend: `mvn verify -Pcoverage` passes. If you touched DB/migration/security code, run the full IT set locally: `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true` (CI already runs it with `-Ddocker.available=true`). Note: a plain local run skips the docker-gated ITs and `territory-service` then fails the 40% gate — expected without the IT environment.
 3. No new cross-feature imports from `features/admin` → `features/map`.
 4. New architecture decision → new ADR under `docs/adr/`.

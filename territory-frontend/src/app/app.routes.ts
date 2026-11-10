@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/guards/admin.guard';
 import { profileGuard } from './core/guards/profile.guard';
+import { MODO_PRACTICA } from './core/map/modo-practica';
 
 export const routes: Routes = [
   {
@@ -20,6 +21,13 @@ export const routes: Routes = [
     path: 'map',
     loadComponent: () => import('./features/map/map').then(m => m.MapPage),
     canActivate: [profileGuard]
+  },
+  {
+    // Modo práctica: el mismo mapa de /map para probar sin cuenta y sin tocar
+    // la app real. Lo marcado vive solo en el teléfono (se borra a los 7 días).
+    path: 'practice',
+    loadComponent: () => import('./features/map/map').then(m => m.MapPage),
+    providers: [{ provide: MODO_PRACTICA, useValue: true }]
   },
   {
     path: 'admin',

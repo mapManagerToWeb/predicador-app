@@ -61,8 +61,18 @@ public class EncargadoService {
      * <p>Entrar por nombre no prueba identidad, así que se niega cuando el
      * administrador cerró el registro, y para encargados con PIN o
      * desactivados (esos entran solo con teléfono + PIN).</p>
+     *
+     * <p><strong>Sin {@code @Transactional} a propósito:</strong> el método
+     * compensa una colisión (insertar y, si el nombre ya existe, releer al
+     * ganador). Eso no puede vivir en una sola transacción: PostgreSQL aborta
+     * la transacción al fallar el insert y la entidad rechazada queda en el
+     * contexto de persistencia sin id, así que el {@code SELECT} posterior
+     * dispara un auto-flush y Hibernate falla con
+     * {@code AssertionFailure: ... has a null identifier}. Sin transacción
+     * exterior, cada llamada al repositorio abre la suya y la relectura ve al
+     * ganador. La carrera la resuelve el índice único
+     * {@code ux_encargados_natural_identity}, no el código.
      */
-    @Transactional
     public Optional<EncargadoDto> buscarOCrear(String nombre, String apellido, String telefono) {
         String nombreLimpio = nombre != null ? nombre.trim() : "";
         String apellidoLimpio = apellido != null ? apellido.trim() : "";
@@ -102,7 +112,7 @@ public class EncargadoService {
     }
 
     /** Alta pública (desde la app): solo con el registro abierto. */
-    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
+    @Transactional
     public EncargadoDto registrar(EncargadoDto dto) {
         exigirRegistroAbierto();
         exigirCelular(dto.telefono());
@@ -112,21 +122,19 @@ public class EncargadoService {
     /**
      * Crea un encargado.
      *
-     * <p>Esta operación se invoca desde {@link #buscarOCrear} cuando no
-     * existe el registro. Si dos requests concurrentes llegan con el mismo
+     * <p>Se invoca desde {@link #buscarOCrear} cuando no existe el registro.
+     * Si dos requests concurrentes llegan con el mismo
      * {@code (nombre, apellido)}, la base de datos rechaza la segunda
      * inserción con {@link DataIntegrityViolationException}. Esa excepción
      * <em>debe</em> propagarse hacia afuera para que el caller pueda leer
-     * el ganador, pero no queremos que marque la transacción externa como
-     * rollback-only (lo que provocaría
-     * {@code UnexpectedRollbackException} al intentar el commit).
+     * el ganador.
      *
-     * <p>{@code noRollbackFor} permite que la constraint exception
-     * se propague sin contaminar la transacción padre. El catch en
-     * {@code buscarOCrear} se hace cargo de la colisión y consulta el
-     * ganador persistido.
+     * <p>No se usa {@code noRollbackFor}: dejar que la transacción haga
+     * commit después de un flush fallido deja la entidad sin id en el
+     * contexto de persistencia, y el siguiente {@code SELECT} la vuelve a
+     * vaciar y falla con {@code AssertionFailure: ... has a null identifier}.
      */
-    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
+    @Transactional
     public EncargadoDto crear(EncargadoDto dto) {
         Encargado encargado = new Encargado();
         encargado.setNombre(dto.nombre() != null ? dto.nombre().trim() : "");

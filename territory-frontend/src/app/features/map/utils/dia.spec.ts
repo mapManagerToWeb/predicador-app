@@ -1,4 +1,4 @@
-import { diaElegible, diasElegibles, fechaParaMensaje, isoLocal } from './dia';
+import { diaElegible, diasElegibles, fechaParaMensaje, isoLocal, mediodiaChile } from './dia';
 
 describe('día de la predicación', () => {
   const martes = new Date(2026, 9, 13, 23, 30); // martes 13-10-2026, de noche
@@ -21,5 +21,11 @@ describe('día de la predicación', () => {
 
   it('en el mensaje va como día-mes-año', () => {
     expect(fechaParaMensaje('2026-10-12')).toBe('12-10-2026');
+  });
+
+  it('el mediodía de Chile es 12:00 local, también con horario de verano', () => {
+    // Enero en Chile es UTC-3; julio es UTC-4.
+    expect(mediodiaChile('2026-01-15')).toBe('2026-01-15T15:00:00.000Z');
+    expect(mediodiaChile('2026-07-15')).toBe('2026-07-15T16:00:00.000Z');
   });
 });

@@ -5,16 +5,16 @@
 
 ## Propósito
 - Gestionar territorios geográficos (manzanas, sectores) y su asignación a encargados.
-- Registrar reportes de predicación (horas, estudios, decisiones).
-- Enviar notificaciones por WhatsApp (Meta Graph API v21.0).
-- Mapa interactivo (MapLibre GL 6) con marcación por lado de manzana.
-- Vistas de administración (`/admin`) y visor público (`/visor`).
+- Registrar salidas de predicación: qué manzanas/calles se trabajaron, en qué día y turno, si el territorio quedó completo.
+- Enviar el resumen por WhatsApp (Meta Graph API v21.0) al teléfono del encargado logueado.
+- Mapa interactivo (MapLibre GL 6) con marcación de manzanas y de calles.
+- Vistas de administración (`/admin`) — incluido el módulo «Sistema» de solo lectura — y visor público (`/visor`).
 
 ## Contexto de dominio
-- **Usuario:** predicadores / asignadores de territorio.
-- **Datos:** geografía (polígonos, puntos), reportes de predicación (sesiones, horas, decisiones), perfiles, encargados.
-- **Flujo:** login → ver mapa → marcar territorio → reportar → cierre de ciclo (S13).
-- **Restricciones de dominio:** teléfonos chilenos (9 dígitos empezando en 9), formato de reporte S13, flujos admin (corregir/anular).
+- **Usuario:** predicadores / encargados de territorio.
+- **Datos:** geografía (polígonos y calles), reportes/salidas (manzanas y calles trabajadas, día, turno, estado), encargados y sesiones.
+- **Flujo:** login → ver mapa → marcar manzanas o calles → enviar reporte → (admin) cerrar ciclo, corregir o anular, registrar salidas informadas por WhatsApp.
+- **Restricciones de dominio:** teléfonos chilenos (9 dígitos empezando en 9), formato S-13-S, historial inmutable (nunca se borra un reporte para cambiar el estado).
 
 ## Stack técnico
 | Capa | Tecnologías |
@@ -28,7 +28,7 @@
 | Infra | Docker Compose, Eureka discovery, Resilience4j circuit breakers, OpenTelemetry (opt-in) |
 
 ## Dos stacks independientes
-- **Backend:** microservicios Java que se comunican por HTTP (Eureka `lb://`) y RabbitMQ (WhatsApp). Cada servicio tiene su propio esquema Flyway.
+- **Backend:** microservicios Java que se comunican por HTTP (Eureka `lb://`) y RabbitMQ (WhatsApp). Cada servicio con base de datos tiene su propio historial Flyway.
 - **Frontend:** Angular SPA/PWA que consume `/api/v1/*` proxyado a `localhost:8080` (gateway). SSR + service worker en build de producción.
 
 ## Ver también

@@ -15,6 +15,7 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { csrfInterceptor } from './core/interceptors/csrf.interceptor';
 import { RumService } from './core/services/rum';
+import { PracticeDraftService } from './core/services/practice-draft';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -38,6 +39,11 @@ export const appConfig: ApplicationConfig = {
     // backend. Se inicializa una sola vez al arrancar la app; noop en SSR.
     provideAppInitializer(() => {
       inject(RumService).start();
+    }),
+    // La práctica se borra sola a los 7 días: al arrancar se limpia si venció,
+    // aunque nadie vuelva a abrir /practice.
+    provideAppInitializer(() => {
+      inject(PracticeDraftService).limpiarSiVencio();
     }),
   ],
 };

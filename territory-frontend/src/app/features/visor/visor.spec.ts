@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { Toast } from '../../core/services/toast';
 import { VisorPage } from './visor';
 
 const mapa = {
@@ -12,10 +13,15 @@ const mapa = {
   hasImage: vi.fn(() => false),
   addImage: vi.fn(),
   on: vi.fn(),
+  once: vi.fn(),
   fitBounds: vi.fn(),
   setMaxBounds: vi.fn(),
   cameraForBounds: vi.fn(() => ({ center: [-73.34, -37.48], zoom: 15 })),
   getContainer: () => ({ clientWidth: 390, clientHeight: 800 }),
+  getSource: vi.fn(),
+  getZoom: () => 14,
+  getCenter: () => ({ lng: -73.34, lat: -37.48 }),
+  easeTo: vi.fn(),
   setFilter: vi.fn(),
   remove: vi.fn(),
   getCanvas: () => ({ style: {} }),
@@ -104,6 +110,44 @@ describe('VisorPage', () => {
     expect(ficha.textContent).toContain('hoy');
     expect(mapa.fitBounds).toHaveBeenCalled();
     expect(mapa.setMaxBounds).toHaveBeenCalled();
+  });
+
+  it('el botón de ubicación dibuja el punto azul y el cono hacia donde apunta el teléfono', async () => {
+    const fixture = await abrir();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('button[aria-label="Mi ubicación"]')).not.toBeNull();
+    expect(mapa.addSource).toHaveBeenCalledWith('rumbo', expect.objectContaining({ type: 'geojson' }));
+    expect(mapa.addLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'ubicacion-rumbo' }));
+    // El control de MapLibre no sabe hacia dónde apunta el teléfono.
+    expect(mapa.addControl).not.toHaveBeenCalled();
+  });
+
+  it('avisa cuando el navegador no entrega la ubicación', async () => {
+    const fixture = await abrir();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (el.querySelector('button[aria-label="Mi ubicación"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(TestBed.inject(Toast).message()).toContain('ubicación');
+  });
+
+  it('explica por qué no aparece el cono cuando el teléfono no da la brújula', async () => {
+    vi.stubGlobal('DeviceOrientationEvent', undefined);
+    const geo = { watchPosition: vi.fn(() => 1), clearWatch: vi.fn(), getCurrentPosition: vi.fn() };
+    Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
+    try {
+      const fixture = await abrir();
+      const el = fixture.nativeElement as HTMLElement;
+
+      (el.querySelector('button[aria-label="Mi ubicación"]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+
+      expect(TestBed.inject(Toast).message()).toContain('brújula');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('avisa si el territorio buscado no existe', async () => {

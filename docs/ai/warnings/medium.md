@@ -5,7 +5,8 @@
 | Templates Angular | `ñ` en identifiers (propiedades, bindings) rompe el parser. Solo permitido en texto (`Contraseña`, `Mañana`). | Escribir identifiers en ASCII. |
 | `app.config.ts` | Orden de interceptors **es load-bearing**: `[auth, error, csrf]` (csrf innermost, retry de CSRF 403 antes del errorInterceptor). | NO reordenar. |
 | `PhoneUtil` (backend) vs `core/utils/phone.ts` (frontend) | `esCelularChileno` debe estar **sincronizado** en ambos lados. | Cambiar uno ⇒ cambiar el otro. |
-| `features/admin` → `features/map` | 2 imports cross-feature ya existen (`TERRITORY_COLORS`, zone helpers de `lados`). Un tercero sería deuda de capa. | Promover a `core/`. |
+| `features/admin` → `features/map` | Queda 1 import cross-feature (`TERRITORY_COLORS` en `territorios.ts`). Un segundo sería deuda de capa. | Promover a `core/`. |
+| Módulo «Sistema» | El pase caduca por inactividad (15 min) o por máximo (1 h); los rechazos son 403 con `code`, nunca 401. | No cambiar a 401: cerraría la sesión del panel entero. |
 | `api-gateway` | `/api/v1/rum` deliberadamente **sin retry**; abrir el circuito lo degrada. | No agregar retry. |
 | `docker-compose.yml` | Orden de arranque: config-server → discovery-server → api-gateway → territory/reporting. | Health checks ya lo enforce; no reordenar servicios. |
 | Flyway | `ddl-auto: none`; history tables separadas; nunca editar una migración aplicada. | Nueva migración siempre. |

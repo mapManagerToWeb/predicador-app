@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.server.ResponseStatusException;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -42,7 +43,19 @@ class TerritoryAdminIntegrationTest {
     private static final String URL_EXTERNA = System.getenv("TERRITORY_IT_DB_URL");
 
     static boolean baseDisponible() {
-        return Boolean.getBoolean("docker.available") || URL_EXTERNA != null;
+        if (URL_EXTERNA != null) {
+            return true;
+        }
+        if (!Boolean.getBoolean("docker.available")) {
+            return false;
+        }
+        try {
+            return DockerClientFactory.instance().isDockerAvailable();
+        } catch (RuntimeException | LinkageError e) {
+            // Un runner donde Testcontainers no logra hablar con el daemon
+            // salta el test en vez de tumbar el build.
+            return false;
+        }
     }
 
     /** Cuadrado de ~100 m x 110 m en Lebu, con esquina inferior izquierda en (lon, lat). */

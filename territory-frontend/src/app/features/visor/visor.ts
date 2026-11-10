@@ -39,6 +39,9 @@ import {
   type ResumenTerritorio,
   zonasParcialesDelVisor,
 } from './visor-estado';
+import { type EstadoUbicacion, UbicacionMapa } from '../../core/map/ubicacion';
+import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
+import { Toast } from '../../core/services/toast';
 
 const CLAVE_TEMA = 'territory_theme';
 type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['properties']>;
@@ -57,13 +60,16 @@ type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['pr
 })
 export class VisorPage {
   private readonly http = inject(HttpClient);
+  private readonly toast = inject(Toast);
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private map: MapLibreMap | null = null;
   private manzanas: ColeccionVisor | null = null;
+  private ubicacionControl: UbicacionMapa | null = null;
 
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly fondo = signal<FondoMapa>('mapa');
+  protected readonly ubicacion = signal<EstadoUbicacion>('apagada');
   protected readonly verLeyenda = signal(false);
   protected readonly busqueda = signal('');
   protected readonly resumen = signal<Map<number, ResumenTerritorio>>(new Map());
@@ -103,6 +109,7 @@ export class VisorPage {
       observador.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
       destroyRef.onDestroy(() => {
         observador.disconnect();
+        this.ubicacionControl?.apagar();
         this.map?.remove();
       });
     });
@@ -112,15 +119,12 @@ export class VisorPage {
     try {
       // Los datos se piden en paralelo con la carga de MapLibre.
       const datos = this.cargarDatos();
-      const { maplibre, map } = await crearMapa(this.contenedor().nativeElement);
+      const { map } = await crearMapa(this.contenedor().nativeElement);
       this.map = map;
-      map.addControl(
-        new maplibre.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }),
-        'top-right',
-      );
       const { manzanas, zonas } = await datos;
       this.manzanas = manzanas;
       this.agregarCapas(map, manzanas, zonas);
+      this.agregarUbicacion(map);
       this.limiteBase = limitesDeNavegacion(manzanas);
       map.setMaxBounds(this.limiteBase ?? undefined);
       const caja = limitesPrincipales(manzanas, 0.12);
@@ -197,6 +201,31 @@ export class VisorPage {
     });
     map.on('mouseenter', 'manzanas-fill', () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', 'manzanas-fill', () => (map.getCanvas().style.cursor = ''));
+  }
+
+  /**
+   * "Mi ubicación" propio y no el control de MapLibre: ese no sabe hacia dónde
+   * apunta el teléfono. Este dibuja el punto azul y el cono del rumbo.
+   */
+  private agregarUbicacion(map: MapLibreMap): void {
+    this.ubicacionControl = new UbicacionMapa(
+      map,
+      typeof navigator !== 'undefined' ? navigator.geolocation : undefined,
+      (estado, error) => {
+        this.ubicacion.set(estado);
+        if (error === 'denegada') {
+          this.toast.show('Permiso de ubicación denegado: actívalo en los ajustes del navegador', 5000, 'warning');
+        } else if (error) {
+          this.toast.show('No se pudo obtener tu ubicación', 3000, 'warning');
+        }
+      },
+      undefined,
+      motivo => this.toast.show(AVISO_SIN_RUMBO[motivo], 5000, 'warning'),
+    );
+  }
+
+  protected alternarUbicacion(): void {
+    this.ubicacionControl?.alternar();
   }
 
   protected alternarLeyenda(): void {

@@ -7,6 +7,7 @@ import { Profile } from '../../core/services/profile';
 import { WhatsAppService } from '../../core/services/whatsapp';
 import { MapPage } from './map';
 import { MapaStore } from './mapa.store';
+import { MODO_PRACTICA } from '../../core/map/modo-practica';
 
 const vista = {
   mostrar: vi.fn(),
@@ -48,6 +49,10 @@ describe('MapPage', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    configurar();
+  });
+
+  function configurar(practica = false): void {
     TestBed.configureTestingModule({
       imports: [MapPage],
       providers: [
@@ -64,10 +69,11 @@ describe('MapPage', () => {
         },
         { provide: WhatsAppService, useValue: { sendReport: vi.fn() } },
         { provide: Profile, useValue: { currentUser: () => ({ name: 'Ana', lastName: 'P', avatar: 0 }), clear: vi.fn() } },
+        ...(practica ? [{ provide: MODO_PRACTICA, useValue: true }] : []),
       ],
     });
     http = TestBed.inject(HttpTestingController);
-  });
+  }
 
   it('sin territorio abierto explica cómo empezar', async () => {
     const { el } = await abrirPagina();
@@ -125,5 +131,14 @@ describe('MapPage', () => {
     const { el } = await abrirPagina();
     (el.querySelector('.lateral .icono.grande') as HTMLButtonElement).click();
     expect(vista.alternarUbicacion).toHaveBeenCalled();
+  });
+
+  it('en modo práctica avisa que nada es real y no ofrece cerrar sesión', async () => {
+    TestBed.resetTestingModule();
+    configurar(true);
+    const { el } = await abrirPagina();
+    expect(el.querySelector('.aviso-practica')?.textContent).toContain('Modo práctica');
+    const iconos = el.querySelectorAll('header .icono');
+    expect(iconos[iconos.length - 1].getAttribute('aria-label')).toBe('Salir de la práctica');
   });
 });

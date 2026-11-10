@@ -43,11 +43,14 @@ export default defineConfig({
         'src/app/**/index.ts',
         'src/**/environment*.ts',
       ],
+      // Floors sit ~5 points under the measured baseline (65.49 lines /
+      // 63.72 statements / 59.15 functions / 55.64 branches) so a real
+      // regression fails the build while refactors keep some room.
       thresholds: {
-        lines: 30,
-        statements: 30,
-        functions: 30,
-        branches: 20,
+        lines: 60,
+        statements: 58,
+        functions: 55,
+        branches: 50,
       },
     },
   },
