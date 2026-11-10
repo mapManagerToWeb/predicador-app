@@ -99,7 +99,9 @@
             "proxyConfig": "proxy.conf.json",
             "allowedHosts": [
               "localhost",
-              "127.0.0.1"
+              "127.0.0.1",
+              ".tunnelmole.net",
+              ".trycloudflare.com"
             ]
           },
           "configurations": {
