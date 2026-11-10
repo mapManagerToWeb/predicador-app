@@ -12,10 +12,12 @@ Todos los workflows declaran `permissions:` mínimos (sin él, `GITHUB_TOKEN` he
 
 ## Compuertas de dependencias en el backend
 
-`backend/pom.xml` ejecuta `maven-enforcer-plugin` en `validate` con una regla `bannedDependencies`. Falla en segundos, antes de compilar, si una dependencia vuelve a una versión con CVE conocido. Un piso por cada pin por CVE de `dependencyManagement`: `amqp-client`, `bcprov-jdk18on`, `jackson-databind`/`jackson-core` 2.x, `tools.jackson` databind, `freemarker`, `spring-cloud-config-server` y `httpcore5`/`httpcore5-h2`.
+`backend/pom.xml` ejecuta `maven-enforcer-plugin` en `validate` con una regla `bannedDependencies`. Falla en segundos, antes de compilar, si una dependencia vuelve a una versión con CVE conocido. Un piso por cada pin por CVE de `dependencyManagement`: `amqp-client`, `bcprov-jdk18on`, `guava`, `jackson-databind`/`jackson-core` 2.x, `tools.jackson` databind, `freemarker`, `spring-cloud-config-server` y `httpcore5`/`httpcore5-h2`.
 
 Al añadir un override por CVE, añade también su entrada al Enforcer: el pin en `dependencyManagement` solo vale mientras alguien no lo pise, y el Enforcer es lo que lo hace imposible.
 
 **Un piso que no muerde es peor que ninguno.** `bannedDependencies` solo ve artefactos en compile-scope. `org.postgresql:postgresql` se resuelve en runtime y `tools.jackson.core:jackson-core` no aparece como dependencia directa: se probó subiendo su techo por encima de la versión resuelta y la regla no se disparó, así que se quitaron de la lista. Esos dos los cubren Trivy y OWASP dependency-check. Antes de agregar un piso, comprueba que muerde: sube el techo una versión y exige el `banned via the exclude/include list`.
+
+**Un pin por `dependencyManagement` no basta para Trivy.** El escáner de imágenes analiza el `pom.xml` embebido en el jar (`META-INF/maven/.../pom.xml`), que no lleva `<parent>`, así que no ve los overrides del pom raíz y vuelve a resolver la versión transitiva vulnerable. Caso real: `guava` llegaba a 33.0.0-jre por Eureka Server; el `dependencyManagement` del padre no movió la aguja en Trivy hasta declarar la dependencia **directa y con versión explícita** en `discovery-server/pom.xml`. Eso además la vuelve compile-scope, que es lo que permite custodiarla con el Enforcer.
 
 **Cuidado con el `first_patched_version` de Dependabot**: cita `amqp-client` 5.36.1, que nunca se publicó en Maven Central. El primer release publicado con los tres arreglos es **5.37.0**. Verifica siempre contra `maven-metadata.xml`, no contra el aviso.
