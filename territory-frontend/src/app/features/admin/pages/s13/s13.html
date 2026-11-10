@@ -110,7 +110,29 @@
     <section class="adm-card">
       <h2>Ciclo en curso</h2>
       @if (cicloActual(); as c) {
-        <p class="adm-sub">Empezó el {{ fmtFecha(c.inicio) }} (hace {{ duracion(c) }} días).</p>
+        <p class="adm-sub">
+          Empezó el {{ fmtFecha(c.inicio) }} (hace {{ duracion(c) }} días).
+          @if (!editandoInicio()) {
+            <button class="enlace" type="button" (click)="editarInicio(c)">Cambiar el día en que empezó</button>
+          }
+        </p>
+        @if (editandoInicio()) {
+          <div class="cambiar-inicio">
+            <label class="adm-field"><span>Esta vuelta empezó el</span>
+              <input type="date" [max]="hoy" [min]="minimoInicio()" [value]="nuevoInicio()" (input)="nuevoInicio.set($any($event.target).value)" />
+            </label>
+            <p class="adm-muted">
+              Para cuando el ciclo se cerró unos días después de que empezó la vuelta (por ejemplo, la campaña empezó el
+              sábado). No cierra otro ciclo ni borra nada: solo cambia desde qué día cuenta el S-13.
+            </p>
+            <div class="adm-actions">
+              <button class="adm-btn" type="button" (click)="editandoInicio.set(false)">Cancelar</button>
+              <button class="adm-btn primary" type="button" (click)="guardarInicio()" [disabled]="!nuevoInicio() || guardandoInicio()">
+                {{ guardandoInicio() ? 'Guardando…' : 'Guardar' }}
+              </button>
+            </div>
+          </div>
+        }
         @if (avance(); as a) {
           <div class="kpis">
             <div class="kpi"><span class="valor">{{ a.completados }} / {{ a.total }}</span><span>territorios completados</span></div>
@@ -144,6 +166,13 @@
       <label class="adm-field"><span>Nota para el informe (opcional)</span>
         <input type="text" maxlength="500" placeholder="Ej.: fin de la campaña, visita del superintendente…" [value]="notaCierre()" (input)="notaCierre.set($any($event.target).value)" />
       </label>
+      <label class="adm-field"><span>La vuelta nueva empieza el</span>
+        <input type="date" [max]="hoy" [min]="minimoCierre()" [value]="desdeCierre()" (input)="desdeCierre.set($any($event.target).value)" />
+      </label>
+      <p class="adm-muted">
+        Normalmente hoy. Si la vuelta nueva empezó unos días antes (por ejemplo, el inicio de una campaña), elige ese día:
+        el S-13 la mostrará desde entonces. Tiene que ser antes de registrar las salidas de esos días.
+      </p>
       <div class="barra">
         <button class="adm-btn danger" type="button" (click)="cerrarCiclo()" [disabled]="cerrando() || !cicloActual()">
           {{ cerrando() ? 'Cerrando…' : 'Cerrar ciclo y reiniciar territorios' }}

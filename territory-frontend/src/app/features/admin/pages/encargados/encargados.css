@@ -38,3 +38,14 @@ dd { margin: 0; }
   .registro { border-left: 0; padding-left: 0; }
   .form { grid-template-columns: 1fr; }
 }
+.lista-card { display: flex; flex-direction: column; gap: var(--space-3); }
+.lista-cabeza { display: flex; justify-content: space-between; align-items: center; }
+.lista-cabeza h2 { margin: 0; }
+.lista-card .adm-sub { margin: 0; }
+.lista-texto { width: 100%; height: auto; min-height: 170px; box-sizing: border-box; font-family: var(--font-mono, monospace); font-size: var(--text-sm); resize: vertical; }
+.lista-acciones { margin-top: 0; }
+.archivo { position: relative; overflow: hidden; cursor: pointer; }
+.archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.lista-conteo { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; }
+.lista-tabla { max-height: 360px; overflow-y: auto; }
+.lista-detalle { display: block; margin-top: 2px; color: var(--ink-muted); font-size: var(--text-xs); }

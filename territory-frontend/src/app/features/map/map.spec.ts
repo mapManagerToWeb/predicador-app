@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TerritorioService } from '../../core/services/territorio';
 import { Profile } from '../../core/services/profile';
-import { WhatsAppService } from './services/whatsapp';
+import { WhatsAppService } from '../../core/services/whatsapp';
 import { MapPage } from './map';
 import { MapaStore } from './mapa.store';
 

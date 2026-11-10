@@ -14,11 +14,15 @@ import type {
   ManzanaGuardada,
   ManzanaRequest,
   ManzanasCollection,
+  RegistroSalidaRequest,
   ReporteAdmin,
+  ResultadoImportacion,
   CorreccionSalidaRequest,
   ResultadoCorreccionSalida,
   SalidaAdmin,
+  SalidaRegistrada,
 } from '../admin.models';
+import type { FilaLista } from '../utils/lista-hermanos';
 
 /**
  * El service worker cachea /api/v1/territories/** con estrategia
@@ -124,8 +128,35 @@ export class AdminApi {
     return this.get<CicloAdmin[]>(`${this.reportes}/ciclos`);
   }
 
-  cerrarCiclo(nota: string | null): Promise<CicloAdmin> {
-    return this.send(this.http.post<CicloAdmin>(`${this.reportes}/ciclos/cerrar`, { nota }, { headers: SIN_SW }));
+  /** `desde` ("AAAA-MM-DD"): día en que empieza la vuelta nueva; null = hoy. */
+  cerrarCiclo(nota: string | null, desde: string | null = null): Promise<CicloAdmin> {
+    return this.send(this.http.post<CicloAdmin>(`${this.reportes}/ciclos/cerrar`, { nota, desde }, { headers: SIN_SW }));
+  }
+
+  /** Corrige el día en que empezó la vuelta actual (sin cerrar otro ciclo). */
+  cambiarInicioCiclo(desde: string): Promise<{ ciclo: CicloAdmin; enLaVueltaAnterior: number }> {
+    return this.send(
+      this.http.post<{ ciclo: CicloAdmin; enLaVueltaAnterior: number }>(`${this.reportes}/ciclos/inicio`, { desde }, { headers: SIN_SW }),
+    );
+  }
+
+  /** Salida que un hermano informó; queda como suya (S-13, reportes). */
+  registrarSalida(req: RegistroSalidaRequest): Promise<SalidaRegistrada> {
+    return this.send(this.http.post<SalidaRegistrada>(`${this.reportes}/salidas`, req, { headers: SIN_SW }));
+  }
+
+  /** Una salida con varios territorios: se guardan todos o ninguno. */
+  registrarSalidas(req: RegistroSalidaRequest[]): Promise<SalidaRegistrada[]> {
+    return this.send(this.http.post<SalidaRegistrada[]>(`${this.reportes}/salidas/varias`, req, { headers: SIN_SW }));
+  }
+
+  /** Número al que llega el WhatsApp de lo que se registra desde el panel ("" = el del servidor). */
+  whatsappDestino(): Promise<{ telefono: string }> {
+    return this.get<{ telefono: string }>(`${this.reportes}/whatsapp-destino`);
+  }
+
+  setWhatsappDestino(telefono: string): Promise<{ telefono: string }> {
+    return this.send(this.http.put<{ telefono: string }>(`${this.reportes}/whatsapp-destino`, { telefono }, { headers: SIN_SW }));
   }
 
   /** Estado actual de un territorio; null si nunca se trabajó (204). */
@@ -180,6 +211,13 @@ export class AdminApi {
   fusionarEncargados(origenId: number, destinoId: number): Promise<EncargadoAdmin> {
     return this.send(
       this.http.post<EncargadoAdmin>(`${this.encargados}/${origenId}/fusionar/${destinoId}`, {}, { headers: SIN_SW }),
+    );
+  }
+
+  /** Carga una lista de hermanos; con `simular` solo dice qué pasaría con cada fila. */
+  importarEncargados(filas: FilaLista[], simular: boolean): Promise<ResultadoImportacion[]> {
+    return this.send(
+      this.http.post<ResultadoImportacion[]>(`${this.encargados}/importar`, { filas, simular }, { headers: SIN_SW }),
     );
   }
 

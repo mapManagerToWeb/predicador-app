@@ -1,0 +1,215 @@
+<header class="adm-head">
+  <div>
+    <h1>Registrar una salida</h1>
+    <p>
+      Para lo que los hermanos informan por WhatsApp. Queda como salida del hermano: suma al territorio, sale en el S-13
+      y en Reportes, igual que si la hubiera enviado desde la app.
+    </p>
+  </div>
+</header>
+
+<section class="adm-card datos" aria-label="Datos de la salida">
+  <label class="adm-field hermano"><span>Hermano que predicó</span>
+    <input type="text" list="lista-hermanos" maxlength="120" autocomplete="off" placeholder="Nombre y apellido"
+           [value]="hermanoTexto()" (input)="hermanoTexto.set(texto($event))" />
+    <datalist id="lista-hermanos">
+      @for (e of encargados(); track e.id) {
+        <option [value]="e.nombre + ' ' + e.apellido"></option>
+      }
+    </datalist>
+    @if (hermanoTexto().trim()) {
+      <small class="pista">
+        @if (hermano().id !== null) {
+          Encargado de la lista.
+        } @else {
+          No tiene cuenta en la app: se guarda con este nombre.
+        }
+      </small>
+    }
+  </label>
+
+  <div class="adm-field"><span>Día</span>
+    <div class="dia">
+      <div class="adm-seg" role="group" aria-label="Día">
+        <button type="button" [class.activo]="dia() === hoy" (click)="dia.set(hoy)">Hoy</button>
+        <button type="button" [class.activo]="dia() === ayer" (click)="dia.set(ayer)">Ayer</button>
+      </div>
+      <input class="adm-input" type="date" [max]="hoy" [value]="dia()" (input)="dia.set(texto($event))" aria-label="Otro día" />
+    </div>
+  </div>
+
+  <div class="adm-field"><span>Turno</span>
+    <div class="adm-seg" role="group" aria-label="Turno">
+      <button type="button" [class.activo]="turno() === 'mañana'" (click)="turno.set('mañana')">Mañana</button>
+      <button type="button" [class.activo]="turno() === 'tarde'" (click)="turno.set('tarde')">Tarde</button>
+    </div>
+  </div>
+
+  <div class="adm-field territorios-campo"><span>Territorios</span>
+    <div class="fichas">
+      @for (r of resumenes(); track r.numero) {
+        <span class="ficha" [class.activa]="activo() === r.numero" [style.--color]="r.color">
+          <button type="button" class="ficha-ir" (click)="activo.set(r.numero)">{{ r.numero }}</button>
+          <button type="button" class="ficha-quitar" (click)="quitarTerritorio(r.numero)" [attr.aria-label]="'Quitar el territorio ' + r.numero">✕</button>
+        </span>
+      }
+      <select class="adm-input agregar" (change)="alElegirTerritorio($event)" aria-label="Agregar territorio">
+        <option value="" selected>{{ territorios().length ? '+ Agregar otro territorio' : 'Elegir territorio…' }}</option>
+        @for (t of disponibles(); track t) {
+          <option [value]="t">Territorio {{ t }}</option>
+        }
+      </select>
+    </div>
+  </div>
+</section>
+
+@if (territorios().length) {
+  <div class="trabajo">
+    <section class="adm-card mapa">
+      <div class="barra">
+        <div class="adm-seg" role="group" aria-label="Cómo marcar">
+          <button type="button" [class.activo]="modo() === 'entera'" (click)="cambiarModo('entera')">Manzana entera</button>
+          <button type="button" [class.activo]="modo() === 'calles'" (click)="cambiarModo('calles')">Por calles</button>
+        </div>
+      </div>
+      <p class="adm-muted ayuda">
+        @if (modo() === 'entera') {
+          Clic en una manzana para marcarla entera (otro clic la desmarca). Lo que ya estaba marcado antes va en gris.
+        } @else if (manzanaCalles(); as m) {
+          Manzana {{ m.properties.nombre }}: clic en cada calle que predicaron (se pone verde). Con todas, queda entera.
+        } @else {
+          Clic en la manzana para ver sus calles.
+        }
+        @if (territorios().length > 1) { Cada territorio va con su color. }
+      </p>
+      <app-correccion-map
+        [manzanas]="manzanas()"
+        [estado]="edicion()"
+        [colores]="colores()"
+        [bloqueadas]="base().marcadas"
+        [zonasBloqueadas]="zonasBloqueadas()"
+        [calles]="calles()"
+        [alto]="540"
+        (manzanaClick)="alTocarManzana($event)"
+        (zonaClick)="alTocarZona($event)"
+        (calleClick)="alTocarCalle($event)"
+      />
+    </section>
+
+    <section class="adm-card resumen" aria-live="polite">
+      @for (r of resumenes(); track r.numero) {
+        <div class="territorio" [class.activo]="activo() === r.numero" [style.--color]="r.color">
+          <div class="territorio-cabeza">
+            <h2><span class="swatch"></span> Territorio {{ r.numero }}</h2>
+            @if (cargandoTerritorio() === r.numero) { <span class="adm-muted">Cargando…</span> }
+          </div>
+          @if (r.estado; as e) {
+            <p class="adm-muted">Último reporte: {{ fmtFechaHora(e.fecha) }} · {{ e.encargado || '—' }}</p>
+            @if (e.estado === 'completed' || e.estado === 'reiniciado') {
+              <p class="aviso"><span class="adm-badge info">Vuelta nueva</span> Estaba completo o se reinició: empieza de cero.</p>
+            }
+          } @else if (cargandoTerritorio() !== r.numero) {
+            <p class="adm-muted">Nunca se había trabajado.</p>
+          }
+          <dl>
+            <dt>En esta salida</dt>
+            <dd>
+              @if (r.enteras + r.porCalles === 0) {
+                <span class="falta">Nada marcado todavía</span>
+              } @else {
+                {{ r.enteras }} manzana(s) entera(s) @if (r.porCalles) { y {{ r.porCalles }} por calles }
+              }
+            </dd>
+            <dt>Queda</dt>
+            <dd>
+              {{ r.queda.enteras }} de {{ r.total }} manzanas
+              @if (r.queda.porCalles) { y {{ r.queda.porCalles }} por calles }
+              @if (r.queda.completo) { <span class="adm-badge good">Completo</span> }
+            </dd>
+          </dl>
+          <div class="acciones">
+            <button class="adm-btn small" type="button" (click)="todo(r.numero)">Todo el territorio</button>
+            <button class="adm-btn small ghost" type="button" (click)="deshacer(r.numero)" [disabled]="r.enteras + r.porCalles === 0">Deshacer</button>
+          </div>
+        </div>
+      }
+
+      <label class="adm-field"><span>Nota (opcional)</span>
+        <input type="text" maxlength="300" placeholder="Ej.: informado por WhatsApp" [value]="nota()" (input)="nota.set(texto($event))" />
+      </label>
+
+      <div class="whatsapp">
+        <label class="check">
+          <input type="checkbox" [checked]="enviarWhatsApp()" (change)="enviarWhatsApp.set($any($event.target).checked)" />
+          Enviar el resumen por WhatsApp (uno con todos los territorios)
+        </label>
+        @if (editandoDestino()) {
+          <div class="fila">
+            <input class="adm-input" type="tel" placeholder="9 1234 5678 (vacío: el del servidor)" [value]="destinoTexto()"
+                   (input)="destinoTexto.set(texto($event))" aria-label="Número de WhatsApp del administrador" />
+            <button class="adm-btn small" type="button" (click)="guardarDestino()">Guardar</button>
+            <button class="adm-btn small ghost" type="button" (click)="editandoDestino.set(false)">Cancelar</button>
+          </div>
+        } @else {
+          <small class="adm-muted">
+            Llega a {{ destino() ? fmtTelefono(destino()) : 'el número configurado en el servidor' }} ·
+            <button class="enlace" type="button" (click)="editarDestino()">cambiar</button>
+          </small>
+        }
+      </div>
+
+      <button class="adm-btn primary guardar" type="button" (click)="registrar()" [disabled]="!puedeGuardar()">
+        {{ guardando() ? 'Registrando…' : 'Registrar salida' }}
+      </button>
+      @if (!hermano().nombre) {
+        <small class="adm-muted">Falta el nombre del hermano.</small>
+      } @else if (sinMarcar().length) {
+        <small class="adm-muted">
+          Falta marcar lo que se predicó en {{ sinMarcar().length === 1 ? 'el territorio' : 'los territorios' }}
+          {{ sinMarcar().join(', ') }} (o quítalo con la ✕).
+        </small>
+      }
+    </section>
+  </div>
+}
+
+@if (registrados().length) {
+  <section class="adm-card">
+    <h2>Registrados ahora</h2>
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr><th>Hermano</th><th>Territorios</th><th>Día</th><th>Quedó</th><th>WhatsApp</th></tr>
+        </thead>
+        <tbody>
+          @for (r of registrados(); track r.salidas[0].id) {
+            <tr>
+              <td>{{ r.hermano }}</td>
+              <td>{{ territoriosDe(r) }}</td>
+              <td>{{ fmtFecha(r.dia + 'T12:00:00') }} · {{ r.turno }}</td>
+              <td>
+                @for (x of r.salidas; track x.id) {
+                  <span class="quedo">
+                    {{ x.territorioNumero }}:
+                    @if (x.estado === 'completed') {
+                      <span class="adm-badge good">Completo</span>
+                    } @else {
+                      {{ x.manzanasMarcadas ?? 0 }} de {{ x.totalManzanas ?? '—' }}
+                    }
+                  </span>
+                }
+              </td>
+              <td>
+                @switch (r.whatsapp) {
+                  @case ('enviado') { <span class="adm-badge good">Enviado</span> }
+                  @case ('fallo') { <span class="adm-badge critical">No se pudo</span> }
+                  @default { <span class="adm-muted">—</span> }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+}

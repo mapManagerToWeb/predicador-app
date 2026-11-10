@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Ciclos y correcciones contra PostGIS real, con las migraciones de Flyway
@@ -155,5 +156,93 @@ class CicloServiceIntegrationTest {
             assertThat(a.manzanasIds()).isEqualTo("3-3.a,3-3.c");
         });
         assertThat(service.estadoActual(99)).isEmpty();
+    }
+
+    // ── Cerrar desde un día (p. ej. el inicio de una campaña) ──
+
+    private static java.time.LocalDate hoyEnChile() {
+        return java.time.LocalDate.now(java.time.ZoneId.of("America/Santiago"));
+    }
+
+    @Test
+    void cerrarDesdeUnDia_laVueltaNuevaEmpiezaEseDia() {
+        salida(1, "2026-09-01T10:00:00Z", "Ana", "incomplete", "1-1.a");
+        java.time.LocalDate desde = hoyEnChile().minusDays(2);
+        Instant inicio = desde.atStartOfDay(java.time.ZoneId.of("America/Santiago")).toInstant();
+
+        CicloDto nuevo = service.cerrar("Campaña", desde);
+
+        assertThat(nuevo.inicio()).isEqualTo(inicio);
+        assertThat(service.listar().get(1).fin()).isEqualTo(inicio);
+        Report reinicio = repository.findLatestByTerritorioNumeroIn(List.of(1L)).get(0);
+        assertThat(reinicio.getOrigen()).isEqualTo(Report.ORIGEN_REINICIO);
+        assertThat(reinicio.getFechaPredicacion()).isEqualTo(desde);
+        // El orden no cambia: el reinicio se guarda con la hora de ahora.
+        assertThat(reinicio.getFecha()).isAfter(Instant.now().minusSeconds(60));
+    }
+
+    @Test
+    void cerrarDesdeUnDia_conReportesEnviadosDesdeEseDiaSeRechazaSinTocarNada() {
+        salida(1, Instant.now().minusSeconds(3600).toString(), "Ana", "incomplete", "1-1.a");
+        long antes = repository.count();
+
+        assertThatThrownBy(() -> service.cerrar(null, hoyEnChile().minusDays(1)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("1 reporte(s)");
+        assertThat(repository.count()).isEqualTo(antes);
+        assertThat(service.listar()).hasSize(1);
+    }
+
+    @Test
+    void cerrarDesdeUnDiaFuturoOAnteriorALaVueltaActualSeRechaza() {
+        assertThatThrownBy(() -> service.cerrar(null, hoyEnChile().plusDays(1)))
+                .hasMessageContaining("futuro");
+        assertThatThrownBy(() -> service.cerrar(null, java.time.LocalDate.parse("2025-12-01")))
+                .hasMessageContaining("Cambiar el día en que empezó");
+        assertThat(service.listar()).hasSize(1);
+    }
+
+    // ── Corregir el día en que empezó la vuelta actual ──
+
+    @Test
+    void cambiarInicio_laVueltaYaCerradaHoyPasaAEmpezarAntes_sinCerrarOtra() {
+        salida(1, "2026-09-01T10:00:00Z", "Ana", "incomplete", "1-1.a");
+        service.cerrar(null);
+        // Lo que se registra después del cierre es de la vuelta nueva.
+        salida(1, Instant.now().plusSeconds(5).toString(), "Pedro", "incomplete", "1-1.b");
+        java.time.LocalDate sabado = hoyEnChile().minusDays(2);
+        Instant inicio = sabado.atStartOfDay(java.time.ZoneId.of("America/Santiago")).toInstant();
+
+        CicloService.CambioDeInicio cambio = service.cambiarInicio(sabado);
+
+        assertThat(cambio.ciclo().inicio()).isEqualTo(inicio);
+        assertThat(cambio.enLaVueltaAnterior()).isZero();
+        List<CicloDto> ciclos = service.listar();
+        assertThat(ciclos).hasSize(2);
+        assertThat(ciclos.get(0).inicio()).isEqualTo(inicio);
+        assertThat(ciclos.get(1).fin()).isEqualTo(inicio);
+        Integer reiniciosDelSabado = jdbc.sql("SELECT count(*) FROM registro_predicacion WHERE origen = 'reinicio' AND fecha_predicacion = ?")
+                .param(sabado).query(Integer.class).single();
+        assertThat(reiniciosDelSabado).isEqualTo(1);
+        // El orden no cambia: lo de Pedro sigue siendo el estado actual.
+        assertThat(estado(1).manzanasIds()).isEqualTo("1-1.b");
+    }
+
+    @Test
+    void cambiarInicio_avisaCuantosReportesQuedaronEnLaVueltaAnterior() {
+        salida(1, Instant.now().minusSeconds(3600).toString(), "Ana", "incomplete", "1-1.a");
+        service.cerrar(null);
+
+        CicloService.CambioDeInicio cambio = service.cambiarInicio(hoyEnChile().minusDays(1));
+
+        assertThat(cambio.enLaVueltaAnterior()).isEqualTo(1);
+    }
+
+    @Test
+    void cambiarInicio_noPuedeSerFuturoNiAntesDeLaVueltaAnterior() {
+        service.cerrar(null);
+        assertThatThrownBy(() -> service.cambiarInicio(hoyEnChile().plusDays(1))).hasMessageContaining("futuro");
+        assertThatThrownBy(() -> service.cambiarInicio(java.time.LocalDate.parse("2025-12-01")))
+                .hasMessageContaining("después de que empezó la vuelta anterior");
     }
 }

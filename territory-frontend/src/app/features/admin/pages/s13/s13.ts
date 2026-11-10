@@ -5,7 +5,7 @@ import { CorreccionMap } from '../../map/correccion-map';
 import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import { AdminUi } from '../../services/admin-ui';
-import { completado } from '../../utils/analytics';
+import { completado, diaLocal } from '../../utils/analytics';
 import {
   alternar,
   clave,
@@ -105,10 +105,71 @@ export class S13Page implements OnInit {
     };
   });
   protected readonly notaCierre = signal('');
+  /** Hoy, "AAAA-MM-DD" (hora local). */
+  protected readonly hoy = diaLocal(new Date());
+  /** Día en que empieza la vuelta nueva; hoy, salvo que se elija otro (p. ej. el inicio de una campaña). */
+  protected readonly desdeCierre = signal(this.hoy);
+  protected readonly editandoInicio = signal(false);
+  protected readonly nuevoInicio = signal('');
+  protected readonly guardandoInicio = signal(false);
+  /** El inicio de la vuelta actual tiene que ser después de que empezó la anterior. */
+  protected readonly minimoInicio = computed(() => {
+    const anterior = (this.ciclos() ?? []).filter(c => c.fin).sort((a, b) => b.fin!.localeCompare(a.fin!))[0];
+    if (!anterior) return null;
+    const d = new Date(anterior.inicio);
+    d.setDate(d.getDate() + 1);
+    return diaLocal(d);
+  });
+  /** La vuelta nueva tiene que empezar después de que empezó la actual. */
+  protected readonly minimoCierre = computed(() => {
+    const c = this.cicloActual();
+    if (!c) return null;
+    const d = new Date(c.inicio);
+    d.setDate(d.getDate() + 1);
+    return diaLocal(d);
+  });
   protected readonly cerrando = signal(false);
 
   // ── Historial ──
   protected readonly abierto = signal<number | null>(null);
+
+  // ── Corregir el día en que empezó la vuelta actual ──
+
+  protected editarInicio(c: CicloAdmin): void {
+    this.nuevoInicio.set(diaLocal(new Date(c.inicio)));
+    this.editandoInicio.set(true);
+  }
+
+  protected async guardarInicio(): Promise<void> {
+    const dia = this.nuevoInicio();
+    if (!dia) return;
+    const ok = await this.ui.confirmar({
+      titulo: 'Cambiar el día en que empezó la vuelta',
+      mensaje: `La vuelta actual va a contar desde el ${fmtFecha(dia + 'T12:00:00')}. No se cierra otro ciclo ni se borra ningún reporte.`,
+      accion: 'Cambiar',
+    });
+    if (!ok) return;
+    this.guardandoInicio.set(true);
+    try {
+      const r = await this.api.cambiarInicioCiclo(dia);
+      await Promise.all([this.cargarCiclos(), this.store.cargarReportes(true)]);
+      this.editandoInicio.set(false);
+      if (r.enLaVueltaAnterior > 0) {
+        this.toast.show(
+          `Listo. Ojo: ${r.enLaVueltaAnterior} reporte(s) se enviaron entre ese día y el cierre, y quedaron en la vuelta anterior. ` +
+            'Si son de esta vuelta, anúlalos en «Reportes» y regístralos de nuevo.',
+          12000,
+          'warning',
+        );
+      } else {
+        this.toast.show(`Listo: la vuelta cuenta desde el ${fmtFecha(dia + 'T12:00:00')}`, 4000, 'success');
+      }
+    } catch (e) {
+      this.toast.show(mensajeDeError(e), 8000, 'error');
+    } finally {
+      this.guardandoInicio.set(false);
+    }
+  }
 
   // ── Corrección ──
   protected readonly territorioSel = signal<number | null>(null);
@@ -234,6 +295,7 @@ export class S13Page implements OnInit {
       titulo: 'Cerrar el ciclo y reiniciar todos los territorios',
       mensaje:
         (faltan > 0 ? `Todavía faltan ${faltan} territorios por completar. ` : 'Se completaron todos los territorios. ') +
+        (this.desdeCierre() && this.desdeCierre() !== this.hoy ? `La vuelta nueva empezará el ${fmtFecha(this.desdeCierre() + 'T12:00:00')}. ` : '') +
         'Se guarda el informe de este ciclo y todos los territorios vuelven a empezar sin marcas. ' +
         'No se borra ningún reporte: el historial y el S-13 siguen disponibles.',
       accion: 'Cerrar ciclo',
@@ -243,13 +305,15 @@ export class S13Page implements OnInit {
     if (!ok) return;
     this.cerrando.set(true);
     try {
-      await this.api.cerrarCiclo(this.notaCierre().trim() || null);
+      const desde = this.desdeCierre();
+      await this.api.cerrarCiclo(this.notaCierre().trim() || null, desde && desde !== this.hoy ? desde : null);
       this.notaCierre.set('');
+      this.desdeCierre.set(this.hoy);
       await Promise.all([this.cargarCiclos(), this.store.cargarReportes(true)]);
       this.toast.show('Ciclo cerrado: los territorios vuelven a empezar', 4000, 'success');
       this.vista.set('historial');
     } catch (e) {
-      this.toast.show(mensajeDeError(e), 5000, 'error');
+      this.toast.show(mensajeDeError(e), 12000, 'error');
     } finally {
       this.cerrando.set(false);
     }

@@ -1,7 +1,7 @@
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { EstadoTerritorioPublico } from '../../core/map/estado-publico';
 import { getColorForTerritorio } from './utils/territory-colors';
-import type { GeometriaManzana } from './utils/lados';
+import type { GeometriaManzana } from '../../core/map/lados';
 import type { Manzana } from './utils/salida';
 
 /**

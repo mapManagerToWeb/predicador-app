@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { vi } from 'vitest';
 import { WhatsAppService } from './whatsapp';
-import { WhatsAppSendRequest } from '../../../core/models/models';
+import { WhatsAppSendRequest } from '../models/models';
 
 describe('WhatsAppService', () => {
   let service: WhatsAppService;

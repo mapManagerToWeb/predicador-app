@@ -98,9 +98,9 @@ describe('ProfilePage', () => {
     expect(component.telefono()).toBe('912345678');
   });
 
-  it('selects an avatar', () => {
-    component.selectAvatar(4);
-    expect(component.selectedAvatar()).toBe(4);
+  it('ya no pide elegir avatar', () => {
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Avatar');
   });
 
   it('does not save when required fields are missing', async () => {
@@ -135,7 +135,6 @@ describe('ProfilePage', () => {
     component.name.set('Daniel');
     component.lastName.set('Uribe');
     component.telefono.set('912345678');
-    component.selectAvatar(3);
 
     await component.save();
 

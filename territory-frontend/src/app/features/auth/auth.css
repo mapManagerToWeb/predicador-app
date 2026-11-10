@@ -340,50 +340,6 @@
   color: var(--color-primary-strong);
 }
 
-/* ── Avatar grid ── */
-.avatar-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3);
-  padding: var(--space-1);
-}
-
-.avatar-btn {
-  aspect-ratio: 1;
-  border: 1.5px solid var(--glass-border);
-  border-radius: 50%;
-  background: var(--surface-2);
-  font-size: 1.35rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s var(--ease-out);
-  position: relative;
-  box-shadow: var(--elev-1);
-}
-
-.avatar-btn:hover {
-  transform: scale(1.08);
-  border-color: var(--ink-faint);
-  box-shadow: var(--elev-2);
-}
-
-.avatar-btn.selected {
-  border-color: var(--avatar-color, var(--color-primary));
-  background: var(--avatar-color, var(--color-primary));
-  transform: scale(1.08);
-  box-shadow:
-    0 0 16px color-mix(in srgb, var(--avatar-color, var(--color-primary)) 20%, transparent);
-  animation: avatar-pop 0.25s var(--ease-out);
-}
-
-@keyframes avatar-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-  100% { transform: scale(1.08); }
-}
-
 /* ── Responsive ── */
 @media (min-width: 640px) {
   .auth-card {
@@ -414,14 +370,6 @@
 
   .auth-brand h1 {
     font-size: var(--text-2xl);
-  }
-
-  .avatar-grid {
-    gap: var(--space-2);
-  }
-
-  .avatar-btn {
-    font-size: 1.15rem;
   }
 }
 

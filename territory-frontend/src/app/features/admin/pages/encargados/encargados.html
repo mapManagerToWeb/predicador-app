@@ -8,6 +8,7 @@
   </div>
   <div class="adm-toolbar">
     <button class="adm-btn" type="button" (click)="exportar()">Exportar (CSV)</button>
+    <button class="adm-btn" type="button" (click)="abrirCargaDeLista()">Cargar lista</button>
     <button class="adm-btn primary" type="button" (click)="nuevo()">+ Nuevo encargado</button>
   </div>
 </header>
@@ -39,6 +40,67 @@
     </button>
   </div>
 </section>
+
+@if (cargandoLista()) {
+  <section class="adm-card lista-card" aria-label="Cargar una lista de hermanos">
+    <header class="lista-cabeza">
+      <h2>Cargar una lista de hermanos</h2>
+      <button class="adm-btn ghost small" type="button" (click)="cerrarCargaDeLista()" aria-label="Cerrar">✕</button>
+    </header>
+    <p class="adm-sub">
+      Una persona por línea: <strong>nombre, apellido y teléfono</strong>. Puedes copiar las columnas desde Excel y
+      pegarlas aquí, subir un archivo CSV, o escribir «Pedro Soto 9 1234 5678». Primero se revisa y nada se guarda
+      hasta que confirmes.
+    </p>
+    <textarea class="adm-input lista-texto" rows="8" spellcheck="false"
+              placeholder="Pedro;Soto;9 1234 5678&#10;Ana;Pérez;9 8765 4321"
+              [value]="textoLista()" (input)="escribirLista(texto($event))" aria-label="Lista de hermanos"></textarea>
+    <div class="adm-actions lista-acciones">
+      <label class="adm-btn archivo">Subir archivo (CSV)
+        <input type="file" accept=".csv,.txt,text/csv,text/plain" (change)="leerArchivo($event)" />
+      </label>
+      <button class="adm-btn primary" type="button" (click)="revisarLista()" [disabled]="!textoLista().trim() || procesandoLista()">
+        {{ procesandoLista() && !revision() ? 'Revisando…' : 'Revisar' }}
+      </button>
+    </div>
+
+    @if (revision(); as r) {
+      <p class="lista-conteo">
+        <span class="adm-badge good">{{ conteoRevision().crear }} se crean</span>
+        @if (conteoRevision().existe) { <span class="adm-badge">{{ conteoRevision().existe }} ya estaban</span> }
+        @if (conteoRevision().error) { <span class="adm-badge critical">{{ conteoRevision().error }} con problemas</span> }
+      </p>
+      <div class="adm-table-wrap lista-tabla">
+        <table class="adm-table">
+          <thead><tr><th class="num">Fila</th><th>Nombre</th><th>Apellido</th><th>Teléfono</th><th>Resultado</th></tr></thead>
+          <tbody>
+            @for (x of r; track x.fila) {
+              <tr>
+                <td class="num">{{ x.fila }}</td>
+                <td>{{ x.nombre || '—' }}</td>
+                <td>{{ x.apellido || '—' }}</td>
+                <td class="tel">{{ x.telefono ? fmtTelefono(x.telefono) : '—' }}</td>
+                <td>
+                  @switch (x.resultado) {
+                    @case ('crear') { <span class="adm-badge good">Se crea</span> }
+                    @case ('existe') { <span class="adm-badge">Ya está</span> }
+                    @default { <span class="adm-badge critical">No se crea</span> }
+                  }
+                  @if (x.resultado === 'error') { <small class="lista-detalle">{{ x.detalle }}</small> }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="adm-actions">
+        <button class="adm-btn primary" type="button" (click)="crearDeLaLista()" [disabled]="!conteoRevision().crear || procesandoLista()">
+          {{ procesandoLista() ? 'Creando…' : 'Crear ' + conteoRevision().crear + (conteoRevision().crear === 1 ? ' hermano' : ' hermanos') }}
+        </button>
+      </div>
+    }
+  </section>
+}
 
 @if (formulario(); as f) {
   <section class="adm-card form-card">

@@ -82,7 +82,8 @@ public class ReportService {
             dtos.stream().map(ReportDto::territorioNumero).distinct().sorted().forEach(catalogo::bloquear);
             List<ReportDto> guardados = new ArrayList<>();
             for (ReportDto dto : dtos) {
-                guardados.add(toDto(repository.saveAndFlush(sumarAlEstado(dto))));
+                LocalDate dia = DiaDePredicacion.delEncargado(dto.fechaPredicacion(), Instant.now());
+                guardados.add(toDto(repository.saveAndFlush(sumarAlEstado(dto, dia))));
             }
             return guardados;
         } finally {
@@ -163,7 +164,21 @@ public class ReportService {
      * también es la del servidor (un teléfono con la hora mal no desordena
      * cuál es el último reporte).
      */
-    private Report sumarAlEstado(ReportDto dto) {
+    /**
+     * Salida que registra el administrador en nombre de un hermano (por
+     * ejemplo, lo que le informaron por WhatsApp). Se suma igual que una
+     * enviada desde la app y queda como salida del hermano (S-13, panel), con
+     * cualquier día que no sea futuro: el límite de 7 días es solo para la app.
+     */
+    @Transactional
+    public ReportDto registrarDelAdministrador(ReportDto dto, String nota) {
+        catalogo.bloquear(dto.territorioNumero());
+        Report report = sumarAlEstado(dto, DiaDePredicacion.delAdministrador(dto.fechaPredicacion(), Instant.now()));
+        report.setNota(nota);
+        return toDto(repository.saveAndFlush(report));
+    }
+
+    private Report sumarAlEstado(ReportDto dto, LocalDate dia) {
         long territorio = dto.territorioNumero();
         Report ultimo = repository.findLatestByTerritorioNumeroIn(List.of(territorio)).stream().findFirst().orElse(null);
         SumaDeSalidas.Resultado suma = SumaDeSalidas.sumar(ultimo, dto, catalogo.manzanas(territorio));
@@ -174,7 +189,7 @@ public class ReportService {
         report.setOrigen(Report.ORIGEN_SALIDA);
         SumaDeSalidas.aplicar(report, suma);
         report.setInicioSesion(inicioSesionPlausible(dto.inicioSesion(), ahora));
-        report.setFechaPredicacion(DiaDePredicacion.delEncargado(dto.fechaPredicacion(), ahora));
+        report.setFechaPredicacion(dia == null ? DiaDePredicacion.hoy(ahora) : dia);
         report.setTurno(DiaDePredicacion.turno(dto.turno()));
         return report;
     }
