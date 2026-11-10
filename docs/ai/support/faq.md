@@ -2,7 +2,7 @@
 
 ## Build & tests
 **¿Por qué `mvn verify` no falla aunque haya tests de integración sin correr?**
-Porque 4 tests están `@EnabledIfSystemProperty("docker.available")` y `EncargadoRaceConditionIT` no coincide con el include de surefire. ⚠️ Ojo: un `mvn verify` **sin** los IT docker sí puede fallar el gate JaCoCo 40% en `territory-service`. Ver `../testing/integration.md`.
+Porque en local nadie pasa `-Ddocker.available=true`, la propiedad que activa los cinco ITs de Testcontainers. CI sí la pasa (`ci-backend.yml`), así que allí corren. ⚠️ Ojo: un `mvn verify` **sin** los IT docker sí puede fallar el gate JaCoCo 40% en `territory-service`. Ver `../testing/integration.md`.
 
 **¿Cómo corro TODOS los tests backend?**
 ```bash

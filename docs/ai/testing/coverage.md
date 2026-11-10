@@ -1,26 +1,27 @@
 # Cobertura de tests
 
-> Métricas verificadas 2026-10-09. Cambian con cada PR — regenerar con los comandos al final.
+> Métricas verificadas 2026-11-09. Cambian con cada PR — regenerar con los comandos al final.
 
 ## Frontend (Vitest) — `pnpm test -- --run --coverage`
 ```
-Statements   : 61.67% (2696/4371)
-Branches     : 53.88% (1221/2266)
-Functions    : 56.95% (622/1092)
-Lines        : 63.46% (2335/3679)
+Statements   : 64.18% (3070/4783)
+Branches     : 55.99% (1397/2495)
+Functions    : 59.41% (710/1195)
+Lines        : 65.98% (2658/4028)
 ```
-- Umbral en `vitest.config.ts`: **30/30/30/20** → PASS.
-- 41 archivos `*.spec.ts`.
+- Umbral en `vitest.config.ts`: **60/58/55/50** (lines/statements/functions/branches) → PASS con margen.
+- 46 archivos `*.spec.ts`, 357 tests.
 
 ### Puntos de cobertura por feature (muestral)
 | Feature | Statements | Notas |
 |---|---|---|
-| `features/auth` | ~91.7% | |
-| `features/profile` | ~95.7% | |
-| `features/visor` | ~78.2% | |
-| `map/mapa.store` | ~82.6% | |
-| `map/mapa-vista` | **0%** | Líneas 49–582 sin cubrir — el archivo que hace todo el dibujo del mapa |
-| `features/admin` | 60–93% | depende del archivo |
+| `features/auth` | ~92.3% | |
+| `features/profile` | ~94.2% | |
+| `features/visor` | ~79.4% | |
+| `map/mapa.store` | ~83.6% | |
+| `map/mapa.datos` | ~92.3% | índice GeoJSON + cache local |
+| `map/mapa-vista` | **0%** | Líneas 65–588 sin cubrir — el archivo que hace todo el dibujo del mapa |
+| `features/admin` | 28–93% | depende del archivo |
 
 ⚠️ Coverage bajo ≠ buena cobertura. El archivo más crítico del mapa (`mapa-vista.ts`) tiene 0%.
 
@@ -36,7 +37,7 @@ Corrida completa con IT de DB: `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pc
 
 - 50 archivos de test: `shared` 12, `api-gateway` 7, `territory-service` 7, `reporting-service` 24, `config/discovery` 0 (infra).
 - JaCoCo: gate **40% LINE/INSTRUCTION** (falla el build si baja).
-- ⚠️ **Los números de arriba son CON los 4 IT docker-gated corriendo.** Sin `-Ddocker.available=true` se saltan y `territory-service` cae bajo el gate 40% (~25–29%) → el build **falla localmente**. En CI corrió bien por `TerritoryAdminIntegrationTest` (env `TERRITORY_IT_DB_*`), pero los otros 3 IT docker se saltan igual en CI. Ver `integration.md`.
+- ⚠️ **Los números de arriba son CON los IT docker-gated corriendo.** Sin `-Ddocker.available=true` se saltan y `territory-service` cae bajo el gate 40% (~25–29%) → el build **falla localmente**. CI pasa `-Ddocker.available=true`, así que ejecuta los seis ITs. Ver `integration.md`.
 
 ## Cómo regenerar
 ```bash

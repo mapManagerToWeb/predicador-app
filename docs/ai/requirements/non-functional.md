@@ -2,9 +2,9 @@
 
 | ID | Requerimiento | Valor |
 |---|---|---|
-| RNF-01 | Build backend | `mvn verify -Pcoverage` + gate JaCoCo 40% — **PASS solo con el ambiente de IT completo**: local `-Ddocker.available=true` (+ `TESTCONTAINERS_RYUK_DISABLED=true` en este entorno) o env `TERRITORY_IT_DB_*`; sin IT, `territory-service` cae bajo el gate (~25–29%) y el build falla |
+| RNF-01 | Build backend | `mvn verify -Pcoverage` + gate JaCoCo 40% — **PASS solo con el ambiente de IT completo**: local `-Ddocker.available=true` (+ `TESTCONTAINERS_RYUK_DISABLED=true` en este entorno) o env `TERRITORY_IT_DB_*`; sin IT, `territory-service` cae bajo el gate (~25–29%) y el build falla. CI lo cumple porque pasa `-Ddocker.available=true` |
 | RNF-02 | Lint frontend | `pnpm run lint` 0 errors |
-| RNF-03 | Tests frontend | `pnpm test -- --run --coverage` PASS (30/30/30/20) |
+| RNF-03 | Tests frontend | `pnpm test -- --run --coverage` PASS (60/58/55/50) |
 | RNF-04 | Build frontend | `pnpm run build` sin error (warning budget tolerado) |
 | RNF-05 | Seguridad | gitleaks/Semgrep/OWASP/Trivy en CI |
 | RNF-06 | Auth | `SESSION_SECRET` ≥32 bytes fuera de `local`; `ADMIN_PASSWORD_BCRYPT` obligatorio |
