@@ -86,6 +86,7 @@ mvn -pl territory-service test     # one module
 ### Frontend gotchas
 
 - **Angular template identifiers must be ASCII — no `ñ`.** The template lexer rejects it. `ñ` is fine in text content (`Contraseña`, `Mañana`) but never in a binding, property or identifier.
+- **New versions reach the phones by themselves** (`core/services/actualizacion.ts`, started from `app.config.ts`): the service worker keeps the app on the phone, and an installed PWA is resumed rather than reopened, so without this an old version stayed for days and brothers had to clear site data. It checks on start, when the app comes back to the foreground and every 30 min; a downloaded version reloads by itself if the user has not touched the app since opening it or since coming back after ≥1 min, otherwise the root shows a «Hay una versión nueva — Actualizar» banner (never reloads mid-task; at most one automatic reload per 5 min; `unrecoverable` always reloads). Map drafts are saved within 300 ms, so a reload loses nothing.
 - SSR is on in production builds: guard `window`/`document` behind platform checks or `afterNextRender()`.
 - `styles.css` sets a global `min-height: 44px` on `button`/`input`/`select`; the admin shell resets it under `.adm`.
 - On touch screens (`pointer: coarse`) `styles.css` forces `input`/`select`/`textarea` to at least 16px (`!important`): below 16px iOS zooms in on focus and the zoom stays for the rest of the app. Don't lower it, and don't "fix" it with `maximum-scale=1` — brothers with poor eyesight need pinch zoom.
