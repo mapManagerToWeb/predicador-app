@@ -4,7 +4,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { firstValueFrom } from 'rxjs';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Profile } from '../../core/services/profile';
-import { CLAVE_TEMA } from '../../core/utils/tema';
+import { CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 import { environment } from '../../../environments/environment';
 import { AdminStore } from './services/admin-store';
 import { AdminUi } from './services/admin-ui';
@@ -147,8 +147,6 @@ export class AdminPage implements OnInit {
 
   private aplicarTema(oscuro: boolean): void {
     this.oscuro.set(oscuro);
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', oscuro ? 'dark' : 'light');
-    }
+    ponerTema(oscuro);
   }
 }

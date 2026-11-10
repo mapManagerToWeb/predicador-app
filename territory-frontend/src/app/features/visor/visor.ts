@@ -42,7 +42,7 @@ import {
 import { type EstadoUbicacion, UbicacionMapa } from '../../core/map/ubicacion';
 import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Toast } from '../../core/services/toast';
-import { aplicarTemaGuardado, CLAVE_TEMA } from '../../core/utils/tema';
+import { aplicarTemaGuardado, CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 
 type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['properties']>;
 
@@ -289,7 +289,7 @@ export class VisorPage {
 
   protected alternarTema(): void {
     const oscuro = !temaOscuro();
-    document.documentElement.setAttribute('data-theme', oscuro ? 'dark' : 'light');
+    ponerTema(oscuro);
     try {
       localStorage.setItem(CLAVE_TEMA, oscuro ? 'dark' : 'light');
     } catch {

@@ -54,6 +54,12 @@ svg .grueso {
   padding: 24px;
 }
 
+/* Al terminar de cargar se funde sobre el mapa en vez de cortarse (animate.leave en map.html). */
+.cargando.saliendo {
+  animation: desaparecer 0.22s ease-out forwards;
+  pointer-events: none;
+}
+
 .spinner {
   width: 28px;
   height: 28px;
@@ -132,6 +138,12 @@ svg .grueso {
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  transition: var(--toque), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Un botón chico tiene que hundirse más para que se note bajo el dedo. */
+.icono:not(:disabled):active {
+  scale: 0.9;
 }
 
 .icono:disabled {
@@ -184,6 +196,7 @@ svg .grueso {
   box-shadow: var(--elev-3);
   max-height: 50vh;
   overflow-y: auto;
+  animation: caer 0.16s var(--ease-out);
 }
 
 .sugerencias button {
@@ -201,7 +214,8 @@ svg .grueso {
 }
 
 .sugerencias button:hover,
-.sugerencias button:focus-visible {
+.sugerencias button:focus-visible,
+.sugerencias button:active {
   background: var(--surface-2);
 }
 
@@ -261,6 +275,17 @@ svg .grueso {
   background: var(--surface-1);
   border: 1px solid var(--color-border-solid);
   box-shadow: var(--elev-3);
+  animation: subir 0.26s var(--ease-out);
+}
+
+/* Lo que cambia dentro del panel (abrir un territorio, pasar a «por calles») aparece suave. */
+.territorio,
+.fichas,
+.calles,
+.modos,
+.indicacion,
+.colores {
+  animation: aparecer 0.2s ease-out;
 }
 
 .indicacion {
@@ -402,6 +427,11 @@ svg .grueso {
   cursor: pointer;
 }
 
+.cerrar:active,
+.ficha-cerrar:active {
+  scale: 0.9;
+}
+
 .modos,
 .turno {
   display: flex;
@@ -428,6 +458,7 @@ svg .grueso {
   font-weight: 600;
   cursor: pointer;
   touch-action: manipulation;
+  transition: var(--toque), background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .modo.activo,
@@ -482,6 +513,7 @@ svg .grueso {
   font-weight: 600;
   cursor: pointer;
   touch-action: manipulation;
+  transition: var(--toque), opacity 0.2s ease, background-color 0.15s ease;
 }
 
 .boton.primario {
@@ -530,6 +562,20 @@ svg .grueso {
   inset: 0;
   z-index: 30;
   background: rgba(0, 0, 0, 0.5);
+  animation: aparecer 0.2s ease-out;
+}
+
+/* La pregunta sube desde abajo y, al responder, baja (animate.leave en
+   map.html). Mientras se va no recibe toques: un segundo toque rápido no debe
+   caer en un botón que ya se respondió. */
+.velo.saliendo {
+  animation: desaparecer 0.16s ease-in forwards;
+  pointer-events: none;
+}
+
+.dialogo.saliendo {
+  animation: bajar 0.16s ease-in forwards;
+  pointer-events: none;
 }
 
 .dialogo {
@@ -547,6 +593,7 @@ svg .grueso {
   border-radius: 20px;
   background: var(--surface-1);
   box-shadow: var(--elev-3);
+  animation: subir 0.28s var(--ease-out);
 }
 
 .dialogo h2 {
@@ -618,6 +665,11 @@ svg .grueso {
   font-size: 16px;
   cursor: pointer;
   touch-action: manipulation;
+  transition: var(--toque), background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.otros-dias {
+  animation: aparecer 0.2s ease-out;
 }
 
 .opcion strong {

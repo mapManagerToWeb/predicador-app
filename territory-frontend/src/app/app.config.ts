@@ -6,7 +6,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withViewTransitions } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideClientHydration } from '@angular/platform-browser';
@@ -17,12 +17,15 @@ import { csrfInterceptor } from './core/interceptors/csrf.interceptor';
 import { RumService } from './core/services/rum';
 import { PracticeDraftService } from './core/services/practice-draft';
 import { ActualizacionApp } from './core/services/actualizacion';
+import { soloEntrePantallas } from './core/utils/transicion';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
     // Keep map and screenshot libraries lazy until the map route is opened.
-    provideRouter(routes),
+    // Pasar de una pantalla a otra (entrada → mapa) funde una en la otra en
+    // vez de cortar de golpe; dentro del panel no (ver soloEntrePantallas).
+    provideRouter(routes, withViewTransitions({ skipInitialTransition: true, onViewTransitionCreated: soloEntrePantallas })),
     // El orden define el anidamiento: el primero es el más externo y ve la
     // respuesta al final. csrfInterceptor va por dentro de errorInterceptor
     // para poder refrescar el token y reintentar un 403 de CSRF antes de que

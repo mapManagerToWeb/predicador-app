@@ -7,6 +7,20 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* ═══ Letra ═══
+   Inter viaja con la app (public/fonts, licencia OFL al lado) en vez de pedirse
+   a Google: se ve igual sin señal y el texto no cambia de forma a medio cargar.
+   Es un solo archivo variable con todos los grosores; index.html lo precarga y
+   ngsw-config.json lo guarda en el teléfono al instalar. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* ═══ Tailwind Theme — single source of truth for utilities ═══ */
 @theme {
   /* Colors — dark theme (default), light overrides in :root[data-theme="light"] */
@@ -56,7 +70,7 @@
   /* Fonts — Inter as primary */
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   /* Font sizes */
   --text-2xs: 0.625rem;
@@ -161,6 +175,9 @@
   /* Motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Respuesta al tocar (ver «Respuesta al tocar» más abajo). Un botón que
+     define su propia `transition` la agrega: `transition: var(--toque), …`. */
+  --toque: scale 0.16s var(--ease-out), filter 0.16s ease-out;
 
   /* Contour — decorative topographic lines */
   --contour-color: rgba(59, 130, 246, 0.03);
@@ -358,6 +375,27 @@ button {
   font-family: inherit;
   cursor: pointer;
   min-height: 44px;
+  transition: var(--toque);
+}
+
+/* ── Respuesta al tocar ──
+   Todo botón se hunde y se apaga un poco mientras está apretado: así se sabe
+   que el toque llegó aunque la app tarde un instante en responder. Se usa
+   `scale` y no `transform` para no pisar el transform que un botón ya tenga. */
+button:not(:disabled):active,
+.tocable:active {
+  scale: 0.97;
+  filter: brightness(0.93);
+  transition-duration: 0.05s;
+}
+
+:root[data-theme='dark'] button:not(:disabled):active,
+:root[data-theme='dark'] .tocable:active {
+  filter: brightness(1.25);
+}
+
+.tocable {
+  transition: var(--toque);
 }
 
 input, select, textarea {
@@ -421,6 +459,37 @@ img {
   border-radius: var(--radius-sm);
 }
 
+/* ── Movimiento ──
+   Lo que aparece en pantalla entra en unos 0,2 s en vez de saltar. Corto a
+   propósito: en un teléfono viejo una animación larga se siente como lentitud.
+   `translate` (y no `transform`) para no pisar el transform que ya tenga el
+   elemento. Las pantallas los usan por nombre: `animation: subir 0.24s …`. */
+@keyframes aparecer {
+  from { opacity: 0; }
+}
+
+@keyframes desaparecer {
+  to { opacity: 0; }
+}
+
+@keyframes subir {
+  from { opacity: 0; translate: 0 18px; }
+}
+
+@keyframes bajar {
+  to { opacity: 0; translate: 0 18px; }
+}
+
+@keyframes caer {
+  from { opacity: 0; translate: 0 -8px; }
+}
+
+/* Cambio de pantalla (entrada → mapa): un fundido corto (withViewTransitions en app.config.ts). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -429,6 +498,17 @@ img {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  button:not(:disabled):active,
+  .tocable:active {
+    scale: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 
@@ -463,6 +543,13 @@ img {
   box-sizing: border-box;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+/* MapLibre ubica el marcador con `transform: translate(…)`, y `scale` también
+   achica ese desplazamiento: el número se corría de su calle al apretarlo. Aquí
+   la respuesta al toque es solo el cambio de brillo. */
+.maplibregl-marker.lado-badge:active {
+  scale: none;
 }
 
 .maplibregl-marker.lado-badge.marcado {

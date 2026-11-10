@@ -2,7 +2,7 @@
   <div #mapa class="mapa" role="application" aria-label="Mapa de territorios"></div>
 
   @if (store.cargando()) {
-    <div class="cargando" role="status" aria-live="polite">
+    <div class="cargando" role="status" aria-live="polite" animate.leave="saliendo">
       <div class="spinner" aria-hidden="true"></div>
       <span>Cargando territorios…</span>
     </div>
@@ -194,8 +194,8 @@
 
   <!-- Preguntas: nada se borra ni se envía sin confirmar -->
   @if (store.pregunta(); as p) {
-    <div class="velo" tabindex="-1" (click)="store.responder(false)" (keydown.escape)="store.responder(false)"></div>
-    <div class="dialogo" role="alertdialog" aria-modal="true" aria-labelledby="dialogo-titulo">
+    <div class="velo" tabindex="-1" animate.leave="saliendo" (click)="store.responder(false)" (keydown.escape)="store.responder(false)"></div>
+    <div class="dialogo" role="alertdialog" aria-modal="true" aria-labelledby="dialogo-titulo" animate.leave="saliendo">
       <h2 id="dialogo-titulo">{{ p.titulo }}</h2>
       @if (p.texto) {
         <p>{{ p.texto }}</p>

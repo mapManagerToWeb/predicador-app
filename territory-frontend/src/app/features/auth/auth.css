@@ -200,15 +200,11 @@
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: var(--toque), background-color 0.15s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-dark);
-}
-
-.btn-primary:active:not(:disabled) {
-  transform: scale(0.98);
 }
 
 /* Apagado pero legible: gris, no un azul lavado con letras blancas. */
@@ -249,6 +245,10 @@
   font-size: 1.0625rem;
   font-weight: var(--weight-semibold);
   text-decoration: none;
+}
+
+.auth-footer a:active {
+  opacity: 0.6;
 }
 
 .auth-visor:hover {
