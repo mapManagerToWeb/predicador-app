@@ -16,13 +16,13 @@ import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Toast } from '../../core/services/toast';
+import { CLAVE_TEMA } from '../../core/utils/tema';
 import { diasElegibles } from './utils/dia';
 import { MapaStore } from './mapa.store';
 import { MapaVista, type EstadoUbicacion } from './mapa-vista';
 import { Tutorial } from './tutorial/tutorial';
 import type { ModoMarcado } from './mapa.types';
 
-const CLAVE_TEMA = 'territory_theme';
 const CLAVE_FONDO = 'territory_satellite';
 
 function leer(clave: string): string | null {

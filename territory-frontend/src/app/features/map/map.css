@@ -86,28 +86,35 @@ svg .grueso {
   gap: 8px;
 }
 
-/* Aviso del modo práctica: queda debajo del buscador y no tapa el panel. */
+/* Aviso del modo práctica: bajo el buscador, en el hueco entre los botones de
+   la izquierda y el zoom. No tapa ningún botón ni los resultados del buscador
+   (queda debajo de la barra), aunque el texto ocupe dos líneas. */
 .aviso-practica {
   position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 58px);
-  left: 12px;
-  right: 12px;
-  z-index: 5;
-  max-width: 560px;
+  top: calc(max(12px, env(safe-area-inset-top)) + 60px);
+  left: 76px;
+  right: 62px;
+  z-index: 3;
+  width: fit-content;
+  max-width: 340px;
   margin: 0 auto;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 12px;
-  background: var(--surface-1);
-  border: 1px solid var(--color-border-solid);
+  /* Oscuro en los dos temas: el amarillo, el verde y el blanco ya son los
+     colores de los números de territorio. */
+  background: rgba(17, 24, 39, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow: var(--elev-2);
-  color: var(--ink-muted);
-  font-size: 14px;
-  line-height: 1.35;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.3;
   text-align: center;
+  text-wrap: balance;
+  pointer-events: none;
 }
 
 .aviso-practica strong {
-  color: var(--ink);
+  color: #fde047;
 }
 
 .icono {
@@ -693,7 +700,7 @@ svg .grueso {
   }
 
   .aviso-practica {
-    right: calc(min(340px, 46vw) + 22px);
+    right: calc(min(340px, 46vw) + 64px);
   }
 
   .panel {

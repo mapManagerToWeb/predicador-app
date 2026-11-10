@@ -42,8 +42,8 @@ import {
 import { type EstadoUbicacion, UbicacionMapa } from '../../core/map/ubicacion';
 import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Toast } from '../../core/services/toast';
+import { aplicarTemaGuardado, CLAVE_TEMA } from '../../core/utils/tema';
 
-const CLAVE_TEMA = 'territory_theme';
 type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['properties']>;
 
 /**
@@ -101,7 +101,7 @@ export class VisorPage {
   constructor() {
     const destroyRef = inject(DestroyRef);
     afterNextRender(() => {
-      this.aplicarTemaGuardado();
+      aplicarTemaGuardado();
       void this.iniciar();
       const observador = new MutationObserver(() => {
         if (this.map) cambiarFondo(this.map, this.fondo(), temaOscuro());
@@ -295,16 +295,6 @@ export class VisorPage {
     } catch {
       // Sin almacenamiento el tema vale solo para esta visita.
     }
-  }
-
-  private aplicarTemaGuardado(): void {
-    let oscuro = false;
-    try {
-      oscuro = localStorage.getItem(CLAVE_TEMA) === 'dark';
-    } catch {
-      // Tema claro por defecto, igual que el mapa de los encargados.
-    }
-    document.documentElement.setAttribute('data-theme', oscuro ? 'dark' : 'light');
   }
 
   protected readonly hace = hace;

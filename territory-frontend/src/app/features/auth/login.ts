@@ -5,6 +5,7 @@ import { AuthTokenService } from '../../core/services/auth-token';
 import { codigoLogin, EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
 import { esCelularChileno, MENSAJE_TELEFONO_INVALIDO, normalizePhone } from '../../core/utils/phone';
+import { aplicarTemaGuardado } from '../../core/utils/tema';
 
 @Component({
   selector: 'app-login',
@@ -31,7 +32,10 @@ export class LoginPage implements OnInit {
   registroAbierto = signal<boolean | null>(null);
 
   constructor() {
-    afterNextRender(() => void this.cargarRegistro());
+    afterNextRender(() => {
+      aplicarTemaGuardado();
+      void this.cargarRegistro();
+    });
   }
 
   async cargarRegistro(): Promise<void> {
