@@ -2,7 +2,7 @@
 
 ## Build & tests
 **¿Por qué `mvn verify` no falla aunque haya tests de integración sin correr?**
-Porque en local nadie pasa `-Ddocker.available=true`, la propiedad que activa los cinco ITs de Testcontainers. CI sí la pasa (`ci-backend.yml`), así que allí corren. ⚠️ Ojo: un `mvn verify` **sin** los IT docker sí puede fallar el gate JaCoCo 40% en `territory-service`. Ver `../testing/integration.md`.
+Porque en local nadie pasa `-Ddocker.available=true`, la propiedad que activa los seis ITs de Testcontainers. CI sí la pasa (`ci-backend.yml`), así que allí corren. Además, desde que la compuerta mira si Docker responde de verdad, un runner con Docker roto los **salta** en vez de tumbar el build. ⚠️ Ojo: un `mvn verify` **sin** los IT docker sí puede fallar el gate JaCoCo 40% en `territory-service`. Ver `../testing/integration.md`.
 
 **¿Cómo corro TODOS los tests backend?**
 ```bash

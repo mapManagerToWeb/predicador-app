@@ -2,11 +2,11 @@
 
 | ID | Requerimiento | Valor |
 |---|---|---|
-| RNF-01 | Build backend | `mvn verify -Pcoverage` + gate JaCoCo 40% — **PASS solo con el ambiente de IT completo**: local `-Ddocker.available=true` (+ `TESTCONTAINERS_RYUK_DISABLED=true` en este entorno) o env `TERRITORY_IT_DB_*`; sin IT, `territory-service` cae bajo el gate (~25–29%) y el build falla. CI lo cumple porque pasa `-Ddocker.available=true` |
+| RNF-01 | Build backend | `mvn verify -Pcoverage` + gate JaCoCo 40% — **PASS solo con el ambiente de IT completo**: local `-Ddocker.available=true` **y Docker respondiendo** (+ `TESTCONTAINERS_RYUK_DISABLED=true` en este entorno) o env `TERRITORY_IT_DB_*`; sin IT, `territory-service` cae bajo el gate (~25–29%) y el build falla. CI lo cumple porque pasa `-Ddocker.available=true`; SonarCloud porque pasa `TERRITORY_IT_DB_*` |
 | RNF-02 | Lint frontend | `pnpm run lint` 0 errors |
 | RNF-03 | Tests frontend | `pnpm test -- --run --coverage` PASS (60/58/55/50) |
 | RNF-04 | Build frontend | `pnpm run build` sin error (warning budget tolerado) |
-| RNF-05 | Seguridad | gitleaks/Semgrep/OWASP/Trivy en CI |
+| RNF-05 | Seguridad | gitleaks/Semgrep/OWASP/Trivy en CI + `pnpm audit --prod --audit-level=high` (frontend) + Enforcer `bannedDependencies` (backend) |
 | RNF-06 | Auth | `SESSION_SECRET` ≥32 bytes fuera de `local`; `ADMIN_PASSWORD_BCRYPT` obligatorio |
 | RNF-07 | Phone validation | `esCelularChileno`: 9 dígitos start with 9; `+56` opcional |
 | RNF-08 | Map worker | MapLibre GL 6, worker via `import.meta.url` → `/vendor/maplibre-gl-worker.mjs` |

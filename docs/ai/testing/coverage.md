@@ -37,7 +37,7 @@ Corrida completa con IT de DB: `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pc
 
 - 50 archivos de test: `shared` 12, `api-gateway` 7, `territory-service` 7, `reporting-service` 24, `config/discovery` 0 (infra).
 - JaCoCo: gate **40% LINE/INSTRUCTION** (falla el build si baja).
-- ⚠️ **Los números de arriba son CON los IT docker-gated corriendo.** Sin `-Ddocker.available=true` se saltan y `territory-service` cae bajo el gate 40% (~25–29%) → el build **falla localmente**. CI pasa `-Ddocker.available=true`, así que ejecuta los seis ITs. Ver `integration.md`.
+- ⚠️ **Los números de arriba son CON los IT docker-gated corriendo.** Sin `-Ddocker.available=true` (y Docker respondiendo) se saltan y `territory-service` cae bajo el gate 40% (~25–29%) → el build **falla localmente**. CI pasa `-Ddocker.available=true`, así que ejecuta los seis ITs; SonarCloud pasa `TERRITORY_IT_DB_*`, que basta para el gate. Ver `integration.md`.
 
 ## Cómo regenerar
 ```bash

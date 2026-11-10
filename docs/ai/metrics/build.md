@@ -21,13 +21,14 @@ BUILD SUCCESS — 5.698 s total
 ## Tests + cobertura
 - `mvn verify -Pcoverage -B` agrega JaCoCo + **40% LINE/INSTRUCTION gate** (SonarCloud)
 - ⚠️ **En local plano el gate FALLA**: los ITs de DB se saltan → territory ~25% < 40%. No indica código roto; indica que faltan los ITs. Ver `../testing/integration.md`.
-- Tests integración DB: 5 tests requieren `-Ddocker.available=true` (Testcontainers)
+- Tests integración DB: 5 tests requieren `-Ddocker.available=true` **y Docker respondiendo** (Testcontainers)
   - PostgisIntegrationTest, ReportRepositoryIntegrationTest
   - CicloServiceIntegrationTest, EstadoPublicoServiceIntegrationTest
   - EncargadoRaceConditionTest (antes `EncargadoRaceConditionIT`, que nunca corría)
-- `TerritoryAdminIntegrationTest`: requiere `-Ddocker.available=true` **O** `TERRITORY_IT_DB_URL` + `TERRITORY_IT_DB_USERNAME` / `TERRITORY_IT_DB_PASSWORD` (DB con sufijo `*_test`)
+- `TerritoryAdminIntegrationTest`: requiere `TERRITORY_IT_DB_URL` + `TERRITORY_IT_DB_USERNAME` / `TERRITORY_IT_DB_PASSWORD` (DB con sufijo `*_test`) **o** `-Ddocker.available=true` con Docker disponible
   - Borra todas las manzanas → rechaza DB sin sufijo `_test`
-- `ci-backend.yml` pasa `-Ddocker.available=true`: CI ejecuta los seis ITs.
+- `ci-backend.yml` pasa `-Ddocker.available=true`: CI ejecuta los seis ITs. `sonarcloud.yml` pasa `TERRITORY_IT_DB_*`: el gate de 40% se sostiene aunque los ITs docker se salten.
+- **`mvn -pl <módulo> validate` corre el Enforcer** de `pom.xml`: falla si una dependencia vuelve a una versión con CVE (hoy `amqp-client < 5.37.0`).
 - Recetas verificadas (2026-10-09) para correr TODOS los ITs:
   1. `TESTCONTAINERS_RYUK_DISABLED=true mvn verify -Pcoverage -B -Ddocker.available=true` — todo vía Testcontainers. Ryuk se desactiva porque GHCR 404 `testcontainers/ryuk:0.11.0` en este entorno.
   2. `TERRITORY_IT_DB_URL=…_test … mvn verify -Pcoverage -B` — vía DB externa `*_test`, sin Testcontainers (los 5 ITs docker-gated siguen skippeados, pero `TerritoryAdminIntegrationTest` da la cobertura). CI ya no usa esta vía: pasa `-Ddocker.available=true`.
