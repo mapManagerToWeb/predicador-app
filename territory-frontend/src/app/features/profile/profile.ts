@@ -5,6 +5,7 @@ import { Profile } from '../../core/services/profile';
 import { codigoLogin, EncargadoService } from '../../core/services/encargado';
 import { Toast } from '../../core/services/toast';
 import { esCelularChileno, MENSAJE_TELEFONO_INVALIDO, normalizePhone } from '../../core/utils/phone';
+import { aplicarTemaGuardado } from '../../core/utils/tema';
 
 @Component({
   selector: 'app-profile',
@@ -29,7 +30,10 @@ export class ProfilePage implements OnInit {
   errorTelefono = signal<string | null>(null);
 
   constructor() {
-    afterNextRender(() => void this.salirSiElRegistroEstaCerrado());
+    afterNextRender(() => {
+      aplicarTemaGuardado();
+      void this.salirSiElRegistroEstaCerrado();
+    });
   }
 
   /** Con el registro cerrado esta pantalla no tiene sentido (p. ej. un enlace guardado): vuelve al login. */

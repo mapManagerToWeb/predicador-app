@@ -4,11 +4,10 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { firstValueFrom } from 'rxjs';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Profile } from '../../core/services/profile';
+import { CLAVE_TEMA } from '../../core/utils/tema';
 import { environment } from '../../../environments/environment';
 import { AdminStore } from './services/admin-store';
 import { AdminUi } from './services/admin-ui';
-
-const CLAVE_TEMA = 'territory_theme';
 
 interface Seccion {
   ruta: string;

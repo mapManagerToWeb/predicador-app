@@ -1,2 +1,10 @@
-/* ── Profile-specific ── */
-/* All shared styles in auth.css */
+/* Solo de «Crear perfil»; lo compartido con el inicio de sesión está en ../auth/auth.css. */
+
+/* Con tres campos, en los teléfonos más bajos el logo no cabe: se quita para
+   que el botón quede a la vista sin deslizar. */
+@media (max-height: 600px) {
+  /* Dos clases: auth.css se carga después y, con una sola, ganaría la suya. */
+  .auth-brand .brand-icon {
+    display: none;
+  }
+}
