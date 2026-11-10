@@ -22,7 +22,8 @@ import type { SituacionTerritorio } from '../../core/map/estado-publico';
 import { franjaDeLados, type GeometriaManzana } from '../../core/map/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import type { EdicionLados } from './mapa.types';
-import { UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from './ubicacion';
+import { UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from '../../core/map/ubicacion';
+import type { MotivoSinRumbo } from '../../core/map/rumbo';
 
 export type { EstadoUbicacion };
 
@@ -57,6 +58,8 @@ export interface EventosVista {
   alTocar(t: Toque): void;
   alTocarLado(indice: number): void;
   alCambiarUbicacion(e: EstadoUbicacion, error?: ErrorUbicacion): void;
+  /** El equipo no puede decir hacia dónde apunta; la pantalla lo explica. */
+  alSinRumbo?(motivo: MotivoSinRumbo): void;
 }
 
 const ESTADO = (clave: string): ExpressionSpecification => ['boolean', ['feature-state', clave], false];
@@ -76,7 +79,7 @@ const OPACIDAD_RELLENO: ExpressionSpecification = [
 ];
 
 const TOQUE_CERCANO_PX = 30;
-const CAPAS_UBICACION = ['ubicacion-precision', 'ubicacion-punto'];
+const CAPAS_UBICACION = ['ubicacion-precision', 'ubicacion-rumbo', 'ubicacion-sombra', 'ubicacion-punto'];
 const TOQUE_LADO_PX = 18;
 const CAPTURA_MAX_PX = 1600;
 
@@ -498,6 +501,8 @@ export class MapaVista {
       this.map,
       typeof navigator !== 'undefined' ? navigator.geolocation : undefined,
       (e, error) => this.eventos.alCambiarUbicacion(e, error),
+      undefined,
+      motivo => this.eventos.alSinRumbo?.(motivo),
     );
   }
 

@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { limitesDeNavegacion, limitesPrincipales, etiquetasTerritorios, type FondoMapa } from '../../core/map/base-map';
+import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Toast } from '../../core/services/toast';
@@ -135,6 +136,7 @@ export class MapPage {
           if (error === 'denegada') this.toast.show('Permiso de ubicación denegado: actívalo en los ajustes del navegador', 5000, 'warning');
           else if (error) this.toast.show('No se pudo obtener tu ubicación', 3000, 'warning');
         },
+        alSinRumbo: motivo => this.toast.show(AVISO_SIN_RUMBO[motivo], 5000, 'warning'),
       },
     );
     this.vista.limitar(limitesDeNavegacion(coleccion));
