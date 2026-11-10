@@ -45,3 +45,36 @@ export function fechaParaMensaje(iso: string): string {
   const [a, m, d] = iso.split('-');
   return `${d}-${m}-${a}`;
 }
+
+const ZONA_CHILE = 'America/Santiago';
+
+/** Desfase de la zona (ms) en ese instante; incluye el horario de verano. */
+function desfaseZona(instante: number, zona: string): number {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: zona,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(instante));
+  const valor = (tipo: string) => Number(partes.find(p => p.type === tipo)?.value ?? 0);
+  const comoUtc = Date.UTC(valor('year'), valor('month') - 1, valor('day'), valor('hour'), valor('minute'), valor('second'));
+  return comoUtc - instante;
+}
+
+/**
+ * El mediodía de Chile del día `iso`, como instante ISO-8601. Es la misma
+ * regla que usa el servidor para `ultimoTrabajo` (día de predicación a las
+ * 12:00 de Chile), así la práctica se ve igual que un reporte real.
+ */
+export function mediodiaChile(iso: string): string {
+  const [a, m, d] = iso.split('-').map(Number);
+  const doceUtc = Date.UTC(a, m - 1, d, 12);
+  // Dos pasadas: la primera estima el desfase y la segunda lo corrige si el
+  // día cae justo en el cambio de horario.
+  const estimado = doceUtc - desfaseZona(doceUtc, ZONA_CHILE);
+  return new Date(doceUtc - desfaseZona(estimado, ZONA_CHILE)).toISOString();
+}

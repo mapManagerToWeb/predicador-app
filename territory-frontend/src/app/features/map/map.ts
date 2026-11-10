@@ -256,6 +256,11 @@ export class MapPage {
   }
 
   protected salir(): void {
+    if (this.store.modoPractica) {
+      // La práctica no cierra la sesión real: se vuelve al mapa si hay una.
+      void this.router.navigate(this.authToken.hasToken() ? ['/map'] : ['/login']);
+      return;
+    }
     const salirYa = () => {
       this.perfil.clear();
       this.authToken.logout();

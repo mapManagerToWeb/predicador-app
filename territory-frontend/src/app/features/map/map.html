@@ -33,7 +33,7 @@
     <button type="button" class="icono" (click)="abrirTutorial()" aria-label="Cómo se usa" data-tutorial="ayuda">
       <span class="signo" aria-hidden="true">?</span>
     </button>
-    <button type="button" class="icono" (click)="salir()" aria-label="Cerrar sesión">
+    <button type="button" class="icono" (click)="salir()" [attr.aria-label]="store.modoPractica ? 'Salir de la práctica' : 'Cerrar sesión'">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
     </button>
 
@@ -47,6 +47,12 @@
       </ul>
     }
   </header>
+
+  @if (store.modoPractica) {
+    <p class="aviso-practica" role="status">
+      <strong>Modo práctica</strong> — nada se envía ni se guarda en la app real. Lo tuyo se borra solo a los 7 días.
+    </p>
+  }
 
   <!-- Botones sobre el mapa -->
   <div class="lateral">
@@ -94,7 +100,7 @@
             <div class="territorio" [style.--color]="r.color">
               <div class="territorio-texto">
                 <span class="territorio-linea">
-                  <span class="territorio-nombre">{{ store.practica() ? 'Práctica' : 'Territorio' }} {{ r.numero }}</span>
+                  <span class="territorio-nombre">{{ store.practicaTutorial() ? 'Práctica' : 'Territorio' }} {{ r.numero }}</span>
                   <span class="territorio-cuenta">
                     <span>{{ r.enteras }} de {{ r.total }} manzanas</span>
                     @if (r.porCalles) {
@@ -104,7 +110,7 @@
                 </span>
                 @if (r.completo) {
                   <strong class="completo">¡Territorio completo!</strong>
-                } @else if (!store.practica() && r.base; as base) {
+                } @else if (!store.practicaTutorial() && r.base; as base) {
                   @if (base.vueltaNueva) {
                     <span class="territorio-nota">Se completó el {{ fechaCorta(base.fecha) }}: empiezas una vuelta nueva.</span>
                   } @else if (base.fecha) {
@@ -161,7 +167,7 @@
             </button>
           </div>
           <!-- La indicación se muestra hasta el primer cambio: después ya se sabe y el mapa necesita el espacio. -->
-          @if (!store.hayCambios() && !store.practica()) {
+          @if (!store.hayCambios() && !store.practicaTutorial()) {
             <p class="indicacion chica">
               @if (store.modo() === 'manzana') {
                 Toca una manzana para marcarla. Tócala otra vez para desmarcarla.
