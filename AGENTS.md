@@ -1,6 +1,6 @@
 # Repository Instructions
 
-> Last verified: 2026-11-07. Whenever a fact here disagrees with the code, the code wins — fix this file.
+> Last verified: 2026-11-10. Whenever a fact here disagrees with the code, the code wins — fix this file.
 
 ## Layout
 
@@ -67,7 +67,7 @@ mvn -pl territory-service test     # one module
 ## Frontend Conventions
 
 - Feature layout under `territory-frontend/src/app/`: `core/` (services, guards, interceptors, models, `map/`, `utils/`), `features/` (`auth`, `map`, `profile`, `admin`, `visor`). No `shared/` directory.
-- Route guards: `profileGuard` → `/map`, `adminGuard` → `/admin`. `/visor` is **intentionally public**. `**` → `/login`. All routes lazy-load via `loadComponent`.
+- Route guards: `profileGuard` → `/map`, `adminGuard` → `/admin`. `/visor` and `/practice` are **intentionally public**. `/practice` is the field map with the `MODO_PRACTICA` token (`core/map/modo-practica.ts`): real territories, but nothing is sent or saved server-side; marks live in `PracticeDraftService` (local storage, wiped after 7 days). `**` → `/login`. All routes lazy-load via `loadComponent`.
 - Selector prefixes are enforced by ESLint: components `app-` (kebab-case), directives `app` (camelCase).
 - Strict TypeScript: `strict`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noPropertyAccessFromIndexSignature`. `no-explicit-any` is `warn`; **`no-floating-promises` is `error`** — `await` or `void` every promise. `no-console` allows only `warn`/`error`.
 - Zoneless (`provideZonelessChangeDetection`); state in plain signals in `providedIn: 'root'` services. HTTP via `HttpClient` + `firstValueFrom` — `httpResource`/`resource`/`linkedSignal` are deliberately unused.
@@ -78,7 +78,7 @@ mvn -pl territory-service test     # one module
 ### Maps (all MapLibre GL 6 — ADR 0010 replaced Leaflet and `@turf/*`)
 
 - **`maplibre-gl` 6 resolves its worker from `import.meta.url`, which breaks after bundling.** `angular.json` copies `maplibre-gl.css`, `maplibre-gl-worker.mjs`, `maplibre-gl-shared.mjs` to `/vendor/`; `core/map/base-map.ts` calls `setWorkerUrl(...)` and injects the CSS. Removing that asset glob breaks the map at runtime, not at build time.
-- `core/map/base-map.ts` is shared by the field map, the viewer and the admin maps. `maxZoom` is 20; the satellite source is capped at `maxzoom` 18 (Esri serves a grey tile at 19 over Curanilahue, so MapLibre overzooms instead).
+- `core/map/base-map.ts` is shared by the field map, the viewer and the admin maps. The «my location» control (`core/map/ubicacion.ts`) and the heading cone (`core/map/rumbo.ts`, iOS asks for permission) are shared by the field map and the viewer; the field map's offline data cache lives in `features/map/mapa.datos.ts`. `maxZoom` is 20; the satellite source is capped at `maxzoom` 18 (Esri serves a grey tile at 19 over Curanilahue, so MapLibre overzooms instead).
 - In MapLibre 6 `GeoJSONSource.setData` returns a promise → prefix with `void`.
 - Marking must only change `feature-state`; never re-upload geometry (ADR 0010 perf rule).
 - `features/map/` split: `map.ts` wires the screen, `mapa.store.ts` holds the rules, `mapa-vista.ts` does all drawing, `utils/salida.ts` + `utils/borrador.ts` (and `core/map/lados.ts`) are pure and tested without a map. **Nothing may discard marks or send a report without a `Pregunta` confirmation.**
