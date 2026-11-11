@@ -386,7 +386,7 @@ export class TerritoriosPage {
     try {
       await this.api.corregir({
         territorio: t,
-        manzanasIds: quedan.map(clave).sort().join(','),
+        manzanasIds: quedan.map(clave).sort((a, b) => a.localeCompare(b)).join(','),
         geometriaParcial: null,
         puntosParciales: null,
         totalManzanas: quedan.length,

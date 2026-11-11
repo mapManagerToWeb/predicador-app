@@ -205,8 +205,8 @@ export class S13Page implements OnInit {
     return m && this.modo() === 'calles' ? callesParaMapa(SIN_BASE, this.edicion(), m) : null;
   });
 
-  async ngOnInit(): Promise<void> {
-    await this.cargar();
+  ngOnInit(): void {
+    void this.cargar();
   }
 
   protected async cargar(forzar = false): Promise<void> {

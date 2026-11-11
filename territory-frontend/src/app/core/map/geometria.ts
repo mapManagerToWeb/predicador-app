@@ -85,8 +85,11 @@ function distanciaAlBorde(p: Position, poligono: Position[][]): number {
  */
 export function puntoInterior(g: Poligonal): Position {
   // El polígono más grande manda (un MultiPolygon rara vez tiene partes parejas).
-  const pol = poligonos(g).reduce((mejor, p) =>
-    area({ type: 'Polygon', coordinates: p }) > area({ type: 'Polygon', coordinates: mejor }) ? p : mejor,
+  const partes = poligonos(g);
+  const pol = partes.reduce(
+    (mejor, p) =>
+      area({ type: 'Polygon', coordinates: p }) > area({ type: 'Polygon', coordinates: mejor }) ? p : mejor,
+    partes[0],
   );
   const anillo = pol[0];
   let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];

@@ -108,7 +108,7 @@ export function alternarCalle(
 /** Lo nuevo de esta salida: manzanas enteras y calles que no estaban en la base. */
 export function aporte(base: EstadoCorreccion, e: EstadoCorreccion): { enteras: string[]; zonas: ZonaParcialDatos[] } {
   return {
-    enteras: [...e.marcadas].filter(k => !base.marcadas.has(k)).sort(),
+    enteras: [...e.marcadas].filter(k => !base.marcadas.has(k)).sort((a, b) => a.localeCompare(b)),
     zonas: e.zonas.filter(z => !esDeLaBase(base, z)),
   };
 }

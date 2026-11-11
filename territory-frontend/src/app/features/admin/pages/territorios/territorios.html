@@ -174,7 +174,7 @@
         <button class="adm-btn primary" type="button" (click)="nuevaManzana()">+ Nueva manzana</button>
         <button class="adm-btn" type="button" (click)="elegirArchivo()">Importar</button>
         <button class="adm-btn" type="button" (click)="exportar()">Exportar</button>
-        <input #archivo type="file" accept=".geojson,.json,application/geo+json,application/json" hidden (change)="importar($event)" />
+        <input #archivo type="file" accept=".geojson,.json,application/geo+json,application/json" hidden aria-label="Importar archivo GeoJSON" (change)="importar($event)" />
       </div>
 
       @if (seleccion().size > 1) {

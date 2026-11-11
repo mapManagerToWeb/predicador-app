@@ -105,7 +105,11 @@ function ladosDeAnillo(anillo: Position[]): Omit<Lado, 'indice'>[] {
   const largo = xy.map((p, i) => dist(p, xy[(i + 1) % n]));
   const perimetro = largo.reduce((a, b) => a + b, 0);
   const posicion: number[] = [];
-  largo.reduce((acc, l, i) => ((posicion[i] = acc), acc + l), 0);
+  let recorrido = 0;
+  for (let i = 0; i < largo.length; i++) {
+    posicion[i] = recorrido;
+    recorrido += largo[i];
+  }
   const giros = xy.map((p, i) => giro(xy[(i - 1 + n) % n], p, xy[(i + 1) % n]));
 
   const ventana = Math.min(8, perimetro * 0.06);

@@ -61,7 +61,7 @@ export function baseDesdeEstado(e: EstadoTerritorioPublico | undefined, manzanas
   if (e.estado === 'completed') return { ...BASE_VACIA, fecha, vueltaNueva: true };
 
   const ids = idsDeLista(e.manzanasIds);
-  const marcadas = manzanas.filter(m => estaEnLista(ids, m.id, m.mid)).map(m => m.id).sort();
+  const marcadas = manzanas.filter(m => estaEnLista(ids, m.id, m.mid)).map(m => m.id).sort((a, b) => a.localeCompare(b));
   const enteras = new Set(marcadas);
   const zonas = leerZonas(e.geometriaParcial, e.puntosParciales ?? null).filter(z => !z.manzanaId || !enteras.has(z.manzanaId));
   return { marcadas, zonas, fecha, vueltaNueva: false };
@@ -127,7 +127,7 @@ export function alternarManzana(t: TerritorioSalida, manzana: Manzana): Territor
     };
   }
   // Marcarla entera reemplaza lo que tuviera marcado por calles.
-  return { ...t, marcadas: [...t.marcadas, manzana.id].sort(), zonas: sinZonasDe(t.zonas, manzana) };
+  return { ...t, marcadas: [...t.marcadas, manzana.id].sort((a, b) => a.localeCompare(b)), zonas: sinZonasDe(t.zonas, manzana) };
 }
 
 /**
@@ -167,7 +167,7 @@ export function ladosElegidos(t: TerritorioSalida, manzanaId: string, totalLados
 function claveZonas(zonas: ZonaParcialDatos[]): string {
   return zonas
     .map(z => `${z.manzanaId ?? JSON.stringify(z.geometria)}:${z.lados.join('.')}`)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .join('|');
 }
 
@@ -175,7 +175,7 @@ function claveZonas(zonas: ZonaParcialDatos[]): string {
 export function hayCambios(t: TerritorioSalida): boolean {
   const base = t.base;
   if (base === null) return t.marcadas.length > 0 || t.zonas.length > 0;
-  return t.marcadas.join(',') !== [...base.marcadas].sort().join(',') || claveZonas(t.zonas) !== claveZonas(base.zonas);
+  return t.marcadas.join(',') !== [...base.marcadas].sort((a, b) => a.localeCompare(b)).join(',') || claveZonas(t.zonas) !== claveZonas(base.zonas);
 }
 
 /** Lo que marcó esta salida por encima de su base (lo único que es del encargado). */

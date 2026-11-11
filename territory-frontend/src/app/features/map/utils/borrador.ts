@@ -97,7 +97,7 @@ export function leerBorrador(valor: unknown): Borrador | null {
     const territorios: TerritorioSalida[] = [];
     for (const t of v['territorios'] as TerritorioGuardado[]) {
       if (!t || !Number.isInteger(t.n) || !esTextos(t.m)) continue;
-      territorios.push({ numero: t.n, marcadas: [...t.m].sort(), zonas: leerZonasGuardadas(t.z), base: leerBase(t.b) });
+      territorios.push({ numero: t.n, marcadas: [...t.m].sort((a, b) => a.localeCompare(b)), zonas: leerZonasGuardadas(t.z), base: leerBase(t.b) });
     }
     const conDatos = new Set(territorios.map(t => t.numero));
     return {
@@ -137,7 +137,7 @@ function leerBorradorLeaflet(v: Record<string, unknown>): Borrador | null {
   }
   const territorios = [...porTerritorio.values()]
     .filter(t => (seleccion as number[]).includes(t.numero))
-    .map(t => ({ ...t, marcadas: [...new Set(t.marcadas)].sort() }));
+    .map(t => ({ ...t, marcadas: [...new Set(t.marcadas)].sort((a, b) => a.localeCompare(b)) }));
   if (territorios.length === 0) return null;
   return {
     abiertos: territorios.map(t => t.numero),

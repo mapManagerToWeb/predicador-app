@@ -63,8 +63,8 @@ export function vaciar(): EstadoCorreccion {
 }
 
 export function iguales(a: EstadoCorreccion, b: EstadoCorreccion): boolean {
-  const ka = [...a.marcadas].sort().join(',');
-  const kb = [...b.marcadas].sort().join(',');
+  const ka = [...a.marcadas].sort((x, y) => x.localeCompare(y)).join(',');
+  const kb = [...b.marcadas].sort((x, y) => x.localeCompare(y)).join(',');
   return ka === kb && serializarZonas(a.zonas).puntosParciales === serializarZonas(b.zonas).puntosParciales;
 }
 
@@ -72,7 +72,7 @@ export function pedido(e: EstadoCorreccion, territorio: number, total: number, n
   const { geometriaParcial, puntosParciales } = serializarZonas(e.zonas);
   return {
     territorio,
-    manzanasIds: [...e.marcadas].sort().join(','),
+    manzanasIds: [...e.marcadas].sort((x, y) => x.localeCompare(y)).join(','),
     geometriaParcial,
     puntosParciales,
     totalManzanas: total,
@@ -169,7 +169,7 @@ export function pedidoSalida(e: EstadoCorreccion, anular: boolean, nota: string)
   const { geometriaParcial, puntosParciales } = serializarZonas(e.zonas);
   return {
     anular,
-    manzanasIds: anular ? null : [...e.marcadas].sort().join(','),
+    manzanasIds: anular ? null : [...e.marcadas].sort((x, y) => x.localeCompare(y)).join(','),
     geometriaParcial: anular ? null : geometriaParcial,
     puntosParciales: anular ? null : puntosParciales,
     nota: nota.trim() || null,
