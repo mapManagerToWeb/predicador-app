@@ -67,7 +67,6 @@ class ReportSendServiceTest {
         );
 
         when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
-        when(messageService.requiereScreenshot(request)).thenReturn(true);
         when(mediaClient.uploadImage("base64image", "image/jpeg")).thenReturn("media_123");
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
@@ -101,7 +100,6 @@ class ReportSendServiceTest {
         );
 
         when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
-        when(messageService.requiereScreenshot(request)).thenReturn(false);
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
         when(props.templateName()).thenReturn("asignacion_territorio");
@@ -119,7 +117,7 @@ class ReportSendServiceTest {
     }
 
     @Test
-    void sendReport_territorioUnicoCompletado_ignoraScreenshotYUsaImagenPorDefecto() {
+    void sendReport_territorioUnicoCompletado_vaConLaCapturaDelMapa() {
         var request = new WhatsAppSendRequest(
             "Daniel", "Uribe", "21-07-2026", "tarde",
             List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
@@ -134,7 +132,7 @@ class ReportSendServiceTest {
         );
 
         when(messageService.generarParametrosTemplate(request)).thenReturn(templateParams);
-        when(messageService.requiereScreenshot(request)).thenReturn(false);
+        when(mediaClient.uploadImage("base64image", "image/jpeg")).thenReturn("media_123");
         when(props.apiVersion()).thenReturn("v21.0");
         when(props.phoneNumberId()).thenReturn("123");
         when(props.templateName()).thenReturn("asignacion_territorio");
@@ -147,7 +145,7 @@ class ReportSendServiceTest {
         WhatsAppSendResponse response = sendService.sendReport(request);
 
         assertTrue(response.success());
-        verify(mediaClient, never()).uploadImage(anyString(), anyString());
+        verify(mediaClient).uploadImage("base64image", "image/jpeg");
     }
 
     /**
@@ -224,7 +222,6 @@ class ReportSendServiceTest {
             "territorio", "1",
             "estado", "tarde"
         ));
-        when(messageService.requiereScreenshot(request)).thenReturn(false);
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");
         when(props.destinationNumber()).thenReturn("+54911111111");
@@ -286,7 +283,6 @@ class ReportSendServiceTest {
         );
         when(messageService.generarParametrosTemplate(request)).thenReturn(Map.of(
             "fecha", "27-09-2026", "encargado", "Ana Soto", "territorio", "71", "estado", "tarde"));
-        when(messageService.requiereScreenshot(request)).thenReturn(false);
         when(props.phoneNumberId()).thenReturn("123");
         when(props.templateName()).thenReturn("asignacion_territorio");
         when(props.languageCode()).thenReturn("es_CL");

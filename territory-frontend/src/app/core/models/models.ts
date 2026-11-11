@@ -58,8 +58,6 @@ export interface TerritorioReporteEnvio {
 
 export interface TerritoriosEnvio {
   territorios: TerritorioReporteEnvio[];
-  /** false cuando es un único territorio completado: se usa la imagen oficial. */
-  requiereScreenshot: boolean;
 }
 
 export interface WhatsAppSendRequest {

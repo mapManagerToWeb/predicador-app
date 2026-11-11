@@ -21,7 +21,6 @@ import {
   alternarManzana,
   BASE_VACIA,
   baseDesdeEstado,
-  envioDe,
   envioDeReportes,
   guardarLados,
   hayCambios,
@@ -785,7 +784,7 @@ export class MapaStore {
         this.toast.show('Otro hermano ya reportó eso mismo: no quedó nada nuevo que enviar', 4000, 'info');
         return;
       }
-      const captura = envioDe(locales).requiereScreenshot ? await this.vista?.capturar(numeros) ?? null : null;
+      const captura = (await this.vista?.capturar(numeros)) ?? null;
       const dia = diaElegible(Math.min(Math.max(this.diaAtras(), 0), DIAS_ATRAS));
       const cuando = { fechaPredicacion: dia.iso, turno: this.predicacion() };
       const registros = locales.map(r =>
@@ -801,7 +800,7 @@ export class MapaStore {
         fechaRegistro: fechaParaMensaje(dia.iso),
         predicacion: this.predicacion(),
         territorios: envio.territorios,
-        screenshotBase64: envio.requiereScreenshot ? captura : null,
+        screenshotBase64: captura,
         destinationNumber: perfil.telefono || null,
       });
       if (!respuesta.success) {

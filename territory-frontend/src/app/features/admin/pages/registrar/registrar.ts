@@ -344,7 +344,7 @@ export class RegistrarPage {
     this.guardando.set(true);
     // La imagen del mapa con todos los territorios de la salida.
     this.manzanaCalles.set(null);
-    const captura = this.mapa()?.capturar() ?? null;
+    const captura = this.enviarWhatsApp() ? ((await this.mapa()?.capturarSalida()) ?? null) : null;
     const dia = this.dia();
     const turno = this.turno();
     try {
@@ -403,8 +403,6 @@ export class RegistrarPage {
       totalManzanas: x.totalManzanas ?? this.manzanas().filter(m => m.properties.territorio === x.territorioNumero).length,
       manzanasMarcadas: x.manzanasMarcadas ?? 0,
     }));
-    // Igual que la app: un solo territorio completo va con la imagen oficial; si no, con el mapa.
-    const imagenOficial = territorios.length === 1 && territorios[0].finalizado;
     try {
       const r = await this.whatsapp.sendReport({
         encargadoNombre: hermano.nombre,
@@ -412,7 +410,7 @@ export class RegistrarPage {
         fechaRegistro: fechaParaWhatsApp(dia),
         predicacion: turno,
         territorios,
-        screenshotBase64: imagenOficial ? null : captura,
+        screenshotBase64: captura,
         destinationNumber: null,
       });
       return r.success;

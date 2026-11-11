@@ -95,15 +95,13 @@ public class ReportSendService {
 
             List<Map<String, Object>> components = new ArrayList<>();
 
-            // Un único territorio completado se anuncia con la imagen por
-            // defecto (link) en lugar de subir la captura: el mensaje es
-            // liviano y no depende de la subida de media a WhatsApp.
-            boolean requiereScreenshot = messageService.requiereScreenshot(request)
-                    && request.screenshotBase64() != null;
-
-            if (requiereScreenshot) {
+            // Siempre va la imagen del mapa que manda la app, también cuando es
+            // un único territorio completado (antes iba la imagen fija). Sin
+            // captura (no se pudo sacar), va la imagen por defecto.
+            String captura = request.screenshotBase64();
+            if (captura != null && !captura.isBlank()) {
                 String mediaId = mediaClient.uploadImage(
-                    request.screenshotBase64(), "image/jpeg");
+                    captura, "image/jpeg");
 
                 components.add(Map.of(
                     "type", "header",
@@ -191,8 +189,7 @@ public class ReportSendService {
     }
 
     /**
-     * Imagen del encabezado cuando se anuncia un territorio completado (va sin
-     * captura). Si {@code WHATSAPP_DEFAULT_IMAGE_URL} no está configurada, la
+     * Imagen del encabezado cuando el mensaje llega sin captura del mapa. Si {@code WHATSAPP_DEFAULT_IMAGE_URL} no está configurada, la
      * propiedad llega vacía y WhatsApp rechazaba el mensaje (el envío fallaba y
      * el reporte no se guardaba): se usa la imagen de siempre.
      */

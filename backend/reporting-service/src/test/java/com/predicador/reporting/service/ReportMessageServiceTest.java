@@ -75,40 +75,4 @@ class ReportMessageServiceTest {
         assertEquals("Territorio 1 *terminado* | Territorio 2 *terminado*", params.get("territorio"));
         assertEquals("mañana", params.get("estado"));
     }
-
-    @Test
-    void requiereScreenshot_variosTerritorios() {
-        var request = new WhatsAppSendRequest(
-            "Daniel", "Uribe", "21-07-2026", "tarde",
-            List.of(
-                new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12),
-                new WhatsAppSendRequest.TerritorioReporte(2L, true, 8, 8)
-            ),
-            null, null
-        );
-
-        assertTrue(service.requiereScreenshot(request));
-    }
-
-    @Test
-    void requiereScreenshot_unTerritorioIncompleto() {
-        var request = new WhatsAppSendRequest(
-            "Daniel", "Uribe", "21-07-2026", "tarde",
-            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, false, 12, 5)),
-            null, null
-        );
-
-        assertTrue(service.requiereScreenshot(request));
-    }
-
-    @Test
-    void noRequiereScreenshot_unTerritorioFinalizado() {
-        var request = new WhatsAppSendRequest(
-            "Daniel", "Uribe", "21-07-2026", "tarde",
-            List.of(new WhatsAppSendRequest.TerritorioReporte(1L, true, 12, 12)),
-            null, null
-        );
-
-        assertFalse(service.requiereScreenshot(request));
-    }
 }

@@ -6,7 +6,6 @@ import {
   alternarManzana,
   aporteDe,
   baseDesdeEstado,
-  envioDe,
   envioDeReportes,
   rebasar,
   guardarLados,
@@ -192,26 +191,6 @@ describe('salida', () => {
       expect(registroDe(t, 3, perfil, null).estado).toBe('completed');
       expect(resumir(t, 3).completo).toBe(true);
     });
-
-    it('un único territorio completo va sin captura; con varios van todos, con captura', () => {
-      const completo = { numero: 5, total: 3, enteras: 3, porCalles: 0, completo: true, cambios: true };
-      const incompleto = { numero: 6, total: 4, enteras: 1, porCalles: 1, completo: false, cambios: true };
-      expect(envioDe([completo])).toEqual({
-        territorios: [{ numero: 5, finalizado: true, totalManzanas: 3, manzanasMarcadas: 3 }],
-        requiereScreenshot: false,
-      });
-      expect(envioDe([completo, incompleto])).toEqual({
-        territorios: [
-          { numero: 5, finalizado: true, totalManzanas: 3, manzanasMarcadas: 3 },
-          { numero: 6, finalizado: false, totalManzanas: 4, manzanasMarcadas: 2 },
-        ],
-        requiereScreenshot: true,
-      });
-      // Dos completos en la misma salida: el mensaje no puede quedar vacío (el servidor lo rechaza).
-      const otroCompleto = { ...completo, numero: 7 };
-      expect(envioDe([completo, otroCompleto]).territorios.map(t => t.numero)).toEqual([5, 7]);
-      expect(envioDe([completo, otroCompleto]).requiereScreenshot).toBe(true);
-    });
   });
 
   describe('aporte de la salida y base más nueva (ADR 0013)', () => {
@@ -288,9 +267,8 @@ describe('salida', () => {
       const envio = envioDeReportes([reporte({ estado: 'completed', manzanasMarcadas: 3 })]);
       expect(envio).toEqual({
         territorios: [{ numero: 5, finalizado: true, totalManzanas: 3, manzanasMarcadas: 3 }],
-        requiereScreenshot: false,
       });
-      expect(envioDeReportes([reporte({}), reporte({ territorioNumero: 6 })]).requiereScreenshot).toBe(true);
+      expect(envioDeReportes([reporte({}), reporte({ territorioNumero: 6 })]).territorios.map(t => t.numero)).toEqual([5, 6]);
     });
   });
 
