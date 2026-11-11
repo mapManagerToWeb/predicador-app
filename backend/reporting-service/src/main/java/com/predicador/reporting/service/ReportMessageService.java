@@ -41,9 +41,4 @@ public class ReportMessageService {
                     .replaceAll("\\s{2,}", " ")
                     .trim();
     }
-
-    public boolean requiereScreenshot(WhatsAppSendRequest request) {
-        if (request.territorios().size() > 1) return true;
-        return request.territorios().stream().anyMatch(t -> !t.finalizado());
-    }
 }

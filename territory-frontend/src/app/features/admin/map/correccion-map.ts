@@ -16,6 +16,7 @@ import type { Position } from 'geojson';
 import type { ManzanaFeature } from '../admin.models';
 import { cambiarFondo, crearMapa, temaOscuro } from '../../../core/map/base-map';
 import { clave, type EstadoCorreccion } from '../utils/correccion';
+import { cajaDePuntos, capturarTerritorios, unirCajas, type Caja } from '../../../core/map/captura';
 
 /** Una calle de la manzana que se está editando (para marcar «por calles»). */
 export interface CalleVisible {
@@ -248,6 +249,30 @@ export class CorreccionMap {
   }
 
   /**
+   * Imagen de todos los territorios del mapa para el WhatsApp del registro,
+   * enteros aunque ahora se vea solo una parte (ver `core/map/captura.ts`).
+   * Las calles de la manzana que se está editando no salen.
+   */
+  async capturarSalida(): Promise<string | null> {
+    const map = this.map;
+    if (!map) return null;
+    const cajas = new Map<number, Caja>();
+    for (const m of this.manzanas()) {
+      const caja = cajaDePuntos(coordenadas(m));
+      if (!caja) continue;
+      const t = m.properties.territorio;
+      cajas.set(t, cajas.has(t) ? unirCajas(cajas.get(t)!, caja) : caja);
+    }
+    const capasCalles = ['calles-borde', 'calles-linea', 'calles-numero'];
+    for (const c of capasCalles) map.setLayoutProperty(c, 'visibility', 'none');
+    try {
+      return await capturarTerritorios(map, cajas);
+    } finally {
+      for (const c of capasCalles) map.setLayoutProperty(c, 'visibility', 'visible');
+    }
+  }
+
+  /**
    * Como `capturar()`, pero espera a que el mapa termine de dibujar lo último
    * que se le pasó (manzanas nuevas y fondo cargado). Para las tarjetas.
    */
@@ -310,11 +335,15 @@ export class CorreccionMap {
   }
 
   private encuadrar(manzanas: ManzanaFeature[]): void {
-    const pts = manzanas.flatMap(m => (m.geometry.type === 'Polygon' ? m.geometry.coordinates.flat() : m.geometry.coordinates.flat(2)));
+    const pts = manzanas.flatMap(coordenadas);
     if (!pts.length || !this.map) return;
     const xs = pts.map(p => p[0]);
     const ys = pts.map(p => p[1]);
     const caja: LngLatBoundsLike = [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]];
     this.map.fitBounds(caja, { padding: 40, duration: 0, maxZoom: 18 });
   }
+}
+
+function coordenadas(m: ManzanaFeature): Position[] {
+  return m.geometry.type === 'Polygon' ? m.geometry.coordinates.flat() : m.geometry.coordinates.flat(2);
 }

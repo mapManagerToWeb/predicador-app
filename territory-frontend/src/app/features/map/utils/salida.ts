@@ -283,27 +283,11 @@ export function registroDe(
 }
 
 /**
- * Qué va en el mensaje de WhatsApp: todos los territorios enviados, cada uno
- * como terminado o incompleto. Un único territorio completado se anuncia con
- * la imagen oficial (sin captura); en los demás casos va la captura del mapa.
- * (Antes se omitían los completados cuando iban con otros: si todos estaban
- * completos, el mensaje quedaba vacío, el servidor lo rechazaba y el reporte
- * no se podía enviar.)
- */
-export function envioDe(resumenes: ResumenTerritorio[]): TerritoriosEnvio {
-  const territorios: TerritorioReporteEnvio[] = resumenes.map(r => ({
-    numero: r.numero,
-    finalizado: r.completo,
-    totalManzanas: r.total,
-    manzanasMarcadas: r.enteras + r.porCalles,
-  }));
-  const soloUnoCompleto = territorios.length === 1 && territorios[0].finalizado;
-  return { territorios, requiereScreenshot: territorios.length > 0 && !soloUnoCompleto };
-}
-
-/**
  * El mensaje de WhatsApp según lo que guardó el servidor (que suma la salida
  * al estado del territorio: puede quedar completo con marcas de otro hermano).
+ * Todos los territorios van en el mensaje, cada uno como terminado o
+ * incompleto, y siempre con la imagen del mapa (también un solo territorio
+ * completado: antes iba con una imagen fija de «territorio completado»).
  */
 export function envioDeReportes(reportes: Reporte[]): TerritoriosEnvio {
   const territorios: TerritorioReporteEnvio[] = reportes.map(r => ({
@@ -312,8 +296,7 @@ export function envioDeReportes(reportes: Reporte[]): TerritoriosEnvio {
     totalManzanas: r.totalManzanas,
     manzanasMarcadas: r.manzanasMarcadas,
   }));
-  const soloUnoCompleto = territorios.length === 1 && territorios[0].finalizado;
-  return { territorios, requiereScreenshot: territorios.length > 0 && !soloUnoCompleto };
+  return { territorios };
 }
 
 /** "Mañana" antes de las 14 h, "tarde" después (la predicación de la tarde empieza ~15 h). */

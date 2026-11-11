@@ -21,6 +21,7 @@ import {
 import type { SituacionTerritorio } from '../../core/map/estado-publico';
 import { franjaDeLados, type GeometriaManzana } from '../../core/map/lados';
 import { puntoInterior } from '../../core/map/geometria';
+import { cajaDePuntos, capturarTerritorios, type Caja } from '../../core/map/captura';
 import type { EdicionLados } from './mapa.types';
 import { UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from '../../core/map/ubicacion';
 import type { MotivoSinRumbo } from '../../core/map/rumbo';
@@ -81,7 +82,6 @@ const OPACIDAD_RELLENO: ExpressionSpecification = [
 const TOQUE_CERCANO_PX = 30;
 const CAPAS_UBICACION = ['ubicacion-precision', 'ubicacion-rumbo', 'ubicacion-sombra', 'ubicacion-punto'];
 const TOQUE_LADO_PX = 18;
-const CAPTURA_MAX_PX = 1600;
 
 /**
  * El mapa de marcado sobre MapLibre (WebGL). Solo dibuja y avisa de los
@@ -517,48 +517,33 @@ export class MapaVista {
   // ── Captura para WhatsApp ──
 
   /**
-   * Imagen (JPEG base64, sin prefijo) de los territorios del reporte: se
-   * ocultan los demás, se encuadran esos y se vuelve a como estaba.
+   * Imagen (JPEG base64, sin prefijo) de los territorios del reporte, todos
+   * enteros (ver `core/map/captura.ts`): se ocultan los demás, se sacan las
+   * fotos y se vuelve a como estaba.
    */
   async capturar(territorios: number[]): Promise<string | null> {
     const map = this.map;
-    const camara = { center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
     const soloEstos: ExpressionSpecification = ['in', ['get', 'territorio'], ['literal', territorios]];
     const capas = ['manzanas-relleno', 'manzanas-borde', 'zonas-relleno', 'etiquetas'];
+    const cajas = new Map<number, Caja>();
+    for (const t of territorios) {
+      const caja = cajaDePuntos((this.porTerritorio.get(t) ?? []).flatMap(i => coordenadas(this.manzanas[i].geometria)));
+      if (caja) cajas.set(t, caja);
+    }
     this.capturando = true;
     try {
       this.mostrarLados(null);
       for (const c of capas) map.setFilter(c, soloEstos);
       // El punto azul no va en la imagen: diría dónde está el hermano.
       for (const c of CAPAS_UBICACION) map.setLayoutProperty(c, 'visibility', 'none');
-      const caja = this.limites(territorios);
-      if (caja) map.fitBounds(caja, { padding: 40, duration: 0, maxZoom: 18 });
-      await this.esperarQuieto();
-      return reducir(map.getCanvas());
+      return await capturarTerritorios(map, cajas);
     } catch {
       return null;
     } finally {
       for (const c of capas) map.setFilter(c, null);
       for (const c of CAPAS_UBICACION) map.setLayoutProperty(c, 'visibility', 'visible');
-      map.jumpTo(camara);
       this.capturando = false;
     }
-  }
-
-  /** Espera a que terminen de cargar las teselas y se dibuje todo (máx. 8 s). */
-  private esperarQuieto(): Promise<void> {
-    return new Promise(resolve => {
-      const listo = () => {
-        clearTimeout(t);
-        resolve();
-      };
-      const t = setTimeout(() => {
-        this.map.off('idle', listo);
-        resolve();
-      }, 8000);
-      this.map.once('idle', listo);
-      this.map.triggerRepaint();
-    });
   }
 }
 
@@ -578,16 +563,4 @@ function puntoMedio(puntos: Position[]): Position {
     resto -= largos[i];
   }
   return puntos[0];
-}
-
-/** JPEG del canvas del mapa, achicado si es muy grande (pantallas de alta densidad). */
-function reducir(origen: HTMLCanvasElement): string | null {
-  const escala = Math.min(1, CAPTURA_MAX_PX / Math.max(origen.width, origen.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(origen.width * escala);
-  canvas.height = Math.round(origen.height * escala);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(origen, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.85).split(',')[1] ?? null;
 }

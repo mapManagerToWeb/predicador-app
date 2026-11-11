@@ -204,8 +204,8 @@ describe('MapaStore', () => {
     expect(territorios.crearReportes).toHaveBeenCalledWith([
       expect.objectContaining({ territorioNumero: 5, manzanasIds: '5-5.a,5-5.b,5-5.c', estado: 'completed' }),
     ]);
-    // Completo solo: sale con la imagen oficial, sin captura.
-    await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalledWith(expect.objectContaining({ screenshotBase64: null })));
+    // Completo solo también va con la imagen del mapa.
+    await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalledWith(expect.objectContaining({ screenshotBase64: 'IMG' })));
   });
 
   it('el WhatsApp dice cómo quedó en el servidor, no la copia del teléfono', async () => {
@@ -220,7 +220,7 @@ describe('MapaStore', () => {
     await responderEstado();
     await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalled());
     expect(whatsapp.sendReport).toHaveBeenCalledWith(
-      expect.objectContaining({ territorios: [expect.objectContaining({ numero: 5, finalizado: true })], screenshotBase64: null }),
+      expect.objectContaining({ territorios: [expect.objectContaining({ numero: 5, finalizado: true })], screenshotBase64: 'IMG' }),
     );
     await vi.waitFor(() => expect(store.estados().get(5)?.estado).toBe('completed'));
   });
