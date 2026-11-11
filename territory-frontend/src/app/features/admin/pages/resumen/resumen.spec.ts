@@ -38,6 +38,17 @@ interface VistaResumen {
 
 let secuencia = 1;
 
+/**
+ * Diferencia en días de calendario entre dos fechas, ignorando la hora.
+ * `rango()` arranca en la medianoche local, así que restar los milisegundos
+ * directo mezcla la hora del día en que corre la prueba (en CI, de madrugada).
+ */
+function diasDeCalendario(desde: Date, hasta: Date): number {
+  const a = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+  const b = new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate());
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
 function iso(diasAtras: number): string {
   const d = new Date();
   d.setDate(d.getDate() - diasAtras);
@@ -117,7 +128,7 @@ describe('ResumenPage', () => {
 
     page.setPeriodo('30');
     const treinta = page.rango();
-    expect(Math.round((treinta.hasta.getTime() - treinta.desde.getTime()) / 86_400_000)).toBe(30);
+    expect(diasDeCalendario(treinta.desde, treinta.hasta)).toBe(29);
 
     page.setPeriodo('todo');
     expect(page.rango().desde.getTime()).toBe(page.primerDato()?.getTime());

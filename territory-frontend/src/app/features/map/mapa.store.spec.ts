@@ -9,6 +9,7 @@ import { DraftMarksService } from '../../core/services/map-draft';
 import type { EstadoTerritorioPublico } from '../../core/map/estado-publico';
 import { WhatsAppService } from '../../core/services/whatsapp';
 import { MapaStore, type VistaMapa } from './mapa.store';
+import { isoLocal } from './utils/dia';
 import { MODO_PRACTICA } from '../../core/map/modo-practica';
 
 const cuadrado = (x: number, y: number): Polygon => ({
@@ -35,6 +36,17 @@ function estado(p: Partial<EstadoTerritorioPublico> = {}): EstadoTerritorioPubli
     manzanasMarcadas: 1, totalManzanas: 3, manzanasIds: '5-5.a', geometriaParcial: null, puntosParciales: null, ...p,
   };
 }
+
+/** Fecha "AAAA-MM-DD" y hora de un instante tal como se ven en Chile. */
+const fechaEnChile = (d: Date): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(d);
+const horaEnChile = (d: Date): string =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Santiago',
+    hourCycle: 'h23',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
 
 describe('MapaStore', () => {
   let store: MapaStore;
@@ -541,10 +553,12 @@ describe('MapaStore', () => {
       p.diaAtras.set(1); // «Ayer»
       p.responder(true);
       await vi.waitFor(() => expect(p.abiertos()).toEqual([]));
-      const trabajo = Date.parse(p.estados().get(5)!.ultimoTrabajo!);
-      const horas = (Date.now() - trabajo) / 3_600_000;
-      // Ayer al mediodía en Chile queda a más de 12 horas; el momento del envío, a menos de 1.
-      expect(horas).toBeGreaterThan(12);
+      const trabajo = new Date(p.estados().get(5)!.ultimoTrabajo!);
+      // Se guarda el mediodía de Chile del día elegido, no el reloj del envío.
+      expect(horaEnChile(trabajo)).toBe('12:00');
+      const ayer = new Date();
+      ayer.setDate(ayer.getDate() - 1);
+      expect(fechaEnChile(trabajo)).toBe(isoLocal(ayer));
     });
 
     it('practicar no toca el borrador real aunque haya uno guardado', async () => {
