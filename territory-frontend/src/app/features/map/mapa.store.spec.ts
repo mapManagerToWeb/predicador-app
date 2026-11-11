@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import type { Polygon } from 'geojson';
 import { TerritorioService } from '../../core/services/territorio';
@@ -366,6 +366,144 @@ describe('MapaStore', () => {
     store.cambiarModo('calles');
     store.tocar({ manzana: '5-5.a', cercana: null });
     expect(store.edicion()).toBeNull();
+  });
+
+  describe('cuando algo sale mal', () => {
+    let toast: Toast;
+
+    beforeEach(() => {
+      toast = TestBed.inject(Toast);
+      vi.spyOn(toast, 'show');
+    });
+
+    async function enviarMarcandoB(): Promise<void> {
+      await cargar(store);
+      await store.abrir(5);
+      store.tocar({ manzana: '5-5.b', cercana: null });
+      store.pedirEnvio();
+      store.responder(true);
+      await responderEstado();
+    }
+
+    it('si el WhatsApp se cae después de guardar, borra lo guardado y las marcas siguen', async () => {
+      whatsapp.sendReport.mockRejectedValue(new Error('sin red'));
+      await enviarMarcandoB();
+      await vi.waitFor(() => expect(territorios.eliminarReportes).toHaveBeenCalledWith([500]));
+      expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('el reporte no se guardó'), 5000, 'error');
+      expect(store.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
+    });
+
+    it('sin conexión con el servidor lo dice claro y no pierde nada', async () => {
+      territorios.crearReportes.mockRejectedValue(new HttpErrorResponse({ status: 0 }));
+      await enviarMarcandoB();
+      await vi.waitFor(() => expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Sin conexión con el servidor'), 5000, 'error'));
+      expect(whatsapp.sendReport).not.toHaveBeenCalled();
+      expect(store.enviando()).toBe(false);
+      expect(store.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
+    });
+
+    it('si el servidor rechaza el reporte, avisa que no se pudo guardar', async () => {
+      territorios.crearReportes.mockRejectedValue(new HttpErrorResponse({ status: 400 }));
+      await enviarMarcandoB();
+      await vi.waitFor(() => expect(toast.show).toHaveBeenCalledWith('No se pudo guardar el reporte', 5000, 'error'));
+    });
+
+    it('si otro hermano ya reportó lo mismo, no envía nada', async () => {
+      await cargar(store);
+      await store.abrir(5);
+      store.tocar({ manzana: '5-5.b', cercana: null });
+      store.pedirEnvio();
+      store.responder(true);
+      await responderEstado([estado({ manzanasIds: '5-5.a,5-5.b', manzanasMarcadas: 2 })]);
+      await vi.waitFor(() =>
+        expect(toast.show).toHaveBeenCalledWith('Otro hermano ya reportó eso mismo: no quedó nada nuevo que enviar', 4000, 'info'),
+      );
+      expect(territorios.crearReportes).not.toHaveBeenCalled();
+    });
+
+    it('sin perfil no se puede enviar', async () => {
+      await cargar(store);
+      await store.abrir(5);
+      store.tocar({ manzana: '5-5.b', cercana: null });
+      vi.spyOn(TestBed.inject(Profile), 'currentUser').mockReturnValue(null);
+      store.pedirEnvio();
+      expect(store.pregunta()).toBeNull();
+      expect(toast.show).toHaveBeenCalledWith('No hay perfil configurado', 3000, 'error');
+    });
+
+    it('abrir un territorio que no existe avisa; abrir uno ya abierto solo lo encuadra', async () => {
+      await cargar(store);
+      await store.abrir(99);
+      expect(toast.show).toHaveBeenCalledWith('No existe el territorio 99', 3000, 'warning');
+      await store.abrir(5);
+      vista.encuadrar.mockClear();
+      await store.abrir(5);
+      expect(vista.encuadrar).toHaveBeenCalledWith([5]);
+      expect(store.abiertos()).toEqual([5]);
+    });
+
+    it('sin red usa la copia guardada en el teléfono', async () => {
+      await cargar(store);
+      territorios.getAllGeoJson.mockRejectedValue(new HttpErrorResponse({ status: 0 }));
+      const otro = TestBed.runInInjectionContext(() => new MapaStore());
+      expect(await otro.cargar()).toBe(true);
+      expect(otro.total(5)).toBe(3);
+      expect(toast.show).toHaveBeenCalledWith('Sin conexión: se muestra la última copia guardada', 4000, 'warning');
+    });
+
+    it('sin sesión (401) y sin copia, no reintenta: muestra el error de carga', async () => {
+      territorios.getAllGeoJson.mockRejectedValue(new HttpErrorResponse({ status: 401 }));
+      expect(await store.cargar()).toBe(false);
+      expect(store.errorCarga()).toBe(true);
+      expect(territorios.getAllGeoJson).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('por calles', () => {
+    let toast: Toast;
+
+    beforeEach(async () => {
+      toast = TestBed.inject(Toast);
+      vi.spyOn(toast, 'show');
+      await cargar(store);
+      await store.abrir(5);
+      store.cambiarModo('calles');
+      store.tocar({ manzana: '5-5.c', cercana: null });
+    });
+
+    it('«Listo» sin calles deja la manzana sin marcar', () => {
+      store.guardarLados();
+      expect(toast.show).toHaveBeenCalledWith('Manzana 5.c sin marcar', 2000);
+      expect(store.resumenes()[0]).toMatchObject({ porCalles: 0, cambios: false });
+    });
+
+    it('una calle elegida se puede volver a quitar antes de «Listo»', () => {
+      store.tocarLado(1);
+      store.tocarLado(0);
+      store.tocarLado(1);
+      expect(store.edicion()?.seleccion).toEqual([0]);
+      store.guardarLados();
+      expect(toast.show).toHaveBeenCalledWith(expect.stringMatching(/^Manzana 5\.c: 1 de \d+ calles$/), 2000, 'success');
+    });
+
+    it('«Toda la manzana» la deja entera', () => {
+      store.todaLaManzana();
+      expect(toast.show).toHaveBeenCalledWith('Manzana 5.c completa', 2000, 'success');
+      expect(store.edicion()).toBeNull();
+      expect(store.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
+    });
+
+    it('«Cancelar» cierra sin guardar', () => {
+      store.tocarLado(0);
+      store.cancelarLados();
+      expect(store.edicion()).toBeNull();
+      expect(store.resumenes()[0]).toMatchObject({ porCalles: 0, cambios: false });
+      // Sin manzana abierta, tocar una calle o «Listo» no hace nada.
+      store.tocarLado(0);
+      store.guardarLados();
+      store.todaLaManzana();
+      expect(store.resumenes()[0]).toMatchObject({ cambios: false });
+    });
   });
 
   describe('práctica del tutorial', () => {

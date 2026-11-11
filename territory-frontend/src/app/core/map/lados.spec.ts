@@ -58,6 +58,38 @@ describe('marcado por lados', () => {
     expect(calcularLados(conMuesca)).toHaveLength(4);
   });
 
+  it('puntos repetidos (a menos de 30 cm) no cuentan como lados', () => {
+    const conRepetidos = poligono([p(0, 0), p(0.1, 0), p(80, 0), p(80, 60), p(80, 60.2), p(0, 60), p(0, 0.1)]);
+    expect(calcularLados(conRepetidos)).toHaveLength(4);
+  });
+
+  it('una manzana redonda, sin esquinas claras, se parte en 4 tramos iguales', () => {
+    const redonda = poligono(Array.from({ length: 36 }, (_, k) => p(40 + 40 * Math.cos((k * Math.PI) / 18), 40 + 40 * Math.sin((k * Math.PI) / 18))));
+    const lados = calcularLados(redonda);
+    expect(lados).toHaveLength(4);
+    const largos = lados.map(l => l.largoM);
+    expect(Math.max(...largos) - Math.min(...largos)).toBeLessThan(10);
+  });
+
+  it('una manzana con muchas esquinas queda con 8 lados como máximo', () => {
+    // Un dentado de 12 puntas: las esquinas más débiles se unen.
+    const dentada = poligono(Array.from({ length: 24 }, (_, k) => {
+      const r = k % 2 === 0 ? 60 : 45;
+      const a = (k * Math.PI) / 12;
+      return p(60 + r * Math.cos(a), 60 + r * Math.sin(a));
+    }));
+    const lados = calcularLados(dentada);
+    expect(lados.length).toBeGreaterThanOrEqual(3);
+    expect(lados.length).toBeLessThanOrEqual(8);
+  });
+
+  it('la franja de un lado curvo cubre también sus vértices intermedios', () => {
+    const lados = calcularLados(cuadraRedondeada());
+    const curvo = lados.findIndex(l => l.puntos.length > 2);
+    expect(curvo).toBeGreaterThanOrEqual(0);
+    expect(franjaDeLados(cuadraRedondeada(), [curvo])).not.toBeNull();
+  });
+
   it('la franja de un lado queda dentro de la manzana y a lo largo de ese lado', () => {
     const [lado] = calcularLados(cuadra).filter(l => Math.round(l.largoM) === 80);
     const ancho = anchoFranja(cuadra);

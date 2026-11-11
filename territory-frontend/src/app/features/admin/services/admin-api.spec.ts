@@ -23,6 +23,12 @@ describe('AdminApi', () => {
     await expect(promesa).resolves.toEqual({ type: 'FeatureCollection', features: [] });
   });
 
+  it('pide el estado público de los territorios (el de los mapas)', async () => {
+    const promesa = api.estadoPublico();
+    http.expectOne('/api/v1/reports/public/estado').flush([{ territorio: 1, estado: 'completed' }]);
+    await expect(promesa).resolves.toEqual([{ territorio: 1, estado: 'completed' }]);
+  });
+
   it('pide los reportes por rango en ISO y borra por ids', async () => {
     const desde = new Date('2026-01-01T03:00:00Z');
     const hasta = new Date('2026-02-01T03:00:00Z');
