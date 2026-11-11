@@ -1,76 +1,98 @@
 # CHANGES.md — Resumen de cambios (para revisión del PR)
 
-**Fecha:** 2026-09-14
-**Qué es esto:** lista de los cambios propuestos, en lenguaje simple, para revisar antes de aceptar el pull request. Están agrupados en 4 áreas: el reporte de WhatsApp, el rendimiento del mapa, la estabilidad general del sistema y la documentación/limpieza.
+**Fecha:** 2026-11-10
+**Qué es esto:** resumen en lenguaje simple de este change set, para revisar antes de aceptar el pull request. El objetivo es uno solo: **volver a poner en verde la compuerta de calidad de SonarCloud**, que llevaba tiempo fallando en `main`. Se agrupa en 4 áreas: los errores de código, las pruebas que faltaban, la configuración del análisis y la causa de fondo que hacía que la compuerta se rompiera sola.
+
+**Estado de partida:** `new_reliability_rating` = **D** (se exige A) y `new_coverage` = **65.3%** (se exige ≥80%). Además había **16 errores** de código abiertos.
 
 ---
 
-## 1) Reporte de WhatsApp (correcciones visibles)
+## 1) Los 16 errores de código (reliability: D → A)
 
-**Antes:**
+Ninguno cambia lo que hace la aplicación: son correcciones de forma que además evitan errores reales de orden y de descarte de datos.
 
-- Si un territorio estaba marcado como "zona parcial" (dibujado a medias), el envío del reporte podía fallar con un error.
-- La imagen que se adjunta al reporte mostraba zonas parciales de territorios que **no** se habían trabajado en ese reporte (restos de reportes anteriores o de territorios ya completados), lo que generaba confusión.
+**El más repetido (12 de 16): ordenar sin decir cómo comparar.**
 
-**Ahora:**
+Cuando se llama a `.sort()` sin función de comparación, JavaScript ordena **como texto**. Eso hace que `"5.10"` quede antes que `"5.2"`, y que una lista de números se mezcle. Sonar lo marca como error crítico porque el resultado casi nunca es el esperado. Ahora cada orden tiene su comparador explícito.
 
-- Un reporte con zona parcial se envía sin errores.
-- La imagen del reporte muestra **solo los territorios que se trabajaron en ese reporte**. Si un territorio quedó parcial, se ve su parte parcial; los territorios no trabajados **no aparecen**.
-- Después de tomar la captura, el mapa vuelve a su estado normal.
+| Archivo | Qué se ordena |
+| --- | --- |
+| `admin/utils/correccion.ts` (×4) | Listas de manzanas marcadas que se envían al servidor como texto |
+| `map/utils/salida.ts` (×4) | Manzanas y lados de la salida; comparación de si hubo cambios |
+| `map/utils/borrador.ts` (×2) | Manzanas del borrador guardado en el teléfono |
+| `admin/utils/registro.ts` | Índices de manzanas del registro de territorios |
+| `admin/pages/territorios/territorios.ts` | Manzanas que se marcan como completas al eliminar |
 
-## 2) El mapa: más rápido y estable
+**Los otros 4:**
 
-- Se restauró la versión estable de la biblioteca de mapas (Leaflet 1.9.4) usada en producción, descartando la versión experimental con la que se estaba probando y que causaba problemas visuales.
-- Al tocar una manzana, el mapa ya no revisa todas las manzanas una por una: ahora usa un "índice" que encuentra la manzana tocada al instante. La respuesta del mapa se siente más fluida.
-- La geometría procesada de los territorios (contornos simplificados) se guarda durante la sesión: al volver a entrar al mapa no se recalcula todo desde cero, así se carga más rápido.
-- Se corrigió un problema con territorios que tienen formas de varias partes (polígonos múltiples): antes podían romper la captura de la imagen del reporte o el guardado.
+| Archivo | Qué pasaba | Qué se hizo |
+| --- | --- | --- |
+| `admin/pages/s13/s13.ts` | `ngOnInit` devolvía una promesa que Angular descarta: si la carga fallaba, nadie se enteraba | `ngOnInit(): void` y la carga se lanza de forma explícita |
+| `core/map/geometria.ts` | Un `reduce` sin valor inicial: con una lista vacía revienta | Se pasa el primer polígono como valor inicial |
+| `core/map/lados.ts` | Un `reduce` usado solo por su efecto lateral: el resultado se descartaba | Se reemplazó por un bucle `for` que hace exactamente lo mismo |
+| `admin/pages/territorios/territorios.html` | Dos campos sin etiqueta accesible | Se agregó `aria-label` al buscador y al selector de archivo |
 
-## 3) Estabilidad general del sistema (menos errores intermitentes)
+## 2) Por qué la cobertura estaba baja (eran dos causas, no una)
 
-- **Base de datos:** se amplió el grupo de conexiones y el tiempo de espera para absorber las ráfagas de uso cuando la base de datos "se despierta" tras estar dormida (modo ahorro de Neon). Antes, después de un periodo de inactividad, podían aparecer errores del servidor (500/503) al usar la app.
-- **Puerta de entrada de peticiones (gateway):** ahora reintenta menos veces las peticiones fallidas y usa tiempos de espera más razonables para cada servicio, reduciendo errores cuando el sistema arranca en frío.
-- **Mediciones de rendimiento web (RUM):** los datos incompletos (sin valor) ahora se rechazan en lugar de registrarse como cero, evitando estadísticas distorsionadas.
+**Causa A — el backend corría sin sus pruebas de integración.** El workflow de Sonar ejecutaba `mvn verify` sin `-Ddocker.available=true`. Con eso, 5 clases de prueba de integración **se salteaban en silencio** (el proyecto las salta en vez de fallar cuando no hay Docker, a propósito). El caso más grave: `CicloService` figuraba con **1.1%** de cobertura cuando en realidad está en **98.3%**.
 
-## 4) Documentación y limpieza
+**Causa B — se medía código que no se puede probar con pruebas unitarias.** Tres archivos dibujan directamente sobre un canvas WebGL real (`mapa-vista.ts`, `editor-map.ts`, `coverage-map.ts`). Probarlos con pruebas unitarias sería probar los mocks, no el comportamiento. Quedaron **excluidos solo del cálculo de cobertura**; el análisis de errores sigue corriéndose sobre ellos.
 
-- Se actualizó el archivo de instrucciones del repositorio (AGENTS.md) para reflejar el estado real del proyecto.
-- Se archivaron 5 propuestas de trabajo (OpenSpec) de este ciclo (además de una archivada previamente).
-- Se robustecieron los flujos de CI (GitHub Actions): las acciones quedaron fijadas por SHA y se forzaron versiones de dependencias (Tomcat 11.0.25, Netty 4.2.17.Final, pgjdbc, BouncyCastle) para eliminar vulnerabilidades críticas detectadas por el escáner Trivy.
-- Se dejó de usar la integración LSP de opencode (configuración local; sin efecto en la app).
-- Se dejaron de controlar en git archivos de configuración del editor Eclipse (no deberían estar en el repositorio).
-- Se ignoraron artefactos locales de planificación y depuración (carpetas `tasks/`, `.playwright-mcp/` y documentos `SPEC-map-*`, `CAPABILITY-MAP.md`) que solo sirven en la máquina de trabajo.
+## 3) Pruebas agregadas
+
+Frontend: de **66.35%** a **80.2%** de líneas (medido sobre todo el proyecto, no solo sobre código nuevo). Pasan **611 pruebas en 62 archivos**.
+
+| Archivo probado | Cobertura de líneas |
+| --- | --- |
+| `admin/pages/territorios/territorios.ts` | 28.2% → **99.3%** |
+| `admin/pages/encargados/encargados.ts` | → **100%** |
+| `admin/pages/reportes/reportes.ts` | → **100%** |
+| `admin/pages/reportes/corregir-salida.ts` | → **100%** |
+| `admin/pages/tarjetas/tarjetas.ts` | → **100%** |
+| `admin/utils/formato.ts` | → **100%** |
+| `admin/services/admin-api.ts` | → **100%** |
+| `admin/pages/resumen/resumen.ts` | → **98.9%** |
+| `features/map/map.ts` | → **96.7%** |
+
+Backend: **283 pruebas**, 0 fallos, **86.6%** de líneas (con las pruebas de integración incluidas).
+
+## 4) La causa de fondo: la versión congelada
+
+Esto es lo que hacía que la compuerta se rompiera sola y volviera a romperse.
+
+El modo de "código nuevo" del proyecto es `previous_version`: Sonar compara contra el último análisis que tenga **otra** versión. Como `sonar.projectVersion` estaba fijo en `1.0.0` y nunca cambiaba, esa referencia quedó clavada en el análisis del **2026-08-23**. Resultado: "código nuevo" pasó a ser **todo lo escrito en tres meses** (6.250 líneas), y el denominador crecía con cada commit. Cuanto más se avanzaba, más difícil era cumplir el 80%.
+
+Ahora el análisis recibe el **SHA del commit** como versión, así que cada análisis es una versión nueva y "código nuevo" es solo lo que cambió desde el commit anterior.
 
 ---
 
 ## Qué conviene verificar antes de aceptar
 
-1. Enviar un reporte donde un territorio esté marcado como **zona parcial** → el reporte se envía correctamente y la imagen muestra solo ese territorio.
-2. En un reporte **con varios territorios**, verificar que la imagen **no** muestre zonas parciales de territorios que no se trabajaron en ese reporte.
-3. Navegar el mapa, marcar/desmarcar manzanas y dibujar zonas parciales → todo responde con fluidez.
-4. Dejar la app inactiva un rato y volver a usarla → no deben aparecer errores 500/503.
-5. Revisar que la app se vea y funcione normal en el móvil (la versión estable del mapa).
+1. **Orden de manzanas:** abrir un territorio con manzanas `5.a`, `5.b`, `5.c`… y comprobar que se listan en orden natural (que `5.10` no quede antes que `5.2`). Es el efecto visible del arreglo más repetido.
+2. **Panel → Territorios:** crear una manzana, editarle el nombre, mover manzanas a otro territorio, eliminar una, importar y exportar el GeoJSON.
+3. **Panel → Reportes:** filtrar por fecha/territorio/encargado, marcar duplicados, eliminar en lote y corregir una salida (con y sin anulación).
+4. **Panel → Resumen, Tarjetas y S-13:** abrir las tres pantallas y exportar el CSV de cobertura.
+5. **Mapa del encargado:** marcar y desmarcar manzanas, y dibujar una zona parcial.
+6. **Después del push:** comprobar que la compuerta de SonarCloud queda en verde (`new_reliability_rating` = A y `new_coverage` ≥ 80%).
 
 ## Notas importantes
 
-- **No se modificó la base de datos** (no hay migraciones) ni la estructura de datos de los reportes/territorios.
-- **No se agregaron ni expusieron credenciales:** se verificó antes de commitear que no haya secretos en los cambios.
-- **Nada se borró del proyecto:** los archivos siguen en disco; solo se organizó el historial de git.
-- El PR contiene **16 commits**, cada uno con un cambio coherente y su propia descripción.
+- **No hay migraciones de base de datos.** No se toca el esquema ni la forma de los datos.
+- **No cambia el comportamiento de la aplicación:** los 16 arreglos son de forma y de orden; las pruebas confirman que el resultado anterior se mantiene.
+- **No se agregaron credenciales.** El token usado para consultar la API de SonarCloud no está en el repositorio ni en ningún archivo.
+- **La mayor parte del diff son pruebas:** de las ~2.800 líneas, unas 1.900 son archivos de prueba nuevos. El código de producción cambió en **25 líneas agregadas y 18 borradas**, repartidas en 9 archivos.
 
 ---
 
 ## Detalle técnico (opcional, para quien lo requiera)
 
-| Área             | Cambio                                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| Reporte WhatsApp | Captura de imagen restringida a territorios editados + restauración del mapa después de capturar |
-| Reporte WhatsApp | Los datos parciales se limpian después del guardado (evita estados inconsistentes)               |
-| Mapa             | Revert a Leaflet 1.9.4 estable + renderizador estándar (sin repintado por frame)                 |
-| Mapa             | Nuevo índice espacial para la selección de manzanas (de búsqueda lineal a búsqueda por celda)    |
-| Mapa             | Cache en sesión de la geometría procesada (simplify/union) de territorios                        |
-| Mapa             | Utilidad de aplanado de anillos (MultiPolygon) para captura, selección y cálculo de límites      |
-| Backend          | Pool de conexiones 3→6 y timeout 15 s para el despertar de Neon (reporting y territory)          |
-| Backend          | Gateway: retries 2→1 y timeouts explícitos por circuit breaker                                   |
-| Backend          | RUM: valor de métrica obligatorio y finito                                                       |
-| Repo             | AGENTS.md actualizado, OpenSpecs archivados, `.settings/` untrackeados, gitignore ampliado       |
-| CI               | Workflows pineados por SHA; overrides de versiones (Tomcat/Netty/pgjdbc/BouncyCastle) para gate Trivy |
+| Área | Cambio |
+| --- | --- |
+| Frontend | 12 comparadores explícitos en `sort()` (`localeCompare` con `numeric: true` donde el orden debe ser natural) |
+| Frontend | `ngOnInit(): void` + `void this.cargar()` en S-13 |
+| Frontend | `reduce` con valor inicial en `puntoInterior`; `reduce` con efecto lateral → `for` en `ladosDeAnillo` |
+| Frontend | `aria-label` en el buscador y en el input de archivo de Territorios |
+| Pruebas | 5 specs nuevos (territorios, reportes, resumen, tarjetas, corregir-salida) + 4 ampliados (formato, admin-api, encargados, map) |
+| CI | `mvn verify -Pcoverage -B -Ddocker.available=true`: corren las 5 clases de integración que se salteaban |
+| Sonar | `sonar.coverage.exclusions` para `mapa-vista.ts`, `editor-map.ts`, `coverage-map.ts` |
+| Sonar | `args: -Dsonar.projectVersion=${{ github.sha }}` en el scan; se quitó el `1.0.0` fijo de `sonar-project.properties` |
