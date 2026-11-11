@@ -1,0 +1,21 @@
+# CODEOWNERS — revisores automáticos por área
+# Los patrones más específicos tienen prioridad sobre los generales.
+
+# Documentación y decisiones de arquitectura
+/docs/ @v1os
+
+# Backend: microservicios Java / Spring Boot (Maven)
+/backend/ @v1os
+
+# Frontend: aplicación Angular (MapLibre, PWA, SSR)
+/territory-frontend/ @v1os
+
+# CI/CD, workflows y automatización de GitHub
+/.github/ @v1os
+
+# Docker Compose e infraestructura local
+/docker-compose.yml @v1os
+/docker-lectura/ @v1os
+
+# Todo lo demás
+* @v1os
