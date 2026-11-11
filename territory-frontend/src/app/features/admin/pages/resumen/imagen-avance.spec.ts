@@ -83,4 +83,85 @@ describe('ImagenAvance', () => {
     const fixture = await abrir();
     expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
   });
+
+  describe('descargar y compartir', () => {
+    let toast: { show: ReturnType<typeof vi.fn> };
+    let clics: string[];
+    let blob: Blob | null;
+
+    beforeEach(() => {
+      toast = TestBed.inject(Toast) as unknown as { show: ReturnType<typeof vi.fn> };
+      clics = [];
+      blob = new Blob(['png'], { type: 'image/png' });
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+      vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(listo => listo(blob));
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        clics.push(this.download);
+      });
+      URL.createObjectURL = vi.fn(() => 'blob:imagen');
+      URL.revokeObjectURL = vi.fn();
+      // El logo se carga bien y el navegador sabe compartir archivos.
+      Object.defineProperty(HTMLImageElement.prototype, 'decode', { value: vi.fn().mockResolvedValue(undefined), configurable: true });
+      Object.defineProperty(navigator, 'canShare', { value: vi.fn(() => true), configurable: true });
+      Object.defineProperty(navigator, 'share', { value: vi.fn().mockResolvedValue(undefined), configurable: true });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      delete (navigator as { canShare?: unknown }).canShare;
+      delete (navigator as { share?: unknown }).share;
+      delete (HTMLImageElement.prototype as { decode?: unknown }).decode;
+    });
+
+    const boton = (fixture: { nativeElement: HTMLElement }, texto: string) =>
+      [...fixture.nativeElement.querySelectorAll('button')].find(b => b.textContent?.trim() === texto) as HTMLButtonElement;
+
+    it('descarga el PNG con el día y la forma en el nombre', async () => {
+      const fixture = await abrir();
+      boton(fixture, 'Para el estado').click();
+      fixture.detectChanges();
+      boton(fixture, 'Descargar imagen').click();
+      await vi.waitFor(() => expect(clics).toHaveLength(1));
+      expect(clics[0]).toMatch(/^avance-territorios-\d{4}-\d{2}-\d{2}-estado\.png$/);
+    });
+
+    it('si no se pudo armar la imagen, lo avisa', async () => {
+      blob = null;
+      const fixture = await abrir();
+      boton(fixture, 'Descargar imagen').click();
+      await vi.waitFor(() => expect(toast.show).toHaveBeenCalledWith('No se pudo armar la imagen', 4000, 'error'));
+      expect(clics).toHaveLength(0);
+    });
+
+    it('comparte el archivo; cerrar el menú no hace nada más', async () => {
+      const fixture = await abrir();
+      boton(fixture, 'Compartir').click();
+      await vi.waitFor(() => expect(navigator.share).toHaveBeenCalledWith({ files: [expect.any(File)] }));
+      vi.mocked(navigator.share).mockRejectedValue(new DOMException('cerrado', 'AbortError'));
+      boton(fixture, 'Compartir').click();
+      await new Promise(r => setTimeout(r, 0));
+      expect(clics).toHaveLength(0);
+    });
+
+    it('si compartir falla de verdad, la descarga', async () => {
+      vi.mocked(navigator.share).mockRejectedValue(new Error('no se puede'));
+      const fixture = await abrir();
+      boton(fixture, 'Compartir').click();
+      await vi.waitFor(() => expect(clics).toHaveLength(1));
+    });
+
+    it('sin poder preguntar si se puede compartir, no muestra el botón', async () => {
+      Object.defineProperty(navigator, 'canShare', { value: vi.fn(() => { throw new Error('no'); }), configurable: true });
+      const fixture = await abrir();
+      expect(boton(fixture, 'Compartir')).toBeUndefined();
+    });
+  });
+
+  it('con lo guardado dañado usa los textos de siempre, y sin ciclos no dice desde cuándo', async () => {
+    localStorage.setItem('territorios_imagen_avance', '{dañado');
+    api.ciclos.mockRejectedValue(new Error('sin ciclos'));
+    const fixture = await abrir();
+    expect((fixture.nativeElement.querySelector('input[maxlength="40"]') as HTMLInputElement).value).toBe('¡Así vamos, hermanos!');
+    expect(fixture.nativeElement.textContent).toContain('empezó la vuelta. Descárgala');
+  });
 });
