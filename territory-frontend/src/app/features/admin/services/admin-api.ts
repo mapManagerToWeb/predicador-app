@@ -23,6 +23,7 @@ import type {
   SalidaRegistrada,
 } from '../admin.models';
 import type { FilaLista } from '../utils/lista-hermanos';
+import type { EstadoTerritorioPublico } from '../../../core/map/estado-publico';
 
 /**
  * El service worker cachea /api/v1/territories/** con estrategia
@@ -126,6 +127,11 @@ export class AdminApi {
 
   enviosWhatsApp(): Promise<EnvioWhatsApp[]> {
     return this.get<EnvioWhatsApp[]>(`${this.reportes}/whatsapp`);
+  }
+
+  /** Cómo va cada territorio en la vuelta actual (el mismo estado público de los mapas). */
+  estadoPublico(): Promise<EstadoTerritorioPublico[]> {
+    return this.get<EstadoTerritorioPublico[]>(`${environment.apiUrl}/reports/public/estado`);
   }
 
   // ── Ciclos y correcciones ──
