@@ -80,10 +80,19 @@ jobs:
           TERRITORY_IT_DB_URL: jdbc:postgresql://localhost:5432/predicador_test
           TERRITORY_IT_DB_USERNAME: predicador
           TERRITORY_IT_DB_PASSWORD: test
-        run: mvn verify -Pcoverage -B
+        run: mvn verify -Pcoverage -B -Ddocker.available=true
 
       - name: SonarCloud Scan
         if: github.actor != 'dependabot[bot]'
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # El modo de código nuevo es `previous_version`, que compara contra el
+          # último análisis con OTRA versión. Con `sonar.projectVersion` fijo en
+          # 1.0.0 esa referencia quedó congelada en el 2026-08-23 y "código
+          # nuevo" pasó a ser todo lo escrito desde entonces: el denominador
+          # crecía con cada commit y la compuerta se rompía sola. Con el SHA
+          # cada análisis es una versión nueva y el código nuevo es el delta
+          # desde el commit anterior.
+          args: -Dsonar.projectVersion=${{ github.sha }}
