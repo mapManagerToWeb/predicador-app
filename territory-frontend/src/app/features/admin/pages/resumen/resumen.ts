@@ -4,6 +4,7 @@ import { BarList, type Barra } from '../../charts/bar-list';
 import { ColumnChart, type Columna } from '../../charts/column-chart';
 import { Heatmap } from '../../charts/heatmap';
 import { CoverageMap } from '../../map/coverage-map';
+import { ImagenAvance } from './imagen-avance';
 import { mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import {
@@ -64,7 +65,7 @@ export const ESTADOS: InfoEstado[] = [
 
 @Component({
   selector: 'app-resumen',
-  imports: [ColumnChart, BarList, Heatmap, CoverageMap],
+  imports: [ColumnChart, BarList, Heatmap, CoverageMap, ImagenAvance],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './resumen.html',
   styleUrl: './resumen.css',
@@ -85,6 +86,8 @@ export class ResumenPage {
   protected readonly encargado = signal('todos');
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
+  /** La imagen para animar a los hermanos (diálogo). */
+  protected readonly imagenAbierta = signal(false);
   private readonly ahora = signal(new Date());
 
   /** Historial completo sin dobles envíos. */

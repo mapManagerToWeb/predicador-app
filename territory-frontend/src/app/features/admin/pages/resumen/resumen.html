@@ -22,8 +22,13 @@
       }
     </select>
     <button class="adm-btn" type="button" (click)="cargar(true)" [disabled]="cargando()">Actualizar</button>
+    <button class="adm-btn primary" type="button" (click)="imagenAbierta.set(true)">Imagen para los hermanos</button>
   </div>
 </header>
+
+@if (imagenAbierta()) {
+  <app-imagen-avance (cerrar)="imagenAbierta.set(false)" />
+}
 
 @if (error()) {
   <div class="adm-alert" role="alert">{{ error() }}</div>
