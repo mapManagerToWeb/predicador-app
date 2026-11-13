@@ -112,7 +112,7 @@
             <dependency>
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
-                <version>42.7.12</version>
+                <version>42.7.14</version>
             </dependency>
             <!--
                 CVE-2026-102554 (HIGH, DoS via unthrottled memory allocation
