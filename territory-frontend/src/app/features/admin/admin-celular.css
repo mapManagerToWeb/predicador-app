@@ -1,0 +1,157 @@
+/* Panel de administración en el celular (hasta 900 px). Va aparte de admin.css por el presupuesto de estilos por archivo. */
+
+/* ── Celular: barra de abajo (todo con su nombre) y menú «Más» ── */
+.adm-tabs, .adm-mas, .adm-mas-fondo { display: none; }
+@media (max-width: 900px) {
+  .adm-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .adm-sidebar { display: none; }
+  .adm-main { padding: var(--space-4) var(--space-4) var(--space-8); }
+  .adm-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    position: relative;
+    z-index: 41;
+    background: var(--surface-1);
+    border-top: 1px solid var(--color-border-solid);
+    padding: 4px 4px max(4px, env(safe-area-inset-bottom));
+  }
+  .adm-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 54px;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 11.5px;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .adm-tab svg, .adm-mas-item svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .adm-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .adm-tab.activo { color: var(--color-primary-strong); font-weight: 600; background: var(--color-primary-soft); }
+  .adm-mas-fondo { display: block; position: fixed; inset: 0; z-index: 39; border: 0; border-radius: 0; background: rgba(0, 0, 0, 0.45); animation: aparecer 0.2s ease-out; }
+  .adm-mas-fondo:active { scale: none; opacity: 1; }
+  .adm-mas {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(63px + env(safe-area-inset-bottom));
+    z-index: 40;
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    padding: var(--space-3);
+    background: var(--surface-1);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--elev-3);
+    animation: subir 0.22s ease-out;
+  }
+  /* `.adm button` quita el alto mínimo (panel de escritorio): aquí vuelve, para el dedo. */
+  .adm .adm-mas-item { min-height: 52px; }
+  .adm .adm-tab { min-height: 54px; }
+  .adm-mas hr { width: 100%; margin: var(--space-2) 0; border: 0; border-top: 1px solid var(--color-border-solid); }
+  .adm-mas-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 52px;
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--text-base);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .adm-mas-item.activo { background: var(--color-primary-soft); font-weight: 600; }
+}
+
+/* ── Celular (hasta 900 px): todo se toca con el dedo y se lee sin correr de lado ── */
+@media (max-width: 900px) {
+  .adm-head { align-items: stretch; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+  .adm-head h1 { font-size: var(--text-xl); }
+  .adm-card { padding: var(--space-4); }
+  .adm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adm-kpi { padding: var(--space-3); }
+  .adm-kpi strong { font-size: var(--text-2xl); }
+
+  /* Tamaños para el dedo. */
+  .adm-btn { height: 42px; padding: 0 var(--space-4); }
+  .adm-btn.small { height: 36px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+  .adm-field input, .adm-field select, .adm-input { height: 44px; }
+  .adm input[type='checkbox'] { width: 22px; height: 22px; }
+  /* Las pestañas ocupan el ancho y, si no caben, bajan a otra fila: ninguna queda escondida. */
+  .adm-seg { display: flex; flex-wrap: wrap; }
+  .adm-seg button { flex: 1 1 auto; min-height: 40px; white-space: nowrap; }
+  .adm-actions { flex-wrap: wrap; }
+  .adm-dialog { padding: var(--space-5); }
+
+  /*
+   * Hoja: en el computador es una tarjeta más de la página; en el celular
+   * ocupa la pantalla (un detalle o un formulario que se abre al tocar algo
+   * quedaría fuera de la vista, más abajo en la página).
+   */
+  .adm-hoja {
+    position: fixed !important;
+    inset: 0 0 calc(63px + env(safe-area-inset-bottom)) 0;
+    z-index: 30;
+    max-width: none !important;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    animation: subir 0.22s ease-out;
+  }
+
+  /*
+   * Tabla apilada: cada fila es un bloque y cada celda una línea «rótulo: valor»
+   * (data-label). La celda .titulo va primero, grande y sin rótulo.
+   */
+  .adm-table.apilada, .adm-table.apilada tbody, .adm-table.apilada tr, .adm-table.apilada td { display: block; }
+  .adm-table.apilada thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .adm-table.apilada tr { padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border-solid); }
+  .adm-table.apilada tr:hover td { background: none; }
+  .adm-table.apilada td { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); padding: 3px 0; border: 0; text-align: right; }
+  .adm-table.apilada td[data-label]::before { content: attr(data-label); flex: none; color: var(--ink-muted); text-align: left; }
+  .adm-table.apilada td.titulo { display: block; text-align: left; font-size: var(--text-base); padding-bottom: 6px; }
+  .adm-table.apilada td:empty { display: none; }
+  .adm-table.apilada td.adm-empty { display: block; text-align: center; }
+}
+
+@media (max-width: 900px) {
+  /* Columnas que en el celular sobran (el dato sigue en el computador y en el CSV). */
+  .adm .solo-escritorio { display: none !important; }
+  .adm .solo-celular { display: inline-flex; }
+  /* 24 horas no caben: cada celda quedaba de 10 px. */
+  .viz-heat { grid-template-columns: 30px repeat(24, minmax(0, 1fr)); gap: 1px; font-size: 9px; }
+  .viz-heat-cell { min-height: 10px; }
+  .viz-heat-foot { flex-direction: column; gap: var(--space-2); }
+}
+@media (max-width: 900px) {
+  /* Una hoja abierta desde otra (p. ej. «Editar datos» desde el detalle) va encima. */
+  .adm-hoja.encima { z-index: 31; }
+}
+@media (max-width: 900px) {
+  /* «Territorio 72» como título de la fila. */
+  .adm-table.apilada td.titulo[data-label]::before { content: attr(data-label) ' '; color: inherit; font-weight: 600; }
+  .adm-table.apilada td[data-label='']::before { content: none; }
+  /* Botones de la fila: a lo ancho, bajo los datos. */
+  .adm-table.apilada td.botones { flex-wrap: wrap; justify-content: flex-start; gap: var(--space-2); padding-top: var(--space-2); white-space: normal; }
+  .adm-table.apilada td.botones .adm-btn { border-color: var(--color-border-solid); }
+  .adm-table.apilada tr.detalle { padding: 0 0 var(--space-3) var(--space-3); }
+  .adm-table.apilada tr.detalle > td { display: block; }
+}

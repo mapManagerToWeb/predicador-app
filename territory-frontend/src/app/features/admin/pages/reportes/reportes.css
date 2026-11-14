@@ -16,3 +16,48 @@ tr.editando td { background: var(--surface-2); }
 .acciones-fila { text-align: right; white-space: nowrap; }
 
 .enviado { display: block; font-size: var(--text-xs); }
+
+.c-todos span { display: none; }
+@media (max-width: 900px) {
+  .abrir-filtros { width: 100%; justify-content: center; margin-bottom: var(--space-3); }
+  .filtros { display: none; }
+  .filtros.abiertos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+  .filtros .adm-field input, .filtros .adm-field select, .filtros .adm-field input[type='number'] { width: 100%; box-sizing: border-box; }
+  .check { grid-column: 1 / -1; height: auto; min-height: 40px; }
+  .barra { flex-wrap: wrap; }
+  .barra .adm-toolbar { width: 100%; }
+  .barra .adm-toolbar .adm-btn { flex: 1; justify-content: center; }
+  .adm-field.inline input { width: 130px; }
+  td .adm-badge { margin-left: 0; }
+
+  /* Cada reporte es un bloque: día y territorio arriba, quién y cómo quedó abajo. */
+  .lista-reportes, .lista-reportes thead, .lista-reportes tbody { display: block; }
+  .lista-reportes thead tr { display: block; }
+  .lista-reportes th { display: none; }
+  .lista-reportes th.c-todos { display: block; padding: var(--space-2) 0; white-space: normal; }
+  .c-todos label { display: flex; align-items: center; gap: var(--space-3); }
+  .c-todos span { display: inline; }
+  .lista-reportes tbody tr {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-areas: 'check fecha territorio' 'check encargado estado' 'check manzanas acciones';
+    gap: 4px var(--space-2);
+    align-items: center;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border-solid);
+  }
+  .lista-reportes td { padding: 0; border: 0; text-align: left; }
+  .lista-reportes td.adm-empty { grid-column: 1 / -1; padding: var(--space-6) 0; text-align: center; }
+  .c-check { grid-area: check; align-self: start; padding-top: 2px !important; }
+  .c-fecha { grid-area: fecha; font-weight: 600; }
+  .c-territorio { grid-area: territorio; font-weight: 600; }
+  .c-territorio::before { content: 'Territorio '; font-weight: 400; color: var(--ink-muted); }
+  .c-encargado { grid-area: encargado; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .c-estado { grid-area: estado; justify-self: end; }
+  .c-manzanas { grid-area: manzanas; color: var(--ink-muted); }
+  .c-manzanas::after { content: ' manzanas'; }
+  .c-duracion { display: none; }
+  .c-acciones { grid-area: acciones; justify-self: end; }
+  .c-acciones .adm-btn { border-color: var(--color-border-solid); }
+  .paginas .adm-btn { flex: 1; justify-content: center; }
+}

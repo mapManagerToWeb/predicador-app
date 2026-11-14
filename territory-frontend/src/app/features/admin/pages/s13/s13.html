@@ -61,10 +61,10 @@
           <tbody>
             @for (f of filas(); track f.territorio + '-' + f.pagina) {
               <tr>
-                <td class="num"><strong>{{ f.territorio }}</strong>@if (f.pagina > 1) { <span class="adm-muted"> (p. {{ f.pagina }})</span> }</td>
-                <td>{{ f.ultimaCompletada ? fmtFecha(f.ultimaCompletada) : '' }}</td>
+                <td class="num c-territorio"><strong>{{ f.territorio }}</strong>@if (f.pagina > 1) { <span class="adm-muted"> (p. {{ f.pagina }})</span> }</td>
+                <td class="c-ultima" [class.vacia]="!f.ultimaCompletada">{{ f.ultimaCompletada ? fmtFecha(f.ultimaCompletada) : '' }}</td>
                 @for (a of f.asignaciones; track $index) {
-                  <td class="asig">
+                  <td class="asig" [class.vacia]="!a">
                     @if (a) {
                       <span class="nombre">{{ a.encargado }}</span>
                       <span class="fechas">{{ fechaDm(a.asignado) }} → @if (a.completado) { <strong>{{ fechaDm(a.completado) }}</strong> } @else { <span class="adm-muted">—</span> }</span>
@@ -87,15 +87,15 @@
         @if (promedioGeneral() !== null) { Promedio general: <strong>{{ promedioGeneral() }} días</strong>. }
       </p>
       <div class="adm-table-wrap">
-        <table class="adm-table">
+        <table class="adm-table apilada">
           <thead><tr><th class="num">Territorio</th><th class="num">Vueltas completadas</th><th class="num">Promedio (días)</th><th>Última vez</th></tr></thead>
           <tbody>
             @for (t of tiempos(); track t.territorio) {
               <tr>
-                <td class="num"><strong>{{ t.territorio }}</strong></td>
-                <td class="num">{{ t.vueltas }}</td>
-                <td class="num">{{ t.promedioDias ?? '—' }}</td>
-                <td>{{ fmtFecha(t.ultimaCompletada) }}</td>
+                <td class="num titulo" data-label="Territorio"><strong>{{ t.territorio }}</strong></td>
+                <td class="num" data-label="Vueltas completadas">{{ t.vueltas }}</td>
+                <td class="num" data-label="Promedio (días)">{{ t.promedioDias ?? '—' }}</td>
+                <td data-label="Última vez">{{ fmtFecha(t.ultimaCompletada) }}</td>
               </tr>
             } @empty {
               <tr><td colspan="4" class="adm-empty">Ningún territorio se completó en este año de servicio.</td></tr>
@@ -288,19 +288,19 @@
       <h2>Ciclos anteriores</h2>
       <p class="adm-sub">Cada vez que se reinician los territorios queda guardado el informe del ciclo.</p>
       <div class="adm-table-wrap">
-        <table class="adm-table">
+        <table class="adm-table apilada">
           <thead>
             <tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th class="num">Territorios completados</th><th>Nota</th><th></th></tr>
           </thead>
           <tbody>
             @for (c of cerrados(); track c.id) {
               <tr>
-                <td>{{ fmtFecha(c.inicio) }}</td>
-                <td>{{ fmtFecha(c.fin) }}</td>
-                <td class="num">{{ duracion(c) }}</td>
-                <td class="num">{{ completadosEn(c) }} / {{ resumen(c).length }}</td>
-                <td class="adm-muted">{{ c.nota ?? '' }}</td>
-                <td class="acciones-fila">
+                <td data-label="Desde">{{ fmtFecha(c.inicio) }}</td>
+                <td data-label="Hasta">{{ fmtFecha(c.fin) }}</td>
+                <td class="num" data-label="Días">{{ duracion(c) }}</td>
+                <td class="num" data-label="Territorios completados">{{ completadosEn(c) }} / {{ resumen(c).length }}</td>
+                <td class="adm-muted" data-label="Nota">{{ c.nota ?? '' }}</td>
+                <td class="acciones-fila botones">
                   <button class="adm-btn small ghost" type="button" (click)="abierto.set(abierto() === c.id ? null : c.id)">
                     {{ abierto() === c.id ? 'Ocultar' : 'Ver informe' }}
                   </button>
@@ -311,19 +311,19 @@
               @if (abierto() === c.id) {
                 <tr class="detalle">
                   <td colspan="6">
-                    <table class="adm-table interna">
+                    <table class="adm-table interna apilada">
                       <thead>
                         <tr><th class="num">Terr.</th><th>Estado al cerrar</th><th class="num">Veces completado</th><th>Se completó</th><th>Primera / última salida</th><th>Encargados</th></tr>
                       </thead>
                       <tbody>
                         @for (t of resumen(c); track t.territorio) {
                           <tr>
-                            <td class="num"><strong>{{ t.territorio }}</strong></td>
-                            <td>{{ estadoTexto(t) }}</td>
-                            <td class="num">{{ t.completado.length }}</td>
-                            <td>{{ fechasCompletado(t) }}</td>
-                            <td>{{ fmtFecha(t.primeraSalida) }} / {{ fmtFecha(t.ultimaSalida) }}</td>
-                            <td>{{ t.encargados.join(', ') }}</td>
+                            <td class="num titulo" data-label="Territorio"><strong>{{ t.territorio }}</strong></td>
+                            <td data-label="Estado al cerrar">{{ estadoTexto(t) }}</td>
+                            <td class="num" data-label="Veces completado">{{ t.completado.length }}</td>
+                            <td data-label="Se completó">{{ fechasCompletado(t) }}</td>
+                            <td data-label="Primera / última salida">{{ fmtFecha(t.primeraSalida) }} / {{ fmtFecha(t.ultimaSalida) }}</td>
+                            <td data-label="Encargados">{{ t.encargados.join(', ') }}</td>
                           </tr>
                         }
                       </tbody>

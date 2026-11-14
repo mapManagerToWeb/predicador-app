@@ -47,6 +47,14 @@ export class ReportesPage {
   protected readonly encargado = signal('todos');
   protected readonly estado = signal<FiltroEstado>('todos');
   protected readonly soloDuplicados = signal(false);
+  /** En el celular los filtros van plegados (lo primero es la lista). */
+  protected readonly filtrosAbiertos = signal(false);
+  /** Cuántos filtros hay puestos, para decirlo en el botón que los despliega. */
+  protected readonly filtrosActivos = computed(
+    () =>
+      [this.desde(), this.hasta(), this.territorio() !== null, this.encargado() !== 'todos', this.estado() !== 'todos', this.soloDuplicados()].filter(Boolean)
+        .length,
+  );
   protected readonly pagina = signal(0);
   protected readonly marcados = signal<Set<number>>(new Set());
   /** Reporte que se está corrigiendo (ADR 0014). */

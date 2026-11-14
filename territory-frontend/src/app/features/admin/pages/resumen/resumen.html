@@ -77,7 +77,7 @@
     <div class="cov-head">
       <div>
         <h2>Cobertura de territorios</h2>
-        <p class="adm-sub">Según la última vez que cada territorio se completó. Clic en el mapa para abrirlo en el editor.</p>
+        <p class="adm-sub">Según la última vez que cada territorio se completó. Toca uno en el mapa para abrirlo en el editor.</p>
       </div>
       <div class="cov-hero">
         <strong>{{ porcentajeAlDia() }}%</strong>
@@ -117,7 +117,7 @@
         <div class="adm-table-wrap">
           <table class="adm-table">
             <thead>
-              <tr><th>Territorio</th><th>Estado</th><th>Completado</th><th>Último trabajo</th></tr>
+              <tr><th>Territorio</th><th>Estado</th><th>Completado</th><th class="solo-escritorio">Último trabajo</th></tr>
             </thead>
             <tbody>
               @for (c of atencion(); track c.territorio) {
@@ -131,7 +131,7 @@
                     }
                   </td>
                   <td class="adm-muted">{{ fmtRelativo(c.ultimoCompletado) }}</td>
-                  <td class="adm-muted">{{ c.ultimoTrabajo ? fmtRelativo(c.ultimoTrabajo) : '—' }}</td>
+                  <td class="adm-muted solo-escritorio">{{ c.ultimoTrabajo ? fmtRelativo(c.ultimoTrabajo) : '—' }}</td>
                 </tr>
               } @empty {
                 <tr><td colspan="4" class="adm-empty">Todos los territorios están al día.</td></tr>
@@ -148,7 +148,7 @@
 
   <section class="adm-card s8">
     <h2>{{ tituloActividad() }}</h2>
-    <p class="adm-sub">Pasá el cursor sobre una columna para ver reportes y territorios completados.</p>
+    <p class="adm-sub">Toca una columna para ver reportes y territorios completados.</p>
     <app-column-chart [columnas]="actividad()" unidad="manzanas" [alto]="260" [descripcion]="tituloActividad()" />
   </section>
 

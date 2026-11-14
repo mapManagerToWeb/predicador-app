@@ -88,6 +88,46 @@
       <router-outlet />
     </main>
 
+    <!-- Celular: barra de abajo con nombre en cada botón; el resto va en «Más». -->
+    <nav class="adm-tabs" aria-label="Secciones del panel">
+      @for (s of principales; track s.ruta) {
+        <a class="adm-tab" [routerLink]="s.ruta" routerLinkActive="activo">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path [attr.d]="s.icono" /></svg>
+          <span>{{ s.corto ?? s.titulo }}</span>
+        </a>
+      }
+      <button class="adm-tab" type="button" [class.activo]="masAbierto() || enOtras()" [attr.aria-expanded]="masAbierto()" (click)="masAbierto.set(!masAbierto())">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        <span>Más</span>
+      </button>
+    </nav>
+    @if (masAbierto()) {
+      <button class="adm-mas-fondo" type="button" aria-label="Cerrar el menú" (click)="masAbierto.set(false)"></button>
+      <div class="adm-mas" role="dialog" aria-label="Más secciones" (keydown.escape)="masAbierto.set(false)">
+        @for (s of otras; track s.ruta) {
+          <a class="adm-mas-item" [routerLink]="s.ruta" routerLinkActive="activo" (click)="masAbierto.set(false)">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path [attr.d]="s.icono" /></svg>
+            <span>{{ s.titulo }}</span>
+          </a>
+        }
+        <hr />
+        <button class="adm-mas-item" type="button" (click)="alternarTema()">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
+          <span>{{ oscuro() ? 'Tema claro' : 'Tema oscuro' }}</span>
+        </button>
+        <button class="adm-mas-item" type="button" (click)="goToMap()">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+          </svg>
+          <span>Ir al mapa</span>
+        </button>
+        <button class="adm-mas-item" type="button" (click)="logout()">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" /></svg>
+          <span>Salir</span>
+        </button>
+      </div>
+    }
+
     @if (ui.confirmacion(); as c) {
       <div class="adm-overlay" tabindex="-1" (click)="cerrarSiFondo($event)" (keydown.escape)="responder(false)">
         <div

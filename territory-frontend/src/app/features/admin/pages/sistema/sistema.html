@@ -115,7 +115,7 @@
         </p>
       }
       <div class="adm-table-wrap">
-        <table class="adm-table">
+        <table class="adm-table apilada">
           <thead>
             <tr><th>Fecha</th><th>Resultado</th><th class="num">Tamaño</th><th></th></tr>
           </thead>
@@ -123,10 +123,10 @@
             @for (r of lista; track r.url) {
               @let res = resultadoRespaldo(r);
               <tr>
-                <td>{{ fmtFechaHora(r.fecha) }}</td>
-                <td><span class="adm-badge" [class]="'adm-badge ' + res.tono">{{ res.texto }}</span></td>
-                <td class="num">{{ fmtBytes(r.tamano) }}</td>
-                <td><a [href]="r.url" target="_blank" rel="noopener noreferrer">Ver en GitHub</a></td>
+                <td class="titulo">{{ fmtFechaHora(r.fecha) }}</td>
+                <td data-label="Resultado"><span class="adm-badge" [class]="'adm-badge ' + res.tono">{{ res.texto }}</span></td>
+                <td class="num" data-label="Tamaño">{{ fmtBytes(r.tamano) }}</td>
+                <td data-label=""><a [href]="r.url" target="_blank" rel="noopener noreferrer">Ver en GitHub</a></td>
               </tr>
             } @empty {
               <tr><td colspan="4" class="adm-empty">Todavía no hay respaldos.</td></tr>
@@ -143,7 +143,7 @@
 
 <ng-template #tabla let-lista>
   <div class="adm-table-wrap">
-    <table class="adm-table">
+    <table class="adm-table apilada">
       <thead>
         <tr><th>Servicio</th><th>Estado</th><th class="num">Memoria</th><th>Actualizado</th><th>Imagen</th></tr>
       </thead>
@@ -151,14 +151,16 @@
         @for (c of lista; track c.nombre) {
           @let est = estadoContenedor(c);
           <tr>
-            <td><strong>{{ c.nombre }}</strong></td>
-            <td>
-              <span class="adm-badge" [class]="'adm-badge ' + est.tono">{{ est.texto }}</span>
-              <small class="adm-muted detalle">{{ c.detalle }}</small>
+            <td class="titulo"><strong>{{ c.nombre }}</strong></td>
+            <td data-label="Estado">
+              <span>
+                <span class="adm-badge" [class]="'adm-badge ' + est.tono">{{ est.texto }}</span>
+                <small class="adm-muted detalle">{{ c.detalle }}</small>
+              </span>
             </td>
-            <td class="num">{{ fmtBytes(c.memoriaUsada) }}</td>
-            <td class="adm-muted">{{ c.creado ? fmtRelativo(c.creado) : '—' }}</td>
-            <td class="adm-muted imagen" [title]="c.imagen">{{ c.imagen }}</td>
+            <td class="num" data-label="Memoria">{{ fmtBytes(c.memoriaUsada) }}</td>
+            <td class="adm-muted" data-label="Actualizado">{{ c.creado ? fmtRelativo(c.creado) : '—' }}</td>
+            <td class="adm-muted imagen solo-escritorio" [title]="c.imagen">{{ c.imagen }}</td>
           </tr>
         } @empty {
           <tr><td colspan="5" class="adm-empty">No hay contenedores.</td></tr>

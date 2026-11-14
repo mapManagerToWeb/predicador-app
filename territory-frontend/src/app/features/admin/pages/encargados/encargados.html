@@ -42,7 +42,7 @@
 </section>
 
 @if (cargandoLista()) {
-  <section class="adm-card lista-card" aria-label="Cargar una lista de hermanos">
+  <section class="adm-card adm-hoja lista-card" aria-label="Cargar una lista de hermanos">
     <header class="lista-cabeza">
       <h2>Cargar una lista de hermanos</h2>
       <button class="adm-btn ghost small" type="button" (click)="cerrarCargaDeLista()" aria-label="Cerrar">✕</button>
@@ -103,7 +103,7 @@
 }
 
 @if (formulario(); as f) {
-  <section class="adm-card form-card">
+  <section class="adm-card adm-hoja encima form-card">
     <h2>{{ f.id === null ? 'Nuevo encargado' : 'Editar encargado' }}</h2>
     <form class="form" (submit)="$event.preventDefault(); guardar()">
       <label class="adm-field"><span>Nombre</span>
@@ -126,7 +126,7 @@
 
 <div class="cuerpo" [class.con-detalle]="seleccionado()">
   <section class="adm-card">
-    <p class="pista">Hacé clic en un encargado para ver sus datos y administrar su PIN.</p>
+    <p class="pista">Toca un encargado para ver sus datos y administrar su PIN.</p>
     <div class="filtros">
       <input class="adm-input" type="search" placeholder="Buscar por nombre o teléfono…" [value]="busqueda()"
              (input)="busqueda.set(texto($event))" aria-label="Buscar encargado" />
@@ -142,7 +142,7 @@
       </div>
     </div>
     <div class="adm-table-wrap">
-      <table class="adm-table">
+      <table class="adm-table lista-encargados">
         <thead>
           <tr>
             <th>Nombre</th><th>Teléfono</th><th>Acceso</th><th>Último acceso</th><th class="num">Reportes</th><th>Último reporte</th>
@@ -152,23 +152,23 @@
           @for (e of filtrados(); track e.id) {
             <tr class="fila" [class.sel]="seleccionadoId() === e.id" (click)="seleccionadoId.set(e.id); formulario.set(null)" tabindex="0"
                 (keydown.enter)="seleccionadoId.set(e.id)">
-              <td>
+              <td class="c-nombre">
                 <strong>{{ e.nombre }} {{ e.apellido }}</strong>
                 @if (!e.activo) { <span class="adm-badge">Inactivo</span> }
                 @if (duplicados().get(e.id); as motivo) { <span class="adm-badge warning" [title]="motivo">¿Duplicado?</span> }
                 @if (telefonoInvalido(e)) { <span class="adm-badge critical" [title]="mensajeTelefonoInvalido">Número inválido</span> }
               </td>
-              <td class="adm-muted tel">{{ fmtTelefono(e.telefono) }}</td>
-              <td>
+              <td class="adm-muted tel c-telefono">{{ fmtTelefono(e.telefono) }}</td>
+              <td class="c-acceso">
                 @switch (acceso(e)) {
                   @case ('bloqueado') { <span class="adm-badge critical">Bloqueado</span> }
                   @case ('pin') { <span class="adm-badge good">Teléfono + PIN</span> }
                   @default { <span class="adm-badge warning">Solo teléfono</span> }
                 }
               </td>
-              <td class="adm-muted">{{ fmtRelativo(e.ultimoAcceso) }}</td>
-              <td class="num">{{ e.totalReportes }}</td>
-              <td class="adm-muted">{{ e.ultimoReporte ? fmtRelativo(e.ultimoReporte) : '—' }}</td>
+              <td class="adm-muted c-oculta">{{ fmtRelativo(e.ultimoAcceso) }}</td>
+              <td class="num c-reportes">{{ e.totalReportes }}</td>
+              <td class="adm-muted c-oculta">{{ e.ultimoReporte ? fmtRelativo(e.ultimoReporte) : '—' }}</td>
             </tr>
           } @empty {
             <tr><td colspan="6" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay encargados con esos filtros.' }}</td></tr>
@@ -179,7 +179,7 @@
   </section>
 
   @if (seleccionado(); as e) {
-    <aside class="adm-card detalle" aria-label="Detalle del encargado">
+    <aside class="adm-card adm-hoja detalle" aria-label="Detalle del encargado">
       <header>
         <h2>{{ e.nombre }} {{ e.apellido }}</h2>
         <button class="adm-btn ghost small" type="button" (click)="seleccionadoId.set(null)" aria-label="Cerrar">✕</button>
