@@ -40,7 +40,7 @@ const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', '
           <strong>{{ a.valor }} {{ a.valor === 1 ? 'reporte' : 'reportes' }}</strong>
           {{ dias[a.d] }} de {{ a.h }}:00 a {{ a.h + 1 }}:00
         } @else {
-          Pasá el cursor por una celda para ver el detalle
+          Toca una celda para ver el detalle
         }
       </span>
       <span class="viz-heat-scale" aria-hidden="true">

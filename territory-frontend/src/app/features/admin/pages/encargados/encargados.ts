@@ -319,7 +319,7 @@ export class EncargadosPage {
     if (e.activo) {
       const ok = await this.ui.confirmar({
         titulo: `Desactivar a ${e.nombre} ${e.apellido}`,
-        mensaje: 'No va a poder entrar a la app. Sus reportes se conservan y podés reactivarlo cuando quieras.',
+        mensaje: 'No va a poder entrar a la app. Sus reportes se conservan y puedes reactivarlo cuando quieras.',
         accion: 'Desactivar',
         peligro: true,
       });
@@ -361,7 +361,7 @@ export class EncargadosPage {
   protected async eliminar(e: EncargadoAdmin): Promise<void> {
     const ok = await this.ui.confirmar({
       titulo: `Eliminar a ${e.nombre} ${e.apellido}`,
-      mensaje: 'Solo se puede eliminar un encargado sin reportes. Si tiene, desactivalo o fusionalo.',
+      mensaje: 'Solo se puede eliminar un encargado sin reportes. Si tiene, desactívalo o fusiónalo.',
       accion: 'Eliminar',
       peligro: true,
     });
@@ -387,7 +387,7 @@ export class EncargadosPage {
     if (d.length < 8) return null;
     const texto =
       `Hola ${e.nombre}, tu PIN para entrar a la app de territorios es ${pin}. ` +
-      'Ingresá con tu número de teléfono y después escribí este PIN.';
+      'Entra con tu número de teléfono y después escribe este PIN.';
     return `https://wa.me/56${d}?text=${encodeURIComponent(texto)}`;
   }
 

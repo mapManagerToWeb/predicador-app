@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { Profile } from '../../core/services/profile';
@@ -14,11 +15,16 @@ interface Seccion {
   titulo: string;
   /** Path SVG (24×24, trazo) del ícono. */
   icono: string;
+  /** En el celular va en la barra de abajo (las demás quedan en «Más»); `corto` es su nombre ahí. */
+  principal?: boolean;
+  corto?: string;
 }
 
 /**
  * Shell del panel de administración: login propio y, con sesión de admin,
- * navegación lateral + la página activa. Pensado para escritorio.
+ * navegación + la página activa. En el computador la navegación va al lado;
+ * en el celular, una barra abajo con las secciones de todos los días y «Más»
+ * (el resto, el tema, el mapa y salir), siempre con el nombre escrito.
  *
  * <p>Usa {@link ViewEncapsulation.None}: su hoja define los componentes
  * visuales compartidos por todas las páginas del panel (tarjetas, tablas,
@@ -30,7 +36,7 @@ interface Seccion {
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   templateUrl: './admin.html',
-  styleUrl: './admin.css',
+  styleUrls: ['./admin.css', './admin-celular.css'],
 })
 export class AdminPage implements OnInit {
   private readonly router = inject(Router);
@@ -49,19 +55,38 @@ export class AdminPage implements OnInit {
   readonly textoConfirmacion = signal('');
 
   readonly secciones: Seccion[] = [
-    { ruta: 'resumen', titulo: 'Resumen', icono: 'M3 3v18h18M7 15l4-4 3 3 5-6' },
-    { ruta: 'registrar', titulo: 'Registrar salida', icono: 'M12 5v14M5 12h14' },
+    { ruta: 'resumen', titulo: 'Resumen', icono: 'M3 3v18h18M7 15l4-4 3 3 5-6', principal: true },
+    { ruta: 'registrar', titulo: 'Registrar salida', corto: 'Registrar', icono: 'M12 5v14M5 12h14', principal: true },
     { ruta: 'territorios', titulo: 'Territorios', icono: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14' },
     { ruta: 'tarjetas', titulo: 'Tarjetas', icono: 'M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z' },
     {
       ruta: 'encargados',
       titulo: 'Encargados',
+      principal: true,
       icono: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
     },
-    { ruta: 'reportes', titulo: 'Reportes', icono: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6M8 13h8M8 17h5' },
+    { ruta: 'reportes', titulo: 'Reportes', icono: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6M8 13h8M8 17h5', principal: true },
     { ruta: 's13', titulo: 'S-13 y ciclos', icono: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm4 12 2 2 4-4' },
     { ruta: 'sistema', titulo: 'Sistema', icono: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01' },
   ];
+
+  /** Barra de abajo del celular: las de todos los días, en el orden del menú. */
+  readonly principales = this.secciones.filter(s => s.principal);
+  readonly otras = this.secciones.filter(s => !s.principal);
+  /** El menú «Más» del celular está abierto. */
+  readonly masAbierto = signal(false);
+  /** La página actual es una de «Más» (para marcar ese botón en la barra). */
+  readonly enOtras = signal(false);
+
+  constructor() {
+    const marcar = () => this.enOtras.set(this.otras.some(s => this.router.url.split(/[?#]/)[0].endsWith(`/admin/${s.ruta}`)));
+    marcar();
+    this.router.events.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe(e => {
+      if (!(e instanceof NavigationEnd)) return;
+      marcar();
+      this.masAbierto.set(false);
+    });
+  }
 
   ngOnInit(): void {
     this.aplicarTema(this.temaInicial());

@@ -177,17 +177,17 @@
   <section class="adm-card">
     <h2>Registrados ahora</h2>
     <div class="adm-table-wrap">
-      <table class="adm-table">
+      <table class="adm-table apilada">
         <thead>
           <tr><th>Hermano</th><th>Territorios</th><th>Día</th><th>Quedó</th><th>WhatsApp</th></tr>
         </thead>
         <tbody>
           @for (r of registrados(); track r.salidas[0].id) {
             <tr>
-              <td>{{ r.hermano }}</td>
-              <td>{{ territoriosDe(r) }}</td>
-              <td>{{ fmtFecha(r.dia + 'T12:00:00') }} · {{ r.turno }}</td>
-              <td>
+              <td class="titulo"><strong>{{ r.hermano }}</strong></td>
+              <td data-label="Territorios">{{ territoriosDe(r) }}</td>
+              <td data-label="Día">{{ fmtFecha(r.dia + 'T12:00:00') }} · {{ r.turno }}</td>
+              <td data-label="Quedó">
                 @for (x of r.salidas; track x.id) {
                   <span class="quedo">
                     {{ x.territorioNumero }}:
@@ -199,7 +199,7 @@
                   </span>
                 }
               </td>
-              <td>
+              <td data-label="WhatsApp">
                 @switch (r.whatsapp) {
                   @case ('enviado') { <span class="adm-badge good">Enviado</span> }
                   @case ('fallo') { <span class="adm-badge critical">No se pudo</span> }

@@ -252,7 +252,7 @@ export class TerritoriosPage {
     const f = this.manzana();
     if (!f || !this.editor) return;
     if (!this.editor.editarVertices(f)) {
-      this.toast.show('Esta forma no se puede editar por vértices; usá "Redibujar".', 4000, 'warning');
+      this.toast.show('Esta forma no se puede editar por vértices; usa "Redibujar".', 4000, 'warning');
       return;
     }
     this.modo.set('vertices');
@@ -280,7 +280,7 @@ export class TerritoriosPage {
     const territorio = this.formTerritorio();
     const nombre = this.formNombre().trim();
     if (territorio === null || territorio < 0 || !nombre) {
-      this.toast.show('Completá el número de territorio y el nombre de la manzana.', 4000, 'warning');
+      this.toast.show('Completa el número de territorio y el nombre de la manzana.', 4000, 'warning');
       return;
     }
     const modo = this.modo();

@@ -22,7 +22,7 @@
     @if (cantidadDuplicados() > 0 && !soloDuplicados()) {
       <div class="adm-alert">
         <span>Hay <strong>{{ cantidadDuplicados() }}</strong> reporte(s) que parecen dobles envíos (mismo contenido, pocos minutos de diferencia).
-          El resumen ya los ignora; podés borrarlos para limpiar el historial.</span>
+          El resumen ya los ignora; puedes borrarlos para limpiar el historial.</span>
         <button class="adm-btn small" type="button" (click)="marcarDuplicados()">Ver y seleccionar</button>
       </div>
     }
@@ -30,7 +30,11 @@
       <app-corregir-salida [reporteId]="id" (cerrar)="corrigiendo.set(null)" />
     }
     <section class="adm-card">
-      <div class="filtros">
+      <!-- En el celular los filtros van plegados: lo primero que se ve es la lista. -->
+      <button class="adm-btn solo-celular abrir-filtros" type="button" [attr.aria-expanded]="filtrosAbiertos()" (click)="filtrosAbiertos.set(!filtrosAbiertos())">
+        {{ filtrosAbiertos() ? 'Ocultar filtros' : filtrosActivos() ? 'Filtros (' + filtrosActivos() + ' puestos)' : 'Filtrar' }}
+      </button>
+      <div class="filtros" [class.abiertos]="filtrosAbiertos()">
         <label class="adm-field"><span>Desde</span>
           <input type="date" [value]="desde()" (change)="setFiltro('desde', $event)" />
         </label>
@@ -73,10 +77,10 @@
       </div>
 
       <div class="adm-table-wrap">
-        <table class="adm-table">
+        <table class="adm-table lista-reportes">
           <thead>
             <tr>
-              <th><input type="checkbox" [checked]="todosMarcados()" (change)="marcarPagina($event)" aria-label="Seleccionar página" /></th>
+              <th class="c-todos"><label><input type="checkbox" [checked]="todosMarcados()" (change)="marcarPagina($event)" aria-label="Seleccionar página" /><span>Seleccionar todos los de esta página</span></label></th>
               <th>Predicación</th><th>Encargado</th><th class="num">Territorio</th><th>Estado</th>
               <th class="num">Manzanas</th><th class="num">Duración</th><th aria-label="Acciones"></th>
             </tr>
@@ -84,26 +88,26 @@
           <tbody>
             @for (r of visibles(); track r.id) {
               <tr [class.marcado]="marcados().has(r.id)" [class.anulado]="!!r.anuladoEn" [class.editando]="corrigiendo() === r.id">
-                <td><input type="checkbox" [checked]="marcados().has(r.id)" (change)="marcar(r.id, $event)" [attr.aria-label]="'Seleccionar reporte ' + r.id" /></td>
-                <td>
+                <td class="c-check"><input type="checkbox" [checked]="marcados().has(r.id)" (change)="marcar(r.id, $event)" [attr.aria-label]="'Seleccionar reporte ' + r.id" /></td>
+                <td class="c-fecha">
                   {{ predicacion(r) }}
                   @if (enviadoOtroDia(r)) { <small class="adm-muted enviado">enviado el {{ fmtFechaHora(r.fecha) }}</small> }
                   @if (esDuplicado(r)) { <span class="adm-badge warning">Duplicado</span> }
                 </td>
-                <td>
+                <td class="c-encargado">
                   {{ nombreEncargado(r) }}
                   @if (r.origen === 'correccion') { <span class="adm-badge info" [attr.title]="r.nota ?? ''">corrección</span> }
                   @if (r.origen === 'reinicio') { <span class="adm-badge info" [attr.title]="r.nota ?? ''">reinicio de ciclo</span> }
                   @if (r.anuladoEn) { <span class="adm-badge critical" [attr.title]="r.nota ?? ''">anulado</span> }
                   @if (r.reemplazaA) { <span class="adm-badge info" [attr.title]="r.nota ?? ''">corregido</span> }
                 </td>
-                <td class="num">{{ r.territorio }}</td>
-                <td>
+                <td class="num c-territorio">{{ r.territorio }}</td>
+                <td class="c-estado">
                   @if (completado(r)) { <span class="adm-badge good">Completo</span> } @else { <span class="adm-badge info">Parcial</span> }
                 </td>
-                <td class="num">{{ r.manzanasMarcadas ?? '—' }}<span class="adm-muted"> / {{ r.totalManzanas ?? '—' }}</span></td>
-                <td class="num adm-muted">{{ minutos(r) !== null ? minutos(r) + ' min' : '—' }}</td>
-                <td class="acciones-fila">
+                <td class="num c-manzanas">{{ r.manzanasMarcadas ?? '—' }}<span class="adm-muted"> / {{ r.totalManzanas ?? '—' }}</span></td>
+                <td class="num adm-muted c-duracion">{{ minutos(r) !== null ? minutos(r) + ' min' : '—' }}</td>
+                <td class="acciones-fila c-acciones">
                   @if (corregible(r)) {
                     <button class="adm-btn small ghost" type="button" (click)="corrigiendo.set(r.id)">Corregir</button>
                   }
@@ -140,19 +144,19 @@
         <button class="adm-btn" type="button" (click)="exportarRegistro()">Exportar (CSV)</button>
       </div>
       <div class="adm-table-wrap">
-        <table class="adm-table">
+        <table class="adm-table apilada">
           <thead>
             <tr><th class="num">Territorio</th><th>Inicio</th><th>Completado</th><th class="num">Días</th><th>Encargados</th><th class="num">Reportes</th></tr>
           </thead>
           <tbody>
             @for (c of ciclos(); track c.territorio + '-' + c.inicio.getTime()) {
               <tr>
-                <td class="num"><strong>{{ c.territorio }}</strong></td>
-                <td>{{ fmtFecha(c.inicio) }}</td>
-                <td>@if (c.fin) { {{ fmtFecha(c.fin) }} } @else { <span class="adm-badge info">En curso</span> }</td>
-                <td class="num">{{ c.fin ? diasEntre(c.inicio, c.fin) : '—' }}</td>
-                <td>{{ c.encargados.join(', ') }}</td>
-                <td class="num">{{ c.reportes }}</td>
+                <td class="num titulo" data-label="Territorio"><strong>{{ c.territorio }}</strong></td>
+                <td data-label="Inicio">{{ fmtFecha(c.inicio) }}</td>
+                <td data-label="Completado">@if (c.fin) { {{ fmtFecha(c.fin) }} } @else { <span class="adm-badge info">En curso</span> }</td>
+                <td class="num" data-label="Días">{{ c.fin ? diasEntre(c.inicio, c.fin) : '—' }}</td>
+                <td data-label="Encargados">{{ c.encargados.join(', ') }}</td>
+                <td class="num" data-label="Reportes">{{ c.reportes }}</td>
               </tr>
             } @empty {
               <tr><td colspan="6" class="adm-empty">No hay registros.</td></tr>
@@ -172,13 +176,13 @@
       </p>
       <div class="barra"><span></span><button class="adm-btn" type="button" (click)="cargarEnvios()">Actualizar</button></div>
       <div class="adm-table-wrap">
-        <table class="adm-table">
+        <table class="adm-table apilada">
           <thead><tr><th>Fecha</th><th>Estado</th><th>Detalle</th></tr></thead>
           <tbody>
             @for (e of envios() ?? []; track e.id) {
               <tr>
-                <td>{{ fmtFechaHora(e.fecha) }}</td>
-                <td>
+                <td class="titulo">{{ fmtFechaHora(e.fecha) }}</td>
+                <td data-label="Estado">
                   @switch (e.estado) {
                     @case ('SUCCEEDED') { <span class="adm-badge good">Enviado</span> }
                     @case ('IN_PROGRESS') { <span class="adm-badge info">En curso</span> }
@@ -187,10 +191,7 @@
                     }
                   }
                 </td>
-                <td class="adm-muted detalle">
-                  {{ e.error ?? '' }}
-                  @if (e.statusCode) { (HTTP {{ e.statusCode }}) }
-                </td>
+                <td class="adm-muted detalle" data-label="Detalle">{{ e.error ?? '' }}@if (e.statusCode) { (HTTP {{ e.statusCode }}) }</td>
               </tr>
             } @empty {
               <tr><td colspan="3" class="adm-empty">{{ envios() === null ? 'Cargando…' : 'No hay envíos registrados.' }}</td></tr>
