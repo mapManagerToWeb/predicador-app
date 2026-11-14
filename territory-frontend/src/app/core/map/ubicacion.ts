@@ -74,7 +74,12 @@ export class UbicacionMapa {
       source: 'rumbo',
       filter: ['==', ['get', 'borde'], true],
       layout: { 'line-join': 'round' },
-      paint: { 'line-color': '#1a73e8', 'line-width': 2, 'line-opacity': 0.85 },
+      // De lejos el contorno también se afina: el cono queda como una punta discreta.
+      paint: {
+        'line-color': '#1a73e8',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 17, 2],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.5, 17, 0.8],
+      },
     });
     // Sombra suave bajo el punto: le da volumen sobre el mapa, como el punto de Google Maps.
     map.addLayer({

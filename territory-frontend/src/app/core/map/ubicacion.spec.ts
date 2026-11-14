@@ -180,7 +180,7 @@ describe('UbicacionMapa', () => {
     expect(mapa.datos('rumbo')?.features.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('el cono mide lo mismo en pantalla aunque el usuario haga zoom', () => {
+  it('de cerca el cono mide lo mismo en pantalla aunque el usuario haga zoom; de lejos es más corto', () => {
     const brujula = brujulaFalsa();
     const u = new UbicacionMapa(mapa as never, gps.geo, () => undefined, brujula.fuente);
     u.alternar();
@@ -194,10 +194,14 @@ describe('UbicacionMapa', () => {
       const metros = Math.abs(medio[1] + 37.47) * 110_540;
       return metros / metrosPorPixel(mapa.getZoom(), -37.47);
     };
+    const deLejos = largoEnPx();
+    expect(deLejos).toBeCloseTo(largoRumboPx(390, 14), 6);
+    mapa.zoomA(17);
     const antes = largoEnPx();
     mapa.zoomA(19);
     expect(largoEnPx()).toBeCloseTo(antes, 6);
     expect(antes).toBeCloseTo(largoRumboPx(390), 6);
+    expect(deLejos).toBeLessThan(antes / 3);
   });
 
   it('dibuja la sombra debajo del punto y el halo de precisión al fondo', () => {
@@ -219,6 +223,8 @@ describe('UbicacionMapa', () => {
       const medio = anillo[Math.floor(anillo.length / 2)];
       return Math.abs(medio[1] + 37.47);
     };
+    // De cerca (de lejos el cono ya va al mínimo, con cualquier ancho).
+    mapa.zoomA(17);
     const antes = largo();
     mapa.redimensionar(1200);
     expect(largo()).toBeGreaterThan(antes);
