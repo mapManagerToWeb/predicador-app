@@ -53,9 +53,9 @@ export type MotivoSinRumbo = 'sin-soporte' | 'permiso-denegado' | 'sin-brujula';
 
 /** Lo que se le dice al usuario cuando no hay cono de dirección. */
 export const AVISO_SIN_RUMBO: Record<MotivoSinRumbo, string> = {
-  'sin-soporte': 'Este navegador no tiene brújula: se ve tu ubicación, pero no hacia dónde apuntás',
+  'sin-soporte': 'Este navegador no tiene brújula: se ve tu ubicación, pero no hacia dónde apuntas',
   'permiso-denegado': 'Sin permiso de movimiento no hay cono de dirección: actívalo en los ajustes del navegador',
-  'sin-brujula': 'El teléfono no está entregando la brújula: no se puede mostrar hacia dónde apuntás',
+  'sin-brujula': 'El teléfono no está entregando la brújula: no se puede mostrar hacia dónde apuntas',
 };
 
 export function normalizar(grados: number): number {

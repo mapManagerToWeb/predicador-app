@@ -27,6 +27,8 @@ tr.editando td { background: var(--surface-2); }
   .barra { flex-wrap: wrap; }
   .barra .adm-toolbar { width: 100%; }
   .barra .adm-toolbar .adm-btn { flex: 1; justify-content: center; }
+  /* «Eliminar» aparece recién cuando hay algo elegido. */
+  .barra .adm-btn.danger:disabled { display: none; }
   .adm-field.inline input { width: 130px; }
   td .adm-badge { margin-left: 0; }
 

@@ -22,7 +22,7 @@
     @if (cantidadDuplicados() > 0 && !soloDuplicados()) {
       <div class="adm-alert">
         <span>Hay <strong>{{ cantidadDuplicados() }}</strong> reporte(s) que parecen dobles envíos (mismo contenido, pocos minutos de diferencia).
-          El resumen ya los ignora; podés borrarlos para limpiar el historial.</span>
+          El resumen ya los ignora; puedes borrarlos para limpiar el historial.</span>
         <button class="adm-btn small" type="button" (click)="marcarDuplicados()">Ver y seleccionar</button>
       </div>
     }

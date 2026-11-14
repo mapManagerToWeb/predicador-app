@@ -417,7 +417,7 @@ describe('TerritoriosPage', () => {
   it('no guarda sin territorio ni nombre, ni sin terminar el polígono', async () => {
     const { page } = await montar();
     await page.guardar();
-    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Completá el número'), 4000, 'warning');
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Completa el número'), 4000, 'warning');
 
     page.formTerritorio.set(5);
     page.formNombre.set('   ');

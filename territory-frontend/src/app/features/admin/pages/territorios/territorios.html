@@ -10,18 +10,18 @@
     @if (modo() === 'dibujar' || modo() === 'redibujar') {
       <div class="mapa-ayuda" role="status">
         @if (!dibujoListo()) {
-          Hacé clic en cada esquina de la manzana. Para cerrar, clic en el primer punto. Los vértices se pegan
+          Haz clic en cada esquina de la manzana. Para cerrar, clic en el primer punto. Los vértices se pegan
           a los de las manzanas vecinas. <kbd>Esc</kbd> cancela.
         } @else {
-          Podés arrastrar los vértices para ajustar. Después completá los datos y guardá.
+          Puedes arrastrar los vértices para ajustar. Después completa los datos y guarda.
         }
       </div>
     } @else if (modo() === 'vertices') {
       <div class="mapa-ayuda" role="status">
-        Arrastrá los vértices. Para agregar uno, arrastrá el punto del medio de un lado. Para borrarlo, clic derecho sobre él.
+        Arrastra los vértices. Para agregar uno, arrastra el punto del medio de un lado. Para borrarlo, clic derecho sobre él.
       </div>
     } @else {
-      <div class="mapa-ayuda sutil">Clic: abrir una manzana · Shift + clic o las casillas de la lista: elegir varias</div>
+      <div class="mapa-ayuda sutil solo-escritorio">Clic: abrir una manzana · Shift + clic o las casillas de la lista: elegir varias</div>
     }
     @if (cargando()) {
       <div class="mapa-estado">Cargando mapa…</div>
@@ -95,7 +95,7 @@
         <h2>Forma</h2>
         <div class="botones">
           <button class="adm-btn" type="button" (click)="editarVertices()" [disabled]="m.geometry.type !== 'Polygon'"
-                  [title]="m.geometry.type !== 'Polygon' ? 'Tiene varias partes: usá Redibujar' : ''">Editar vértices</button>
+                  [title]="m.geometry.type !== 'Polygon' ? 'Tiene varias partes: usa Redibujar' : ''">Editar vértices</button>
           <button class="adm-btn" type="button" (click)="redibujar()">Redibujar</button>
         </div>
       </div>

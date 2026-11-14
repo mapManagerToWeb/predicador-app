@@ -6,7 +6,7 @@
           <img src="logo.jpeg" alt="" width="56" height="56" loading="lazy" />
         </div>
         <h1>Panel de Administrador</h1>
-        <p class="subtitle">Ingresá tus credenciales</p>
+        <p class="subtitle">Entra con tu usuario y contraseña</p>
       </div>
 
       <form class="login-body" (submit)="$event.preventDefault(); login()">
@@ -140,7 +140,7 @@
           <p>{{ c.mensaje }}</p>
           @if (c.escribir) {
             <label class="adm-field">
-              <span>Para confirmar, escribí <strong>{{ c.escribir }}</strong></span>
+              <span>Para confirmar, escribe <strong>{{ c.escribir }}</strong></span>
               <input type="text" [value]="textoConfirmacion()" (input)="onTextoConfirmacion($event)" />
             </label>
           }

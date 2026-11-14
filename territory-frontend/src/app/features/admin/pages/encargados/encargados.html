@@ -21,7 +21,7 @@
   <div>
     <h2>Cómo entran los encargados</h2>
     <p class="adm-sub">
-      Entran con su número de teléfono. Si les generás un PIN, además tienen que escribirlo: sin PIN, cualquiera
+      Entran con su número de teléfono. Si les generas un PIN, además tienen que escribirlo: sin PIN, cualquiera
       que sepa el número puede entrar como esa persona. Tras 5 PIN incorrectos la cuenta se bloquea 15 minutos.
     </p>
     @if (totales().sinPin > 0) {
@@ -197,7 +197,7 @@
         <dt>Alta</dt><dd>{{ fmtFecha(e.creadoEn) }}</dd>
       </dl>
       @if (duplicados().get(e.id); as motivo) {
-        <p class="aviso"><span class="adm-badge warning">{{ motivo }}</span> Si es la misma persona, fusionalos.</p>
+        <p class="aviso"><span class="adm-badge warning">{{ motivo }}</span> Si es la misma persona, fusiónalos.</p>
       }
       @if (telefonoInvalido(e)) {
         <p class="aviso"><span class="adm-badge critical">Número inválido</span> Así no puede entrar a la app: corrígelo en «Editar datos».</p>
@@ -230,7 +230,7 @@
       </div>
 
       <button class="adm-btn danger eliminar" type="button" (click)="eliminar(e)" [disabled]="e.totalReportes > 0"
-              [title]="e.totalReportes > 0 ? 'Tiene reportes: desactivalo o fusionalo' : ''">Eliminar</button>
+              [title]="e.totalReportes > 0 ? 'Tiene reportes: desactívalo o fusiónalo' : ''">Eliminar</button>
     </aside>
   }
 </div>
@@ -239,7 +239,7 @@
   <div class="adm-overlay">
     <div class="adm-dialog" role="dialog" aria-modal="true" aria-label="PIN generado">
       <h2>PIN de {{ p.encargado.nombre }}</h2>
-      <p>Pasáselo por un medio privado. Por seguridad no se vuelve a mostrar.</p>
+      <p>Pásaselo por un medio privado. Por seguridad no se vuelve a mostrar.</p>
       <div class="pin" aria-live="polite">{{ p.pin }}</div>
       <div class="adm-actions">
         <button class="adm-btn" type="button" (click)="copiarPin()">Copiar</button>

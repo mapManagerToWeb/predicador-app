@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
@@ -7,7 +8,7 @@ import { Toast } from '../../core/services/toast';
 import { Profile } from '../../core/services/profile';
 import { AuthTokenService } from '../../core/services/auth-token';
 import { environment } from '../../../environments/environment';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { AdminStore } from './services/admin-store';
 import { AdminUi } from './services/admin-ui';
 
@@ -164,6 +165,64 @@ describe('AdminPage', () => {
   describe('goToMap', () => {
     it('should be defined', () => {
       expect(component.goToMap).toBeDefined();
+    });
+  });
+
+  describe('menú del celular', () => {
+    @Component({ template: '' })
+    class Vacia {}
+
+    async function conRutas() {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideRouter(['resumen', 'reportes', 's13', 'sistema'].map(r => ({ path: `admin/${r}`, component: Vacia }))),
+        ],
+      });
+      TestBed.inject(AuthTokenService).set('admin');
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/admin/resumen');
+      const fixture = TestBed.createComponent(AdminPage);
+      fixture.detectChanges();
+      return { fixture, router, el: fixture.nativeElement as HTMLElement };
+    }
+
+    it('la barra de abajo trae las secciones de todos los días, con su nombre, y «Más»', async () => {
+      const { el } = await conRutas();
+      const nombres = [...el.querySelectorAll('.adm-tabs .adm-tab span')].map(s => s.textContent?.trim());
+      expect(nombres).toEqual(['Resumen', 'Registrar', 'Encargados', 'Reportes', 'Más']);
+      expect(el.querySelector('.adm-mas')).toBeNull();
+    });
+
+    it('«Más» abre el resto de las secciones, el tema, el mapa y salir; elegir una lo cierra', async () => {
+      const { fixture, router, el } = await conRutas();
+      const mas = [...el.querySelectorAll<HTMLElement>('.adm-tabs .adm-tab')].at(-1)!;
+      mas.click();
+      fixture.detectChanges();
+      const items = [...el.querySelectorAll('.adm-mas .adm-mas-item span')].map(s => s.textContent?.trim());
+      expect(items).toEqual(['Territorios', 'Tarjetas', 'S-13 y ciclos', 'Sistema', expect.stringMatching(/^Tema/), 'Ir al mapa', 'Salir']);
+      expect(mas.getAttribute('aria-expanded')).toBe('true');
+
+      await router.navigateByUrl('/admin/s13');
+      fixture.detectChanges();
+      expect(fixture.componentInstance.masAbierto()).toBe(false);
+      // Estando en una sección de «Más», ese botón queda marcado.
+      expect(fixture.componentInstance.enOtras()).toBe(true);
+      expect(mas.classList.contains('activo')).toBe(true);
+
+      await router.navigateByUrl('/admin/reportes?x=1');
+      expect(fixture.componentInstance.enOtras()).toBe(false);
+    });
+
+    it('tocar fuera del menú lo cierra', async () => {
+      const { fixture, el } = await conRutas();
+      fixture.componentInstance.masAbierto.set(true);
+      fixture.detectChanges();
+      el.querySelector<HTMLElement>('.adm-mas-fondo')!.click();
+      fixture.detectChanges();
+      expect(el.querySelector('.adm-mas')).toBeNull();
     });
   });
 });

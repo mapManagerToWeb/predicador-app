@@ -273,7 +273,7 @@ export class AdminApi {
  */
 export function mensajeDeError(error: unknown, porDefecto = 'No se pudo completar la operación'): string {
   if (error instanceof HttpErrorResponse) {
-    if (error.status === 0) return 'Servidor no disponible. Revisá la conexión.';
+    if (error.status === 0) return 'Servidor no disponible. Revisa la conexión.';
     const cuerpo: unknown = error.error;
     if (cuerpo && typeof cuerpo === 'object') {
       const problema = cuerpo as { detail?: unknown; errors?: { field: string; message: string }[] };

@@ -112,11 +112,15 @@ describe('páginas del panel (lógica)', () => {
       eliminarMarcados: () => Promise<void>;
       setFiltro: (f: string, e: Event) => void;
       ciclos: () => { territorio: number; fin: Date | null }[];
+      filtrosActivos: () => number;
     };
 
     expect(pagina.filtrados()).toHaveLength(3);
+    // El botón «Filtrar» del celular dice cuántos filtros hay puestos.
+    expect(pagina.filtrosActivos()).toBe(0);
     pagina.setFiltro('territorio', { target: { value: '6' } } as unknown as Event);
     expect(pagina.filtrados().map(r => r.territorio)).toEqual([6]);
+    expect(pagina.filtrosActivos()).toBe(1);
 
     pagina.marcarDuplicados();
     expect([...pagina.marcados()]).toEqual([50]);
