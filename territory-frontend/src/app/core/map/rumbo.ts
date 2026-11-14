@@ -17,10 +17,12 @@ type ConBrújula = DeviceOrientationEvent & {
  * Largo del cono en pantalla (px): proporcional al ancho del mapa, con topes
  * para que no se vea diminuto en un teléfono chico ni enorme en una tablet.
  */
-const LARGO_RUMBO_FRACCION = 0.1;
-const LARGO_RUMBO_MIN_PX = 34;
-const LARGO_RUMBO_MAX_PX = 48;
-/** Medio ángulo de apertura: 52° en total, la apertura del cono de Google Maps. */
+// Más largo y más marcado que el de Google Maps: los hermanos lo usan para
+// orientarse en la calle y el de antes casi no se veía, sobre todo en el satélite.
+const LARGO_RUMBO_FRACCION = 0.22;
+const LARGO_RUMBO_MIN_PX = 70;
+const LARGO_RUMBO_MAX_PX = 110;
+/** Medio ángulo de apertura: 52° en total, como el cono de Google Maps. */
 const MEDIO_ANGULO = 26;
 const PASOS_CONO = 12;
 /**
@@ -29,10 +31,10 @@ const PASOS_CONO = 12;
  * vez de leerse como una mancha de color parejo.
  */
 const TRAMOS_CONO: readonly { fraccion: number; opacidad: number }[] = [
-  { fraccion: 1, opacidad: 0.045 },
-  { fraccion: 0.72, opacidad: 0.05 },
-  { fraccion: 0.45, opacidad: 0.055 },
-  { fraccion: 0.2, opacidad: 0.06 },
+  { fraccion: 1, opacidad: 0.12 },
+  { fraccion: 0.72, opacidad: 0.15 },
+  { fraccion: 0.45, opacidad: 0.18 },
+  { fraccion: 0.2, opacidad: 0.22 },
 ];
 /** Como mucho se avisa 16 veces por segundo: el resto solo agrega temblor. */
 const MS_ENTRE_AVISOS = 60;
@@ -123,14 +125,15 @@ export function cono([lng, lat]: Position, rumbo: number, largoM: number, medioA
 
 /**
  * Cono del mismo largo en pantalla a cualquier zoom, en tramos anidados: la
- * punta queda casi transparente y la base toma un azul suave. Así se lee como
- * un haz de dirección y no como una mancha sobre el mapa.
+ * base va más marcada que la punta, y el contorno se dibuja, para que se lea
+ * como un haz de dirección también sobre el satélite.
  */
 export function conoEnPantalla(punto: Position, rumbo: number, zoom: number, anchoMapa: number): Feature<Polygon>[] {
   const largoM = metrosPorPixel(zoom, punto[1]) * largoRumboPx(anchoMapa);
-  return TRAMOS_CONO.map(({ fraccion, opacidad }) => ({
+  return TRAMOS_CONO.map(({ fraccion, opacidad }, i) => ({
     ...cono(punto, rumbo, largoM * fraccion),
-    properties: { opacidad },
+    // El tramo de afuera lleva borde: marca bien hasta dónde llega y hacia dónde.
+    properties: { opacidad, borde: i === 0 },
   }));
 }
 
