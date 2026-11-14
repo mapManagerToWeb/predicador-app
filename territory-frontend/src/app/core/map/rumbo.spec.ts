@@ -126,9 +126,9 @@ describe('metrosPorPixel', () => {
 
 describe('largoRumboPx', () => {
   it('acompaña el ancho del mapa dentro de topes sanos', () => {
-    expect(largoRumboPx(390)).toBeCloseTo(39, 6);
-    expect(largoRumboPx(320)).toBe(34);
-    expect(largoRumboPx(1200)).toBe(48);
+    expect(largoRumboPx(390)).toBeCloseTo(85.8, 6);
+    expect(largoRumboPx(300)).toBe(70);
+    expect(largoRumboPx(1200)).toBe(110);
   });
 
   it('sin ancho válido usa un teléfono típico', () => {
@@ -170,8 +170,10 @@ describe('conoEnPantalla', () => {
       expect(largoDe(tramos[i])).toBeLessThan(largoDe(tramos[i - 1]));
       expect(tramos[i].properties?.['opacidad'] as number).toBeGreaterThan(tramos[i - 1].properties?.['opacidad'] as number);
     }
-    // La punta queda casi transparente: el cono se lee como un haz, no como una mancha.
-    expect(tramos[0].properties?.['opacidad'] as number).toBeLessThan(0.08);
+    // Junto al punto se ve bien marcado (los tramos se suman) y solo el de afuera lleva contorno.
+    const base = 1 - tramos.reduce((resto, t) => resto * (1 - (t.properties?.['opacidad'] as number)), 1);
+    expect(base).toBeGreaterThan(0.5);
+    expect(tramos.map(t => t.properties?.['borde'])).toEqual([true, false, false, false]);
   });
 });
 

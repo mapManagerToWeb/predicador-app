@@ -114,6 +114,19 @@ const FONDOS = {
 } as const;
 
 /**
+ * Sobre el satélite van las calles con su nombre (capa transparente de Esri,
+ * la misma de su mapa «híbrido»): en la foto sola no se distinguían las calles
+ * y costaba ubicarse. El mapa normal ya las trae dibujadas.
+ */
+const CALLES_SATELITE = {
+  tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'],
+  attribution: '© Esri',
+  maxzoom: 19,
+} as const;
+/** Capas del fondo (lo que cambia al elegir mapa o satélite); todo lo demás es de la app. */
+const CAPAS_FONDO = ['fondo', 'calles-satelite'];
+
+/**
  * En tema oscuro se atenúa el mapa de OpenStreetMap en vez de usar las
  * teselas oscuras de CARTO, que ahora exigen API key (devuelven una marca de
  * agua "API KEY REQUIRED").
@@ -132,8 +145,22 @@ export function estiloBase(fondo: FondoMapa, oscuro: boolean): StyleSpecificatio
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
     sources: {
       fondo: { type: 'raster', tiles: [...f.tiles], tileSize: 256, maxzoom: f.maxzoom, attribution: f.attribution },
+      ...(fondo === 'satelite'
+        ? {
+            'calles-satelite': {
+              type: 'raster',
+              tiles: [...CALLES_SATELITE.tiles],
+              tileSize: 256,
+              maxzoom: CALLES_SATELITE.maxzoom,
+              attribution: CALLES_SATELITE.attribution,
+            },
+          }
+        : {}),
     },
-    layers: [{ id: 'fondo', type: 'raster', source: 'fondo', paint: pinturaFondo(fondo, oscuro) }],
+    layers: [
+      { id: 'fondo', type: 'raster', source: 'fondo', paint: pinturaFondo(fondo, oscuro) },
+      ...(fondo === 'satelite' ? [{ id: 'calles-satelite', type: 'raster' as const, source: 'calles-satelite' }] : []),
+    ],
   };
 }
 
@@ -141,14 +168,19 @@ function pinturaFondo(fondo: FondoMapa, oscuro: boolean) {
   return fondo === 'mapa' && oscuro ? ATENUACION_OSCURA : {};
 }
 
-/** Cambia solo la capa de fondo, sin tocar las fuentes y capas propias. */
+/** Cambia solo el fondo (y las calles del satélite), sin tocar las fuentes y capas propias. */
 export function cambiarFondo(map: MapLibreMap, fondo: FondoMapa, oscuro: boolean): void {
   const estilo = estiloBase(fondo, oscuro);
-  const primeraPropia = map.getStyle().layers.find(l => l.id !== 'fondo')?.id;
-  if (map.getLayer('fondo')) map.removeLayer('fondo');
-  if (map.getSource('fondo')) map.removeSource('fondo');
-  map.addSource('fondo', estilo.sources['fondo']);
-  map.addLayer({ id: 'fondo', type: 'raster', source: 'fondo', paint: pinturaFondo(fondo, oscuro) }, primeraPropia);
+  const primeraPropia = map.getStyle().layers.find(l => !CAPAS_FONDO.includes(l.id))?.id;
+  for (const id of CAPAS_FONDO) {
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+  }
+  for (const capa of estilo.layers) {
+    const fuente = (capa as { source: string }).source;
+    map.addSource(fuente, estilo.sources[fuente]);
+    map.addLayer(capa, primeraPropia);
+  }
 }
 
 let cssCargado: Promise<void> | null = null;

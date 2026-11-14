@@ -8,6 +8,9 @@ export type ErrorUbicacion = 'denegada' | 'no-disponible';
 const ZOOM_AL_CENTRAR = 17;
 const OPCIONES: PositionOptions = { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 };
 
+/** Capas del punto, la precisión y el cono: la foto del reporte las oculta (diría dónde está el hermano). */
+export const CAPAS_UBICACION = ['ubicacion-precision', 'ubicacion-rumbo', 'ubicacion-rumbo-borde', 'ubicacion-sombra', 'ubicacion-punto'];
+
 /**
  * "Mi ubicación" como en Google Maps:
  * - el primer toque busca la posición, centra el mapa y lo sigue;
@@ -63,7 +66,15 @@ export class UbicacionMapa {
       type: 'fill',
       source: 'rumbo',
       // La opacidad viene por tramo: la punta casi transparente, la base más marcada.
-      paint: { 'fill-color': '#1a73e8', 'fill-opacity': ['coalesce', ['get', 'opacidad'], 0.05] },
+      paint: { 'fill-color': '#1a73e8', 'fill-opacity': ['coalesce', ['get', 'opacidad'], 0.12] },
+    });
+    map.addLayer({
+      id: 'ubicacion-rumbo-borde',
+      type: 'line',
+      source: 'rumbo',
+      filter: ['==', ['get', 'borde'], true],
+      layout: { 'line-join': 'round' },
+      paint: { 'line-color': '#1a73e8', 'line-width': 2, 'line-opacity': 0.85 },
     });
     // Sombra suave bajo el punto: le da volumen sobre el mapa, como el punto de Google Maps.
     map.addLayer({

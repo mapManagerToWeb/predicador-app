@@ -23,7 +23,7 @@ import { franjaDeLados, type GeometriaManzana } from '../../core/map/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import { cajaDePuntos, capturarTerritorios, type Caja } from '../../core/map/captura';
 import type { EdicionLados } from './mapa.types';
-import { UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from '../../core/map/ubicacion';
+import { CAPAS_UBICACION, UbicacionMapa, type ErrorUbicacion, type EstadoUbicacion } from '../../core/map/ubicacion';
 import type { MotivoSinRumbo } from '../../core/map/rumbo';
 
 export type { EstadoUbicacion };
@@ -80,7 +80,6 @@ const OPACIDAD_RELLENO: ExpressionSpecification = [
 ];
 
 const TOQUE_CERCANO_PX = 30;
-const CAPAS_UBICACION = ['ubicacion-precision', 'ubicacion-rumbo', 'ubicacion-sombra', 'ubicacion-punto'];
 const TOQUE_LADO_PX = 18;
 
 /**

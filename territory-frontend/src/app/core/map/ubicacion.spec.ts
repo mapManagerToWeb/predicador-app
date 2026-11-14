@@ -1,4 +1,4 @@
-import { UbicacionMapa, type EstadoUbicacion } from './ubicacion';
+import { CAPAS_UBICACION, UbicacionMapa, type EstadoUbicacion } from './ubicacion';
 import { largoRumboPx, metrosPorPixel, type FuenteOrientacion } from './rumbo';
 import type { Feature, Polygon } from 'geojson';
 
@@ -202,7 +202,9 @@ describe('UbicacionMapa', () => {
 
   it('dibuja la sombra debajo del punto y el halo de precisión al fondo', () => {
     const ids = mapa.addLayer.mock.calls.map(([capa]) => (capa as { id: string }).id);
-    expect(ids).toEqual(['ubicacion-precision', 'ubicacion-rumbo', 'ubicacion-sombra', 'ubicacion-punto']);
+    expect(ids).toEqual(['ubicacion-precision', 'ubicacion-rumbo', 'ubicacion-rumbo-borde', 'ubicacion-sombra', 'ubicacion-punto']);
+    // La foto del reporte oculta todas (diría dónde está el hermano).
+    expect(CAPAS_UBICACION).toEqual(ids);
   });
 
   it('al girar el teléfono el cono se reajusta al nuevo ancho del mapa', () => {
