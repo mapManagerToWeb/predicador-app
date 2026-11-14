@@ -131,6 +131,14 @@ describe('largoRumboPx', () => {
     expect(largoRumboPx(1200)).toBe(110);
   });
 
+  it('de cerca va completo; al alejar el mapa se achica hasta una punta junto al punto', () => {
+    expect(largoRumboPx(390, 19)).toBeCloseTo(85.8, 6);
+    expect(largoRumboPx(390, 17)).toBeCloseTo(85.8, 6);
+    expect(largoRumboPx(390, 15.5)).toBeCloseTo(56.9, 6);
+    expect(largoRumboPx(390, 14)).toBe(28);
+    expect(largoRumboPx(390, 11)).toBe(28);
+  });
+
   it('sin ancho válido usa un teléfono típico', () => {
     expect(largoRumboPx(0)).toBe(largoRumboPx(390));
     expect(largoRumboPx(Number.NaN)).toBe(largoRumboPx(390));
@@ -152,10 +160,12 @@ describe('conoEnPantalla', () => {
     return Math.abs(anillo[Math.floor(anillo.length / 2)][1] - punto[1]);
   };
 
-  it('mide largoRumboPx en pantalla a cualquier zoom', () => {
-    for (const zoom of [11, 14, 17, 19]) {
-      expect(px(conoEnPantalla(punto, 0, zoom, 390)[0], zoom)).toBeCloseTo(largoRumboPx(390), 6);
+  it('mide largoRumboPx en pantalla en cada zoom', () => {
+    for (const zoom of [11, 14, 15.5, 17, 19]) {
+      expect(px(conoEnPantalla(punto, 0, zoom, 390)[0], zoom)).toBeCloseTo(largoRumboPx(390, zoom), 6);
     }
+    // De la ciudad entera a la calle: tres veces más largo en pantalla.
+    expect(px(conoEnPantalla(punto, 0, 17, 390)[0], 17)).toBeGreaterThan(3 * px(conoEnPantalla(punto, 0, 13, 390)[0], 13));
   });
 
   it('se achica en un teléfono chico y no crece en una tablet', () => {

@@ -22,6 +22,14 @@ type ConBrújula = DeviceOrientationEvent & {
 const LARGO_RUMBO_FRACCION = 0.22;
 const LARGO_RUMBO_MIN_PX = 70;
 const LARGO_RUMBO_MAX_PX = 110;
+/**
+ * Ese largo es para ver de cerca (en la calle). Al alejar el mapa el cono se
+ * achica hasta quedar como una punta junto al punto: con el tamaño completo
+ * tapaba varias manzanas y se veía enorme sobre la ciudad entera.
+ */
+const ZOOM_RUMBO_COMPLETO = 17;
+const ZOOM_RUMBO_LEJOS = 14;
+const LARGO_RUMBO_LEJOS_PX = 28;
 /** Medio ángulo de apertura: 52° en total, como el cono de Google Maps. */
 const MEDIO_ANGULO = 26;
 const PASOS_CONO = 12;
@@ -101,10 +109,12 @@ export function metrosPorPixel(zoom: number, lat: number): number {
   return (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (512 * 2 ** zoom);
 }
 
-/** Largo del cono en pantalla para ese ancho de mapa. */
-export function largoRumboPx(anchoMapa: number): number {
+/** Largo del cono en pantalla para ese ancho de mapa y ese zoom (sin zoom: de cerca). */
+export function largoRumboPx(anchoMapa: number, zoom: number = ZOOM_RUMBO_COMPLETO): number {
   const ancho = Number.isFinite(anchoMapa) && anchoMapa > 0 ? anchoMapa : 390;
-  return Math.min(LARGO_RUMBO_MAX_PX, Math.max(LARGO_RUMBO_MIN_PX, ancho * LARGO_RUMBO_FRACCION));
+  const deCerca = Math.min(LARGO_RUMBO_MAX_PX, Math.max(LARGO_RUMBO_MIN_PX, ancho * LARGO_RUMBO_FRACCION));
+  const cerca = Math.min(1, Math.max(0, (zoom - ZOOM_RUMBO_LEJOS) / (ZOOM_RUMBO_COMPLETO - ZOOM_RUMBO_LEJOS)));
+  return LARGO_RUMBO_LEJOS_PX + (deCerca - LARGO_RUMBO_LEJOS_PX) * cerca;
 }
 
 /**
@@ -124,12 +134,12 @@ export function cono([lng, lat]: Position, rumbo: number, largoM: number, medioA
 }
 
 /**
- * Cono del mismo largo en pantalla a cualquier zoom, en tramos anidados: la
+ * Cono medido en píxeles de pantalla (ver {@link largoRumboPx}), en tramos anidados: la
  * base va más marcada que la punta, y el contorno se dibuja, para que se lea
  * como un haz de dirección también sobre el satélite.
  */
 export function conoEnPantalla(punto: Position, rumbo: number, zoom: number, anchoMapa: number): Feature<Polygon>[] {
-  const largoM = metrosPorPixel(zoom, punto[1]) * largoRumboPx(anchoMapa);
+  const largoM = metrosPorPixel(zoom, punto[1]) * largoRumboPx(anchoMapa, zoom);
   return TRAMOS_CONO.map(({ fraccion, opacidad }, i) => ({
     ...cono(punto, rumbo, largoM * fraccion),
     // El tramo de afuera lleva borde: marca bien hasta dónde llega y hacia dónde.
