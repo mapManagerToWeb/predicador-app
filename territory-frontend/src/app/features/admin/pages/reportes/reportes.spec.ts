@@ -46,7 +46,6 @@ interface VistaReportes {
   enviadoOtroDia(r: ReporteAdmin): boolean;
   exportarReportes(): void;
   exportarRegistro(): void;
-  minutos(r: ReporteAdmin): number | null;
   esDuplicado(r: ReporteAdmin): boolean;
 }
 
@@ -339,15 +338,6 @@ describe('ReportesPage', () => {
 
     expect(page.enviadoOtroDia(reporte({ fecha: '2026-11-05T12:00:00Z', fechaPredicacion: '2026-11-04' }))).toBe(true);
     expect(page.enviadoOtroDia(reporte({ fecha: '2026-11-05T12:00:00Z' }))).toBe(false);
-  });
-
-  it('calcula la duración de la salida dentro del rango razonable', async () => {
-    const page = await montar();
-    expect(page.minutos(reporte())).toBeNull();
-    const base = new Date('2026-11-05T12:00:00Z');
-    expect(page.minutos(reporte({ fecha: base.toISOString(), inicioSesion: new Date(base.getTime() - 30 * 60_000).toISOString() }))).toBe(30);
-    expect(page.minutos(reporte({ fecha: base.toISOString(), inicioSesion: new Date(base.getTime() - 20 * 3_600_000).toISOString() }))).toBeNull();
-    expect(page.minutos(reporte({ fecha: base.toISOString(), inicioSesion: new Date(base.getTime() - 10_000).toISOString() }))).toBeNull();
   });
 
   it('exporta el listado filtrado y el registro de territorios', async () => {

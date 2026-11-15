@@ -58,7 +58,6 @@ tr.editando td { background: var(--surface-2); }
   .c-estado { grid-area: estado; justify-self: end; }
   .c-manzanas { grid-area: manzanas; color: var(--ink-muted); }
   .c-manzanas::after { content: ' manzanas'; }
-  .c-duracion { display: none; }
   .c-acciones { grid-area: acciones; justify-self: end; }
   .c-acciones .adm-btn { border-color: var(--color-border-solid); }
   .paginas .adm-btn { flex: 1; justify-content: center; }

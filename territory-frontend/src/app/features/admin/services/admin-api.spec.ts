@@ -23,6 +23,18 @@ describe('AdminApi', () => {
     await expect(promesa).resolves.toEqual({ type: 'FeatureCollection', features: [] });
   });
 
+  it('lee y guarda los territorios que quedan fuera de la meta', async () => {
+    const lista = api.fueraDeMeta();
+    http.expectOne('/api/v1/reports/admin/fuera-de-meta').flush({ territorios: [129, 130] });
+    await expect(lista).resolves.toEqual([129, 130]);
+
+    const guardado = api.setFueraDeMeta([130, 5]);
+    const put = http.expectOne(r => r.url === '/api/v1/reports/admin/fuera-de-meta' && r.method === 'PUT');
+    expect(put.request.body).toEqual({ territorios: [130, 5] });
+    put.flush({ territorios: [5, 130] });
+    await expect(guardado).resolves.toEqual([5, 130]);
+  });
+
   it('pide el estado público de los territorios (el de los mapas)', async () => {
     const promesa = api.estadoPublico();
     http.expectOne('/api/v1/reports/public/estado').flush([{ territorio: 1, estado: 'completed' }]);

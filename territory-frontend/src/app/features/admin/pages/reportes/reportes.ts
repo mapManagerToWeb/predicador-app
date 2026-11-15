@@ -258,7 +258,7 @@ export class ReportesPage {
 
   protected exportarReportes(): void {
     const csv = aCsv(
-      ['Id', 'Día de predicación', 'Turno', 'Enviado', 'Encargado', 'Territorio', 'Estado', 'Manzanas marcadas', 'Total manzanas', 'Duración (min)', 'Manzanas'],
+      ['Id', 'Día de predicación', 'Turno', 'Enviado', 'Encargado', 'Territorio', 'Estado', 'Manzanas marcadas', 'Total manzanas', 'Manzanas'],
       this.filtrados().map(r => [
         r.id,
         fmtFecha(fechaDeTrabajo(r), ''),
@@ -269,7 +269,6 @@ export class ReportesPage {
         completado(r) ? 'Completo' : 'Parcial',
         r.manzanasMarcadas,
         r.totalManzanas,
-        this.minutos(r),
         r.manzanasIds ?? '',
       ]),
     );
@@ -295,13 +294,6 @@ export class ReportesPage {
 
   protected claveEncargado(r: ReporteAdmin): string {
     return r.encargadoId != null ? `id:${r.encargadoId}` : `nombre:${nombreEncargado(r).toLowerCase()}`;
-  }
-
-  /** Duración de la salida (desde la primera manzana marcada hasta el envío). */
-  protected minutos(r: ReporteAdmin): number | null {
-    if (!r.inicioSesion) return null;
-    const min = (new Date(r.fecha).getTime() - new Date(r.inicioSesion).getTime()) / 60_000;
-    return min >= 1 && min <= 12 * 60 ? Math.round(min) : null;
   }
 
   protected esDuplicado(r: ReporteAdmin): boolean {

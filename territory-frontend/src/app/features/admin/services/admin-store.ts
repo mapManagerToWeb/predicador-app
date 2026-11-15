@@ -2,6 +2,8 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import type { EncargadoAdmin, ManzanasCollection, ReporteAdmin } from '../admin.models';
 import { AdminApi } from './admin-api';
 import { esSalida } from '../utils/analytics';
+import { situacionDe, type SituacionTerritorio } from '../../../core/map/estado-publico';
+import { avanceDe } from '../utils/avance';
 
 /** Historial que carga el panel: suficiente para la cobertura y el registro por territorio. */
 const ANIOS_DE_HISTORIAL = 10;
@@ -26,6 +28,14 @@ export class AdminStore {
   readonly reportes = computed(() => this.todosLosReportes()?.filter(r => !r.anuladoEn) ?? null);
   readonly encargados = signal<EncargadoAdmin[] | null>(null);
 
+  // ── La vuelta actual (la campaña): cómo va cada territorio y cuáles no cuentan ──
+  /** Situación de cada territorio en la vuelta (la misma regla que los números del mapa); null sin cargar. */
+  readonly situaciones = signal<ReadonlyMap<number, SituacionTerritorio> | null>(null);
+  /** Día en que empezó la vuelta abierta (ISO), si se sabe. */
+  readonly inicioVuelta = signal<string | null>(null);
+  /** Territorios que el administrador dejó fuera de la meta. */
+  readonly fueraDeMeta = signal<number[]>([]);
+
   /** Cantidad de manzanas por territorio. */
   readonly manzanasPorTerritorio = computed(() => {
     const conteo = new Map<number, number>();
@@ -40,7 +50,34 @@ export class AdminStore {
 
   readonly territorios = computed(() => [...this.manzanasPorTerritorio().keys()].sort((a, b) => a - b));
 
+  /** Los territorios que cuentan para la meta: todos menos los que se dejaron fuera. */
+  readonly territoriosEnMeta = computed(() => {
+    const fuera = new Set(this.fueraDeMeta());
+    return this.territorios().filter(t => !fuera.has(t));
+  });
+  /** Avance de la vuelta sobre los territorios que cuentan. */
+  readonly avanceVuelta = computed(() => avanceDe(this.territoriosEnMeta(), this.situaciones() ?? new Map()));
+
   private cargas = new Map<string, Promise<unknown>>();
+
+  /** Estado de la vuelta, su inicio y los territorios fuera de la meta. */
+  cargarVuelta(forzar = false): Promise<void> {
+    return this.unaVez('vuelta', forzar, async () => {
+      const [estados, ciclos, fuera] = await Promise.all([
+        this.api.estadoPublico(),
+        this.api.ciclos().catch(() => []),
+        // Un servidor que todavía no tiene esta opción: nadie queda fuera.
+        this.api.fueraDeMeta().catch(() => []),
+      ]);
+      this.situaciones.set(new Map(estados.map(e => [e.territorio, situacionDe(e)])));
+      this.inicioVuelta.set(ciclos.find(c => !c.fin)?.inicio ?? null);
+      this.fueraDeMeta.set(fuera);
+    });
+  }
+
+  async guardarFueraDeMeta(territorios: number[]): Promise<void> {
+    this.fueraDeMeta.set(await this.api.setFueraDeMeta(territorios));
+  }
 
   cargarManzanas(forzar = false): Promise<void> {
     return this.unaVez('manzanas', forzar, async () => {
@@ -75,6 +112,9 @@ export class AdminStore {
     this.colores.set({});
     this.todosLosReportes.set(null);
     this.encargados.set(null);
+    this.situaciones.set(null);
+    this.inicioVuelta.set(null);
+    this.fueraDeMeta.set([]);
   }
 
   /** Evita pedir lo mismo dos veces cuando varias páginas lo necesitan a la vez. */

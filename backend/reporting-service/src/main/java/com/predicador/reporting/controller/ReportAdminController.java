@@ -176,6 +176,24 @@ public class ReportAdminController {
         return ResponseEntity.ok(registro.registrarVarias(salidas));
     }
 
+    /** Territorios que no cuentan en el avance de la vuelta (imagen para los hermanos y Resumen). */
+    @GetMapping("/fuera-de-meta")
+    public ResponseEntity<Map<String, List<Long>>> fueraDeMeta(HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        return ResponseEntity.ok(Map.of("territorios", configuracion.territoriosFueraDeMeta()));
+    }
+
+    @PutMapping("/fuera-de-meta")
+    public ResponseEntity<Map<String, List<Long>>> cambiarFueraDeMeta(@RequestBody Map<String, List<Long>> body,
+                                                                       HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        List<Long> territorios = body.get("territorios");
+        if (territorios != null && territorios.size() > 1000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Demasiados territorios");
+        }
+        return ResponseEntity.ok(Map.of("territorios", configuracion.setTerritoriosFueraDeMeta(territorios)));
+    }
+
     /** Número al que llega el WhatsApp de lo que se registra desde el panel. */
     @GetMapping("/whatsapp-destino")
     public ResponseEntity<Map<String, String>> whatsappDestino(HttpServletRequest request) {

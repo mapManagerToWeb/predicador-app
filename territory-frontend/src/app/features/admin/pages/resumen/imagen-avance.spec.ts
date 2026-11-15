@@ -5,7 +5,7 @@ import { AdminStore } from '../../services/admin-store';
 import { ImagenAvance } from './imagen-avance';
 
 describe('ImagenAvance', () => {
-  let api: { estadoPublico: ReturnType<typeof vi.fn>; ciclos: ReturnType<typeof vi.fn> };
+  let api: { estadoPublico: ReturnType<typeof vi.fn>; ciclos: ReturnType<typeof vi.fn>; fueraDeMeta: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     localStorage.clear();
@@ -18,6 +18,7 @@ describe('ImagenAvance', () => {
         { id: 2, inicio: '2026-11-03T03:00:00Z', fin: null, nota: null, resumen: null },
         { id: 1, inicio: '2026-08-01T03:00:00Z', fin: '2026-11-03T03:00:00Z', nota: null, resumen: null },
       ]),
+      fueraDeMeta: vi.fn().mockResolvedValue([]),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -50,6 +51,15 @@ describe('ImagenAvance', () => {
     const fixture = await abrir();
     expect(api.estadoPublico).toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('(desde el 3 de noviembre).');
+  });
+
+  it('los territorios fuera de la meta no cuentan, y lo dice', async () => {
+    api.fueraDeMeta.mockResolvedValue([3]);
+    const fixture = await abrir();
+    const store = TestBed.inject(AdminStore);
+    // Quedan el 1 (completo) y el 2 (empezado): 1 de 2, no 1 de 3.
+    expect(store.avanceVuelta()).toEqual({ total: 2, completados: 1, enCurso: 1, porcentaje: 50 });
+    expect(fixture.nativeElement.textContent).toContain('No cuenta 1 territorio que está fuera de la meta');
   });
 
   it('recuerda lo escrito y avisa si la fecha de la meta ya pasó', async () => {

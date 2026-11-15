@@ -331,6 +331,24 @@ class ReportAdminCiclosControllerTest {
     }
 
     @Test
+    void territoriosFueraDeMeta_seLeenYSeGuardan_soloElAdmin() throws Exception {
+        when(configuracion.territoriosFueraDeMeta()).thenReturn(List.of(129L, 130L));
+        mvc.perform(get("/api/v1/reports/admin/fuera-de-meta").with(comoAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.territorios[0]").value(129))
+                .andExpect(jsonPath("$.territorios[1]").value(130));
+
+        when(configuracion.setTerritoriosFueraDeMeta(List.of(130L, 5L))).thenReturn(List.of(5L, 130L));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/fuera-de-meta")
+                        .with(comoAdmin()).contentType(MediaType.APPLICATION_JSON).content("{\"territorios\":[130,5]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.territorios[0]").value(5));
+
+        mvc.perform(get("/api/v1/reports/admin/fuera-de-meta"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
     void registrarVariasSalidas_soloElAdmin() throws Exception {
         String cuerpo = """
                 [{"territorio":72,"encargadoNombre":"Pedro","fechaPredicacion":"2026-11-07","manzanasIds":"72-72.a","totalManzanas":4},

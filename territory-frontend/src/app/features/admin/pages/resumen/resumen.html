@@ -34,6 +34,58 @@
   <div class="adm-alert" role="alert">{{ error() }}</div>
 }
 
+<section class="adm-card vuelta" [class.recargando]="cargando()" aria-labelledby="vuelta-titulo">
+  <div class="vuelta-cabeza">
+    <div>
+      <h2 id="vuelta-titulo">Avance de la vuelta</h2>
+      <p class="adm-sub">
+        {{ explicacionVuelta() }}
+      </p>
+    </div>
+    <div class="vuelta-numero">
+      <strong>{{ avance().porcentaje }}%</strong>
+      <span>{{ avance().completados }} de {{ avance().total }} territorios</span>
+    </div>
+  </div>
+  <div class="vuelta-barra" role="img" [attr.aria-label]="avance().completados + ' completados, ' + avance().enCurso + ' empezados y ' + faltan() + ' sin empezar'">
+    @if (avance().completados) { <span class="hecho" [style.flex-grow]="avance().completados"></span> }
+    @if (avance().enCurso) { <span class="empezado" [style.flex-grow]="avance().enCurso"></span> }
+    @if (faltan()) { <span class="falta" [style.flex-grow]="faltan()"></span> }
+  </div>
+  <ul class="vuelta-leyenda">
+    <li><span class="adm-badge good">Completados</span> <strong>{{ avance().completados }}</strong></li>
+    <li><span class="adm-badge warning">Empezados</span> <strong>{{ avance().enCurso }}</strong></li>
+    <li><span class="adm-badge">Sin empezar</span> <strong>{{ faltan() }}</strong></li>
+  </ul>
+
+  <div class="vuelta-fuera">
+    @if (textoFuera() === null) {
+      <p>
+        @if (fuera().length) {
+          <strong>Fuera de la meta:</strong> {{ fuera().join(', ') }}.
+          <span class="adm-muted">No cuentan en este avance ni en la imagen.</span>
+        } @else {
+          <span class="adm-muted">Todos los territorios cuentan para la meta.</span>
+        }
+      </p>
+      <button class="adm-btn" type="button" (click)="editarFuera()">{{ fuera().length ? 'Cambiar' : 'Dejar territorios fuera de la meta' }}</button>
+    } @else {
+      <label class="adm-field">
+        <span>Territorios que no cuentan para la meta (rurales, los que no se harán en esta campaña)</span>
+        <input type="text" inputmode="text" placeholder="Por ejemplo: 0, 127, 129-130" [value]="textoFuera()" (input)="textoFuera.set(texto($event))" />
+      </label>
+      <p class="adm-muted">
+        Escribe los números separados por coma; «129-130» son del 129 al 130. Siguen en el mapa, en el S-13 y en los reportes: solo dejan de contar aquí y en la imagen.
+        @if (fueraLeidos().length) { Quedan fuera {{ fueraLeidos().length }}: {{ fueraLeidos().join(', ') }}. } @else { Con la lista vacía cuentan todos. }
+      </p>
+      <div class="adm-actions">
+        <button class="adm-btn" type="button" (click)="textoFuera.set(null)">Cancelar</button>
+        <button class="adm-btn primary" type="button" [disabled]="guardandoFuera()" (click)="guardarFuera()">{{ guardandoFuera() ? 'Guardando…' : 'Guardar' }}</button>
+      </div>
+    }
+  </div>
+</section>
+
 <section class="adm-kpis" [class.recargando]="cargando()" aria-label="Indicadores del período">
   <div class="adm-kpi">
     <span>Manzanas trabajadas</span>
@@ -49,26 +101,6 @@
     <span>Encargados activos</span>
     <strong>{{ fmtNumero(kpi().encargadosActivos) }}</strong>
     <small>enviaron al menos un reporte</small>
-  </div>
-  <div class="adm-kpi">
-    <span>Tiempo por manzana</span>
-    @if (kpi().minutosPorManzana !== null) {
-      <strong>{{ fmtNumero(kpi().minutosPorManzana) }} min</strong>
-      <small>mediana de {{ kpi().salidasMedidas }} salidas medidas</small>
-    } @else {
-      <strong class="adm-muted">—</strong>
-      <small>se mide en los reportes nuevos</small>
-    }
-  </div>
-  <div class="adm-kpi">
-    <span>Horas de predicación</span>
-    @if (kpi().horas !== null) {
-      <strong>{{ fmtNumero(kpi().horas) }} h</strong>
-      <small>en salidas con tiempo medido</small>
-    } @else {
-      <strong class="adm-muted">—</strong>
-      <small>se mide en los reportes nuevos</small>
-    }
   </div>
 </section>
 
