@@ -82,7 +82,7 @@
             <tr>
               <th class="c-todos"><label><input type="checkbox" [checked]="todosMarcados()" (change)="marcarPagina($event)" aria-label="Seleccionar página" /><span>Seleccionar todos los de esta página</span></label></th>
               <th>Predicación</th><th>Encargado</th><th class="num">Territorio</th><th>Estado</th>
-              <th class="num">Manzanas</th><th class="num">Duración</th><th aria-label="Acciones"></th>
+              <th class="num">Manzanas</th><th aria-label="Acciones"></th>
             </tr>
           </thead>
           <tbody>
@@ -106,7 +106,6 @@
                   @if (completado(r)) { <span class="adm-badge good">Completo</span> } @else { <span class="adm-badge info">Parcial</span> }
                 </td>
                 <td class="num c-manzanas">{{ r.manzanasMarcadas ?? '—' }}<span class="adm-muted"> / {{ r.totalManzanas ?? '—' }}</span></td>
-                <td class="num adm-muted c-duracion">{{ minutos(r) !== null ? minutos(r) + ' min' : '—' }}</td>
                 <td class="acciones-fila c-acciones">
                   @if (corregible(r)) {
                     <button class="adm-btn small ghost" type="button" (click)="corrigiendo.set(r.id)">Corregir</button>
@@ -114,7 +113,7 @@
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="8" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay reportes con esos filtros.' }}</td></tr>
+              <tr><td colspan="7" class="adm-empty">{{ cargando() ? 'Cargando…' : 'No hay reportes con esos filtros.' }}</td></tr>
             }
           </tbody>
         </table>

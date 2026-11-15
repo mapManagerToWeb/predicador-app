@@ -11,11 +11,11 @@ import {
   viewChild,
 } from '@angular/core';
 import { limitesPrincipales } from '../../../../core/map/base-map';
-import { situacionDe, type SituacionTerritorio } from '../../../../core/map/estado-publico';
+import type { SituacionTerritorio } from '../../../../core/map/estado-publico';
 import { Toast } from '../../../../core/services/toast';
-import { AdminApi, mensajeDeError } from '../../services/admin-api';
+import { mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
-import { avanceDe, textoDesde, textoMeta } from '../../utils/avance';
+import { textoDesde, textoMeta } from '../../utils/avance';
 import { dibujarAvance, type FormatoAvance, type ManzanaAvance } from '../../utils/avance-dibujo';
 
 /** Lo que el administrador escribió la última vez (se recuerda en este navegador). */
@@ -63,6 +63,9 @@ function leerGuardado(): Guardado {
         <form class="campos" (submit)="$event.preventDefault()">
           <h2 id="avance-titulo">Imagen para los hermanos</h2>
           <p class="adm-muted">{{ explicacion() }}</p>
+          @if (fuera() > 0) {
+            <p class="adm-muted">No cuenta {{ fuera() === 1 ? '1 territorio que está' : fuera() + ' territorios que están' }} fuera de la meta (se cambia en el Resumen).</p>
+          }
           @if (error(); as e) {
             <div class="adm-alert" role="alert">{{ e }}</div>
           }
@@ -153,7 +156,6 @@ export class ImagenAvance {
   readonly cerrar = output<void>();
 
   private readonly store = inject(AdminStore);
-  private readonly api = inject(AdminApi);
   private readonly toast = inject(Toast);
   private readonly lienzo = viewChild<ElementRef<HTMLCanvasElement>>('lienzo');
 
@@ -167,11 +169,11 @@ export class ImagenAvance {
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly puedeCompartir = signal(false);
-  private readonly situaciones = signal<ReadonlyMap<number, SituacionTerritorio>>(new Map());
-  private readonly inicioVuelta = signal<string | null>(null);
   private readonly logo = signal<HTMLImageElement | null>(null);
 
-  protected readonly desde = computed(() => textoDesde(this.inicioVuelta()));
+  protected readonly desde = computed(() => textoDesde(this.store.inicioVuelta()));
+  /** Cuántos territorios quedaron fuera de la meta (se avisa bajo la explicación). */
+  protected readonly fuera = computed(() => this.store.territorios().length - this.store.territoriosEnMeta().length);
   protected readonly explicacion = computed(() => {
     const desde = this.desde();
     return (
@@ -181,9 +183,13 @@ export class ImagenAvance {
     );
   });
   protected readonly meta = computed(() => textoMeta({ nombre: this.metaNombre(), fecha: this.metaFecha() }, new Date()));
-  private readonly manzanas = computed<ManzanaAvance[]>(() =>
-    (this.store.manzanas()?.features ?? []).map(f => ({ territorio: f.properties.territorio, geometria: f.geometry })),
-  );
+  /** Solo los territorios que cuentan: los que están fuera de la meta no se dibujan. */
+  private readonly manzanas = computed<ManzanaAvance[]>(() => {
+    const enMeta = new Set(this.store.territoriosEnMeta());
+    return (this.store.manzanas()?.features ?? [])
+      .filter(f => enMeta.has(f.properties.territorio))
+      .map(f => ({ territorio: f.properties.territorio, geometria: f.geometry }));
+  });
   private readonly caja = computed(() => {
     const coleccion = this.store.manzanas();
     // Un recorte mayor que en los mapas: lo que importa es que se vea la ciudad.
@@ -195,9 +201,9 @@ export class ImagenAvance {
     effect(() => {
       const canvas = this.lienzo()?.nativeElement;
       const datos = {
-        avance: avanceDe(this.store.territorios(), this.situaciones()),
+        avance: this.store.avanceVuelta(),
         manzanas: this.manzanas(),
-        situaciones: this.situaciones(),
+        situaciones: this.store.situaciones() ?? new Map<number, SituacionTerritorio>(),
         caja: this.caja(),
         titulo: this.titulo().trim(),
         mensaje: this.mensaje(),
@@ -221,14 +227,8 @@ export class ImagenAvance {
 
   private async cargar(): Promise<void> {
     try {
-      const [estados, ciclos] = await Promise.all([
-        this.api.estadoPublico(),
-        this.api.ciclos().catch(() => []),
-        this.store.cargarManzanas(),
-        this.cargarRecursos(),
-      ]);
-      this.situaciones.set(new Map(estados.map(e => [e.territorio, situacionDe(e)])));
-      this.inicioVuelta.set(ciclos.find(c => !c.fin)?.inicio ?? null);
+      // Siempre lo último: la imagen se comparte, no puede salir con datos viejos.
+      await Promise.all([this.store.cargarVuelta(true), this.store.cargarManzanas(), this.cargarRecursos()]);
     } catch (e) {
       this.error.set(mensajeDeError(e, 'No se pudo cargar cómo van los territorios'));
     } finally {

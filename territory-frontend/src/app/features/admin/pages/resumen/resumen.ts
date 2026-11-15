@@ -19,7 +19,9 @@ import {
   porPeriodo,
   resumen,
 } from '../../utils/analytics';
+import { textoDesde } from '../../utils/avance';
 import { aCsv, descargar } from '../../utils/csv';
+import { leerTerritorios } from '../../utils/tarjeta';
 import { fmtDiaMes, fmtFecha, fmtMesAnio, fmtNumero, fmtRelativo } from '../../utils/formato';
 
 type Periodo = '30' | '90' | '365' | 'todo';
@@ -88,6 +90,45 @@ export class ResumenPage {
   protected readonly error = signal<string | null>(null);
   /** La imagen para animar a los hermanos (diálogo). */
   protected readonly imagenAbierta = signal(false);
+
+  // ── Avance de la vuelta (la campaña) ──
+  protected readonly avance = this.store.avanceVuelta;
+  protected readonly faltan = computed(() => Math.max(0, this.avance().total - this.avance().completados - this.avance().enCurso));
+  protected readonly desdeVuelta = computed(() => textoDesde(this.store.inicioVuelta()));
+  protected readonly explicacionVuelta = computed(() => {
+    const desde = this.desdeVuelta();
+    return `Territorios completados desde que empezó la vuelta${desde ? ` (${desde.toLowerCase()})` : ''}. Es lo mismo que muestra la imagen para los hermanos.`;
+  });
+  /** Los que quedaron fuera de la meta y existen, en orden. */
+  protected readonly fuera = computed(() => {
+    const existen = new Set(this.store.territorios());
+    return this.store.fueraDeMeta().filter(t => existen.has(t));
+  });
+  /** Editando la lista de territorios fuera de la meta: el texto que se escribe ("0, 127-130"). */
+  protected readonly textoFuera = signal<string | null>(null);
+  protected readonly guardandoFuera = signal(false);
+  /** Lo que se entendió de lo escrito, para mostrarlo antes de guardar. */
+  protected readonly fueraLeidos = computed(() => leerTerritorios(this.textoFuera() ?? '', this.store.territorios()).sort((a, b) => a - b));
+
+  protected editarFuera(): void {
+    this.textoFuera.set(this.fuera().join(', '));
+  }
+
+  protected async guardarFuera(): Promise<void> {
+    this.guardandoFuera.set(true);
+    try {
+      await this.store.guardarFueraDeMeta(this.fueraLeidos());
+      this.textoFuera.set(null);
+    } catch (e) {
+      this.error.set(mensajeDeError(e, 'No se pudo guardar la lista de territorios fuera de la meta'));
+    } finally {
+      this.guardandoFuera.set(false);
+    }
+  }
+
+  protected texto(e: Event): string {
+    return (e.target as HTMLInputElement).value;
+  }
   private readonly ahora = signal(new Date());
 
   /** Historial completo sin dobles envíos. */
@@ -151,8 +192,7 @@ export class ResumenPage {
       etiqueta: f.nombre,
       valor: f.manzanas,
       detalle:
-        `${f.reportes} reportes · ${f.territorios} territorios · ${f.completados} completados` +
-        (f.minutosPorManzana !== null ? ` · ${fmtNumero(f.minutosPorManzana)} min por manzana` : ''),
+        `${f.reportes} reportes · ${f.territorios} territorios · ${f.completados} completados`,
     })),
   );
 
@@ -224,7 +264,7 @@ export class ResumenPage {
     this.cargando.set(true);
     this.error.set(null);
     try {
-      await Promise.all([this.store.cargarReportes(forzar), this.store.cargarManzanas(forzar)]);
+      await Promise.all([this.store.cargarReportes(forzar), this.store.cargarManzanas(forzar), this.store.cargarVuelta(forzar)]);
       this.ahora.set(new Date());
     } catch (e) {
       this.error.set(mensajeDeError(e, 'No se pudieron cargar los datos'));

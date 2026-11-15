@@ -5,12 +5,18 @@ import com.predicador.reporting.repository.AppConfigRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
+
 /** Ajustes que el administrador cambia desde el panel. */
 @Service
 public class ConfiguracionService {
 
     static final String REGISTRO_ABIERTO = "registro_abierto";
     static final String WHATSAPP_ADMINISTRADOR = "whatsapp_administrador";
+    static final String FUERA_DE_META = "territorios_fuera_de_meta";
 
     private final AppConfigRepository repository;
 
@@ -56,5 +62,41 @@ public class ConfiguracionService {
                 .orElseGet(() -> new AppConfig(WHATSAPP_ADMINISTRADOR, ""));
         config.setValor(telefono == null ? "" : telefono);
         repository.save(config);
+    }
+
+    /**
+     * Territorios que no cuentan en el avance de la vuelta (rurales, o los que
+     * no se predicarán en una campaña): la imagen para los hermanos y el
+     * Resumen los dejan fuera. No cambia reportes, S-13 ni el mapa.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> territoriosFueraDeMeta() {
+        return repository.findById(FUERA_DE_META)
+                .map(c -> leerNumeros(c.getValor()))
+                .orElse(List.of());
+    }
+
+    /** Guarda la lista ordenada y sin repetidos; los números negativos se descartan. */
+    @Transactional
+    public List<Long> setTerritoriosFueraDeMeta(Collection<Long> territorios) {
+        List<Long> limpia = (territorios == null ? List.<Long>of() : territorios).stream()
+                .filter(t -> t != null && t >= 0)
+                .distinct()
+                .sorted()
+                .toList();
+        AppConfig config = repository.findById(FUERA_DE_META)
+                .orElseGet(() -> new AppConfig(FUERA_DE_META, ""));
+        config.setValor(limpia.stream().map(String::valueOf).collect(Collectors.joining(",")));
+        repository.save(config);
+        return limpia;
+    }
+
+    private static List<Long> leerNumeros(String valor) {
+        if (valor == null || valor.isBlank()) return List.of();
+        return Arrays.stream(valor.split(","))
+                .map(String::strip)
+                .filter(v -> v.matches("\\d{1,9}"))
+                .map(Long::valueOf)
+                .toList();
     }
 }

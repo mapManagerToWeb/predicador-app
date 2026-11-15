@@ -134,6 +134,18 @@ export class AdminApi {
     return this.get<EstadoTerritorioPublico[]>(`${environment.apiUrl}/reports/public/estado`);
   }
 
+  /** Territorios que no cuentan en el avance de la vuelta (rurales, los que no se harán en la campaña). */
+  async fueraDeMeta(): Promise<number[]> {
+    return (await this.get<{ territorios: number[] }>(`${this.reportes}/fuera-de-meta`)).territorios ?? [];
+  }
+
+  async setFueraDeMeta(territorios: number[]): Promise<number[]> {
+    const r = await this.send(
+      this.http.put<{ territorios: number[] }>(`${this.reportes}/fuera-de-meta`, { territorios }, { headers: SIN_SW }),
+    );
+    return r.territorios ?? [];
+  }
+
   // ── Ciclos y correcciones ──
 
   ciclos(): Promise<CicloAdmin[]> {

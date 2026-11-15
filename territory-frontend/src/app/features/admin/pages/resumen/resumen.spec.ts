@@ -107,7 +107,69 @@ describe('ResumenPage', () => {
     store = TestBed.inject(AdminStore);
     vi.spyOn(store, 'cargarReportes').mockResolvedValue();
     vi.spyOn(store, 'cargarManzanas').mockResolvedValue();
+    vi.spyOn(store, 'cargarVuelta').mockResolvedValue();
     store.manzanas.set(manzanas([1, 2, 3]));
+  });
+
+  describe('avance de la vuelta', () => {
+    type Vuelta = VistaResumen & {
+      avance(): { total: number; completados: number; enCurso: number; porcentaje: number };
+      faltan(): number;
+      desdeVuelta(): string | null;
+      explicacionVuelta(): string;
+      fuera(): number[];
+      textoFuera: { (): string | null; set(v: string | null): void };
+      fueraLeidos(): number[];
+      editarFuera(): void;
+      guardarFuera(): Promise<void>;
+      texto(e: Event): string;
+    };
+
+    beforeEach(() => {
+      store.manzanas.set(manzanas([1, 2, 3, 4, 130]));
+      store.situaciones.set(new Map([[1, 'completado'], [2, 'en-curso'], [130, 'completado']]));
+      store.inicioVuelta.set('2026-11-03T03:00:00Z');
+    });
+
+    it('cuenta completados, empezados y los que faltan desde que empezó la vuelta', () => {
+      const page = montar() as Vuelta;
+      expect(page.avance()).toEqual({ total: 5, completados: 2, enCurso: 1, porcentaje: 40 });
+      expect(page.faltan()).toBe(2);
+      expect(page.desdeVuelta()).toBe('Desde el 3 de noviembre');
+      expect(page.explicacionVuelta()).toContain('la vuelta (desde el 3 de noviembre). Es lo mismo');
+    });
+
+    it('los territorios fuera de la meta no cuentan (los que ya no existen se ignoran)', () => {
+      store.fueraDeMeta.set([130, 999]);
+      const page = montar() as Vuelta;
+      expect(page.fuera()).toEqual([130]);
+      expect(page.avance()).toEqual({ total: 4, completados: 1, enCurso: 1, porcentaje: 25 });
+    });
+
+    it('se escribe la lista (con rangos), se revisa y se guarda', async () => {
+      const guardar = vi.spyOn(store, 'guardarFueraDeMeta').mockImplementation(async lista => store.fueraDeMeta.set(lista));
+      store.fueraDeMeta.set([130]);
+      const page = montar() as Vuelta;
+      page.editarFuera();
+      expect(page.textoFuera()).toBe('130');
+      page.textoFuera.set(page.texto({ target: { value: '130, 3-4, 77' } } as unknown as Event));
+      // El 77 no existe: no entra.
+      expect(page.fueraLeidos()).toEqual([3, 4, 130]);
+      await page.guardarFuera();
+      expect(guardar).toHaveBeenCalledWith([3, 4, 130]);
+      expect(page.textoFuera()).toBeNull();
+      expect(page.avance().total).toBe(2);
+    });
+
+    it('si no se puede guardar lo dice y deja la lista abierta', async () => {
+      vi.spyOn(store, 'guardarFueraDeMeta').mockRejectedValue(new Error('caído'));
+      const page = montar() as Vuelta;
+      page.editarFuera();
+      page.textoFuera.set('1');
+      await page.guardarFuera();
+      expect(page.error()).not.toBeNull();
+      expect(page.textoFuera()).toBe('1');
+    });
   });
 
   it('carga y guarda el error si falla', async () => {
