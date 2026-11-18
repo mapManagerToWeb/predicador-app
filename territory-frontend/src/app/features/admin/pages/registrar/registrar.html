@@ -74,7 +74,8 @@
       </div>
       <p class="adm-muted ayuda">
         @if (modo() === 'entera') {
-          Clic en una manzana para marcarla entera (otro clic la desmarca). Lo que ya estaba marcado antes va en gris.
+          Clic en una manzana para marcarla entera (otro clic la desmarca). Las que ya estaban predicadas y las que marques
+          se ven con el color del territorio; las que marcas ahora llevan además un borde grueso.
         } @else if (manzanaCalles(); as m) {
           Manzana {{ m.properties.nombre }}: clic en cada calle que predicaron (se pone verde). Con todas, queda entera.
         } @else {
@@ -87,6 +88,7 @@
         [estado]="edicion()"
         [colores]="colores()"
         [bloqueadas]="base().marcadas"
+        [anterioresEnColor]="true"
         [zonasBloqueadas]="zonasBloqueadas()"
         [calles]="calles()"
         [alto]="540"

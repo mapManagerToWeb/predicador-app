@@ -31,7 +31,11 @@ export interface CalleVisible {
 const GRIS_BLOQUEADO = '#9ca3af';
 /** Color de cada manzana: el de su territorio si viene (varios territorios), si no el color del mapa. */
 const delTerritorio = (color: string): ExpressionSpecification => ['coalesce', ['get', 'color'], color];
-const relleno = (color: string): ExpressionSpecification => ['case', ['get', 'bloqueada'], GRIS_BLOQUEADO, delTerritorio(color)];
+/** Relleno de lo marcado: lo que ya estaba antes en gris, salvo que se pida verlo con su color. */
+export const relleno = (color: string, anterioresEnColor = false): ExpressionSpecification =>
+  anterioresEnColor ? delTerritorio(color) : ['case', ['get', 'bloqueada'], GRIS_BLOQUEADO, delTerritorio(color)];
+/** Borde de las manzanas que se marcan ahora (cuando lo de antes va con su color): así se distinguen. */
+const BORDE_NUEVAS = '#111827';
 
 /**
  * Mapa de un territorio para corregir su estado: las manzanas marcadas enteras
@@ -63,6 +67,12 @@ export class CorreccionMap {
   readonly alto = input(460);
   /** Manzanas que ya estaban marcadas antes (al corregir una salida): en gris, no se tocan. */
   readonly bloqueadas = input<ReadonlySet<string>>(new Set());
+  /**
+   * Lo que ya estaba predicado se ve con el color del territorio, igual que lo
+   * que se marca ahora (que lleva además un borde grueso). Para registrar una
+   * salida: así se ve el territorio como queda. Sin esto, lo de antes va en gris.
+   */
+  readonly anterioresEnColor = input(false);
   /** Índices de las zonas de calles que ya estaban antes. */
   readonly zonasBloqueadas = input<ReadonlySet<number>>(new Set());
   /** Color por territorio, cuando el mapa muestra varios (si no, todo va con {@link color}). */
@@ -129,9 +139,11 @@ export class CorreccionMap {
     });
     effect(() => {
       const color = this.color();
+      const enColor = this.anterioresEnColor();
       if (!this.listo() || !this.map) return;
-      for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', relleno(color));
+      for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', relleno(color, enColor));
       this.map.setPaintProperty('manzanas-line', 'line-color', delTerritorio(color));
+      this.map.setLayoutProperty('manzanas-nuevas', 'visibility', enColor ? 'visible' : 'none');
     });
   }
 
@@ -144,10 +156,23 @@ export class CorreccionMap {
       id: 'manzanas-fill',
       type: 'fill',
       source: 'manzanas',
-      paint: { 'fill-color': relleno(this.color()), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
+      paint: { 'fill-color': relleno(this.color(), this.anterioresEnColor()), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
     });
-    map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': relleno(this.color()), 'fill-opacity': 0.75 } });
+    map.addLayer({
+      id: 'zonas-fill',
+      type: 'fill',
+      source: 'zonas',
+      paint: { 'fill-color': relleno(this.color(), this.anterioresEnColor()), 'fill-opacity': 0.75 },
+    });
     map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': delTerritorio(this.color()), 'line-width': 1.5 } });
+    map.addLayer({
+      id: 'manzanas-nuevas',
+      type: 'line',
+      source: 'manzanas',
+      filter: ['all', ['get', 'marcada'], ['!', ['get', 'bloqueada']]],
+      layout: { 'line-join': 'round', visibility: this.anterioresEnColor() ? 'visible' : 'none' },
+      paint: { 'line-color': BORDE_NUEVAS, 'line-width': 3 },
+    });
     map.addSource('calles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addSource('calles-numero', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -192,7 +217,8 @@ export class CorreccionMap {
       const f = map.queryRenderedFeatures(e.point, { layers: ['zonas-fill', 'manzanas-fill'] })[0];
       map.getCanvas().style.cursor = f ? 'pointer' : '';
       if (!f) this.hover.set(null);
-      else if (f.properties['bloqueada']) this.hover.set('Ya estaba marcado antes: no se cambia aquí');
+      else if (f.properties['bloqueada'])
+        this.hover.set(this.anterioresEnColor() ? `Manzana ${f.properties['nombre']}: ya estaba predicada` : 'Ya estaba marcado antes: no se cambia aquí');
       else if (f.layer.id === 'zonas-fill') this.hover.set('Clic: quitar estas calles');
       else this.hover.set(`Manzana ${f.properties['nombre']}: clic para ${f.properties['marcada'] ? 'desmarcar' : 'cambiar'}`);
     });
@@ -263,12 +289,14 @@ export class CorreccionMap {
       const t = m.properties.territorio;
       cajas.set(t, cajas.has(t) ? unirCajas(cajas.get(t)!, caja) : caja);
     }
+    // La foto muestra cómo queda el territorio, como la de la app: sin calles a medio elegir ni el borde de lo nuevo.
     const capasCalles = ['calles-borde', 'calles-linea', 'calles-numero'];
-    for (const c of capasCalles) map.setLayoutProperty(c, 'visibility', 'none');
+    for (const c of [...capasCalles, 'manzanas-nuevas']) map.setLayoutProperty(c, 'visibility', 'none');
     try {
       return await capturarTerritorios(map, cajas);
     } finally {
       for (const c of capasCalles) map.setLayoutProperty(c, 'visibility', 'visible');
+      map.setLayoutProperty('manzanas-nuevas', 'visibility', this.anterioresEnColor() ? 'visible' : 'none');
     }
   }
 
