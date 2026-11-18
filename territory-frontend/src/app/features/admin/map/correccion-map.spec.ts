@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import type { ManzanaFeature } from '../admin.models';
 import { vaciar } from '../utils/correccion';
 import { capturarTerritorios } from '../../../core/map/captura';
+import { crearMapa } from '../../../core/map/base-map';
 import { CorreccionMap, relleno } from './correccion-map';
 
 // Sin WebGL: el mapa real no se crea; cada prueba le pone uno de mentira.
@@ -115,5 +116,87 @@ describe('CorreccionMap: cómo se ve lo que ya estaba predicado', () => {
     expect(mapa.setPaintProperty).toHaveBeenCalledWith('manzanas-fill', 'fill-color', ['coalesce', ['get', 'color'], '#ff0000']);
     expect(mapa.setPaintProperty).toHaveBeenCalledWith('zonas-fill', 'fill-color', ['coalesce', ['get', 'color'], '#ff0000']);
     expect(mapa.setLayoutProperty).toHaveBeenCalledWith('manzanas-nuevas', 'visibility', 'visible');
+  });
+});
+
+describe('CorreccionMap: el mapa al abrirse', () => {
+  type Manejador = (e: { point: { x: number; y: number } }) => void;
+  function mapaDeMentira() {
+    const manejadores: Record<string, Manejador> = {};
+    const canvas = { style: { cursor: '' } };
+    return {
+      manejadores,
+      canvas,
+      encontrado: [] as unknown[],
+      addSource: vi.fn(),
+      addLayer: vi.fn(),
+      on: vi.fn((evento: string, h: Manejador) => (manejadores[evento] = h)),
+      getCanvas: () => canvas,
+      getSource: vi.fn(() => ({ setData: vi.fn() })),
+      queryRenderedFeatures: vi.fn(function (this: { encontrado: unknown[] }) {
+        return this.encontrado;
+      }),
+      setPaintProperty: vi.fn(),
+      setLayoutProperty: vi.fn(),
+      fitBounds: vi.fn(),
+      remove: vi.fn(),
+    };
+  }
+
+  async function abrir(anterioresEnColor: boolean) {
+    const mapa = mapaDeMentira();
+    vi.mocked(crearMapa).mockResolvedValueOnce({ map: mapa } as unknown as Awaited<ReturnType<typeof crearMapa>>);
+    const fixture = TestBed.createComponent(CorreccionMap);
+    fixture.componentRef.setInput('manzanas', [manzana(1, 15, 0), manzana(2, 15, 3)]);
+    fixture.componentRef.setInput('estado', vaciar());
+    fixture.componentRef.setInput('anterioresEnColor', anterioresEnColor);
+    await fixture.whenStable();
+    await new Promise(r => setTimeout(r, 0));
+    await fixture.whenStable();
+    const hover = () => (fixture.componentInstance as unknown as { hover(): string | null }).hover();
+    return { fixture, mapa, hover };
+  }
+
+  const capa = (mapa: ReturnType<typeof mapaDeMentira>, id: string) =>
+    mapa.addLayer.mock.calls.map(c => c[0] as { id: string; layout?: { visibility?: string }; paint?: Record<string, unknown> }).find(l => l.id === id);
+
+  it('al registrar: lo de antes con el color del territorio y el borde de lo nuevo visible', async () => {
+    const { mapa, hover } = await abrir(true);
+    expect(capa(mapa, 'manzanas-nuevas')?.layout?.visibility).toBe('visible');
+    expect(JSON.stringify(capa(mapa, 'manzanas-fill')?.paint?.['fill-color'])).not.toContain('#9ca3af');
+    expect(JSON.stringify(capa(mapa, 'zonas-fill')?.paint?.['fill-color'])).not.toContain('#9ca3af');
+    expect(mapa.fitBounds).toHaveBeenCalled();
+
+    mapa.encontrado = [{ properties: { bloqueada: true, nombre: '15.1' }, layer: { id: 'manzanas-fill' } }];
+    mapa.manejadores['mousemove']({ point: { x: 1, y: 1 } });
+    expect(hover()).toBe('Manzana 15.1: ya estaba predicada');
+    expect(mapa.canvas.style.cursor).toBe('pointer');
+  });
+
+  it('al corregir: lo de antes en gris y sin el borde de lo nuevo', async () => {
+    const { mapa, hover } = await abrir(false);
+    expect(capa(mapa, 'manzanas-nuevas')?.layout?.visibility).toBe('none');
+    expect(JSON.stringify(capa(mapa, 'manzanas-fill')?.paint?.['fill-color'])).toContain('#9ca3af');
+
+    mapa.encontrado = [{ properties: { bloqueada: true, nombre: '15.1' }, layer: { id: 'manzanas-fill' } }];
+    mapa.manejadores['mousemove']({ point: { x: 1, y: 1 } });
+    expect(hover()).toBe('Ya estaba marcado antes: no se cambia aquí');
+
+    mapa.encontrado = [{ properties: { marcada: false, nombre: '15.2' }, layer: { id: 'manzanas-fill' } }];
+    mapa.manejadores['mousemove']({ point: { x: 1, y: 1 } });
+    expect(hover()).toBe('Manzana 15.2: clic para cambiar');
+
+    mapa.encontrado = [];
+    mapa.manejadores['mousemove']({ point: { x: 1, y: 1 } });
+    expect(hover()).toBeNull();
+  });
+
+  it('un clic en una manzana avisa cuál es', async () => {
+    const { fixture, mapa } = await abrir(true);
+    const tocadas: string[] = [];
+    fixture.componentInstance.manzanaClick.subscribe(m => tocadas.push(m.properties.nombre));
+    mapa.encontrado = [{ properties: { clave: '15-15.2' }, layer: { id: 'manzanas-fill' } }];
+    mapa.manejadores['click']({ point: { x: 1, y: 1 } });
+    expect(tocadas).toEqual(['15.2']);
   });
 });
