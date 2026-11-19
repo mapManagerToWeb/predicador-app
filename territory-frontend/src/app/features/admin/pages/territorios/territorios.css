@@ -39,6 +39,26 @@ kbd { font-family: var(--font-mono); font-size: var(--text-xs); padding: 1px 4px
 .grupo h2 { margin: 0; font-size: var(--text-sm); font-weight: 600; }
 .grupo-head { display: flex; justify-content: space-between; align-items: center; }
 .grupo.peligro { margin-top: auto; }
+/* Aviso de duplicados: diálogo centrado, reusa .adm-overlay/.adm-dialog del shell. */
+.aviso-duplicadas {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: left;
+}
+.aviso-duplicadas h2 { margin: 0; }
+.aviso-duplicadas p { margin: 0; }
+.aviso-duplicadas .ver-duplicadas { width: 100%; text-align: center; }
+.aviso-duplicadas .adm-actions { margin-top: 0; }
+/* Si el archivo trae muchas repetidas, la lista scrollea y no empuja el resto. */
+.aviso-duplicadas .lista { max-height: min(45vh, 320px); overflow-y: auto; }
+@media (max-width: 420px) {
+  .aviso-duplicadas .lista-item { flex-direction: column; align-items: flex-start; gap: 2px; }
+}
 .botones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .nota { margin: 0; font-size: var(--text-xs); color: var(--ink-muted); }
 .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }

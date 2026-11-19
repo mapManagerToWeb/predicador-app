@@ -22,6 +22,8 @@ import { AdminApi, mensajeDeError } from '../../services/admin-api';
 import { AdminStore } from '../../services/admin-store';
 import { AdminUi } from '../../services/admin-ui';
 import { descargar } from '../../utils/csv';
+import { manzanasDeclaradas, manzanasRepetidas, type ManzanaImportada, type ManzanaRepetida } from '../../utils/importacion';
+import { aKml, deKml } from '../../utils/kml';
 import { aFeature, conManzana, fmtArea, siguienteTerritorio, sinManzanas, sugerirNombre } from '../../utils/manzanas';
 
 /**
@@ -60,6 +62,9 @@ export class TerritoriosPage {
   protected readonly territorio = signal<number | null>(null);
   protected readonly seleccion = signal<Set<number>>(new Set());
   protected readonly calidad = signal<CalidadDatos | null>(null);
+  /** Manzanas del último archivo importado que ya estaban en el mapa. */
+  protected readonly duplicadas = signal<ManzanaRepetida[]>([]);
+  protected readonly verDuplicadas = signal(false);
 
   /** Formulario de la manzana (alta o edición). */
   protected readonly formTerritorio = signal<number | null>(null);
@@ -232,7 +237,8 @@ export class TerritoriosPage {
 
   @HostListener('document:keydown.escape')
   protected escape(): void {
-    if (this.modo() !== 'ver') this.cancelarDibujo();
+    if (this.duplicadas().length > 0) this.descartarDuplicadas();
+    else if (this.modo() !== 'ver') this.cancelarDibujo();
     else this.seleccion.set(new Set());
   }
 
@@ -482,16 +488,47 @@ export class TerritoriosPage {
     const archivo = input.files?.[0];
     input.value = '';
     if (!archivo) return;
+    const esKml = /\.kml$/i.test(archivo.name);
+
+    let coleccion: string;
+    let declaradas: ManzanaImportada[];
+    try {
+      const texto = await archivo.text();
+      if (esKml || /^\s*</.test(texto)) {
+        const convertida = deKml(texto);
+        coleccion = JSON.stringify(convertida);
+        declaradas = convertida.features.map(f => ({ ...f.properties }));
+      } else {
+        coleccion = texto;
+        declaradas = manzanasDeclaradas(texto);
+      }
+    } catch (e) {
+      this.toast.show(e instanceof Error ? e.message : 'No se pudo leer el archivo', 10000, 'error');
+      return;
+    }
+
+    // Antes de mandar nada: si una manzana ya está en el mapa, no se importa
+    // ninguna y se muestra cuáles son (el servidor igual las rechazaría).
+    const repetidas = manzanasRepetidas(declaradas, [...this.porId().values()]);
+    if (repetidas.length > 0) {
+      this.duplicadas.set(repetidas);
+      this.verDuplicadas.set(false);
+      this.toast.show('Los territorios que acaba de importar ya están en el mapa', 10000, 'error');
+      return;
+    }
+
     const ok = await this.ui.confirmar({
       titulo: `Importar ${archivo.name}`,
-      mensaje:
-        'Cada feature se agrega como manzana nueva. Necesita las propiedades "territorio" y "nombre", en coordenadas WGS84. Si alguna tiene error no se importa ninguna.',
+      mensaje: esKml
+        ? 'Cada Placemark del KML se agrega como manzana nueva. Necesita la propiedad "territorio" y el nombre (propiedad "nombre" o el nombre del Placemark), en coordenadas WGS84. Si alguna tiene error no se importa ninguna.'
+        : 'Cada feature se agrega como manzana nueva. Necesita las propiedades "territorio" y "nombre", en coordenadas WGS84. Si alguna tiene error no se importa ninguna.',
       accion: 'Importar',
     });
     if (!ok) return;
     try {
-      const resultado = await this.api.importarManzanas(await archivo.text());
+      const resultado = await this.api.importarManzanas(coleccion);
       await Promise.all([this.store.cargarManzanas(true)]);
+      this.descartarDuplicadas();
       this.toast.show(`${resultado.creadas} manzanas importadas en ${resultado.territorios.length} territorio(s)`, 4000, 'success');
       void this.revisarCalidad();
     } catch (e) {
@@ -499,7 +536,27 @@ export class TerritoriosPage {
     }
   }
 
-  protected exportar(): void {
+  protected alternarDuplicadas(): void {
+    this.verDuplicadas.update(v => !v);
+  }
+
+  protected descartarDuplicadas(): void {
+    this.duplicadas.set([]);
+    this.verDuplicadas.set(false);
+  }
+
+  /** Cierra el aviso de duplicados al tocar el fondo, no al tocar el diálogo. */
+  protected cerrarDuplicadasSiFondo(event: MouseEvent): void {
+    if (event.target === event.currentTarget) this.descartarDuplicadas();
+  }
+
+  /** Ir a una manzana repetida: se cierra el aviso para poder verla en el mapa. */
+  protected verDuplicada(id: number): void {
+    this.descartarDuplicadas();
+    this.irAManzana(id);
+  }
+
+  protected exportarGeoJson(): void {
     const coleccion = this.store.manzanas();
     if (!coleccion) return;
     const salida = {
@@ -514,6 +571,16 @@ export class TerritoriosPage {
       `manzanas-${new Date().toISOString().slice(0, 10)}.geojson`,
       JSON.stringify(salida),
       'application/geo+json',
+    );
+  }
+
+  protected exportarKml(): void {
+    const coleccion = this.store.manzanas();
+    if (!coleccion) return;
+    descargar(
+      `manzanas-${new Date().toISOString().slice(0, 10)}.kml`,
+      aKml(coleccion),
+      'application/vnd.google-earth.kml+xml',
     );
   }
 
