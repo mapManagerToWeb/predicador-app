@@ -173,9 +173,49 @@
       <div class="botones">
         <button class="adm-btn primary" type="button" (click)="nuevaManzana()">+ Nueva manzana</button>
         <button class="adm-btn" type="button" (click)="elegirArchivo()">Importar</button>
-        <button class="adm-btn" type="button" (click)="exportar()">Exportar</button>
-        <input #archivo type="file" accept=".geojson,.json,application/geo+json,application/json" hidden aria-label="Importar archivo GeoJSON" (change)="importar($event)" />
+        <button class="adm-btn" type="button" (click)="exportarGeoJson()">Exportar GeoJSON</button>
+        <button class="adm-btn" type="button" (click)="exportarKml()">Exportar KML</button>
+        <input #archivo type="file" accept=".geojson,.json,.kml,application/geo+json,application/json,application/vnd.google-earth.kml+xml" hidden aria-label="Importar archivo GeoJSON o KML" (change)="importar($event)" />
       </div>
+
+      @if (duplicadas().length > 0) {
+        <div class="adm-overlay" tabindex="-1" (click)="cerrarDuplicadasSiFondo($event)" (keydown.escape)="descartarDuplicadas()">
+          <div
+            class="adm-dialog aviso-duplicadas"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Manzanas que ya están en el mapa"
+          >
+            <h2>Los territorios que acaba de importar ya están en el mapa</h2>
+            <p>
+              No se importó nada. Si son las mismas manzanas, borralas del mapa o cambiales el nombre antes de
+              volver a importar el archivo.
+            </p>
+            <button class="adm-btn ver-duplicadas" type="button" (click)="alternarDuplicadas()" [attr.aria-expanded]="verDuplicadas()">
+              @if (verDuplicadas()) {
+                Ocultar las {{ duplicadas().length === 1 ? 'manzana que ya está' : duplicadas().length + ' manzanas que ya están' }} en el mapa
+              } @else {
+                Ver {{ duplicadas().length === 1 ? 'la manzana que ya está' : 'las ' + duplicadas().length + ' manzanas que ya están' }} en el mapa
+              }
+            </button>
+            @if (verDuplicadas()) {
+              <ul class="lista">
+                @for (d of duplicadas(); track d.id) {
+                  <li>
+                    <button type="button" class="lista-item" (click)="verDuplicada(d.id)">
+                      <span>Manzana {{ d.nombre }} del territorio {{ d.territorio }}</span>
+                      <span class="adm-muted">Ya está en el mapa · ver</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="adm-actions">
+              <button class="adm-btn primary" type="button" (click)="descartarDuplicadas()">Entendido</button>
+            </div>
+          </div>
+        </div>
+      }
 
       @if (seleccion().size > 1) {
         <div class="grupo">

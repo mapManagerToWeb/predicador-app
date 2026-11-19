@@ -75,7 +75,14 @@ interface VistaTerritorios {
   cambiarColor(color: string): Promise<void>;
   elegirArchivo(): void;
   importar(event: Event): Promise<void>;
-  exportar(): void;
+  descartarDuplicadas(): void;
+  alternarDuplicadas(): void;
+  cerrarDuplicadasSiFondo(event: MouseEvent): void;
+  verDuplicada(id: number): void;
+  exportarGeoJson(): void;
+  exportarKml(): void;
+  readonly duplicadas: { (): { id: number; territorio: number; nombre: string }[] };
+  readonly verDuplicadas: { (): boolean };
   revisarCalidad(): Promise<void>;
   irAManzana(id: number): void;
   setFondo(f: string): void;
@@ -710,10 +717,178 @@ describe('TerritoriosPage', () => {
     const click = vi.fn();
     const original = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = click;
-    page.exportar();
+    page.exportarGeoJson();
     HTMLAnchorElement.prototype.click = original;
     expect(crear).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
+  });
+
+  it('exporta las manzanas como KML con sus propiedades', async () => {
+    const { page } = await montar();
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn().mockReturnValue('blob:x'), configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
+    const ancla = { href: '', download: '', click: vi.fn() };
+    const crearEl = vi.spyOn(document, 'createElement').mockReturnValue(ancla as unknown as HTMLElement);
+    page.exportarKml();
+    crearEl.mockRestore();
+
+    expect(ancla.download).toMatch(/^manzanas-\d{4}-\d{2}-\d{2}\.kml$/);
+    expect(ancla.click).toHaveBeenCalled();
+  });
+
+  it('importa un archivo KML convirtiéndolo a GeoJSON', async () => {
+    const { page } = await montar();
+    api['importarManzanas'].mockResolvedValue({ creadas: 1, territorios: [5] });
+    const kml = `<kml><Document><Placemark><name>9.a</name>
+      <ExtendedData><Data name="territorio"><value>9</value></Data></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-73,-37 -72.9,-37 -72.9,-36.9 -73,-37</coordinates></LinearRing></outerBoundaryIs></Polygon>
+      </Placemark></Document></kml>`;
+    const archivo = { name: 'manzanas.kml', text: () => Promise.resolve(kml) };
+    await page.importar({ target: { files: [archivo], value: 'x' } } as unknown as Event);
+
+    expect(ui.confirmar).toHaveBeenCalledWith(
+      expect.objectContaining({ mensaje: expect.stringContaining('Placemark') }),
+    );
+    const enviado = JSON.parse(api['importarManzanas'].mock.calls[0][0] as string);
+    expect(enviado.type).toBe('FeatureCollection');
+    expect(enviado.features[0].properties).toEqual({ territorio: 9, nombre: '9.a' });
+    expect(toast.show).toHaveBeenCalledWith('1 manzanas importadas en 1 territorio(s)', 4000, 'success');
+  });
+
+  it('avisa y no importa cuando las manzanas ya están en el mapa', async () => {
+    const { page } = await montar();
+    const archivo = {
+      name: 'manzanas.geojson',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            type: 'FeatureCollection',
+            features: [
+              { type: 'Feature', properties: { territorio: 5, nombre: '5.A' }, geometry: POLIGONO },
+              { type: 'Feature', properties: { territorio: 9, nombre: '9.a' }, geometry: POLIGONO },
+            ],
+          }),
+        ),
+    };
+
+    await page.importar({ target: { files: [archivo], value: '' } } as unknown as Event);
+
+    expect(ui.confirmar).not.toHaveBeenCalled();
+    expect(api['importarManzanas']).not.toHaveBeenCalled();
+    expect(toast.show).toHaveBeenCalledWith(
+      'Los territorios que acaba de importar ya están en el mapa',
+      10000,
+      'error',
+    );
+    expect(page.duplicadas()).toEqual([{ id: 1, territorio: 5, nombre: '5.A' }]);
+    expect(page.verDuplicadas()).toBe(false);
+
+    page.alternarDuplicadas();
+    expect(page.verDuplicadas()).toBe(true);
+    page.descartarDuplicadas();
+    expect(page.duplicadas()).toEqual([]);
+    expect(page.verDuplicadas()).toBe(false);
+  });
+
+  it('cierra el aviso de duplicados con Escape o tocando el fondo, no el diálogo', async () => {
+    const { page } = await montar();
+    const archivo = {
+      name: 'a.geojson',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', properties: { territorio: 5, nombre: '5.a' }, geometry: POLIGONO }],
+          }),
+        ),
+    };
+
+    await page.importar({ target: { files: [archivo], value: '' } } as unknown as Event);
+    page.escape();
+    expect(page.duplicadas()).toEqual([]);
+
+    await page.importar({ target: { files: [archivo], value: '' } } as unknown as Event);
+    expect(page.duplicadas()).toHaveLength(1);
+    const fondo = { target: 'fondo', currentTarget: 'dialogo' } as unknown as MouseEvent;
+    page.cerrarDuplicadasSiFondo(fondo);
+    expect(page.duplicadas()).toHaveLength(1);
+
+    page.cerrarDuplicadasSiFondo({ target: 'fondo', currentTarget: 'fondo' } as unknown as MouseEvent);
+    expect(page.duplicadas()).toEqual([]);
+  });
+
+  it('al abrir una manzana repetida cierra el aviso y la selecciona', async () => {
+    const { page } = await montar();
+    const archivo = {
+      name: 'a.geojson',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', properties: { territorio: 5, nombre: '5.a' }, geometry: POLIGONO }],
+          }),
+        ),
+    };
+    await page.importar({ target: { files: [archivo], value: '' } } as unknown as Event);
+
+    page.verDuplicada(1);
+
+    expect(page.duplicadas()).toEqual([]);
+    expect(page.seleccion().has(1)).toBe(true);
+  });
+
+  it('también detecta las manzanas repetidas al importar KML', async () => {
+    const { page } = await montar();
+    const kml = `<kml><Document><Placemark><name>5.a</name>
+      <ExtendedData><Data name="territorio"><value>5</value></Data></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-73,-37 -72.9,-37 -72.9,-36.9 -73,-37</coordinates></LinearRing></outerBoundaryIs></Polygon>
+      </Placemark></Document></kml>`;
+
+    await page.importar({ target: { files: [{ name: 'm.kml', text: () => Promise.resolve(kml) }], value: '' } } as unknown as Event);
+
+    expect(api['importarManzanas']).not.toHaveBeenCalled();
+    expect(page.duplicadas()).toHaveLength(1);
+  });
+
+  it('limpia el aviso de duplicados cuando la importación sale bien', async () => {
+    const { page } = await montar();
+    const repetido = {
+      name: 'a.geojson',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', properties: { territorio: 5, nombre: '5.a' }, geometry: POLIGONO }],
+          }),
+        ),
+    };
+    await page.importar({ target: { files: [repetido], value: '' } } as unknown as Event);
+    expect(page.duplicadas()).toHaveLength(1);
+
+    api['importarManzanas'].mockResolvedValue({ creadas: 1, territorios: [9] });
+    const nuevo = {
+      name: 'b.geojson',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', properties: { territorio: 9, nombre: '9.a' }, geometry: POLIGONO }],
+          }),
+        ),
+    };
+    await page.importar({ target: { files: [nuevo], value: '' } } as unknown as Event);
+
+    expect(api['importarManzanas']).toHaveBeenCalledTimes(1);
+    expect(page.duplicadas()).toEqual([]);
+  });
+
+  it('avisa si el KML viene mal y no llama al servidor', async () => {
+    const { page } = await montar();
+    const archivo = { name: 'manzanas.kml', text: () => Promise.resolve('<gpx/>') };
+    await page.importar({ target: { files: [archivo], value: '' } } as unknown as Event);
+
+    expect(api['importarManzanas']).not.toHaveBeenCalled();
+    expect(toast.show).toHaveBeenCalledWith('El archivo no es un KML válido', 10000, 'error');
   });
 
   it('no exporta si todavía no hay manzanas', async () => {
@@ -721,7 +896,8 @@ describe('TerritoriosPage', () => {
     page.store.manzanas.set(null);
     const crear = vi.fn();
     Object.defineProperty(URL, 'createObjectURL', { value: crear, configurable: true });
-    page.exportar();
+    page.exportarGeoJson();
+    page.exportarKml();
     expect(crear).not.toHaveBeenCalled();
   });
 
