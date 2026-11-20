@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   signal,
@@ -47,6 +48,7 @@ import { type EstadoUbicacion, UbicacionMapa } from '../../core/map/ubicacion';
 import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Toast } from '../../core/services/toast';
 import { Capacitacion } from '../../core/services/capacitacion';
+import { Apariencia, opacidadFranja } from '../../core/services/apariencia';
 import { aplicarTemaGuardado, CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 
 type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['properties']>;
@@ -56,6 +58,11 @@ type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['pr
  * manzanas y calles se predicaron en la vuelta en curso de cada territorio y
  * cuándo se trabajó o completó, sin datos de personas.
  */
+/** Relleno de las manzanas del visor: lo predicado con la intensidad elegida, lo demás muy suave. */
+function opacidadVisor(predicadas: number): ExpressionSpecification {
+  return ['case', ['get', 'predicada'], predicadas, 0.1];
+}
+
 @Component({
   selector: 'app-visor',
   imports: [RouterLink],
@@ -68,6 +75,8 @@ export class VisorPage {
   private readonly toast = inject(Toast);
   /** Durante una capacitación el visor muestra también lo de prueba: se avisa. */
   protected readonly capacitacion = inject(Capacitacion);
+  /** Qué tan fuerte se pinta lo predicado (lo elige el administrador). */
+  private readonly apariencia = inject(Apariencia);
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private map: MapLibreMap | null = null;
   private manzanas: ColeccionVisor | null = null;
@@ -107,9 +116,17 @@ export class VisorPage {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    // Si la intensidad llega (o cambia) con el mapa ya dibujado, se aplica ahí mismo.
+    effect(() => {
+      const opacidad = this.apariencia.opacidadPredicadas();
+      if (!this.map?.getLayer('manzanas-fill')) return;
+      this.map.setPaintProperty('manzanas-fill', 'fill-opacity', opacidadVisor(opacidad));
+      this.map.setPaintProperty('zonas-fill', 'fill-opacity', opacidadFranja(opacidad));
+    });
     afterNextRender(() => {
       aplicarTemaGuardado();
       void this.iniciar();
+      void this.apariencia.cargar();
       destroyRef.onDestroy(this.capacitacion.vigilar());
       const observador = new MutationObserver(() => {
         if (this.map) cambiarFondo(this.map, this.fondo(), temaOscuro());
@@ -188,11 +205,16 @@ export class VisorPage {
       source: 'manzanas',
       paint: {
         'fill-color': color,
-        'fill-opacity': ['case', ['get', 'predicada'], 0.62, 0.1],
+        'fill-opacity': opacidadVisor(this.apariencia.opacidadPredicadas()),
       },
     });
     // La franja va suave: la calle predicada se remarca encima (como en el mapa de los encargados).
-    map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': color, 'fill-opacity': 0.3 } });
+    map.addLayer({
+      id: 'zonas-fill',
+      type: 'fill',
+      source: 'zonas',
+      paint: { 'fill-color': color, 'fill-opacity': opacidadFranja(this.apariencia.opacidadPredicadas()) },
+    });
     map.addLayer({
       id: 'manzanas-line',
       type: 'line',

@@ -35,6 +35,14 @@ describe('AdminApi', () => {
     await expect(guardado).resolves.toEqual([5, 130]);
   });
 
+  it('guarda la intensidad de lo predicado', async () => {
+    const guardado = api.setOpacidadPredicadas(0.8);
+    const put = http.expectOne(r => r.url === '/api/v1/reports/admin/apariencia' && r.method === 'PUT');
+    expect(put.request.body).toEqual({ opacidadPredicadas: 0.8 });
+    put.flush({ opacidadPredicadas: 0.8 });
+    await expect(guardado).resolves.toBe(0.8);
+  });
+
   it('maneja la capacitación: estado, empezar y terminar borrando las pruebas', async () => {
     const estado = { activa: true, desde: '2026-11-22T19:00:00Z', pruebas: [] };
     const leido = api.capacitacion();

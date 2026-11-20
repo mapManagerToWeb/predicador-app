@@ -20,6 +20,7 @@ import { CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 import { diasElegibles } from './utils/dia';
 import { MapaStore } from './mapa.store';
 import { Capacitacion } from '../../core/services/capacitacion';
+import { Apariencia } from '../../core/services/apariencia';
 import { MapaVista, type EstadoUbicacion } from './mapa-vista';
 import { Tutorial } from './tutorial/tutorial';
 import type { ModoMarcado } from './mapa.types';
@@ -62,6 +63,8 @@ export class MapPage {
   private readonly toast = inject(Toast);
   /** Aviso de capacitación en curso (no en el modo práctica, que no envía nada). */
   protected readonly capacitacion = inject(Capacitacion);
+  /** Qué tan fuerte se pinta lo predicado (lo elige el administrador). */
+  private readonly apariencia = inject(Apariencia);
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
   private vista: MapaVista | null = null;
@@ -99,9 +102,14 @@ export class MapPage {
       const estado = this.store.estadoVista();
       this.vista?.mostrar(estado);
     });
+    effect(() => {
+      const opacidad = this.apariencia.opacidadPredicadas();
+      this.vista?.ponerOpacidad(opacidad);
+    });
     afterNextRender(() => {
       this.aplicarTema();
       void this.iniciar();
+      void this.apariencia.cargar();
       if (!this.store.modoPractica) destroyRef.onDestroy(this.capacitacion.vigilar());
     });
     // El mapa encuadra en lo que el panel deja libre: con varios territorios
@@ -147,6 +155,7 @@ export class MapPage {
     this.store.conectar(this.vista);
     const panel = this.panel()?.nativeElement;
     if (panel) this.medirPanel(panel);
+    this.vista.ponerOpacidad(this.apariencia.opacidadPredicadas());
     this.vista.mostrar(this.store.estadoVista());
     const abiertos = this.store.abiertos();
     if (abiertos.length) this.vista.encuadrar(abiertos, false);

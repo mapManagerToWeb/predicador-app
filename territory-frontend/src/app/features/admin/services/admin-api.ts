@@ -147,6 +147,20 @@ export class AdminApi {
     return r.territorios ?? [];
   }
 
+  // ── Cómo se ven los mapas ──
+
+  /** Guarda la intensidad de lo predicado en los mapas de los hermanos; devuelve la que quedó. */
+  async setOpacidadPredicadas(opacidad: number): Promise<number> {
+    const r = await this.send(
+      this.http.put<{ opacidadPredicadas: number }>(
+        `${this.reportes}/apariencia`,
+        { opacidadPredicadas: opacidad },
+        { headers: SIN_SW },
+      ),
+    );
+    return r.opacidadPredicadas;
+  }
+
   // ── Capacitación ──
 
   /** La capacitación en curso y sus reportes de prueba. */

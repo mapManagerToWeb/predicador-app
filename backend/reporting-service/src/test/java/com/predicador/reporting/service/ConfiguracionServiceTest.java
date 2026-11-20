@@ -85,4 +85,27 @@ class ConfiguracionServiceTest {
             assertEquals(Optional.empty(), service.capacitacion(), valor);
         }
     }
+
+    @Test
+    void intensidadDeLoPredicado_porDefectoYLeidaDentroDeLosLimites() {
+        when(repository.findById(ConfiguracionService.OPACIDAD_PREDICADAS)).thenReturn(Optional.empty());
+        assertEquals(0.6, service.opacidadPredicadas());
+        for (var caso : List.of(new String[] {"0.8", "0.8"}, new String[] {"2", "0.95"}, new String[] {"0.1", "0.3"},
+                new String[] {"x", "0.6"}, new String[] {"NaN", "0.6"})) {
+            when(repository.findById(ConfiguracionService.OPACIDAD_PREDICADAS))
+                    .thenReturn(Optional.of(new AppConfig(ConfiguracionService.OPACIDAD_PREDICADAS, caso[0])));
+            assertEquals(Double.parseDouble(caso[1]), service.opacidadPredicadas(), caso[0]);
+        }
+    }
+
+    @Test
+    void guardaLaIntensidadDentroDeLosLimites_conDosDecimales() {
+        AppConfig existente = new AppConfig(ConfiguracionService.OPACIDAD_PREDICADAS, "");
+        when(repository.findById(ConfiguracionService.OPACIDAD_PREDICADAS)).thenReturn(Optional.of(existente));
+        assertEquals(0.73, service.setOpacidadPredicadas(0.7349));
+        assertEquals("0.73", existente.getValor());
+        assertEquals(0.95, service.setOpacidadPredicadas(5));
+        assertEquals(0.3, service.setOpacidadPredicadas(-1));
+        assertEquals(0.6, service.setOpacidadPredicadas(Double.NaN));
+    }
 }
