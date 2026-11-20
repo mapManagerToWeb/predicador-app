@@ -2,6 +2,7 @@ import {
   afterNextRender,
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   ElementRef,
@@ -23,6 +24,7 @@ import {
   temaOscuro,
 } from '../../../core/map/base-map';
 import { callesDeZonas } from '../../../core/map/lados';
+import { colorFuerte, coloresFuertes } from '../../../core/map/colores';
 import { clave, type EstadoCorreccion } from '../utils/correccion';
 import { cajaDePuntos, capturarTerritorios, unirCajas, type Caja } from '../../../core/map/captura';
 
@@ -87,6 +89,12 @@ export class CorreccionMap {
   readonly colores = input<Record<number, string> | null>(null);
   /** Calles de una manzana para marcarlas una a una (null: sin edición de calles). */
   readonly calles = input<CalleVisible[] | null>(null);
+  /** Colores para pintar: los muy claros, reforzados como en el mapa de los hermanos. */
+  private readonly colorMapa = computed(() => colorFuerte(this.color()));
+  private readonly coloresMapa = computed(() => {
+    const c = this.colores();
+    return c ? coloresFuertes(c) : null;
+  });
   readonly manzanaClick = output<ManzanaFeature>();
   readonly zonaClick = output<number>();
   readonly calleClick = output<number>();
@@ -123,7 +131,7 @@ export class CorreccionMap {
       const estado = this.estado();
       const manzanas = this.manzanas();
       const zonasBloqueadas = this.zonasBloqueadas();
-      const colores = this.colores();
+      const colores = this.coloresMapa();
       this.bloqueadas();
       if (!this.listo() || !this.map) return;
       this.dibujarManzanas(manzanas, estado);
@@ -156,7 +164,7 @@ export class CorreccionMap {
       this.dibujarCalles(calles);
     });
     effect(() => {
-      const color = this.color();
+      const color = this.colorMapa();
       const enColor = this.anterioresEnColor();
       if (!this.listo() || !this.map) return;
       for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', relleno(color, enColor));
@@ -175,16 +183,16 @@ export class CorreccionMap {
       id: 'manzanas-fill',
       type: 'fill',
       source: 'manzanas',
-      paint: { 'fill-color': relleno(this.color(), this.anterioresEnColor()), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
+      paint: { 'fill-color': relleno(this.colorMapa(), this.anterioresEnColor()), 'fill-opacity': ['case', ['get', 'marcada'], 0.75, 0.08] },
     });
     map.addLayer({
       id: 'zonas-fill',
       type: 'fill',
       source: 'zonas',
       // Suave: la calle predicada se remarca encima (capas calles-hechas).
-      paint: { 'fill-color': relleno(this.color(), this.anterioresEnColor()), 'fill-opacity': 0.35 },
+      paint: { 'fill-color': relleno(this.colorMapa(), this.anterioresEnColor()), 'fill-opacity': 0.35 },
     });
-    map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': delTerritorio(this.color()), 'line-width': 1.5 } });
+    map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': delTerritorio(this.colorMapa()), 'line-width': 1.5 } });
     map.addSource('calles-hechas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
       id: 'calles-hechas-borde',
@@ -198,7 +206,7 @@ export class CorreccionMap {
       type: 'line',
       source: 'calles-hechas',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': relleno(this.color(), this.anterioresEnColor()), 'line-width': ANCHO_CALLE_HECHA },
+      paint: { 'line-color': relleno(this.colorMapa(), this.anterioresEnColor()), 'line-width': ANCHO_CALLE_HECHA },
     });
     map.addLayer({
       id: 'manzanas-nuevas',
@@ -289,7 +297,7 @@ export class CorreccionMap {
           nombre: m.properties.nombre,
           marcada: estado.marcadas.has(clave(m)),
           bloqueada: this.bloqueadas().has(clave(m)),
-          color: this.colores()?.[m.properties.territorio] ?? null,
+          color: this.coloresMapa()?.[m.properties.territorio] ?? null,
         },
       })),
     });

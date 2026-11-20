@@ -6,6 +6,7 @@ import { AuthTokenService } from '../services/auth-token';
 import { Profile } from '../services/profile';
 import { Toast } from '../services/toast';
 import { AuthService } from '../services/auth.service';
+import { Mantenimiento } from '../services/mantenimiento';
 
 /**
  * Endpoints that issue tokens or bootstrap a session. Errors here are handled
@@ -41,6 +42,7 @@ const ADMIN_URL_PATTERN = /\/(territories|reports|encargados)\/admin(\/|\?|$)|\/
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(Toast);
+  const mantenimiento = inject(Mantenimiento);
   const authToken = inject(AuthTokenService);
   const profile = inject(Profile);
   const router = inject(Router);
@@ -72,6 +74,13 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         toastService.show('Tu sesión venció. Vuelve a entrar: lo que marcaste sigue guardado.', 4000, 'warning');
         // Desde el panel se vuelve a su propio login, no al de encargados.
         void router.navigate([isAdminRequest ? '/admin' : '/login']);
+        return throwError(() => error);
+      }
+
+      // El servidor se está actualizando: en vez de errores, la pantalla «Estamos haciendo mejoras»
+      // (no en el panel, desde donde se hace la actualización).
+      if ((error.status === 502 || error.status === 503 || error.status === 504) && !isAdminRequest) {
+        mantenimiento.avisarCaida();
         return throwError(() => error);
       }
 

@@ -1,3 +1,4 @@
+import { coloresFuertes } from '../../core/map/colores';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -173,7 +174,8 @@ export class VisorPage {
       firstValueFrom(
         this.http.get<FeatureCollection<Polygon | MultiPolygon, PropsManzanaPublica>>(`${api}/territories/all/geojson`),
       ),
-      firstValueFrom(this.http.get<Record<number, string>>(`${api}/territories/colors`)),
+      // Los colores muy claros se refuerzan para pintar (los hermanos los veían «muy claritos»).
+      firstValueFrom(this.http.get<Record<number, string>>(`${api}/territories/colors`)).then(coloresFuertes),
       firstValueFrom(
         this.http.get<EstadoTerritorioPublico[]>(`${api}/reports/public/estado`, { headers: sinCacheSw }),
       ),
