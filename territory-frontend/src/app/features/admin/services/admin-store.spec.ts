@@ -60,3 +60,41 @@ describe('AdminStore: la vuelta y los territorios fuera de la meta', () => {
     expect(store.situaciones()).toBeNull();
   });
 });
+
+describe('AdminStore: la capacitación', () => {
+  let store: AdminStore;
+  let api: Record<string, ReturnType<typeof vi.fn>>;
+
+  beforeEach(() => {
+    api = {
+      capacitacion: vi.fn().mockResolvedValue({ activa: true, desde: '2026-11-22T19:00:00Z', pruebas: [] }),
+      empezarCapacitacion: vi.fn().mockResolvedValue({ activa: true, desde: '2026-11-22T19:00:00Z', pruebas: [] }),
+      terminarCapacitacion: vi.fn().mockResolvedValue(4),
+      reportesEntre: vi.fn().mockResolvedValue([]),
+      estadoPublico: vi.fn().mockResolvedValue([]),
+      ciclos: vi.fn().mockResolvedValue([]),
+      fueraDeMeta: vi.fn().mockResolvedValue([]),
+    };
+    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: api }] });
+    store = TestBed.inject(AdminStore);
+  });
+
+  it('carga, empieza y termina; al terminar vuelve a cargar los reportes y la vuelta', async () => {
+    await store.cargarCapacitacion();
+    expect(store.capacitacion()?.activa).toBe(true);
+    await store.empezarCapacitacion();
+    expect(api['empezarCapacitacion']).toHaveBeenCalled();
+    await expect(store.terminarCapacitacion()).resolves.toBe(4);
+    expect(store.capacitacion()).toEqual({ activa: false, desde: null, pruebas: [] });
+    expect(api['reportesEntre']).toHaveBeenCalled();
+    expect(api['estadoPublico']).toHaveBeenCalled();
+    store.limpiar();
+    expect(store.capacitacion()).toBeNull();
+  });
+
+  it('con un servidor sin esta opción no muestra nada nuevo', async () => {
+    api['capacitacion'].mockRejectedValue(new Error('404'));
+    await store.cargarCapacitacion();
+    expect(store.capacitacion()).toBeNull();
+  });
+});

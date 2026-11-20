@@ -267,3 +267,20 @@ export interface ResultadoImportacion {
   resultado: 'crear' | 'existe' | 'error';
   detalle: string;
 }
+
+/** Un reporte enviado durante la capacitación (se borra al terminarla). */
+export interface PruebaCapacitacion {
+  id: number;
+  fecha: string;
+  territorio: number;
+  encargado: string | null;
+  estado: string | null;
+  origen: string | null;
+}
+
+/** Modo capacitación: lo enviado desde que empezó es de prueba. */
+export interface EstadoCapacitacion {
+  activa: boolean;
+  desde: string | null;
+  pruebas: PruebaCapacitacion[];
+}

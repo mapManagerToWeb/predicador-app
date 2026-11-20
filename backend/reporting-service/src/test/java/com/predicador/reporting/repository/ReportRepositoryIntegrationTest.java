@@ -164,4 +164,22 @@ class ReportRepositoryIntegrationTest {
 
         assertThat(repository.findVersions(List.of(9L))).isEmpty();
     }
+
+    @Test
+    void capacitacion_borraSoloLoGuardadoDespuesDelUltimoReporteQueExistia() {
+        Integer anterior = repository.save(report(11L, Instant.parse("2026-08-01T10:00:00Z"), "incomplete", "A")).getId();
+        long limite = repository.ultimoId();
+        assertThat(limite).isEqualTo(anterior.longValue());
+
+        Integer prueba1 = repository.save(report(11L, Instant.parse("2026-08-02T10:00:00Z"), "completed", "A,B")).getId();
+        Integer prueba2 = repository.save(report(12L, Instant.parse("2026-08-02T11:00:00Z"), "incomplete", "C")).getId();
+        assertThat(repository.findByIdGreaterThanOrderByIdAsc((int) limite)).extracting(Report::getId).containsExactly(prueba1, prueba2);
+
+        assertThat(repository.borrarDespuesDe((int) limite)).isEqualTo(2);
+        assertThat(repository.findById(anterior)).isPresent();
+        assertThat(repository.findById(prueba1)).isEmpty();
+        // El territorio vuelve a su último reporte de antes.
+        assertThat(repository.findLatestByTerritorioNumeroIn(java.util.List.of(11L)))
+                .extracting(Report::getId).containsExactly(anterior);
+    }
 }

@@ -1,3 +1,4 @@
+import { Capacitacion } from '../../core/services/capacitacion';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -136,6 +137,22 @@ describe('MapPage', () => {
     const { el } = await abrirPagina();
     (el.querySelector('.lateral .icono.grande') as HTMLButtonElement).click();
     expect(vista.alternarUbicacion).toHaveBeenCalled();
+  });
+
+  it('durante una capacitación avisa que lo enviado es de prueba (en la práctica no, porque no envía nada)', async () => {
+    const { fixture, el } = await abrirPagina();
+    const capacitacion = TestBed.inject(Capacitacion);
+    expect(el.querySelector('.aviso-practica')).toBeNull();
+    capacitacion.activa.set(true);
+    await fixture.whenStable();
+    expect(el.querySelector('.aviso-practica')?.textContent).toContain('Capacitación en curso');
+
+    TestBed.resetTestingModule();
+    configurar(true);
+    const practica = await abrirPagina();
+    TestBed.inject(Capacitacion).activa.set(true);
+    await practica.fixture.whenStable();
+    expect(practica.el.querySelector('.aviso-practica')?.textContent).toContain('Modo práctica');
   });
 
   it('en modo práctica avisa que nada es real y no ofrece cerrar sesión', async () => {

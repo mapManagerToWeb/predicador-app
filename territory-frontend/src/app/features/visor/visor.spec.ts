@@ -1,3 +1,4 @@
+import { Capacitacion } from '../../core/services/capacitacion';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -79,6 +80,16 @@ describe('VisorPage', () => {
     expect(mapa.addSource).toHaveBeenCalledWith('manzanas', expect.objectContaining({ type: 'geojson' }));
     expect(el.textContent).not.toMatch(/Marcar|Enviar|Guardar/);
     expect(el.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('durante una capacitación avisa que el mapa muestra también lo de prueba', async () => {
+    const fixture = await abrir();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.aviso.capacitacion')).toBeNull();
+    http.expectOne(`${environment.apiUrl}/reports/public/capacitacion`).flush({ activa: true, desde: '2026-11-22T19:00:00Z' });
+    await vi.waitFor(() => expect(TestBed.inject(Capacitacion).activa()).toBe(true));
+    await fixture.whenStable();
+    expect(el.querySelector('.aviso.capacitacion')?.textContent).toContain('Capacitación en curso');
   });
 
   it('el cuadrito del número lleva el color de cómo va el territorio', async () => {

@@ -1,3 +1,4 @@
+import { CapacitacionPanel } from '../../capacitacion/capacitacion';
 import { ChangeDetectionStrategy, Component, computed, ElementRef, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { BarList, type Barra } from '../../charts/bar-list';
@@ -67,7 +68,7 @@ export const ESTADOS: InfoEstado[] = [
 
 @Component({
   selector: 'app-resumen',
-  imports: [ColumnChart, BarList, Heatmap, CoverageMap, ImagenAvance],
+  imports: [ColumnChart, BarList, Heatmap, CoverageMap, ImagenAvance, CapacitacionPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './resumen.html',
   styleUrl: './resumen.css',

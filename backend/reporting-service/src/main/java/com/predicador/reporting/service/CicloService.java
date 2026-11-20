@@ -43,10 +43,12 @@ public class CicloService {
 
     private final JdbcClient jdbc;
     private final ReportRepository reportes;
+    private final CapacitacionService capacitacion;
 
-    public CicloService(JdbcClient jdbc, ReportRepository reportes) {
+    public CicloService(JdbcClient jdbc, ReportRepository reportes, CapacitacionService capacitacion) {
         this.jdbc = jdbc;
         this.reportes = reportes;
+        this.capacitacion = capacitacion;
     }
 
     @Transactional(readOnly = true)
@@ -76,6 +78,7 @@ public class CicloService {
      */
     @Transactional
     public CicloDto cerrar(String nota, LocalDate desde) {
+        capacitacion.exigirSinCapacitacion();
         Instant ahora = Instant.now();
         CicloDto actual = jdbc.sql("SELECT id, inicio, fin, nota, resumen FROM ciclo_territorios WHERE fin IS NULL FOR UPDATE")
                 .query(CicloService::ciclo)
@@ -120,6 +123,7 @@ public class CicloService {
      */
     @Transactional
     public CambioDeInicio cambiarInicio(LocalDate desde) {
+        capacitacion.exigirSinCapacitacion();
         if (desde == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elige el día en que empezó la vuelta.");
         }

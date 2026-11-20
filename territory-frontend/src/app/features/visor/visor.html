@@ -85,6 +85,10 @@
 
   @if (cargando()) {
     <div class="aviso" role="status">Cargando territorios…</div>
+  } @else if (capacitacion.activa()) {
+    <div class="aviso capacitacion" role="status">
+      <strong>Capacitación en curso:</strong> el mapa muestra también lo de prueba, que se borrará al terminar.
+    </div>
   }
   @if (error()) {
     <div class="aviso error" role="alert">{{ error() }}</div>

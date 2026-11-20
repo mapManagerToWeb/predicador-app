@@ -29,7 +29,8 @@ const AUTH_URL_PATTERNS = [...LOGIN_URL_PATTERNS, '/encargados/session'];
  * Endpoints whose callers handle errors themselves (guardarYEnviar, etc.).
  * Showing a generic toast here would duplicate the caller's own messaging.
  */
-const SELF_HANDLED_PATTERNS = ['/reports/send', '/reports?'];
+// '/reports/public/capacitacion': el aviso de capacitación se consulta solo cada minuto; sin señal no debe molestar.
+const SELF_HANDLED_PATTERNS = ['/reports/send', '/reports?', '/reports/public/capacitacion'];
 
 /**
  * Endpoints del panel de administración (`/territories/admin`,

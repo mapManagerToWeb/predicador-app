@@ -17,6 +17,18 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
 
     Page<Report> findAllByOrderByFechaDesc(Pageable pageable);
 
+    /** El id más alto (0 sin reportes): marca dónde empieza una capacitación. */
+    @Query("SELECT COALESCE(MAX(r.id), 0) FROM Report r")
+    long ultimoId();
+
+    /** Los reportes de prueba de una capacitación (los guardados después de empezarla). */
+    List<Report> findByIdGreaterThanOrderByIdAsc(Integer id);
+
+    /** Borra los reportes de prueba de una capacitación. */
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM Report r WHERE r.id > :id")
+    int borrarDespuesDe(@Param("id") Integer id);
+
     Page<Report> findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaDesc(Long territorioNumero, Pageable pageable);
 
     /** Reportes vigentes de un territorio, del más antiguo al más nuevo (para recalcular su estado). */
@@ -60,7 +72,7 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
     List<Object[]> resumenPorEncargado();
 
     /** Pasa todos los reportes de un encargado a otro (fusión de duplicados). */
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Report r SET r.encargadoId = :destino, r.encargadoNombre = :nombre, r.encargadoApellido = :apellido "
             + "WHERE r.encargadoId = :origen")
     int reasignarEncargado(@Param("origen") Long origen, @Param("destino") Long destino,

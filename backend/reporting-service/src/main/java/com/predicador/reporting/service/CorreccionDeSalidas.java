@@ -33,8 +33,10 @@ public class CorreccionDeSalidas {
 
     private final ReportRepository reportes;
     private final CatalogoManzanas catalogo;
+    private final CapacitacionService capacitacion;
 
-    public CorreccionDeSalidas(ReportRepository reportes, CatalogoManzanas catalogo) {
+    public CorreccionDeSalidas(ReportRepository reportes, CatalogoManzanas catalogo, CapacitacionService capacitacion) {
+        this.capacitacion = capacitacion;
         this.reportes = reportes;
         this.catalogo = catalogo;
     }
@@ -62,6 +64,7 @@ public class CorreccionDeSalidas {
 
     @Transactional
     public ResultadoCorreccionSalida corregir(int id, CorreccionSalidaRequest req) {
+        capacitacion.exigirQueSeaPrueba(id);
         Report salida = buscar(id);
         if (salida.getAnuladoEn() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ese reporte ya estaba anulado.");

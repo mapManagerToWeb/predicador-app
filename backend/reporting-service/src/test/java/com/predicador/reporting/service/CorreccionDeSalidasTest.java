@@ -31,6 +31,7 @@ class CorreccionDeSalidasTest {
 
     @Mock ReportRepository reportes;
     @Mock CatalogoManzanas catalogo;
+    @Mock CapacitacionService capacitacion;
 
     private CorreccionDeSalidas servicio;
     private final List<Report> guardados = new ArrayList<>();
@@ -55,7 +56,7 @@ class CorreccionDeSalidasTest {
 
     @BeforeEach
     void setUp() {
-        servicio = new CorreccionDeSalidas(reportes, catalogo);
+        servicio = new CorreccionDeSalidas(reportes, catalogo, capacitacion);
         // Ana marcó la 5.a; Luis marcó por error también la 5.c (y el territorio quedó completo);
         // después Ana empezó la vuelta nueva con la 5.a.
         r1 = reporte(1, "Ana", "5-5.a", "incomplete", 0);
@@ -147,5 +148,14 @@ class CorreccionDeSalidasTest {
         verify(reportes).findByTerritorioNumeroAndAnuladoEnIsNullOrderByFechaAscIdAsc(5L);
         assertThat(servicio.detalle(1).anterior()).isNull();
         when(reportes.findById(9)).thenReturn(Optional.empty());
+    }
+
+    @Test
+    void duranteLaCapacitacion_noSeCorrigenReportesDeAntes() {
+        org.mockito.Mockito.doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "capacitación")).when(capacitacion).exigirQueSeaPrueba(2);
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> servicio.corregir(2, new com.predicador.reporting.dto.CorreccionSalidaRequest(true, null, null, null, null, null, null)));
+        org.mockito.Mockito.verify(reportes, org.mockito.Mockito.never()).saveAndFlush(any(Report.class));
     }
 }

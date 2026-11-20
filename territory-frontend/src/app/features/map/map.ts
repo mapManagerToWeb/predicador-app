@@ -19,6 +19,7 @@ import { Toast } from '../../core/services/toast';
 import { CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 import { diasElegibles } from './utils/dia';
 import { MapaStore } from './mapa.store';
+import { Capacitacion } from '../../core/services/capacitacion';
 import { MapaVista, type EstadoUbicacion } from './mapa-vista';
 import { Tutorial } from './tutorial/tutorial';
 import type { ModoMarcado } from './mapa.types';
@@ -59,6 +60,8 @@ export class MapPage {
   private readonly perfil = inject(Profile);
   private readonly authToken = inject(AuthTokenService);
   private readonly toast = inject(Toast);
+  /** Aviso de capacitación en curso (no en el modo práctica, que no envía nada). */
+  protected readonly capacitacion = inject(Capacitacion);
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
   private vista: MapaVista | null = null;
@@ -99,6 +102,7 @@ export class MapPage {
     afterNextRender(() => {
       this.aplicarTema();
       void this.iniciar();
+      if (!this.store.modoPractica) destroyRef.onDestroy(this.capacitacion.vigilar());
     });
     // El mapa encuadra en lo que el panel deja libre: con varios territorios
     // abiertos el panel crece, y con un margen fijo quedaban manzanas debajo.

@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import type {
+  EstadoCapacitacion,
   CicloAdmin,
   CorreccionRequest,
   EstadoTerritorioAdmin,
@@ -144,6 +145,25 @@ export class AdminApi {
       this.http.put<{ territorios: number[] }>(`${this.reportes}/fuera-de-meta`, { territorios }, { headers: SIN_SW }),
     );
     return r.territorios ?? [];
+  }
+
+  // ── Capacitación ──
+
+  /** La capacitación en curso y sus reportes de prueba. */
+  capacitacion(): Promise<EstadoCapacitacion> {
+    return this.get<EstadoCapacitacion>(`${this.reportes}/capacitacion`);
+  }
+
+  empezarCapacitacion(): Promise<EstadoCapacitacion> {
+    return this.send(this.http.post<EstadoCapacitacion>(`${this.reportes}/capacitacion/empezar`, {}, { headers: SIN_SW }));
+  }
+
+  /** Termina la capacitación y borra sus reportes de prueba; devuelve cuántos se borraron. */
+  async terminarCapacitacion(): Promise<number> {
+    const r = await this.send(
+      this.http.post<{ borrados: number }>(`${this.reportes}/capacitacion/terminar`, { borrar: true }, { headers: SIN_SW }),
+    );
+    return r.borrados ?? 0;
   }
 
   // ── Ciclos y correcciones ──
