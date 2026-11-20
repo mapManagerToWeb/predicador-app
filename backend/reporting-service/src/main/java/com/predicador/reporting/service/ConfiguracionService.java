@@ -5,9 +5,12 @@ import com.predicador.reporting.repository.AppConfigRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Ajustes que el administrador cambia desde el panel. */
@@ -17,6 +20,14 @@ public class ConfiguracionService {
     static final String REGISTRO_ABIERTO = "registro_abierto";
     static final String WHATSAPP_ADMINISTRADOR = "whatsapp_administrador";
     static final String FUERA_DE_META = "territorios_fuera_de_meta";
+    static final String CAPACITACION = "capacitacion";
+
+    /**
+     * Capacitación en curso: desde cuándo y cuál era el último reporte que ya
+     * existía. Todo reporte con un id mayor es de prueba.
+     */
+    public record Capacitacion(Instant desde, long ultimoReporte) {
+    }
 
     private final AppConfigRepository repository;
 
@@ -98,5 +109,32 @@ public class ConfiguracionService {
                 .filter(v -> v.matches("\\d{1,9}"))
                 .map(Long::valueOf)
                 .toList();
+    }
+
+    /** La capacitación en curso, si hay una. Un valor que no se entiende cuenta como ninguna. */
+    @Transactional(readOnly = true)
+    public Optional<Capacitacion> capacitacion() {
+        return repository.findById(CAPACITACION)
+                .map(AppConfig::getValor)
+                .flatMap(ConfiguracionService::leerCapacitacion);
+    }
+
+    /** {@code null}: no hay capacitación. */
+    @Transactional
+    public void setCapacitacion(Capacitacion capacitacion) {
+        AppConfig config = repository.findById(CAPACITACION).orElseGet(() -> new AppConfig(CAPACITACION, ""));
+        config.setValor(capacitacion == null ? "" : capacitacion.desde() + "|" + capacitacion.ultimoReporte());
+        repository.save(config);
+    }
+
+    private static Optional<Capacitacion> leerCapacitacion(String valor) {
+        if (valor == null || valor.isBlank()) return Optional.empty();
+        String[] partes = valor.split("\\|");
+        if (partes.length != 2) return Optional.empty();
+        try {
+            return Optional.of(new Capacitacion(Instant.parse(partes[0].strip()), Long.parseLong(partes[1].strip())));
+        } catch (DateTimeParseException | NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 }

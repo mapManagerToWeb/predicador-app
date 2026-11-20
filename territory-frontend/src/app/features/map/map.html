@@ -52,6 +52,10 @@
     <p class="aviso-practica" role="status">
       <strong>Modo práctica:</strong> nada se envía ni se guarda.
     </p>
+  } @else if (capacitacion.activa()) {
+    <p class="aviso-practica" role="status">
+      <strong>Capacitación en curso:</strong> lo que envíes es de prueba y se borrará al terminar.
+    </p>
   }
 
   <!-- Botones sobre el mapa -->

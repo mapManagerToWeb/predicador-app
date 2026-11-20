@@ -42,6 +42,7 @@ import {
 import { type EstadoUbicacion, UbicacionMapa } from '../../core/map/ubicacion';
 import { AVISO_SIN_RUMBO } from '../../core/map/rumbo';
 import { Toast } from '../../core/services/toast';
+import { Capacitacion } from '../../core/services/capacitacion';
 import { aplicarTemaGuardado, CLAVE_TEMA, ponerTema } from '../../core/utils/tema';
 
 type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['properties']>;
@@ -61,6 +62,8 @@ type ColeccionVisor = FeatureCollection<Polygon | MultiPolygon, ManzanaVisor['pr
 export class VisorPage {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(Toast);
+  /** Durante una capacitación el visor muestra también lo de prueba: se avisa. */
+  protected readonly capacitacion = inject(Capacitacion);
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private map: MapLibreMap | null = null;
   private manzanas: ColeccionVisor | null = null;
@@ -103,6 +106,7 @@ export class VisorPage {
     afterNextRender(() => {
       aplicarTemaGuardado();
       void this.iniciar();
+      destroyRef.onDestroy(this.capacitacion.vigilar());
       const observador = new MutationObserver(() => {
         if (this.map) cambiarFondo(this.map, this.fondo(), temaOscuro());
       });

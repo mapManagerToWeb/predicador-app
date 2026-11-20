@@ -53,4 +53,36 @@ class ConfiguracionServiceTest {
         assertEquals(List.of(), service.setTerritoriosFueraDeMeta(null));
         assertEquals("", existente.getValor());
     }
+
+    @Test
+    void sinCapacitacionGuardada_noHayNinguna() {
+        when(repository.findById(ConfiguracionService.CAPACITACION)).thenReturn(Optional.empty());
+        assertEquals(Optional.empty(), service.capacitacion());
+        when(repository.findById(ConfiguracionService.CAPACITACION))
+                .thenReturn(Optional.of(new AppConfig(ConfiguracionService.CAPACITACION, "")));
+        assertEquals(Optional.empty(), service.capacitacion());
+    }
+
+    @Test
+    void guardaYLeeLaCapacitacion() {
+        AppConfig existente = new AppConfig(ConfiguracionService.CAPACITACION, "");
+        when(repository.findById(ConfiguracionService.CAPACITACION)).thenReturn(Optional.of(existente));
+        var c = new ConfiguracionService.Capacitacion(java.time.Instant.parse("2026-11-22T19:00:00Z"), 1234L);
+        service.setCapacitacion(c);
+        assertEquals("2026-11-22T19:00:00Z|1234", existente.getValor());
+        assertEquals(Optional.of(c), service.capacitacion());
+
+        service.setCapacitacion(null);
+        assertEquals("", existente.getValor());
+        assertEquals(Optional.empty(), service.capacitacion());
+    }
+
+    @Test
+    void unaCapacitacionMalGuardadaCuentaComoNinguna() {
+        for (String valor : List.of("2026-11-22T19:00:00Z", "ayer|12", "2026-11-22T19:00:00Z|x", "a|b|c")) {
+            when(repository.findById(ConfiguracionService.CAPACITACION))
+                    .thenReturn(Optional.of(new AppConfig(ConfiguracionService.CAPACITACION, valor)));
+            assertEquals(Optional.empty(), service.capacitacion(), valor);
+        }
+    }
 }

@@ -191,6 +191,10 @@
   text-align: center;
 }
 .aviso.error { color: var(--color-danger); }
+/* Oscuro en los dos temas, como el aviso del modo práctica del mapa: el amarillo,
+   el verde y el blanco ya son los colores de los números de territorio. */
+.aviso.capacitacion { background: #1f2937; color: #f9fafb; line-height: 1.35; }
+.aviso.capacitacion strong { color: #fde047; }
 
 /* Los controles de MapLibre van debajo de la barra de búsqueda. */
 :host ::ng-deep .maplibregl-ctrl-top-right {

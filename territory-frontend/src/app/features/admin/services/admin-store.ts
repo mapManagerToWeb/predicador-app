@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import type { EncargadoAdmin, ManzanasCollection, ReporteAdmin } from '../admin.models';
+import type { EncargadoAdmin, EstadoCapacitacion, ManzanasCollection, ReporteAdmin } from '../admin.models';
 import { AdminApi } from './admin-api';
 import { esSalida } from '../utils/analytics';
 import { situacionDe, type SituacionTerritorio } from '../../../core/map/estado-publico';
@@ -35,6 +35,8 @@ export class AdminStore {
   readonly inicioVuelta = signal<string | null>(null);
   /** Territorios que el administrador dejó fuera de la meta. */
   readonly fueraDeMeta = signal<number[]>([]);
+  /** Capacitación: null hasta saber (o con un servidor que no tiene esta opción). */
+  readonly capacitacion = signal<EstadoCapacitacion | null>(null);
 
   /** Cantidad de manzanas por territorio. */
   readonly manzanasPorTerritorio = computed(() => {
@@ -79,6 +81,27 @@ export class AdminStore {
     this.fueraDeMeta.set(await this.api.setFueraDeMeta(territorios));
   }
 
+  /** Si hay una capacitación y qué se envió en ella. Un servidor sin esta opción la deja en null. */
+  async cargarCapacitacion(): Promise<void> {
+    try {
+      this.capacitacion.set(await this.api.capacitacion());
+    } catch {
+      // Sin la opción en el servidor o sin conexión: no se muestra nada nuevo.
+    }
+  }
+
+  async empezarCapacitacion(): Promise<void> {
+    this.capacitacion.set(await this.api.empezarCapacitacion());
+  }
+
+  /** Termina la capacitación, borra lo de prueba y vuelve a cargar lo que cambió. */
+  async terminarCapacitacion(): Promise<number> {
+    const borrados = await this.api.terminarCapacitacion();
+    this.capacitacion.set({ activa: false, desde: null, pruebas: [] });
+    await Promise.all([this.cargarReportes(true), this.cargarVuelta(true)]).catch(() => undefined);
+    return borrados;
+  }
+
   cargarManzanas(forzar = false): Promise<void> {
     return this.unaVez('manzanas', forzar, async () => {
       const [manzanas, colores] = await Promise.all([this.api.manzanas(), this.api.colores()]);
@@ -115,6 +138,7 @@ export class AdminStore {
     this.situaciones.set(null);
     this.inicioVuelta.set(null);
     this.fueraDeMeta.set([]);
+    this.capacitacion.set(null);
   }
 
   /** Evita pedir lo mismo dos veces cuando varias páginas lo necesitan a la vez. */

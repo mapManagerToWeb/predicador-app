@@ -1,3 +1,4 @@
+import { CapacitacionPanel } from './capacitacion/capacitacion';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
@@ -32,7 +33,7 @@ interface Seccion {
  */
 @Component({
   selector: 'app-admin',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CapacitacionPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   templateUrl: './admin.html',
