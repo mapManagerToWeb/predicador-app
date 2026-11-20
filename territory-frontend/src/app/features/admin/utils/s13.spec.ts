@@ -70,6 +70,52 @@ describe('S-13', () => {
     ]);
   });
 
+  it('ordena por el día en que se predicó, no por el día en que llegó el reporte', () => {
+    // Juan predicó el lunes y envió el miércoles; Pedro predicó y envió el martes.
+    const a = asignaciones([
+      reporte(20, '2026-11-11', 'Juan Pérez', 'incomplete', { fechaPredicacion: '2026-11-09', turno: 'mañana' }),
+      reporte(20, '2026-11-10', 'Pedro Rojas', 'completed', { fechaPredicacion: '2026-11-10', turno: 'mañana' }),
+    ]);
+    expect(a.map(x => [x.encargado, dm(x.asignado), dm(x.completado)])).toEqual([
+      ['Juan Pérez', '09-11', null],
+      ['Pedro Rojas', '10-11', '10-11'],
+    ]);
+  });
+
+  it('el mismo día va primero la mañana; sin turno guardado decide la hora', () => {
+    const a = asignaciones([
+      reporte(21, '2026-11-12', 'Ana Soto', 'incomplete', { fechaPredicacion: '2026-11-10', turno: 'tarde' }),
+      reporte(21, '2026-11-13', 'Luis Díaz', 'incomplete', { fechaPredicacion: '2026-11-10', turno: 'mañana' }),
+      { ...reporte(22, '2026-11-10', 'Ana Soto'), fecha: '2026-11-10T17:00:00' },
+      { ...reporte(22, '2026-11-10', 'Luis Díaz'), fecha: '2026-11-10T11:00:00' },
+    ]);
+    expect(a.filter(x => x.territorio === 21).map(x => x.encargado)).toEqual(['Luis Díaz', 'Ana Soto']);
+    expect(a.filter(x => x.territorio === 22).map(x => x.encargado)).toEqual(['Luis Díaz', 'Ana Soto']);
+  });
+
+  it('un reporte de la misma mañana que llega al día siguiente no repite la «última fecha completada»', () => {
+    // Como el 45 y el 46: dos encargados completan la misma mañana; uno lo envía al día siguiente.
+    const reportes = [
+      reporte(45, '2026-08-20', 'Ana Soto', 'completed', { fechaPredicacion: '2026-08-20' }),
+      { ...reporte(45, '2026-11-10', 'Pedro Rojas', 'completed', { fechaPredicacion: '2026-11-10', turno: 'mañana' }), fecha: '2026-11-10T12:30:00' },
+      reporte(45, '2026-11-11', 'Juan Pérez', 'completed', { fechaPredicacion: '2026-11-10', turno: 'mañana' }),
+    ];
+    const { desde, hasta } = rangoAnioDeServicio(2027);
+    const [pagina] = paginasS13(asignaciones(reportes), [45], desde, hasta);
+    const fila = pagina.filas[0];
+    expect(fila.asignaciones.filter(Boolean).map(x => [x!.encargado, dm(x!.completado)])).toEqual([
+      ['Pedro Rojas', '10-11'],
+      ['Juan Pérez', '10-11'],
+    ]);
+    expect(dm(fila.ultimaCompletada)).toBe('20-08');
+  });
+
+  it('un territorio sin asignaciones en el período muestra lo último completado antes', () => {
+    const { desde, hasta } = rangoAnioDeServicio(2027);
+    const [pagina] = paginasS13(asignaciones([reporte(30, '2026-08-20', 'Ana Soto', 'completed')]), [30, 31], desde, hasta);
+    expect(pagina.filas.map(f => dm(f.ultimaCompletada))).toEqual(['20-08', null]);
+  });
+
   it('año de servicio: de septiembre a agosto', () => {
     expect(anioDeServicio(new Date(2025, 8, 1))).toBe(2026);
     expect(anioDeServicio(new Date(2026, 7, 31))).toBe(2026);

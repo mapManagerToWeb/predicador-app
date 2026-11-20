@@ -48,8 +48,25 @@ function ms(fecha: string): number {
   return new Date(fecha).getTime();
 }
 
+/**
+ * Cuándo se predicó, para ordenar el S-13: el día y el turno (la mañana antes
+ * que la tarde). Sin turno guardado (reportes antiguos), la hora del trabajo.
+ */
+function momentoDePredicacion(r: ReporteAdmin): [string, number] {
+  const trabajo = fechaDeTrabajo(r);
+  const turno = r.turno === 'mañana' ? 0 : r.turno === 'tarde' ? 1 : trabajo.getHours() < 14 ? 0 : 1;
+  return [diaLocal(trabajo), turno];
+}
+
 export function asignaciones(reportes: ReporteAdmin[]): AsignacionS13[] {
-  const ordenados = deduplicar(reportes).sort((a, b) => a.territorio - b.territorio || ms(a.fecha) - ms(b.fecha) || a.id - b.id);
+  // En el orden en que se predicó, no en el que se envió: un reporte que llega
+  // días después va en su lugar (el estado del territorio sigue el orden de envío, ADR 0013).
+  const momentos = new Map(reportes.map(r => [r, momentoDePredicacion(r)]));
+  const ordenados = deduplicar(reportes).sort((a, b) => {
+    const [diaA, turnoA] = momentos.get(a)!;
+    const [diaB, turnoB] = momentos.get(b)!;
+    return a.territorio - b.territorio || diaA.localeCompare(diaB) || turnoA - turnoB || ms(a.fecha) - ms(b.fecha) || a.id - b.id;
+  });
   const resultado: AsignacionS13[] = [];
   let abierta: AsignacionS13 | null = null;
   let territorio: number | null = null;
@@ -116,11 +133,17 @@ export function paginasS13(todas: AsignacionS13[], territorios: number[], desde:
   }
   const numeros = [...new Set([...territorios, ...porTerritorio.keys()])].sort((a, b) => a - b);
 
-  const ultimaAntesDe = (t: number, limite: Date): Date | null => {
+  /**
+   * Última vez que se completó antes de la fila: con asignaciones, lo
+   * completado en las asignaciones anteriores a la primera de la fila (así
+   * nunca repite una fecha que ya sale en ella); sin asignaciones, lo
+   * completado antes del período.
+   */
+  const ultimaAntesDe = (t: number, primera: AsignacionS13 | null, limite: Date | null): Date | null => {
+    const lista = porTerritorio.get(t) ?? [];
+    const previas = primera ? lista.slice(0, lista.indexOf(primera)) : lista.filter(a => limite && a.completado && a.completado < limite);
     let ultima: Date | null = null;
-    for (const a of porTerritorio.get(t) ?? []) {
-      if (a.completado && a.completado < limite && (!ultima || a.completado > ultima)) ultima = a.completado;
-    }
+    for (const a of previas) if (a.completado && (!ultima || a.completado > ultima)) ultima = a.completado;
     return ultima;
   };
 
@@ -142,8 +165,8 @@ export function paginasS13(todas: AsignacionS13[], territorios: number[], desde:
           const parte = bloques.get(t)![k] ?? [];
           const casillas: (AsignacionS13 | null)[] = [...parte];
           while (casillas.length < ASIGNACIONES_POR_FILA) casillas.push(null);
-          const limite = parte[0]?.asignado ?? (k === 0 ? desde : null);
-          return { territorio: t, ultimaCompletada: limite ? ultimaAntesDe(t, limite) : null, asignaciones: casillas };
+          const ultima = parte[0] ? ultimaAntesDe(t, parte[0], null) : k === 0 ? ultimaAntesDe(t, null, desde) : null;
+          return { territorio: t, ultimaCompletada: ultima, asignaciones: casillas };
         }),
       });
     }
