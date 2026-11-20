@@ -78,6 +78,9 @@ describe('VisorPage', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     expect(mapa.addSource).toHaveBeenCalledWith('manzanas', expect.objectContaining({ type: 'geojson' }));
+    // La calle predicada va remarcada encima de la franja.
+    expect(mapa.addSource).toHaveBeenCalledWith('calles-hechas', expect.objectContaining({ type: 'geojson' }));
+    expect(mapa.addLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'calles-hechas' }));
     expect(el.textContent).not.toMatch(/Marcar|Enviar|Guardar/);
     expect(el.querySelector('[role="alert"]')).toBeNull();
   });

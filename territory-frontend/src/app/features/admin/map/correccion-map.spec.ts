@@ -191,6 +191,28 @@ describe('CorreccionMap: el mapa al abrirse', () => {
     expect(hover()).toBeNull();
   });
 
+  it('remarca la calle predicada de cada zona encima de la franja, en gris si era de antes al corregir', async () => {
+    const { fixture, mapa } = await abrir(false);
+    const datos: unknown[] = [];
+    mapa.getSource.mockImplementation(() => ({ setData: (d: unknown) => datos.push(d) }));
+    expect(capa(mapa, 'calles-hechas')).toBeDefined();
+    expect(JSON.stringify(capa(mapa, 'calles-hechas')?.paint?.['line-color'])).toContain('#9ca3af');
+    fixture.componentRef.setInput('estado', {
+      marcadas: new Set<string>(),
+      zonas: [
+        { manzanaId: '15-15.1', manzanaNombre: '15.1', lados: [0], geometria: manzana(1, 15, 0).geometry },
+        { manzanaId: null, manzanaNombre: 'Zona parcial', lados: [], geometria: manzana(2, 15, 3).geometry },
+      ],
+    });
+    fixture.componentRef.setInput('zonasBloqueadas', new Set([0]));
+    fixture.componentRef.setInput('colores', { 15: '#ff0000' });
+    await fixture.whenStable();
+    const calles = datos.at(-1) as { features: { geometry: { type: string }; properties: { bloqueada: boolean; color: string | null } }[] };
+    expect(calles.features).toHaveLength(1);
+    expect(calles.features[0].geometry.type).toBe('LineString');
+    expect(calles.features[0].properties).toEqual({ bloqueada: true, color: '#ff0000' });
+  });
+
   it('un clic en una manzana avisa cuál es', async () => {
     const { fixture, mapa } = await abrir(true);
     const tocadas: string[] = [];

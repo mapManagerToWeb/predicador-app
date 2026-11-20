@@ -3,6 +3,7 @@ import {
   hace,
   manzanasDelVisor,
   resumenTerritorios,
+  callesDelVisor,
   zonasParcialesDelVisor,
   type EstadoTerritorioPublico,
   type PropsManzanaPublica,
@@ -77,5 +78,38 @@ describe('visor de territorios', () => {
     expect(hace(new Date(2026, 8, 23, 20), ahora)).toBe('ayer');
     expect(hace(new Date(2026, 8, 14), ahora)).toBe('hace 10 días');
     expect(hace(new Date(2026, 4, 24), ahora)).toBe('hace 4 meses');
+  });
+});
+
+describe('callesDelVisor', () => {
+  it('remarca la calle predicada de cada zona, con el color de su territorio', () => {
+    const manzanas: FeatureCollection<Polygon, PropsManzanaPublica> = {
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: cuadro, properties: { id: '12-12.a', mid: 1, territorio_padre: 12, nombre_bloque: '12.a', color: null } }],
+    };
+    const zona = { m: '12-12.a', n: '12.a', l: [0], g: cuadro };
+    const calles = callesDelVisor(
+      manzanas,
+      [
+        estado({ territorio: 12, geometriaParcial: JSON.stringify(cuadro), puntosParciales: JSON.stringify({ v: 2, zonas: [zona] }) }),
+        estado({ territorio: 13, geometriaParcial: null, puntosParciales: null }),
+        // Reporte antiguo: solo la franja, sin saber qué calle.
+        estado({ territorio: 14, geometriaParcial: JSON.stringify(cuadro), puntosParciales: null }),
+      ],
+      { 12: '#00ff00' },
+    );
+    expect(calles.features).toHaveLength(1);
+    expect(calles.features[0].geometry.type).toBe('LineString');
+    expect(calles.features[0].properties).toEqual({ territorio: 12, color: '#00ff00' });
+  });
+
+  it('sin color conocido usa el gris', () => {
+    const manzanas: FeatureCollection<Polygon, PropsManzanaPublica> = {
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: cuadro, properties: { id: '12-12.a', mid: 1, territorio_padre: 12, nombre_bloque: '12.a', color: null } }],
+    };
+    const zona = { m: '12-12.a', n: '12.a', l: [0], g: cuadro };
+    const calles = callesDelVisor(manzanas, [estado({ territorio: 12, geometriaParcial: null, puntosParciales: JSON.stringify({ v: 2, zonas: [zona] }) })], {});
+    expect(calles.features[0].properties.color).toBe('#888888');
   });
 });

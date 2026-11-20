@@ -77,6 +77,25 @@ function giro(a: XY, b: XY, c: XY): number {
  * muchos vértices cuenta como una sola), y los tramos muy cortos se unen al
  * vecino para no ofrecer "lados" de dos metros.
  */
+/**
+ * Las calles marcadas de cada zona, como líneas: el mapa las remarca encima de
+ * la franja para que se lea qué calle se predicó (la franja sola parecía otra
+ * manzana). Las zonas sin manzana o sin lados (reportes antiguos) no tienen.
+ */
+export function callesDeZonas(
+  zonas: readonly Pick<ZonaParcialDatos, 'manzanaId' | 'lados'>[],
+  geometriaDe: (manzanaId: string) => GeometriaManzana | undefined,
+): Position[][] {
+  const lineas: Position[][] = [];
+  for (const z of zonas) {
+    if (!z.manzanaId || z.lados.length === 0) continue;
+    const g = geometriaDe(z.manzanaId);
+    if (!g) continue;
+    for (const l of calcularLados(g)) if (z.lados.includes(l.indice)) lineas.push(l.puntos);
+  }
+  return lineas;
+}
+
 export function calcularLados(g: GeometriaManzana): Lado[] {
   const lados: Omit<Lado, 'indice'>[] = [];
   for (const anillo of anillosExteriores(g)) lados.push(...ladosDeAnillo(anillo));

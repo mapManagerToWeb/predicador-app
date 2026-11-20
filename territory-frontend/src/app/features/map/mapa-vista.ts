@@ -9,7 +9,10 @@ import type {
 import type { Feature, FeatureCollection, LineString, Point, Position } from 'geojson';
 import {
   agregarPildoras,
+  ANCHO_CALLE_HECHA,
+  ANCHO_CALLE_HECHA_BORDE,
   cambiarFondo,
+  COLOR_BORDE_CALLE_HECHA,
   conSituacion,
   crearMapa,
   DISENO_NUMEROS,
@@ -42,6 +45,8 @@ export interface EstadoVista {
   /** Manzanas pintadas como predicadas: las de la salida en los abiertos, la vuelta en curso en el resto. */
   marcadas: Set<string>;
   zonas: FeatureCollection<GeometriaManzana, { territorio: number; color: string }>;
+  /** Las calles predicadas de esas zonas, remarcadas encima de la franja. */
+  calles: FeatureCollection<LineString, { territorio: number; color: string }>;
   editando: string | null;
   /** Cómo va cada territorio (color del cuadrito de su número); los que faltan, sin registro. */
   situaciones: Map<number, SituacionTerritorio>;
@@ -177,13 +182,15 @@ export class MapaVista {
     map.addSource('etiquetas', { type: 'geojson', data: this.datosEtiquetas(new Map()) });
     map.addSource('lados', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addSource('franja', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addSource('calles-hechas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
     map.addLayer({ id: 'manzanas-relleno', type: 'fill', source: 'manzanas', paint: { 'fill-color': COLOR, 'fill-opacity': OPACIDAD_RELLENO } });
     map.addLayer({
       id: 'zonas-relleno',
       type: 'fill',
       source: 'zonas',
-      paint: { 'fill-color': COLOR, 'fill-opacity': ['case', ['get', 'atenuada'], 0.18, 0.8] },
+      // Suave: la calle predicada se remarca encima (capas calles-hechas). Nunca más fuerte que una manzana entera.
+      paint: { 'fill-color': COLOR, 'fill-opacity': ['case', ['get', 'atenuada'], 0.1, 0.35] },
     });
     map.addLayer({
       id: 'manzanas-borde',
@@ -200,6 +207,25 @@ export class MapaVista {
       type: 'line',
       source: 'manzanas',
       paint: { 'line-color': '#facc15', 'line-width': 4, 'line-opacity': ['case', EDITANDO, 1, 0] },
+    });
+    // Calle predicada: línea gruesa del color del territorio con borde oscuro, como al marcarla por calles.
+    map.addLayer({
+      id: 'calles-hechas-borde',
+      type: 'line',
+      source: 'calles-hechas',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': COLOR_BORDE_CALLE_HECHA,
+        'line-width': ANCHO_CALLE_HECHA_BORDE,
+        'line-opacity': ['case', ['get', 'atenuada'], 0.25, 0.8],
+      },
+    });
+    map.addLayer({
+      id: 'calles-hechas',
+      type: 'line',
+      source: 'calles-hechas',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': COLOR, 'line-width': ANCHO_CALLE_HECHA, 'line-opacity': ['case', ['get', 'atenuada'], 0.35, 1] },
     });
     map.addLayer({ id: 'franja', type: 'fill', source: 'franja', paint: { 'fill-color': COLOR, 'fill-opacity': 0.8 } });
     map.addLayer({
@@ -283,6 +309,13 @@ export class MapaVista {
     void (this.map.getSource('zonas') as GeoJSONSource).setData({
       type: 'FeatureCollection',
       features: e.zonas.features.map(f => ({
+        ...f,
+        properties: { ...f.properties, atenuada: hayAbiertos && !abiertos.has(f.properties.territorio) },
+      })),
+    });
+    void (this.map.getSource('calles-hechas') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: e.calles.features.map(f => ({
         ...f,
         properties: { ...f.properties, atenuada: hayAbiertos && !abiertos.has(f.properties.territorio) },
       })),

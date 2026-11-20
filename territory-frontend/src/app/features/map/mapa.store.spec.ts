@@ -1,3 +1,4 @@
+import { calcularLados } from '../../core/map/lados';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -162,6 +163,28 @@ describe('MapaStore', () => {
     store.guardarLados();
     expect(store.edicion()).toBeNull();
     expect(store.resumenes()[0]).toMatchObject({ porCalles: 1, cambios: true });
+  });
+
+  it('la calle predicada se remarca: la del estado (territorio cerrado) y la que se marca ahora', async () => {
+    const lados = calcularLados(cuadrado(-73.336, -37.5));
+    const zona = { m: '5-5.c', n: '5.c', l: [1], t: lados.length, g: cuadrado(-73.336, -37.5) };
+    await cargar(store, [
+      estado({ geometriaParcial: JSON.stringify(zona.g), puntosParciales: JSON.stringify({ v: 2, zonas: [zona] }) }),
+    ]);
+    const cerrado = store.estadoVista();
+    expect(cerrado.zonas.features).toHaveLength(1);
+    expect(cerrado.calles.features).toEqual([
+      { type: 'Feature', geometry: { type: 'LineString', coordinates: lados[1].puntos }, properties: { territorio: 5, color: expect.any(String) } },
+    ]);
+
+    await store.abrir(5);
+    store.cambiarModo('calles');
+    store.tocar({ manzana: null, cercana: '5-5.b' });
+    store.tocarLado(0);
+    store.guardarLados();
+    const abierto = store.estadoVista();
+    expect(abierto.calles.features.length).toBeGreaterThanOrEqual(1);
+    expect(abierto.calles.features.every(f => f.properties.territorio === 5)).toBe(true);
   });
 
   it('enviar: pide confirmar, guarda, avisa por WhatsApp con la captura y cierra el territorio', async () => {

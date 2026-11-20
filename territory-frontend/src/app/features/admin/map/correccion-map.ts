@@ -14,7 +14,15 @@ import {
 import type { ExpressionSpecification, GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
 import type { Position } from 'geojson';
 import type { ManzanaFeature } from '../admin.models';
-import { cambiarFondo, crearMapa, temaOscuro } from '../../../core/map/base-map';
+import {
+  ANCHO_CALLE_HECHA,
+  ANCHO_CALLE_HECHA_BORDE,
+  cambiarFondo,
+  COLOR_BORDE_CALLE_HECHA,
+  crearMapa,
+  temaOscuro,
+} from '../../../core/map/base-map';
+import { callesDeZonas } from '../../../core/map/lados';
 import { clave, type EstadoCorreccion } from '../utils/correccion';
 import { cajaDePuntos, capturarTerritorios, unirCajas, type Caja } from '../../../core/map/captura';
 
@@ -119,17 +127,27 @@ export class CorreccionMap {
       this.bloqueadas();
       if (!this.listo() || !this.map) return;
       this.dibujarManzanas(manzanas, estado);
+      const colorDe = (manzanaId: string | null) =>
+        colores && manzanaId ? (colores[Number(manzanaId.slice(0, manzanaId.indexOf('-')))] ?? null) : null;
       void (this.map.getSource('zonas') as GeoJSONSource).setData({
         type: 'FeatureCollection',
         features: estado.zonas.map((z, i) => ({
           type: 'Feature',
           geometry: z.geometria,
-          properties: {
-            indice: i,
-            bloqueada: zonasBloqueadas.has(i),
-            color: colores && z.manzanaId ? (colores[Number(z.manzanaId.slice(0, z.manzanaId.indexOf('-')))] ?? null) : null,
-          },
+          properties: { indice: i, bloqueada: zonasBloqueadas.has(i), color: colorDe(z.manzanaId) },
         })),
+      });
+      // La calle predicada de cada zona, remarcada encima de la franja (como en el mapa de los encargados).
+      const geometrias = new Map(manzanas.map(m => [clave(m), m.geometry]));
+      void (this.map.getSource('calles-hechas') as GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: estado.zonas.flatMap((z, i) =>
+          callesDeZonas([z], id => geometrias.get(id)).map(puntos => ({
+            type: 'Feature' as const,
+            geometry: { type: 'LineString' as const, coordinates: puntos },
+            properties: { bloqueada: zonasBloqueadas.has(i), color: colorDe(z.manzanaId) },
+          })),
+        ),
       });
     });
     effect(() => {
@@ -142,6 +160,7 @@ export class CorreccionMap {
       const enColor = this.anterioresEnColor();
       if (!this.listo() || !this.map) return;
       for (const capa of ['manzanas-fill', 'zonas-fill']) this.map.setPaintProperty(capa, 'fill-color', relleno(color, enColor));
+      this.map.setPaintProperty('calles-hechas', 'line-color', relleno(color, enColor));
       this.map.setPaintProperty('manzanas-line', 'line-color', delTerritorio(color));
       this.map.setLayoutProperty('manzanas-nuevas', 'visibility', enColor ? 'visible' : 'none');
     });
@@ -162,9 +181,25 @@ export class CorreccionMap {
       id: 'zonas-fill',
       type: 'fill',
       source: 'zonas',
-      paint: { 'fill-color': relleno(this.color(), this.anterioresEnColor()), 'fill-opacity': 0.75 },
+      // Suave: la calle predicada se remarca encima (capas calles-hechas).
+      paint: { 'fill-color': relleno(this.color(), this.anterioresEnColor()), 'fill-opacity': 0.35 },
     });
     map.addLayer({ id: 'manzanas-line', type: 'line', source: 'manzanas', paint: { 'line-color': delTerritorio(this.color()), 'line-width': 1.5 } });
+    map.addSource('calles-hechas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'calles-hechas-borde',
+      type: 'line',
+      source: 'calles-hechas',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': COLOR_BORDE_CALLE_HECHA, 'line-width': ANCHO_CALLE_HECHA_BORDE, 'line-opacity': 0.8 },
+    });
+    map.addLayer({
+      id: 'calles-hechas',
+      type: 'line',
+      source: 'calles-hechas',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': relleno(this.color(), this.anterioresEnColor()), 'line-width': ANCHO_CALLE_HECHA },
+    });
     map.addLayer({
       id: 'manzanas-nuevas',
       type: 'line',
