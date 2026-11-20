@@ -24,6 +24,8 @@ const mapa = {
   getCenter: () => ({ lng: -73.34, lat: -37.48 }),
   easeTo: vi.fn(),
   setFilter: vi.fn(),
+  getLayer: vi.fn(() => ({})),
+  setPaintProperty: vi.fn(),
   remove: vi.fn(),
   getCanvas: () => ({ style: {} }),
 };
@@ -83,6 +85,16 @@ describe('VisorPage', () => {
     expect(mapa.addLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'calles-hechas' }));
     expect(el.textContent).not.toMatch(/Marcar|Enviar|Guardar/);
     expect(el.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('pinta lo predicado con la intensidad que eligió el administrador', async () => {
+    const fixture = await abrir();
+    http.expectOne(`${environment.apiUrl}/reports/public/apariencia`).flush({ opacidadPredicadas: 0.85 });
+    await vi.waitFor(() =>
+      expect(mapa.setPaintProperty).toHaveBeenCalledWith('manzanas-fill', 'fill-opacity', ['case', ['get', 'predicada'], 0.85, 0.1]),
+    );
+    expect(mapa.setPaintProperty).toHaveBeenCalledWith('zonas-fill', 'fill-opacity', 0.51);
+    fixture.destroy();
   });
 
   it('durante una capacitación avisa que el mapa muestra también lo de prueba', async () => {

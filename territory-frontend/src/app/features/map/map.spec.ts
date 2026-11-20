@@ -1,3 +1,4 @@
+import { Apariencia } from '../../core/services/apariencia';
 import { Capacitacion } from '../../core/services/capacitacion';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -14,6 +15,7 @@ import { MODO_PRACTICA } from '../../core/map/modo-practica';
 
 const vista = {
   mostrar: vi.fn(),
+  ponerOpacidad: vi.fn(),
   encuadrar: vi.fn(),
   encuadrarTodo: vi.fn(),
   limitar: vi.fn(),
@@ -131,6 +133,13 @@ describe('MapPage', () => {
     await fixture.whenStable();
     expect(store.abiertos()).toEqual([]);
     expect(el.querySelector('.dialogo')).toBeNull();
+  });
+
+  it('aplica al mapa la intensidad de lo predicado, también cuando cambia', async () => {
+    await abrirPagina();
+    expect(vista.ponerOpacidad).toHaveBeenCalledWith(TestBed.inject(Apariencia).opacidadPredicadas());
+    TestBed.inject(Apariencia).usar(0.9);
+    await vi.waitFor(() => expect(vista.ponerOpacidad).toHaveBeenLastCalledWith(0.9));
   });
 
   it('el botón de ubicación va al mapa', async () => {

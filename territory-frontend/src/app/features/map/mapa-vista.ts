@@ -22,6 +22,7 @@ import {
   type MapLibre,
 } from '../../core/map/base-map';
 import type { SituacionTerritorio } from '../../core/map/estado-publico';
+import { OPACIDAD_PREDICADAS_POR_DEFECTO, opacidadFranja } from '../../core/services/apariencia';
 import { franjaDeLados, type GeometriaManzana } from '../../core/map/lados';
 import { puntoInterior } from '../../core/map/geometria';
 import { cajaDePuntos, capturarTerritorios, type Caja } from '../../core/map/captura';
@@ -73,16 +74,28 @@ const ESTADO = (clave: string): ExpressionSpecification => ['boolean', ['feature
 const [ABIERTO, MARCADA, ATENUADA, EDITANDO] = ['a', 'm', 'd', 'e'].map(ESTADO);
 const COLOR: ExpressionSpecification = ['get', 'color'];
 
-const OPACIDAD_RELLENO: ExpressionSpecification = [
-  'case',
-  EDITANDO, 0.1,
-  ['all', ABIERTO, MARCADA], 0.8,
-  ABIERTO, 0.12,
-  ['all', ATENUADA, MARCADA], 0.18,
-  ATENUADA, 0.03,
-  MARCADA, 0.55,
-  0.1,
-];
+/**
+ * Relleno de las manzanas. `predicadas` es la intensidad que elige el
+ * administrador para lo predicado en los territorios cerrados; en el que se
+ * está marcando nunca baja de 0.8, para que se vea claro lo que se toca.
+ */
+function opacidadRelleno(predicadas: number): ExpressionSpecification {
+  return [
+    'case',
+    EDITANDO, 0.1,
+    ['all', ABIERTO, MARCADA], Math.max(0.8, predicadas),
+    ABIERTO, 0.12,
+    ['all', ATENUADA, MARCADA], 0.18,
+    ATENUADA, 0.03,
+    MARCADA, predicadas,
+    0.1,
+  ];
+}
+
+/** La franja de una calle predicada: suave, la calle va remarcada encima. */
+function opacidadZonas(predicadas: number): ExpressionSpecification {
+  return ['case', ['get', 'atenuada'], 0.1, opacidadFranja(predicadas)];
+}
 
 const TOQUE_CERCANO_PX = 30;
 const TOQUE_LADO_PX = 18;
@@ -184,13 +197,18 @@ export class MapaVista {
     map.addSource('franja', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addSource('calles-hechas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-    map.addLayer({ id: 'manzanas-relleno', type: 'fill', source: 'manzanas', paint: { 'fill-color': COLOR, 'fill-opacity': OPACIDAD_RELLENO } });
+    map.addLayer({
+      id: 'manzanas-relleno',
+      type: 'fill',
+      source: 'manzanas',
+      paint: { 'fill-color': COLOR, 'fill-opacity': opacidadRelleno(OPACIDAD_PREDICADAS_POR_DEFECTO) },
+    });
     map.addLayer({
       id: 'zonas-relleno',
       type: 'fill',
       source: 'zonas',
       // Suave: la calle predicada se remarca encima (capas calles-hechas). Nunca más fuerte que una manzana entera.
-      paint: { 'fill-color': COLOR, 'fill-opacity': ['case', ['get', 'atenuada'], 0.1, 0.35] },
+      paint: { 'fill-color': COLOR, 'fill-opacity': opacidadZonas(OPACIDAD_PREDICADAS_POR_DEFECTO) },
     });
     map.addLayer({
       id: 'manzanas-borde',
@@ -325,6 +343,12 @@ export class MapaVista {
       this.map.setFeatureState({ source: 'etiquetas', id: t }, { a: abiertos.has(t), d: hayAbiertos && !abiertos.has(t) });
     }
     this.abiertosAntes = abiertos;
+  }
+
+  /** La intensidad de lo predicado que eligió el administrador. */
+  ponerOpacidad(predicadas: number): void {
+    this.map.setPaintProperty('manzanas-relleno', 'fill-opacity', opacidadRelleno(predicadas));
+    this.map.setPaintProperty('zonas-relleno', 'fill-opacity', opacidadZonas(predicadas));
   }
 
   // ── Cámara ──

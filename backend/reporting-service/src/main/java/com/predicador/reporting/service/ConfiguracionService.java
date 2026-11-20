@@ -21,6 +21,12 @@ public class ConfiguracionService {
     static final String WHATSAPP_ADMINISTRADOR = "whatsapp_administrador";
     static final String FUERA_DE_META = "territorios_fuera_de_meta";
     static final String CAPACITACION = "capacitacion";
+    static final String OPACIDAD_PREDICADAS = "opacidad_predicadas";
+
+    /** Intensidad de lo predicado en los mapas: por defecto, y los límites para que siempre se distinga. */
+    public static final double OPACIDAD_PREDICADAS_POR_DEFECTO = 0.6;
+    public static final double OPACIDAD_PREDICADAS_MINIMA = 0.3;
+    public static final double OPACIDAD_PREDICADAS_MAXIMA = 0.95;
 
     /**
      * Capacitación en curso: desde cuándo y cuál era el último reporte que ya
@@ -109,6 +115,39 @@ public class ConfiguracionService {
                 .filter(v -> v.matches("\\d{1,9}"))
                 .map(Long::valueOf)
                 .toList();
+    }
+
+    /**
+     * Qué tan fuerte se pintan las manzanas predicadas en el mapa de los
+     * hermanos y en el visor (0 a 1). Algunos hermanos las veían «muy claritas».
+     */
+    @Transactional(readOnly = true)
+    public double opacidadPredicadas() {
+        return repository.findById(OPACIDAD_PREDICADAS)
+                .map(AppConfig::getValor)
+                .map(ConfiguracionService::leerOpacidad)
+                .orElse(OPACIDAD_PREDICADAS_POR_DEFECTO);
+    }
+
+    /** Guarda la intensidad dentro de los límites, con dos decimales; devuelve la guardada. */
+    @Transactional
+    public double setOpacidadPredicadas(double opacidad) {
+        double limpia = Double.isNaN(opacidad) ? OPACIDAD_PREDICADAS_POR_DEFECTO
+                : Math.round(Math.clamp(opacidad, OPACIDAD_PREDICADAS_MINIMA, OPACIDAD_PREDICADAS_MAXIMA) * 100) / 100.0;
+        AppConfig config = repository.findById(OPACIDAD_PREDICADAS).orElseGet(() -> new AppConfig(OPACIDAD_PREDICADAS, ""));
+        config.setValor(String.valueOf(limpia));
+        repository.save(config);
+        return limpia;
+    }
+
+    private static double leerOpacidad(String valor) {
+        try {
+            double v = Double.parseDouble(valor.strip());
+            return Double.isNaN(v) ? OPACIDAD_PREDICADAS_POR_DEFECTO
+                    : Math.clamp(v, OPACIDAD_PREDICADAS_MINIMA, OPACIDAD_PREDICADAS_MAXIMA);
+        } catch (NumberFormatException | NullPointerException e) {
+            return OPACIDAD_PREDICADAS_POR_DEFECTO;
+        }
     }
 
     /** La capacitación en curso, si hay una. Un valor que no se entiende cuenta como ninguna. */
