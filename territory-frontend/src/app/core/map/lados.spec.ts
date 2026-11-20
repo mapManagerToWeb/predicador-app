@@ -1,5 +1,5 @@
 import type { Polygon, Position } from 'geojson';
-import { anchoFranja, calcularLados, franjaDeLados, leerZonas, serializarZonas } from './lados';
+import { anchoFranja, calcularLados, callesDeZonas, franjaDeLados, leerZonas, serializarZonas } from './lados';
 
 const LAT0 = -37.5;
 const M_LAT = 1 / 110_540;
@@ -138,5 +138,29 @@ describe('marcado por lados', () => {
     expect(zonas.every(z => z.manzanaId === null && z.lados.length === 0)).toBe(true);
     expect(leerZonas(null, null)).toEqual([]);
     expect(leerZonas('no es json', null)).toEqual([]);
+  });
+});
+
+describe('callesDeZonas: la calle predicada, para remarcarla en el mapa', () => {
+  const geometrias = new Map([['5-5.a', cuadra]]);
+  const geometriaDe = (id: string) => geometrias.get(id);
+
+  it('devuelve cada calle marcada de la manzana como una línea', () => {
+    const lados = calcularLados(cuadra);
+    const lineas = callesDeZonas([{ manzanaId: '5-5.a', lados: [0, 2] }], geometriaDe);
+    expect(lineas).toEqual([lados[0].puntos, lados[2].puntos]);
+  });
+
+  it('las zonas de reportes antiguos (sin manzana o sin calles) y las de manzanas que ya no existen no tienen línea', () => {
+    expect(
+      callesDeZonas(
+        [
+          { manzanaId: null, lados: [0] },
+          { manzanaId: '5-5.a', lados: [] },
+          { manzanaId: '9-9.z', lados: [0] },
+        ],
+        geometriaDe,
+      ),
+    ).toEqual([]);
   });
 });

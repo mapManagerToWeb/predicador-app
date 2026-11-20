@@ -78,6 +78,15 @@ export function agregarPildoras(map: MapLibreMap): void {
 }
 
 /** Diseño de la capa de números con cuadrito: el mismo en el mapa de los encargados y en el visor. */
+/**
+ * Calle predicada «por calles»: línea gruesa del color del territorio con un
+ * borde oscuro, encima de la franja de la manzana (mapa de los encargados,
+ * visor y panel). Fina de lejos para no tapar el pueblo, gruesa de cerca.
+ */
+export const ANCHO_CALLE_HECHA: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 14, 2, 16, 4.5, 18, 8];
+export const ANCHO_CALLE_HECHA_BORDE: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 14, 3.5, 16, 7, 18, 12];
+export const COLOR_BORDE_CALLE_HECHA = '#111827';
+
 export const DISENO_NUMEROS: NonNullable<SymbolLayerSpecification['layout']> = {
   'text-field': ['get', 'etiqueta'],
   'text-font': ['Open Sans Semibold'],

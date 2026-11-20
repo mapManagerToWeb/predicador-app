@@ -12,7 +12,7 @@ import { estaEnLista, idsDeLista, situacionDe, type EstadoTerritorioPublico, typ
 import type { Reporte } from '../../core/models/models';
 import { WhatsAppService } from '../../core/services/whatsapp';
 import { getColorForTerritorio } from './utils/territory-colors';
-import { calcularLados, leerZonas, serializarZonas, type GeometriaManzana } from '../../core/map/lados';
+import { calcularLados, callesDeZonas, leerZonas, serializarZonas, type GeometriaManzana } from '../../core/map/lados';
 import { comodidadDeToque } from '../../core/map/geometria';
 import { leerBorrador, serializarBorrador, type Borrador } from './utils/borrador';
 import { guardarCopia, indexarManzanas, leerCopia, type DatosMapa } from './mapa.datos';
@@ -163,26 +163,32 @@ export class MapaStore {
     const abiertos = new Set(this.abiertos());
     const marcadas = new Set<string>();
     const zonas: EstadoVista['zonas']['features'] = [];
+    const calles: EstadoVista['calles']['features'] = [];
+    const geometriaDe = (id: string) => this.manzanasPorId.get(id)?.geometria;
+    const agregar = (territorio: number, lista: ReturnType<typeof leerZonas>) => {
+      const color = this.colorDe(territorio);
+      for (const z of lista) zonas.push({ type: 'Feature', geometry: z.geometria, properties: { territorio, color } });
+      for (const puntos of callesDeZonas(lista, geometriaDe)) {
+        calles.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: puntos }, properties: { territorio, color } });
+      }
+    };
     for (const id of this.predicadas()) {
       if (!abiertos.has(this.manzanasPorId.get(id)?.territorio ?? -1)) marcadas.add(id);
     }
     for (const e of this.estados().values()) {
       if (abiertos.has(e.territorio) || !e.geometriaParcial) continue;
-      for (const z of leerZonas(e.geometriaParcial, null)) {
-        zonas.push({ type: 'Feature', geometry: z.geometria, properties: { territorio: e.territorio, color: this.colorDe(e.territorio) } });
-      }
+      agregar(e.territorio, leerZonas(e.geometriaParcial, e.puntosParciales ?? null));
     }
     for (const t of this.salida().values()) {
       if (!abiertos.has(t.numero)) continue;
       for (const id of t.marcadas) marcadas.add(id);
-      for (const z of t.zonas) {
-        zonas.push({ type: 'Feature', geometry: z.geometria, properties: { territorio: t.numero, color: this.colorDe(t.numero) } });
-      }
+      agregar(t.numero, t.zonas);
     }
     return {
       abiertos: [...abiertos],
       marcadas,
       zonas: { type: 'FeatureCollection', features: zonas },
+      calles: { type: 'FeatureCollection', features: calles },
       editando: this.edicion()?.manzanaId ?? null,
       situaciones: this.situaciones(),
     };

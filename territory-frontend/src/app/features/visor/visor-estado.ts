@@ -1,4 +1,5 @@
-import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
+import type { Feature, FeatureCollection, LineString, MultiPolygon, Polygon } from 'geojson';
+import { callesDeZonas, leerZonas } from '../../core/map/lados';
 import {
   estaEnLista,
   idsDeLista,
@@ -61,6 +62,27 @@ export function manzanasDelVisor(
       },
     })),
   };
+}
+
+/**
+ * Las calles predicadas «por calles» del último reporte de cada territorio,
+ * como líneas: el visor las remarca encima de la franja de la manzana.
+ */
+export function callesDelVisor(
+  geojson: FeatureCollection<GeometriaManzana, PropsManzanaPublica>,
+  estados: EstadoTerritorioPublico[],
+  colores: Record<number, string>,
+): FeatureCollection<LineString, { territorio: number; color: string }> {
+  const geometrias = new Map(geojson.features.map(f => [f.properties.id, f.geometry]));
+  const features: Feature<LineString, { territorio: number; color: string }>[] = [];
+  for (const e of estados) {
+    if (!e.geometriaParcial && !e.puntosParciales) continue;
+    const color = colores[e.territorio] ?? '#888888';
+    for (const puntos of callesDeZonas(leerZonas(e.geometriaParcial, e.puntosParciales ?? null), id => geometrias.get(id))) {
+      features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: puntos }, properties: { territorio: e.territorio, color } });
+    }
+  }
+  return { type: 'FeatureCollection', features };
 }
 
 /** Zonas parciales (calles sueltas) del último reporte de cada territorio. */

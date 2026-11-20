@@ -17,7 +17,10 @@ import type { ExpressionSpecification, Map as MapLibreMap } from 'maplibre-gl';
 import { environment } from '../../../environments/environment';
 import {
   agregarPildoras,
+  ANCHO_CALLE_HECHA,
+  ANCHO_CALLE_HECHA_BORDE,
   cambiarFondo,
+  COLOR_BORDE_CALLE_HECHA,
   conSituacion,
   crearMapa,
   DISENO_NUMEROS,
@@ -31,6 +34,7 @@ import {
 } from '../../core/map/base-map';
 import {
   type EstadoTerritorioPublico,
+  callesDelVisor,
   hace,
   manzanasDelVisor,
   type ManzanaVisor,
@@ -125,9 +129,9 @@ export class VisorPage {
       const datos = this.cargarDatos();
       const { map } = await crearMapa(this.contenedor().nativeElement);
       this.map = map;
-      const { manzanas, zonas } = await datos;
+      const { manzanas, zonas, calles } = await datos;
       this.manzanas = manzanas;
-      this.agregarCapas(map, manzanas, zonas);
+      this.agregarCapas(map, manzanas, zonas, calles);
       this.agregarUbicacion(map);
       this.limiteBase = limitesDeNavegacion(manzanas);
       map.setMaxBounds(this.limiteBase ?? undefined);
@@ -140,7 +144,11 @@ export class VisorPage {
     }
   }
 
-  private async cargarDatos(): Promise<{ manzanas: ColeccionVisor; zonas: ReturnType<typeof zonasParcialesDelVisor> }> {
+  private async cargarDatos(): Promise<{
+    manzanas: ColeccionVisor;
+    zonas: ReturnType<typeof zonasParcialesDelVisor>;
+    calles: ReturnType<typeof callesDelVisor>;
+  }> {
     const api = environment.apiUrl;
     // El estado cambia con cada reporte: saltar el service worker para no mostrar uno viejo.
     const sinCacheSw = new HttpHeaders({ 'ngsw-bypass': 'true' });
@@ -155,13 +163,19 @@ export class VisorPage {
     ]);
     const manzanas = manzanasDelVisor(geojson, estados, colores);
     this.resumen.set(resumenTerritorios(manzanas, estados));
-    return { manzanas, zonas: zonasParcialesDelVisor(estados, colores) };
+    return { manzanas, zonas: zonasParcialesDelVisor(estados, colores), calles: callesDelVisor(geojson, estados, colores) };
   }
 
-  private agregarCapas(map: MapLibreMap, manzanas: ColeccionVisor, zonas: ReturnType<typeof zonasParcialesDelVisor>): void {
+  private agregarCapas(
+    map: MapLibreMap,
+    manzanas: ColeccionVisor,
+    zonas: ReturnType<typeof zonasParcialesDelVisor>,
+    calles: ReturnType<typeof callesDelVisor>,
+  ): void {
     const color: ExpressionSpecification = ['get', 'color'];
     map.addSource('manzanas', { type: 'geojson', data: manzanas });
     map.addSource('zonas', { type: 'geojson', data: zonas });
+    map.addSource('calles-hechas', { type: 'geojson', data: calles });
     // El cuadrito de cada número va del color de cómo va el territorio (igual que en el mapa de los encargados).
     const resumen = this.resumen();
     map.addSource('etiquetas', {
@@ -177,12 +191,27 @@ export class VisorPage {
         'fill-opacity': ['case', ['get', 'predicada'], 0.62, 0.1],
       },
     });
-    map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': color, 'fill-opacity': 0.62 } });
+    // La franja va suave: la calle predicada se remarca encima (como en el mapa de los encargados).
+    map.addLayer({ id: 'zonas-fill', type: 'fill', source: 'zonas', paint: { 'fill-color': color, 'fill-opacity': 0.3 } });
     map.addLayer({
       id: 'manzanas-line',
       type: 'line',
       source: 'manzanas',
       paint: { 'line-color': color, 'line-width': 1.2 },
+    });
+    map.addLayer({
+      id: 'calles-hechas-borde',
+      type: 'line',
+      source: 'calles-hechas',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': COLOR_BORDE_CALLE_HECHA, 'line-width': ANCHO_CALLE_HECHA_BORDE, 'line-opacity': 0.8 },
+    });
+    map.addLayer({
+      id: 'calles-hechas',
+      type: 'line',
+      source: 'calles-hechas',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': color, 'line-width': ANCHO_CALLE_HECHA },
     });
     map.addLayer({
       id: 'territorio-sel',
