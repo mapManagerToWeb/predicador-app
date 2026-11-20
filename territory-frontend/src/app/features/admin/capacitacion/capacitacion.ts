@@ -126,9 +126,10 @@ export class CapacitacionPanel {
 
   constructor() {
     void this.store.cargarCapacitacion();
-    // La barra (siempre a la vista en el panel) mantiene al día la cantidad de pruebas.
+    // La barra (siempre a la vista en el panel) mantiene al día la cantidad de pruebas, y se
+    // entera si la capacitación se empezó o se terminó desde otro aparato.
     const reloj = setInterval(() => {
-      if (this.vista() === 'barra' && this.activa()) void this.store.cargarCapacitacion();
+      if (this.vista() === 'barra') void this.store.cargarCapacitacion();
     }, REFRESCO_CAPACITACION_MS);
     inject(DestroyRef).onDestroy(() => clearInterval(reloj));
   }

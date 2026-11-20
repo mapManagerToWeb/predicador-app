@@ -35,6 +35,28 @@ describe('AdminApi', () => {
     await expect(guardado).resolves.toEqual([5, 130]);
   });
 
+  it('maneja la capacitación: estado, empezar y terminar borrando las pruebas', async () => {
+    const estado = { activa: true, desde: '2026-11-22T19:00:00Z', pruebas: [] };
+    const leido = api.capacitacion();
+    http.expectOne('/api/v1/reports/admin/capacitacion').flush(estado);
+    await expect(leido).resolves.toEqual(estado);
+
+    const empezado = api.empezarCapacitacion();
+    const post = http.expectOne(r => r.url === '/api/v1/reports/admin/capacitacion/empezar' && r.method === 'POST');
+    post.flush(estado);
+    await expect(empezado).resolves.toEqual(estado);
+
+    const terminado = api.terminarCapacitacion();
+    const fin = http.expectOne(r => r.url === '/api/v1/reports/admin/capacitacion/terminar' && r.method === 'POST');
+    expect(fin.request.body).toEqual({ borrar: true });
+    fin.flush({ borrados: 7 });
+    await expect(terminado).resolves.toBe(7);
+
+    const sinCuenta = api.terminarCapacitacion();
+    http.expectOne('/api/v1/reports/admin/capacitacion/terminar').flush({});
+    await expect(sinCuenta).resolves.toBe(0);
+  });
+
   it('pide el estado público de los territorios (el de los mapas)', async () => {
     const promesa = api.estadoPublico();
     http.expectOne('/api/v1/reports/public/estado').flush([{ territorio: 1, estado: 'completed' }]);

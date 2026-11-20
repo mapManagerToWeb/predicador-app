@@ -158,4 +158,14 @@ class CorreccionDeSalidasTest {
                 () -> servicio.corregir(2, new com.predicador.reporting.dto.CorreccionSalidaRequest(true, null, null, null, null, null, null)));
         org.mockito.Mockito.verify(reportes, org.mockito.Mockito.never()).saveAndFlush(any(Report.class));
     }
+
+    @Test
+    void duranteLaCapacitacion_tampocoSeRecalculanReportesDeAntes() {
+        // Se corrige el 2 (de prueba), pero el 3 que viene después es de antes: no se toca nada.
+        org.mockito.Mockito.doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "capacitación")).when(capacitacion).exigirQueSeaPrueba(3);
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> servicio.corregir(2, new com.predicador.reporting.dto.CorreccionSalidaRequest(true, null, null, null, null, null, null)));
+        org.mockito.Mockito.verify(reportes, org.mockito.Mockito.never()).saveAndFlush(any(Report.class));
+    }
 }

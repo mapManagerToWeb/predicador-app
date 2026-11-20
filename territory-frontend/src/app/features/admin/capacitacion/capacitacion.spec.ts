@@ -179,15 +179,23 @@ describe('CapacitacionPanel', () => {
     expect(el.querySelector('.cap-lista')).toBeNull();
   });
 
-  it('la barra actualiza la cantidad cada medio minuto mientras dura', async () => {
+  it('la barra se mantiene al día cada medio minuto (también si se empezó desde otro aparato); la tarjeta no repite', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    store.capacitacion.set(enCurso(1));
-    await crear('barra');
-    const antes = store.cargarCapacitacion.mock.calls.length;
-    vi.advanceTimersByTime(REFRESCO_CAPACITACION_MS);
-    expect(store.cargarCapacitacion.mock.calls.length).toBe(antes + 1);
     store.capacitacion.set({ activa: false, desde: null, pruebas: [] });
+    const { fixture, el } = await crear('barra');
+    const antes = store.cargarCapacitacion.mock.calls.length;
+    store.cargarCapacitacion.mockImplementationOnce(async () => store.capacitacion.set(enCurso(1)));
     vi.advanceTimersByTime(REFRESCO_CAPACITACION_MS);
     expect(store.cargarCapacitacion.mock.calls.length).toBe(antes + 1);
+    await fixture.whenStable();
+    expect(el.textContent).toContain('1 reporte de prueba');
+    fixture.destroy();
+    vi.advanceTimersByTime(REFRESCO_CAPACITACION_MS);
+    expect(store.cargarCapacitacion.mock.calls.length).toBe(antes + 1);
+
+    await crear('tarjeta');
+    const conTarjeta = store.cargarCapacitacion.mock.calls.length;
+    vi.advanceTimersByTime(REFRESCO_CAPACITACION_MS);
+    expect(store.cargarCapacitacion.mock.calls.length).toBe(conTarjeta);
   });
 });

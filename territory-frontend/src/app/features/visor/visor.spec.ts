@@ -90,6 +90,10 @@ describe('VisorPage', () => {
     await vi.waitFor(() => expect(TestBed.inject(Capacitacion).activa()).toBe(true));
     await fixture.whenStable();
     expect(el.querySelector('.aviso.capacitacion')?.textContent).toContain('Capacitación en curso');
+    // Con un error a la vista, no se tapan uno al otro.
+    (fixture.componentInstance as unknown as { error: { set(v: string): void } }).error.set('Sin conexión');
+    await fixture.whenStable();
+    expect(el.querySelector('.aviso.capacitacion')).toBeNull();
   });
 
   it('el cuadrito del número lleva el color de cómo va el territorio', async () => {

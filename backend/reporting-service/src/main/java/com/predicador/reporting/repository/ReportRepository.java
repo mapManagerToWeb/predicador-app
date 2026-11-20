@@ -72,7 +72,7 @@ public interface ReportRepository extends JpaRepository<Report, Integer> {
     List<Object[]> resumenPorEncargado();
 
     /** Pasa todos los reportes de un encargado a otro (fusión de duplicados). */
-    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE Report r SET r.encargadoId = :destino, r.encargadoNombre = :nombre, r.encargadoApellido = :apellido "
             + "WHERE r.encargadoId = :origen")
     int reasignarEncargado(@Param("origen") Long origen, @Param("destino") Long destino,

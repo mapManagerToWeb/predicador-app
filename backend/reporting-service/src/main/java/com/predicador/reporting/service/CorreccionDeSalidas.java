@@ -80,6 +80,8 @@ public class CorreccionDeSalidas {
         int i = indice(historia, salida);
         Report anterior = i > 0 ? historia.get(i - 1) : null;
         List<Report> despues = historia.subList(i + 1, historia.size());
+        // Corregir recalcula los reportes que vienen después: durante una capacitación tienen que ser de prueba.
+        despues.forEach(r -> capacitacion.exigirQueSeaPrueba(r.getId()));
 
         String motivo = req.nota() == null || req.nota().isBlank() ? null : req.nota().strip();
         salida.setAnuladoEn(Instant.now());
