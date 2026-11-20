@@ -9,6 +9,7 @@ import { AuthTokenService } from '../services/auth-token';
 import { Profile } from '../services/profile';
 import { Toast } from '../services/toast';
 import { errorInterceptor } from './error.interceptor';
+import { Mantenimiento } from '../services/mantenimiento';
 
 describe('errorInterceptor', () => {
   let http: HttpClient;
@@ -52,6 +53,24 @@ describe('errorInterceptor', () => {
     expect(profile.currentUser()).toBeNull();
     expect(localStorage.getItem('isAdmin')).toBeNull();
     expect(navSpy).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('502, 503 y 504 fuera del panel: avisa al mantenimiento en vez de mostrar un error', () => {
+    const aviso = vi.spyOn(TestBed.inject(Mantenimiento), 'avisarCaida').mockImplementation(() => undefined);
+    const toastSpy = vi.spyOn(TestBed.inject(Toast), 'show');
+    for (const status of [502, 503, 504]) {
+      http.get('/api/v1/territories/all/geojson').subscribe({ error: () => void 0 });
+      httpMock.expectOne('/api/v1/territories/all/geojson').flush({}, { status, statusText: 'Caído' });
+    }
+    expect(aviso).toHaveBeenCalledTimes(3);
+    expect(toastSpy).not.toHaveBeenCalled();
+  });
+
+  it('un 503 del panel no muestra la pantalla de mantenimiento (desde ahí se actualiza)', () => {
+    const aviso = vi.spyOn(TestBed.inject(Mantenimiento), 'avisarCaida').mockImplementation(() => undefined);
+    http.get('/api/v1/reports/admin/ciclos').subscribe({ error: () => void 0 });
+    httpMock.expectOne('/api/v1/reports/admin/ciclos').flush({}, { status: 503, statusText: 'Caído' });
+    expect(aviso).not.toHaveBeenCalled();
   });
 
   it('en 401 sobre rutas de login: NO limpia token ni redirige', () => {

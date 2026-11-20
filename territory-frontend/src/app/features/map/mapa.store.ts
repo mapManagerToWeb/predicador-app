@@ -1,3 +1,4 @@
+import { colorFuerte } from '../../core/map/colores';
 import { computed, DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -276,8 +277,9 @@ export class MapaStore {
     return this.manzanasPorId.get(id);
   }
 
+  /** Color para pintar el territorio (los muy claros, reforzados: `colorFuerte`). */
   colorDe(territorio: number): string {
-    return this.colores[territorio] ?? getColorForTerritorio(territorio, null);
+    return colorFuerte(this.colores[territorio] ?? getColorForTerritorio(territorio, null));
   }
 
   total(territorio: number): number {

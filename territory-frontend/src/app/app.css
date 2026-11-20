@@ -219,3 +219,48 @@
   font-size: 17px;
   font-weight: 700;
 }
+
+/* Pantalla «Estamos haciendo mejoras» (core/services/mantenimiento.ts): clara y grande, para la vista cansada. */
+.mantenimiento {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: var(--surface-0, #f8fafc);
+  overflow-y: auto;
+  animation: aparecer 0.25s ease-out;
+}
+.mant-tarjeta {
+  width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  color: var(--ink, #111827);
+}
+.mant-tarjeta img { border-radius: 16px; }
+.mant-tarjeta h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+.mant-tarjeta > p { margin: 0; font-size: 19px; line-height: 1.45; color: var(--ink-muted, #4b5563); }
+.mant-texto-biblico {
+  margin: 6px 0;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: var(--surface-1, #ffffff);
+  border: 1px solid var(--color-border-solid, #e5e7eb);
+}
+.mant-texto-biblico blockquote { margin: 0; font-size: 20px; line-height: 1.5; font-style: italic; }
+.mant-texto-biblico figcaption { margin-top: 10px; font-size: 17px; font-weight: 700; }
+.mant-tarjeta .mant-nota { font-size: 16px; }
+.mant-tarjeta button {
+  min-height: 52px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 12px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}

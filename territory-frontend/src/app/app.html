@@ -7,6 +7,22 @@
   </div>
 }
 
+@if (mantenimiento.activo() && !enPanel()) {
+  <div class="mantenimiento" role="alertdialog" aria-modal="true" aria-labelledby="mant-titulo" aria-describedby="mant-texto">
+    <div class="mant-tarjeta">
+      <img src="logo.jpeg" alt="" width="64" height="64" />
+      <h1 id="mant-titulo">Estamos haciendo mejoras</h1>
+      <p id="mant-texto">La app vuelve en unos minutos. Lo que marcaste quedó guardado en tu teléfono.</p>
+      <figure class="mant-texto-biblico">
+        <blockquote>«{{ mantenimiento.texto().texto }}»</blockquote>
+        <figcaption>{{ mantenimiento.texto().cita }}</figcaption>
+      </figure>
+      <p class="mant-nota">La app vuelve a intentarlo sola cada 20 segundos.</p>
+      <button type="button" (click)="mantenimiento.reintentar()">Intentar ahora</button>
+    </div>
+  </div>
+}
+
 @if (toastService.visible()) {
   <div
     class="toast"
