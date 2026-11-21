@@ -3,11 +3,12 @@ import { Router, RouterOutlet } from '@angular/router';
 import { ActualizacionApp } from './core/services/actualizacion';
 import { Mantenimiento } from './core/services/mantenimiento';
 import { Toast } from './core/services/toast';
+import { AvisoInstalar } from './core/instalar/aviso-instalar';
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, AvisoInstalar],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })

@@ -19,6 +19,14 @@
         }
       } catch (e) {}
     </script>
+    <!-- Android avisa que la app se puede instalar apenas carga, a veces antes que la app: se guarda para
+         el botón «Instalar» (core/services/instalacion.ts). -->
+    <script>
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__eventoInstalar = e;
+      });
+    </script>
     <meta name="description" content="Aplicación para encargados de grupos de territorios" />
     <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />

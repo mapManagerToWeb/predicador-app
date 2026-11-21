@@ -1,0 +1,59 @@
+@if (visible(); as aviso) {
+  <div class="fondo" animate.leave="saliendo"></div>
+  <section class="hoja" role="dialog" aria-modal="true" aria-labelledby="instalar-titulo" animate.leave="saliendo">
+    <div class="cabeza">
+      <img src="logo.jpeg" alt="" width="56" height="56" />
+      <h2 id="instalar-titulo">Instala Territorios en tu teléfono</h2>
+    </div>
+
+    @switch (aviso) {
+      @case ('android') {
+        <p class="texto">Así la abres con un toque desde la pantalla de inicio, como cualquier app.</p>
+        <button type="button" class="principal" (click)="instalar()">Instalar</button>
+        <button type="button" class="secundario" (click)="instalacion.ahoraNo()">Ahora no</button>
+      }
+      @case ('iphone-otro') {
+        <p class="texto">En iPhone se instala desde <strong>Safari</strong> (la brújula azul). Copia el enlace y ábrelo ahí.</p>
+        <button type="button" class="principal" (click)="copiarEnlace()">Copiar el enlace</button>
+        <button type="button" class="secundario" (click)="instalacion.marcarInstalada()">Ya la tengo instalada</button>
+        <button type="button" class="secundario" (click)="instalacion.ahoraNo()">Ahora no</button>
+      }
+      @default {
+        <p class="texto">Así la abres con un toque, como cualquier app. Son 3 pasos:</p>
+        <ol class="pasos">
+          <li>
+            <span class="num">1</span>
+            <span>
+              Toca
+              <svg class="icono" viewBox="0 0 24 24" aria-label="el botón Compartir" role="img">
+                <path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M8 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2" />
+              </svg>
+              <strong>Compartir</strong>
+              @if (aviso === 'iphone-chrome') {
+                arriba, al lado de la dirección.
+              } @else {
+                (si no lo ves, toca primero <strong class="puntos">···</strong>).
+              }
+            </span>
+          </li>
+          <li>
+            <span class="num">2</span>
+            <span>
+              Busca y toca
+              <svg class="icono" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="3" /><path d="M12 8.5v7M8.5 12h7" />
+              </svg>
+              <strong>«Agregar a inicio»</strong>. Si no aparece, baja un poco.
+            </span>
+          </li>
+          <li>
+            <span class="num">3</span>
+            <span>Toca <strong>«Agregar»</strong>. Listo: queda el ícono en tu pantalla.</span>
+          </li>
+        </ol>
+        <button type="button" class="principal" (click)="instalacion.ahoraNo()">Entendido</button>
+        <button type="button" class="secundario" (click)="instalacion.marcarInstalada()">Ya la tengo instalada</button>
+      }
+    }
+  </section>
+}
