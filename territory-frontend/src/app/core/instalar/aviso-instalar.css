@@ -1,0 +1,137 @@
+/* Hoja «Instala Territorios en tu teléfono»: grande y clara, la leen hermanos
+   mayores. Por debajo del aviso de versión nueva y de «Estamos haciendo mejoras». */
+.fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.45);
+  animation: aparecer 0.2s ease-out;
+}
+
+.hoja {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9001;
+  width: min(100%, 520px);
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 20px max(20px, calc(12px + env(safe-area-inset-bottom)));
+  border-radius: 22px 22px 0 0;
+  background: var(--surface-1, #fff);
+  color: var(--ink, #18181b);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+  animation: subir 0.24s ease-out;
+}
+
+.fondo.saliendo {
+  animation: desaparecer 0.16s ease-in forwards;
+  pointer-events: none;
+}
+
+.hoja.saliendo {
+  animation: bajar 0.16s ease-in forwards;
+  pointer-events: none;
+}
+
+.cabeza {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cabeza img {
+  flex: none;
+  border-radius: 14px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.texto {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--ink-muted, #52525b);
+}
+
+.pasos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pasos li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 19px;
+  line-height: 1.45;
+}
+
+.num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.icono {
+  display: inline-block;
+  width: 26px;
+  height: 26px;
+  vertical-align: -6px;
+  fill: none;
+  stroke: var(--color-primary, #2563eb);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.puntos {
+  letter-spacing: 1px;
+}
+
+.principal,
+.secundario {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 14px;
+  font-size: 19px;
+  font-weight: 700;
+  transition: var(--toque);
+}
+
+.principal {
+  margin-top: 4px;
+  border: 0;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+}
+
+.secundario {
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted, #52525b);
+  font-size: 18px;
+  font-weight: 600;
+}

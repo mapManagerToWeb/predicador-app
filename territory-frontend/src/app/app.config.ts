@@ -17,6 +17,7 @@ import { csrfInterceptor } from './core/interceptors/csrf.interceptor';
 import { RumService } from './core/services/rum';
 import { PracticeDraftService } from './core/services/practice-draft';
 import { ActualizacionApp } from './core/services/actualizacion';
+import { Instalacion } from './core/services/instalacion';
 import { soloEntrePantallas } from './core/utils/transicion';
 
 export const appConfig: ApplicationConfig = {
@@ -52,6 +53,10 @@ export const appConfig: ApplicationConfig = {
     // Versiones nuevas: que nadie quede con la app vieja guardada en el teléfono.
     provideAppInitializer(() => {
       inject(ActualizacionApp).iniciar();
+    }),
+    // Ofrecer instalar la app en el teléfono (Android: botón; iPhone: los pasos).
+    provideAppInitializer(() => {
+      inject(Instalacion).iniciar();
     }),
   ],
 };
