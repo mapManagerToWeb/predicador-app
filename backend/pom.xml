@@ -48,7 +48,7 @@
             es el último parche de esa línea y mantiene compatibilidad con
             spring-rabbit 4.1.1.
         -->
-        <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
+        <rabbit-amqp-client.version>5.38.0</rabbit-amqp-client.version>
         <!--
             Found by the Trivy image scan (see docs/adr/0015-baseline-deps-contra-cves.md).
             All five of these were shipping CRITICAL/HIGH CVEs in every published
