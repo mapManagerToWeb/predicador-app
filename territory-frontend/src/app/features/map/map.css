@@ -738,6 +738,90 @@ svg .grueso {
   }
 }
 
+/* El panel de inicio: la ✕ para ocultarlo (el hermano gana el mapa entero; la app lo recuerda). */
+.panel.inicio {
+  padding-right: 48px;
+  padding-left: 48px;
+}
+
+.ocultar-indicacion {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* Pantalla muy angosta: el zoom de pantalla del sistema (vista cansada) deja la
+   página en unos 280 puntos. Se quita lo que se puede leer en otro lado y los
+   botones quedan en 44 (fáciles de tocar); el texto no se achica. */
+@media (max-width: 330px) {
+  .barra {
+    left: 8px;
+    right: 8px;
+    gap: 6px;
+  }
+
+  .barra .icono,
+  .lateral .icono,
+  .lateral .icono.grande {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .lateral {
+    gap: 6px;
+    left: 8px;
+  }
+
+  .panel {
+    left: 6px;
+    right: 6px;
+    padding: 8px;
+    gap: 8px;
+    border-radius: 16px;
+  }
+
+  .panel.inicio {
+    padding: 8px 40px 8px 6px;
+  }
+
+  .panel.inicio .ocultar-indicacion {
+    top: 2px;
+    right: 2px;
+  }
+
+  .panel.inicio .indicacion,
+  .indicacion.chica,
+  .territorio-nota {
+    display: none;
+  }
+
+  .colores {
+    margin: 0;
+    gap: 6px 8px;
+  }
+
+  .colores > span {
+    gap: 4px;
+  }
+
+  .territorio {
+    padding: 6px 6px 6px 10px;
+  }
+}
+
 @media (max-height: 640px) {
   .territorio-nota {
     display: none;
