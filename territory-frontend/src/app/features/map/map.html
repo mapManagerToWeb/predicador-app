@@ -21,7 +21,7 @@
         type="search"
         inputmode="numeric"
         enterkeyhint="search"
-        placeholder="Buscar territorio"
+        [placeholder]="angosta() ? 'Buscar' : 'Buscar territorio'"
         aria-label="Número de territorio"
         autocomplete="off"
         [value]="busqueda()"
@@ -85,10 +85,11 @@
     </button>
   </div>
 
-  <!-- Panel inferior -->
-  @if (!store.cargando() && !store.errorCarga()) {
-    <section #panel class="panel" aria-live="polite" data-tutorial="panel">
+  <!-- Panel inferior (sin territorio abierto, el hermano puede ocultarlo para ver más mapa) -->
+  @if (!store.cargando() && !store.errorCarga() && (store.abiertos().length > 0 || !sinIndicacion() || verTutorial())) {
+    <section #panel class="panel" [class.inicio]="store.abiertos().length === 0" aria-live="polite" data-tutorial="panel">
       @if (store.abiertos().length === 0) {
+        <button type="button" class="ocultar-indicacion" (click)="ocultarIndicacion(true)" aria-label="Ocultar esta indicación">✕</button>
         <p class="indicacion">
           <strong>Busca tu territorio</strong> arriba o tócalo en el mapa para empezar.
         </p>

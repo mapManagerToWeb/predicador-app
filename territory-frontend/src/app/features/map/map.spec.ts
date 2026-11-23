@@ -142,6 +142,50 @@ describe('MapPage', () => {
     await vi.waitFor(() => expect(vista.ponerOpacidad).toHaveBeenLastCalledWith(0.9));
   });
 
+  it('la ✕ oculta la indicación de abajo para ver más mapa, y se recuerda; al abrir un territorio el panel vuelve', async () => {
+    const { fixture, el, store } = await abrirPagina();
+    expect(el.querySelector('.panel.inicio')).not.toBeNull();
+    vista.ajustarMargenes.mockClear();
+    (el.querySelector('.ocultar-indicacion') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(el.querySelector('.panel')).toBeNull();
+    expect(localStorage.getItem('mapa.indicacion.oculta')).toBe('1');
+    expect(vista.ajustarMargenes).toHaveBeenCalledWith({ abajo: 0, derecha: 0 });
+
+    await store.abrir(5);
+    await fixture.whenStable();
+    expect(el.querySelector('.panel .territorio')).not.toBeNull();
+    store.cerrar(5);
+    await fixture.whenStable();
+    expect(el.querySelector('.panel')).toBeNull();
+
+    // El tutorial la señala: mientras está abierto, vuelve a verse.
+    (fixture.componentInstance as unknown as { verTutorial: { set(v: boolean): void } }).verTutorial.set(true);
+    await fixture.whenStable();
+    expect(el.querySelector('.panel.inicio')).not.toBeNull();
+  });
+
+  it('en una pantalla muy angosta (zoom de pantalla del teléfono) el buscador dice solo «Buscar»', async () => {
+    const original = window.matchMedia;
+    const oyentes: ((e: MediaQueryListEvent) => void)[] = [];
+    window.matchMedia = vi.fn(() => ({
+      matches: true,
+      addEventListener: (_: string, f: (e: MediaQueryListEvent) => void) => oyentes.push(f),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const { fixture, el } = await abrirPagina();
+      const buscador = el.querySelector('.buscar input') as HTMLInputElement;
+      expect(buscador.placeholder).toBe('Buscar');
+      oyentes.forEach(f => f({ matches: false } as MediaQueryListEvent));
+      await fixture.whenStable();
+      expect(buscador.placeholder).toBe('Buscar territorio');
+      fixture.destroy();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('el botón de ubicación va al mapa', async () => {
     const { el } = await abrirPagina();
     (el.querySelector('.lateral .icono.grande') as HTMLButtonElement).click();

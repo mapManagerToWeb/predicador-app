@@ -8,6 +8,7 @@ import {
   ElementRef,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -26,6 +27,13 @@ import { Tutorial } from './tutorial/tutorial';
 import type { ModoMarcado } from './mapa.types';
 
 const CLAVE_FONDO = 'territory_satellite';
+/** El hermano ocultó la indicación de abajo («Busca tu territorio…» y los colores). */
+const CLAVE_SIN_INDICACION = 'mapa.indicacion.oculta';
+/**
+ * Pantalla muy angosta: un teléfono con el zoom de pantalla del sistema (vista
+ * cansada) deja la página en unos 280 puntos y los cuadros tapaban medio mapa.
+ */
+export const CONSULTA_ANGOSTA = '(max-width: 330px)';
 
 function leer(clave: string): string | null {
   try {
@@ -75,6 +83,8 @@ export class MapPage {
   protected readonly fondo = signal<FondoMapa>(leer(CLAVE_FONDO) === 'true' ? 'satelite' : 'mapa');
   protected readonly oscuro = signal(leer(CLAVE_TEMA) === 'dark');
   protected readonly verTutorial = signal(false);
+  protected readonly sinIndicacion = signal(leer(CLAVE_SIN_INDICACION) === '1');
+  protected readonly angosta = signal(false);
   /** Días que se pueden informar (se recalculan cada vez que se abre una pregunta). */
   protected readonly dias = computed(() => {
     this.store.pregunta();
@@ -107,6 +117,13 @@ export class MapPage {
       this.vista?.ponerOpacidad(opacidad);
     });
     afterNextRender(() => {
+      const consulta = window.matchMedia?.(CONSULTA_ANGOSTA);
+      if (consulta) {
+        this.angosta.set(consulta.matches);
+        const alCambiar = (e: MediaQueryListEvent) => this.angosta.set(e.matches);
+        consulta.addEventListener?.('change', alCambiar);
+        destroyRef.onDestroy(() => consulta.removeEventListener?.('change', alCambiar));
+      }
       this.aplicarTema();
       void this.iniciar();
       void this.apariencia.cargar();
@@ -118,6 +135,8 @@ export class MapPage {
     effect(() => {
       const panel = this.panel()?.nativeElement;
       observador?.disconnect();
+      // Sin panel (el hermano ocultó la indicación) el mapa usa toda la pantalla.
+      if (!panel) untracked(() => this.vista?.ajustarMargenes({ abajo: 0, derecha: 0 }));
       if (!panel || typeof ResizeObserver === 'undefined') return;
       observador = new ResizeObserver(() => this.medirPanel(panel));
       observador.observe(panel);
@@ -185,6 +204,12 @@ export class MapPage {
   }
 
   // ── Buscador ──
+
+  /** Oculta (o vuelve a mostrar) la indicación de abajo; se recuerda en el teléfono. */
+  protected ocultarIndicacion(ocultar: boolean): void {
+    this.sinIndicacion.set(ocultar);
+    escribir(CLAVE_SIN_INDICACION, ocultar ? '1' : '0');
+  }
 
   protected alEscribir(event: Event): void {
     const valor = (event.target as HTMLInputElement).value.replace(/[^\d,\s]/g, '');
