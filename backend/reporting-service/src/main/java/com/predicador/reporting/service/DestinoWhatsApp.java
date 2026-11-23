@@ -55,6 +55,20 @@ public class DestinoWhatsApp {
     }
 
     /**
+     * Adónde va un reporte que el administrador reenvía desde el panel: al
+     * número de la copia; si no hay, al número del panel («Registrar salida»);
+     * si tampoco, al del servidor.
+     */
+    public String reenvio() {
+        if (configuracion != null) {
+            for (String candidato : new String[] {configuracion.whatsappCopia(), configuracion.whatsappAdministrador()}) {
+                if (PhoneUtil.esCelularChileno(candidato)) return PhoneUtil.normalize(candidato);
+            }
+        }
+        return props.destinationNumber();
+    }
+
+    /**
      * A quién le llega además una copia del reporte: el número que el
      * administrador eligió en el panel. Solo para lo que envían los hermanos
      * desde la app (lo que registra el administrador ya le llega a él), nunca

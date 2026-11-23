@@ -50,6 +50,24 @@ public class WhatsAppController {
     }
 
     /**
+     * El administrador reenvía desde el panel un reporte que ya se envió (para
+     * ver cómo llegó o para tenerlo): va al número de la copia, nunca al que
+     * diga la app.
+     */
+    @PostMapping("/admin/reenviar")
+    public ResponseEntity<WhatsAppDeliveryDto> reenviar(
+            @Valid @RequestBody WhatsAppSendRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest httpRequest) {
+        authorization.requireAdmin(RequestTokens.token(httpRequest));
+        WhatsAppDeliveryDto delivery = whatsAppSendService.submit(request, idempotencyKey, destino.reenvio());
+        if (WhatsAppDeliveryStatus.IN_PROGRESS.name().equals(delivery.status())) {
+            return ResponseEntity.accepted().body(delivery);
+        }
+        return ResponseEntity.ok(delivery);
+    }
+
+    /**
      * La copia al número que eligió el administrador (si hay): con su propia
      * clave, así un reintento de la app tampoco la repite. Si falla, el envío
      * principal sigue igual.

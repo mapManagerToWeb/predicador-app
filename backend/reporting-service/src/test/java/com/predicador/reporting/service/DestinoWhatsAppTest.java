@@ -103,4 +103,21 @@ class DestinoWhatsAppTest {
         // Sin configuración (construido sin ella): nunca hay copia.
         assertThat(destino.copiaPara(hermano, "56912345678")).isNull();
     }
+
+    @Test
+    void reenvioDesdeElPanel_vaALaCopia_oAlNumeroDelPanel_oAlDelServidor() {
+        ConfiguracionService configuracion = mock(ConfiguracionService.class);
+        WhatsAppProperties props = mock(WhatsAppProperties.class);
+        when(props.destinationNumber()).thenReturn(CONFIGURADO);
+        DestinoWhatsApp conPanel = new DestinoWhatsApp(encargados, props, configuracion);
+
+        when(configuracion.whatsappCopia()).thenReturn("9 8765 4321");
+        when(configuracion.whatsappAdministrador()).thenReturn("56911112222");
+        assertThat(conPanel.reenvio()).isEqualTo("56987654321");
+        when(configuracion.whatsappCopia()).thenReturn(null);
+        assertThat(conPanel.reenvio()).isEqualTo("56911112222");
+        when(configuracion.whatsappAdministrador()).thenReturn("123");
+        assertThat(conPanel.reenvio()).isEqualTo(CONFIGURADO);
+        assertThat(destino.reenvio()).isEqualTo(CONFIGURADO);
+    }
 }

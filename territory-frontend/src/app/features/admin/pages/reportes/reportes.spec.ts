@@ -326,6 +326,24 @@ describe('ReportesPage', () => {
     expect(page.corregible(reporte({ anuladoEn: '2026-01-01' }))).toBe(false);
   });
 
+  it('se reenvían salidas vigentes, y abrir uno cierra la corrección', async () => {
+    const page = await montar();
+    const vista = page as unknown as {
+      reenviable(r: ReporteAdmin): boolean;
+      reenviar(id: number): void;
+      reenviando(): number | null;
+      corrigiendo: { set(v: number | null): void; (): number | null };
+    };
+    expect(vista.reenviable(reporte({ origen: 'salida' }))).toBe(true);
+    expect(vista.reenviable(reporte({ origen: undefined }))).toBe(true);
+    expect(vista.reenviable(reporte({ origen: 'reinicio' }))).toBe(false);
+    expect(vista.reenviable(reporte({ anuladoEn: '2026-01-01' }))).toBe(false);
+    vista.corrigiendo.set(5);
+    vista.reenviar(7);
+    expect(vista.reenviando()).toBe(7);
+    expect(vista.corrigiendo()).toBeNull();
+  });
+
   it('muestra el día de predicación con turno y detecta envíos de otro día', async () => {
     const page = await montar();
     expect(page.predicacion(reporte({ fecha: '2026-11-05T12:00:00Z' }))).toContain('05-11-2026');

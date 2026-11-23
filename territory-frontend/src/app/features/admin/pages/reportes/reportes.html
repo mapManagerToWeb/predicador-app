@@ -26,6 +26,9 @@
         <button class="adm-btn small" type="button" (click)="marcarDuplicados()">Ver y seleccionar</button>
       </div>
     }
+    @if (reenviando(); as id) {
+      <app-reenviar-salida [reporteId]="id" (cerrar)="reenviando.set(null)" />
+    }
     @if (corrigiendo(); as id) {
       <app-corregir-salida [reporteId]="id" (cerrar)="corrigiendo.set(null)" />
     }
@@ -107,8 +110,11 @@
                 </td>
                 <td class="num c-manzanas">{{ r.manzanasMarcadas ?? '—' }}<span class="adm-muted"> / {{ r.totalManzanas ?? '—' }}</span></td>
                 <td class="acciones-fila c-acciones">
+                  @if (reenviable(r)) {
+                    <button class="adm-btn small ghost" type="button" (click)="reenviar(r.id)">Reenviar</button>
+                  }
                   @if (corregible(r)) {
-                    <button class="adm-btn small ghost" type="button" (click)="corrigiendo.set(r.id)">Corregir</button>
+                    <button class="adm-btn small ghost" type="button" (click)="reenviando.set(null); corrigiendo.set(r.id)">Corregir</button>
                   }
                 </td>
               </tr>

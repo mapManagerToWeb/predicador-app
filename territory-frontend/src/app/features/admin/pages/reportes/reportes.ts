@@ -17,6 +17,7 @@ import {
 import { aCsv, descargar } from '../../utils/csv';
 import { fmtFecha, fmtFechaHora, fmtNumero } from '../../utils/formato';
 import { CorregirSalida } from './corregir-salida';
+import { ReenviarSalida } from './reenviar-salida';
 
 type Vista = 'reportes' | 'registro' | 'whatsapp';
 type FiltroEstado = 'todos' | 'completos' | 'parciales';
@@ -26,7 +27,7 @@ const POR_PAGINA = 50;
 @Component({
   selector: 'app-reportes',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CorregirSalida],
+  imports: [CorregirSalida, ReenviarSalida],
   templateUrl: './reportes.html',
   styleUrl: './reportes.css',
 })
@@ -59,6 +60,8 @@ export class ReportesPage {
   protected readonly marcados = signal<Set<number>>(new Set());
   /** Reporte que se está corrigiendo (ADR 0014). */
   protected readonly corrigiendo = signal<number | null>(null);
+  /** Reporte que se está por reenviar por WhatsApp. */
+  protected readonly reenviando = signal<number | null>(null);
 
   protected readonly envios = signal<EnvioWhatsApp[] | null>(null);
   protected readonly registroTerritorio = signal<number | null>(null);
@@ -236,6 +239,16 @@ export class ReportesPage {
     } catch (e) {
       this.toast.show(mensajeDeError(e), 6000, 'error');
     }
+  }
+
+  /** Se reenvían las salidas vigentes (no los reinicios, correcciones de estado ni anulados). */
+  protected reenviable(r: ReporteAdmin): boolean {
+    return !r.anuladoEn && (!r.origen || r.origen === 'salida');
+  }
+
+  protected reenviar(id: number): void {
+    this.corrigiendo.set(null);
+    this.reenviando.set(id);
   }
 
   /** Solo las salidas vigentes se corrigen así; el estado actual se corrige en «S-13 y ciclos». */
