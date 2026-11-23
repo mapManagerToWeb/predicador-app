@@ -25,6 +25,11 @@ export const LADO_MAXIMO_M = 1400;
 export const MAXIMO_PARTES = 4;
 /** Lado mayor de la imagen final, en px (WhatsApp la achica igual). */
 export const CAPTURA_MAX_PX = 1600;
+/**
+ * Calidad JPEG de la foto del reporte: 0,70 pesa ~30 % menos que 0,85 y se ve
+ * igual en el teléfono (comparadas lado a lado); sube más rápido con poca señal.
+ */
+export const CALIDAD_FOTO = 0.7;
 /** Lado de cada parte cuando la imagen se arma con varias fotos. */
 const LADO_PARTE_PX = 800;
 const SEPARACION_PX = 8;
@@ -218,5 +223,5 @@ function achicar(origen: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 function aJpeg(canvas: HTMLCanvasElement): string | null {
-  return canvas.toDataURL('image/jpeg', 0.85).split(',')[1] ?? null;
+  return canvas.toDataURL('image/jpeg', CALIDAD_FOTO).split(',')[1] ?? null;
 }

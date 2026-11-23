@@ -200,6 +200,8 @@ describe('MapaStore', () => {
       expect.objectContaining({ territorioNumero: 5, manzanasIds: '5-5.a,5-5.b', estado: 'incomplete', encargadoId: 3 }),
     ]);
     expect(whatsapp.sendReport).toHaveBeenCalledWith(expect.objectContaining({ screenshotBase64: 'IMG', territorios: [expect.objectContaining({ numero: 5 })] }));
+    // En la foto el número ya va con el color que tendrá: amarillo (en curso).
+    expect(vista.capturar).toHaveBeenCalledWith([5], new Map([[5, 'en-curso']]));
     expect(store.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
   });
 
@@ -227,8 +229,9 @@ describe('MapaStore', () => {
     expect(territorios.crearReportes).toHaveBeenCalledWith([
       expect.objectContaining({ territorioNumero: 5, manzanasIds: '5-5.a,5-5.b,5-5.c', estado: 'completed' }),
     ]);
-    // Completo solo también va con la imagen del mapa.
+    // Completo solo también va con la imagen del mapa, y el número sale verde en la foto.
     await vi.waitFor(() => expect(whatsapp.sendReport).toHaveBeenCalledWith(expect.objectContaining({ screenshotBase64: 'IMG' })));
+    expect(vista.capturar).toHaveBeenCalledWith([5], new Map([[5, 'completado']]));
   });
 
   it('el WhatsApp dice cómo quedó en el servidor, no la copia del teléfono', async () => {

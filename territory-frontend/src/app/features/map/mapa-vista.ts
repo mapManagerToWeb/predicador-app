@@ -129,6 +129,7 @@ export class MapaVista {
   private etiquetas: FeatureCollection<Point, { territorio: number; etiqueta: string }> = { type: 'FeatureCollection', features: [] };
   /** Situaciones ya pintadas en los cuadritos (para no reemplazar las etiquetas si no cambiaron). */
   private firmaSituaciones = '';
+  private situacionesPintadas = new Map<number, SituacionTerritorio>();
   private observadorTema: MutationObserver | null = null;
   private capturando = false;
 
@@ -304,6 +305,7 @@ export class MapaVista {
       .join(',');
     if (firma === this.firmaSituaciones) return;
     this.firmaSituaciones = firma;
+    this.situacionesPintadas = situaciones;
     void (this.map.getSource('etiquetas') as GeoJSONSource | undefined)?.setData(this.datosEtiquetas(situaciones));
   }
 
@@ -577,7 +579,7 @@ export class MapaVista {
    * enteros (ver `core/map/captura.ts`): se ocultan los demás, se sacan las
    * fotos y se vuelve a como estaba.
    */
-  async capturar(territorios: number[]): Promise<string | null> {
+  async capturar(territorios: number[], situaciones?: Map<number, SituacionTerritorio>): Promise<string | null> {
     const map = this.map;
     const soloEstos: ExpressionSpecification = ['in', ['get', 'territorio'], ['literal', territorios]];
     const capas = ['manzanas-relleno', 'manzanas-borde', 'zonas-relleno', 'etiquetas'];
@@ -592,10 +594,14 @@ export class MapaVista {
       for (const c of capas) map.setFilter(c, soloEstos);
       // El punto azul no va en la imagen: diría dónde está el hermano.
       for (const c of CAPAS_UBICACION) map.setLayoutProperty(c, 'visibility', 'none');
+      // Los números con el color que tendrán con este reporte (solo en la foto).
+      const fuente = map.getSource('etiquetas') as GeoJSONSource | undefined;
+      if (situaciones?.size && fuente) await fuente.setData(this.datosEtiquetas(new Map([...this.situacionesPintadas, ...situaciones])));
       return await capturarTerritorios(map, cajas);
     } catch {
       return null;
     } finally {
+      if (situaciones?.size) void (map.getSource('etiquetas') as GeoJSONSource | undefined)?.setData(this.datosEtiquetas(this.situacionesPintadas));
       for (const c of capas) map.setFilter(c, null);
       for (const c of CAPAS_UBICACION) map.setLayoutProperty(c, 'visibility', 'visible');
       this.capturando = false;
