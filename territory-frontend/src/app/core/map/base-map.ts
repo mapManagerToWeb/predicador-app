@@ -11,6 +11,12 @@ import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { puntoDeRotulo, type Poligonal } from './geometria';
 import type { SituacionTerritorio } from './estado-publico';
 
+/**
+ * Letra de todos los rótulos de los mapas: Open Sans Semibold, con sus glifos
+ * en `public/glifos/OpenSans-Semibold/` (nombre sin espacios para la URL).
+ */
+export const FUENTE_MAPA = 'OpenSans-Semibold';
+
 /** Cualquier colección de manzanas (Polygon/MultiPolygon); el territorio va en `properties.territorio`. */
 type ColeccionManzanas = FeatureCollection<Polygon | MultiPolygon, { territorio: number }>;
 
@@ -89,7 +95,7 @@ export const COLOR_BORDE_CALLE_HECHA = '#111827';
 
 export const DISENO_NUMEROS: NonNullable<SymbolLayerSpecification['layout']> = {
   'text-field': ['get', 'etiqueta'],
-  'text-font': ['Open Sans Semibold'],
+  'text-font': [FUENTE_MAPA],
   // Grandes y con buen contraste: hay hermanos con poca vista.
   'text-size': TAMANO_NUMERO_TERRITORIO,
   'icon-image': ICONO_PILDORA,
@@ -146,12 +152,19 @@ export function temaOscuro(): boolean {
   return typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') !== 'light';
 }
 
+/**
+ * Dónde están los glifos de `FUENTE_MAPA` (`public/glifos/`). MapLibre
+ * pide una URL absoluta; en el servidor (SSR) no se dibuja ningún mapa.
+ */
+export const URL_GLIFOS = `${typeof location === 'undefined' ? '' : location.origin}/glifos/{fontstack}/{range}.pbf`;
+
 export function estiloBase(fondo: FondoMapa, oscuro: boolean): StyleSpecification {
   const f = FONDOS[fondo];
   return {
     version: 8,
-    // Fuentes para los rótulos de territorio (las teselas de fondo son imágenes).
-    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    // Letra de los rótulos (números de territorio, manzanas): va dentro de la
+    // app y el service worker la guarda, así sale aunque no haya señal.
+    glyphs: URL_GLIFOS,
     sources: {
       fondo: { type: 'raster', tiles: [...f.tiles], tileSize: 256, maxzoom: f.maxzoom, attribution: f.attribution },
       ...(fondo === 'satelite'

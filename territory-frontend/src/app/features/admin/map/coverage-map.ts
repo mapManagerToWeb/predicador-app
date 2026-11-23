@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import type { ManzanasCollection } from '../admin.models';
-import { cambiarFondo, crearMapa, etiquetasTerritorios, limitesPrincipales, temaOscuro } from '../../../core/map/base-map';
+import { cambiarFondo, crearMapa, etiquetasTerritorios, FUENTE_MAPA, limitesPrincipales, temaOscuro } from '../../../core/map/base-map';
 
 /**
  * Mapa de solo lectura que pinta cada manzana con el color asignado a su
@@ -106,7 +106,7 @@ export class CoverageMap {
       type: 'symbol',
       source: 'etiquetas',
       minzoom: 13,
-      layout: { 'text-field': ['get', 'etiqueta'], 'text-font': ['Open Sans Semibold'], 'text-size': 12 },
+      layout: { 'text-field': ['get', 'etiqueta'], 'text-font': [FUENTE_MAPA], 'text-size': 12 },
       paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
     });
     map.on('mousemove', 'manzanas-fill', e => {

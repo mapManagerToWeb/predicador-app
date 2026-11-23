@@ -15,18 +15,11 @@ import {
 import type { ExpressionSpecification, GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
 import type { Position } from 'geojson';
 import type { ManzanaFeature } from '../admin.models';
-import {
-  ANCHO_CALLE_HECHA,
-  ANCHO_CALLE_HECHA_BORDE,
-  cambiarFondo,
-  COLOR_BORDE_CALLE_HECHA,
-  crearMapa,
-  temaOscuro,
-} from '../../../core/map/base-map';
+import { ANCHO_CALLE_HECHA, ANCHO_CALLE_HECHA_BORDE, cambiarFondo, COLOR_BORDE_CALLE_HECHA, crearMapa, FUENTE_MAPA, temaOscuro } from '../../../core/map/base-map';
 import { callesDeZonas } from '../../../core/map/lados';
 import { colorFuerte, coloresFuertes } from '../../../core/map/colores';
 import { clave, type EstadoCorreccion } from '../utils/correccion';
-import { cajaDePuntos, capturarTerritorios, unirCajas, type Caja } from '../../../core/map/captura';
+import { CALIDAD_FOTO, cajaDePuntos, capturarTerritorios, unirCajas, type Caja } from '../../../core/map/captura';
 
 /** Una calle de la manzana que se está editando (para marcar «por calles»). */
 export interface CalleVisible {
@@ -239,14 +232,14 @@ export class CorreccionMap {
       id: 'calles-numero',
       type: 'symbol',
       source: 'calles-numero',
-      layout: { 'text-field': ['get', 'texto'], 'text-font': ['Open Sans Semibold'], 'text-size': 16, 'text-allow-overlap': true },
+      layout: { 'text-field': ['get', 'texto'], 'text-font': [FUENTE_MAPA], 'text-size': 16, 'text-allow-overlap': true },
       paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 2.5 },
     });
     map.addLayer({
       id: 'manzanas-nombre',
       type: 'symbol',
       source: 'manzanas',
-      layout: { 'text-field': ['get', 'nombre'], 'text-font': ['Open Sans Semibold'], 'text-size': 12 },
+      layout: { 'text-field': ['get', 'nombre'], 'text-font': [FUENTE_MAPA], 'text-size': 12 },
       paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
     });
 
@@ -311,7 +304,7 @@ export class CorreccionMap {
     if (!this.map) return null;
     this.map.triggerRepaint();
     try {
-      return this.map.getCanvas().toDataURL('image/jpeg', 0.85).split(',')[1] ?? null;
+      return this.map.getCanvas().toDataURL('image/jpeg', CALIDAD_FOTO).split(',')[1] ?? null;
     } catch {
       return null;
     }

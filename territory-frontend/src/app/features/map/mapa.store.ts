@@ -46,7 +46,8 @@ export interface VistaMapa {
   mostrar(e: EstadoVista): void;
   encuadrar(territorios: number[], animar?: boolean): void;
   mostrarLados(ed: EdicionLados | null, encuadrar?: boolean): void;
-  capturar(territorios: number[]): Promise<string | null>;
+  /** `situaciones`: el color que deben tener en la foto los números de estos territorios. */
+  capturar(territorios: number[], situaciones?: Map<number, SituacionTerritorio>): Promise<string | null>;
   /** Práctica del tutorial: un aro que late sobre la manzana a tocar (null lo quita). */
   resaltarManzana?(id: string | null): void;
   /** Acerca el mapa a una manzana (la práctica la muestra grande, fácil de tocar). */
@@ -792,7 +793,10 @@ export class MapaStore {
         this.toast.show('Otro hermano ya reportó eso mismo: no quedó nada nuevo que enviar', 4000, 'info');
         return;
       }
-      const captura = (await this.vista?.capturar(numeros)) ?? null;
+      // En la foto, cada número ya con el color que tendrá con este reporte
+      // (verde si quedó completo): antes salía con el color de antes de enviar.
+      const situacionesFoto = new Map(locales.map(r => [r.numero, r.completo ? 'completado' : 'en-curso'] as const));
+      const captura = (await this.vista?.capturar(numeros, situacionesFoto)) ?? null;
       const dia = diaElegible(Math.min(Math.max(this.diaAtras(), 0), DIAS_ATRAS));
       const cuando = { fechaPredicacion: dia.iso, turno: this.predicacion() };
       const registros = locales.map(r =>

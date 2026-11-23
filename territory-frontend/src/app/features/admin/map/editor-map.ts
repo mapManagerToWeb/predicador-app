@@ -8,17 +8,7 @@ import type {
 import type { TerraDraw, TerraDrawMouseEvent, SnappableContext } from 'terra-draw';
 import type { Polygon, Position } from 'geojson';
 import type { ManzanaFeature, ManzanasCollection } from '../admin.models';
-import {
-  agregarPildoras,
-  cambiarFondo,
-  crearMapa,
-  DISENO_NUMEROS,
-  etiquetasTerritorios,
-  type FondoMapa,
-  limites,
-  limitesPrincipales,
-  temaOscuro,
-} from '../../../core/map/base-map';
+import { agregarPildoras, cambiarFondo, crearMapa, DISENO_NUMEROS, etiquetasTerritorios, FUENTE_MAPA, limites, limitesPrincipales, temaOscuro, type FondoMapa } from '../../../core/map/base-map';
 
 /** Distancia (px) a la que un vértice nuevo se pega al de una manzana vecina. */
 const TOLERANCIA_SNAP_PX = 10;
@@ -99,7 +89,7 @@ export class EditorMapa {
       type: 'symbol',
       source: 'manzanas',
       minzoom: 16,
-      layout: { 'text-field': ['get', 'nombre'], 'text-font': ['Open Sans Semibold'], 'text-size': 11 },
+      layout: { 'text-field': ['get', 'nombre'], 'text-font': [FUENTE_MAPA], 'text-size': 11 },
       paint: { 'text-color': '#111111', 'text-halo-color': '#ffffff', 'text-halo-width': 1.2 },
     });
     // Los números con el mismo cuadrito que en el mapa de los hermanos: se ven
