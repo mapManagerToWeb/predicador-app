@@ -34,9 +34,11 @@ const salida: SalidaAdmin = {
   posteriores: 0,
 };
 
-const reporte = {
+const reporte: ReporteAdmin = {
   id: 42,
   fecha: '2026-11-05T12:00:00Z',
+  inicioSesion: '2026-11-04T19:00:00Z',
+  encargadoId: 7,
   encargadoNombre: 'Ana',
   encargadoApellido: 'Pérez',
   territorio: 72,
@@ -48,19 +50,26 @@ const reporte = {
   turno: 'tarde',
 } as ReporteAdmin;
 
+/** El mismo envío: el territorio 61 se guardó junto con el 72. */
+const reporte61 = { ...reporte, id: 43, territorio: 61, estado: 'completed', totalManzanas: 1, manzanasMarcadas: 1 } as ReporteAdmin;
+const salida61: SalidaAdmin = { ...salida, id: 43, territorio: 61, estado: 'completed', manzanasIds: '61-61.a', totalManzanas: 1, anterior: null };
+
 interface Vista {
   error: Senal<string | null>;
   destino: Senal<string>;
   enviando: Senal<boolean>;
-  reporte(): ReporteAdmin | null;
+  envio(): { reporte: ReporteAdmin }[];
+  seleccion(): { reporte: ReporteAdmin }[];
   nombre(): string;
   dia(): string;
-  completo(): boolean;
+  turno(): string;
   manzanas(): ManzanaFeature[];
   estado(): { marcadas: Set<string> };
   base(): { marcadas: Set<string> };
   zonasBloqueadas(): Set<number>;
-  color(): string;
+  colores(): Record<number, string>;
+  detalle(r: ReporteAdmin): string;
+  alternar(id: number): void;
   reenviar(): Promise<void>;
 }
 
@@ -123,13 +132,47 @@ describe('ReenviarSalida', () => {
     expect(api['salida']).toHaveBeenCalledWith(42);
     expect(page.nombre()).toBe('Ana Pérez');
     expect(page.dia()).toBe('2026-11-04');
-    expect(page.completo()).toBe(false);
+    expect(page.turno()).toBe('tarde');
+    expect(page.envio()).toHaveLength(1);
+    expect(page.detalle(reporte)).toBe('2 de 3 manzanas');
     expect(page.manzanas()).toHaveLength(3);
     expect([...page.estado().marcadas].sort()).toEqual(['72-72.a', '72-72.b']);
     expect([...page.base().marcadas]).toEqual(['72-72.b']);
     expect(page.zonasBloqueadas().size).toBe(0);
-    expect(page.color()).toBe('#ec4899');
+    expect(page.colores()).toEqual({ 72: '#ec4899' });
     expect(page.destino()).toBe('+56 9 8765 4321');
+  });
+
+  it('abre el envío completo: todos sus territorios van en un solo mensaje, y se puede quitar uno', async () => {
+    store.todosLosReportes.set([reporte, reporte61]);
+    api['salida'].mockImplementation(async (id: number) => (id === 43 ? { ...salida61 } : { ...salida }));
+    const { page } = await montar();
+    expect(page.envio().map(t => t.reporte.territorio)).toEqual([61, 72]);
+    expect(page.manzanas()).toHaveLength(4);
+    expect([...page.estado().marcadas].sort()).toEqual(['61-61.a', '72-72.a', '72-72.b']);
+    expect(page.colores()).toEqual({ 61: '#2563eb', 72: '#ec4899' });
+    expect(page.detalle(reporte61)).toBe('completo');
+
+    await page.reenviar();
+    expect(whatsapp.reenviarDesdePanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        territorios: [
+          { numero: 61, finalizado: true, totalManzanas: 1, manzanasMarcadas: 1 },
+          { numero: 72, finalizado: false, totalManzanas: 3, manzanasMarcadas: 2 },
+        ],
+      }),
+    );
+
+    page.alternar(43);
+    expect(page.seleccion().map(t => t.reporte.territorio)).toEqual([72]);
+    expect(page.manzanas()).toHaveLength(3);
+    page.alternar(42);
+    expect(page.seleccion()).toEqual([]);
+    whatsapp.reenviarDesdePanel.mockClear();
+    await page.reenviar();
+    expect(whatsapp.reenviarDesdePanel).not.toHaveBeenCalled();
+    page.alternar(43);
+    expect(page.seleccion().map(t => t.reporte.territorio)).toEqual([61]);
   });
 
   it('sin copia dice que llega al número del panel, o al del servidor', async () => {
@@ -192,11 +235,16 @@ describe('ReenviarSalida', () => {
   });
 
   it('un reporte completo sale como completo, con la fecha del envío si no trae día', async () => {
-    store.todosLosReportes.set([{ ...reporte, estado: 'completed', fechaPredicacion: null, turno: null, encargadoApellido: null } as unknown as ReporteAdmin]);
+    store.todosLosReportes.set([{ ...reporte, estado: 'completed', fechaPredicacion: null, turno: null, encargadoApellido: null, totalManzanas: null, manzanasMarcadas: null } as unknown as ReporteAdmin]);
     api['salida'].mockResolvedValue({ ...salida, estado: 'completed', anterior: null });
     const { page } = await montar();
-    expect(page.completo()).toBe(true);
+    expect(page.envio()[0].reporte.estado).toBe('completed');
+    expect(page.turno()).toBe('');
     expect(page.nombre()).toBe('Ana');
     expect(page.dia()).toMatch(/^2026-11-0[45]$/);
+    await page.reenviar();
+    expect(whatsapp.reenviarDesdePanel).toHaveBeenCalledWith(
+      expect.objectContaining({ predicacion: '', territorios: [{ numero: 72, finalizado: true, totalManzanas: 3, manzanasMarcadas: 0 }] }),
+    );
   });
 });
