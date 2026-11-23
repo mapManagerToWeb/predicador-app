@@ -22,6 +22,7 @@ public class ConfiguracionService {
     static final String FUERA_DE_META = "territorios_fuera_de_meta";
     static final String CAPACITACION = "capacitacion";
     static final String OPACIDAD_PREDICADAS = "opacidad_predicadas";
+    static final String WHATSAPP_COPIA = "whatsapp_copia_reportes";
 
     /** Intensidad de lo predicado en los mapas: por defecto, y los límites para que siempre se distinga. */
     public static final double OPACIDAD_PREDICADAS_POR_DEFECTO = 0.6;
@@ -70,6 +71,27 @@ public class ConfiguracionService {
                 .map(AppConfig::getValor)
                 .filter(v -> !v.isBlank())
                 .orElse(null);
+    }
+
+    /**
+     * Número al que llega una copia de cada reporte que los hermanos envían
+     * desde la app (WhatsApp no deja escribir en el grupo, y se olvidaban de
+     * reenviarlo). Sin configurar: no hay copia.
+     */
+    @Transactional(readOnly = true)
+    public String whatsappCopia() {
+        return repository.findById(WHATSAPP_COPIA)
+                .map(AppConfig::getValor)
+                .filter(v -> !v.isBlank())
+                .orElse(null);
+    }
+
+    /** {@code null} o vacío: sin copia. */
+    @Transactional
+    public void setWhatsappCopia(String telefono) {
+        AppConfig config = repository.findById(WHATSAPP_COPIA).orElseGet(() -> new AppConfig(WHATSAPP_COPIA, ""));
+        config.setValor(telefono == null ? "" : telefono);
+        repository.save(config);
     }
 
     /** {@code null} o vacío: vuelve al número del servidor. */

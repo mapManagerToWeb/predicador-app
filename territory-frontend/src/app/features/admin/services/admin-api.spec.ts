@@ -35,6 +35,17 @@ describe('AdminApi', () => {
     await expect(guardado).resolves.toEqual([5, 130]);
   });
 
+  it('lee y guarda el número de la copia de los reportes', async () => {
+    const leido = api.whatsappCopia();
+    http.expectOne('/api/v1/reports/admin/whatsapp-copia').flush({ telefono: '' });
+    await expect(leido).resolves.toEqual({ telefono: '' });
+    const guardado = api.setWhatsappCopia('987654321');
+    const put = http.expectOne(r => r.url === '/api/v1/reports/admin/whatsapp-copia' && r.method === 'PUT');
+    expect(put.request.body).toEqual({ telefono: '987654321' });
+    put.flush({ telefono: '56987654321' });
+    await expect(guardado).resolves.toEqual({ telefono: '56987654321' });
+  });
+
   it('guarda la intensidad de lo predicado', async () => {
     const guardado = api.setOpacidadPredicadas(0.8);
     const put = http.expectOne(r => r.url === '/api/v1/reports/admin/apariencia' && r.method === 'PUT');

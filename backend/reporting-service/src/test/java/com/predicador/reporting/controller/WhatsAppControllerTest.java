@@ -88,6 +88,58 @@ class WhatsAppControllerTest {
     }
 
     @Test
+    void conCopiaConfigurada_tambienLlegaAlNumeroElegido_conSuPropiaClave() throws Exception {
+        when(destino.para(any())).thenReturn("56912345678");
+        when(destino.copiaPara(any(), org.mockito.ArgumentMatchers.eq("56912345678"))).thenReturn("56987654321");
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), any(), any()))
+                .thenReturn(new WhatsAppDeliveryDto("k", "IN_PROGRESS", null, null));
+
+        mockMvc.perform(post("/api/v1/reports/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "abc-123")
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
+                .content(PAYLOAD))
+            .andExpect(status().isAccepted());
+
+        org.mockito.Mockito.verify(whatsAppSendService).submit(any(WhatsAppSendRequest.class), org.mockito.ArgumentMatchers.eq("abc-123"), org.mockito.ArgumentMatchers.eq("56912345678"));
+        org.mockito.Mockito.verify(whatsAppSendService).submit(any(WhatsAppSendRequest.class), org.mockito.ArgumentMatchers.eq("abc-123:copia"), org.mockito.ArgumentMatchers.eq("56987654321"));
+    }
+
+    @Test
+    void siLaCopiaFalla_elEnvioPrincipalSigueIgual() throws Exception {
+        when(destino.para(any())).thenReturn("56912345678");
+        when(destino.copiaPara(any(), any())).thenReturn("56987654321");
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), org.mockito.ArgumentMatchers.eq("abc-123"), any()))
+                .thenReturn(new WhatsAppDeliveryDto("abc-123", "IN_PROGRESS", null, null));
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), org.mockito.ArgumentMatchers.eq("abc-123:copia"), any()))
+                .thenThrow(new IllegalStateException("cola llena"));
+
+        mockMvc.perform(post("/api/v1/reports/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "abc-123")
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
+                .content(PAYLOAD))
+            .andExpect(status().isAccepted())
+            .andExpect(jsonPath("$.idempotencyKey").value("abc-123"));
+    }
+
+    @Test
+    void sinCopiaConfigurada_soloLeLlegaAlHermano() throws Exception {
+        when(destino.para(any())).thenReturn("56912345678");
+        when(whatsAppSendService.submit(any(WhatsAppSendRequest.class), any(), any()))
+                .thenReturn(new WhatsAppDeliveryDto("abc-123", "IN_PROGRESS", null, null));
+
+        mockMvc.perform(post("/api/v1/reports/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "abc-123")
+                .requestAttr(SessionAuthFilter.ATTR_TOKEN, owner)
+                .content(PAYLOAD))
+            .andExpect(status().isAccepted());
+
+        org.mockito.Mockito.verify(whatsAppSendService, org.mockito.Mockito.times(1)).submit(any(WhatsAppSendRequest.class), any(), any());
+    }
+
+    @Test
     void sendWhatsAppReport_withoutToken_shouldReturn403() throws Exception {
         mockMvc.perform(post("/api/v1/reports/send")
                 .contentType(MediaType.APPLICATION_JSON)

@@ -108,4 +108,17 @@ class ConfiguracionServiceTest {
         assertEquals(0.3, service.setOpacidadPredicadas(-1));
         assertEquals(0.6, service.setOpacidadPredicadas(Double.NaN));
     }
+
+    @Test
+    void copiaDeLosReportes_vaciaEsSinCopia() {
+        AppConfig existente = new AppConfig(ConfiguracionService.WHATSAPP_COPIA, "");
+        when(repository.findById(ConfiguracionService.WHATSAPP_COPIA)).thenReturn(Optional.of(existente));
+        assertEquals(null, service.whatsappCopia());
+        service.setWhatsappCopia("56987654321");
+        assertEquals("56987654321", service.whatsappCopia());
+        service.setWhatsappCopia(null);
+        assertEquals("", existente.getValor());
+        when(repository.findById(ConfiguracionService.WHATSAPP_COPIA)).thenReturn(Optional.empty());
+        assertEquals(null, service.whatsappCopia());
+    }
 }
