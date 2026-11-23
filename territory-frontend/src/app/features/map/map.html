@@ -197,6 +197,14 @@
     </section>
   }
 
+  <!-- Recuadro de inicio oculto con la ✕: un botón chico lo vuelve a mostrar (y se queda). -->
+  @if (!store.cargando() && !store.errorCarga() && store.abiertos().length === 0 && sinIndicacion() && !verTutorial()) {
+    <button type="button" class="mostrar-indicacion" (click)="ocultarIndicacion(false)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
+      Ver colores
+    </button>
+  }
+
   <!-- Preguntas: nada se borra ni se envía sin confirmar -->
   @if (store.pregunta(); as p) {
     <div class="velo" tabindex="-1" animate.leave="saliendo" (click)="store.responder(false)" (keydown.escape)="store.responder(false)"></div>

@@ -149,6 +149,7 @@ describe('MapPage', () => {
     (el.querySelector('.ocultar-indicacion') as HTMLButtonElement).click();
     await fixture.whenStable();
     expect(el.querySelector('.panel')).toBeNull();
+    expect(el.querySelector('.mostrar-indicacion')?.textContent).toContain('Ver colores');
     expect(localStorage.getItem('mapa.indicacion.oculta')).toBe('1');
     expect(vista.ajustarMargenes).toHaveBeenCalledWith({ abajo: 0, derecha: 0 });
 
@@ -160,9 +161,20 @@ describe('MapPage', () => {
     expect(el.querySelector('.panel')).toBeNull();
 
     // El tutorial la señala: mientras está abierto, vuelve a verse.
-    (fixture.componentInstance as unknown as { verTutorial: { set(v: boolean): void } }).verTutorial.set(true);
+    const tutorial = (fixture.componentInstance as unknown as { verTutorial: { set(v: boolean): void } }).verTutorial;
+    tutorial.set(true);
     await fixture.whenStable();
     expect(el.querySelector('.panel.inicio')).not.toBeNull();
+    expect(el.querySelector('.mostrar-indicacion')).toBeNull();
+    tutorial.set(false);
+    await fixture.whenStable();
+
+    // «Ver colores» la vuelve a mostrar, y se queda.
+    (el.querySelector('.mostrar-indicacion') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(el.querySelector('.panel.inicio')).not.toBeNull();
+    expect(el.querySelector('.mostrar-indicacion')).toBeNull();
+    expect(localStorage.getItem('mapa.indicacion.oculta')).toBe('0');
   });
 
   it('en una pantalla muy angosta (zoom de pantalla del teléfono) el buscador dice solo «Buscar»', async () => {

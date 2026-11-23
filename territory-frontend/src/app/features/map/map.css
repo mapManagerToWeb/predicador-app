@@ -762,6 +762,39 @@ svg .grueso {
   cursor: pointer;
 }
 
+/* Con el recuadro de inicio oculto queda este botón chico para volver a mostrarlo. */
+.mostrar-indicacion {
+  position: absolute;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  translate: -50% 0;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-solid);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--ink);
+  box-shadow: var(--elev-2);
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: aparecer 0.2s ease-out;
+}
+
+.mostrar-indicacion svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
 /* Pantalla muy angosta: el zoom de pantalla del sistema (vista cansada) deja la
    página en unos 280 puntos. Se quita lo que se puede leer en otro lado y los
    botones quedan en 44 (fáciles de tocar); el texto no se achica. */
