@@ -80,4 +80,12 @@ describe('WhatsAppService', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe('Token invalido');
   });
+
+  it('el panel reenvía por su propio camino y espera el resultado', async () => {
+    const promise = service.reenviarDesdePanel(request);
+    const postReq = httpMock.expectOne(r => r.method === 'POST' && r.url.endsWith('/reports/admin/reenviar'));
+    expect(postReq.request.headers.has('Idempotency-Key')).toBe(true);
+    postReq.flush({ idempotencyKey: 'key-2', status: 'SUCCEEDED', messageId: 'msg_1', error: null });
+    await expect(promise).resolves.toEqual({ success: true, messageId: 'msg_1', error: null });
+  });
 });

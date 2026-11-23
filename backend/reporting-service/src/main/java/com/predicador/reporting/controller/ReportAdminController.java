@@ -216,4 +216,26 @@ public class ReportAdminController {
         String guardado = configuracion.whatsappAdministrador();
         return ResponseEntity.ok(Map.of("telefono", guardado == null ? "" : guardado));
     }
+
+    /** Número al que llega una copia de cada reporte de los hermanos (vacío: sin copia). */
+    @GetMapping("/whatsapp-copia")
+    public ResponseEntity<Map<String, String>> whatsappCopia(HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        String telefono = configuracion.whatsappCopia();
+        return ResponseEntity.ok(Map.of("telefono", telefono == null ? "" : telefono));
+    }
+
+    @PutMapping("/whatsapp-copia")
+    public ResponseEntity<Map<String, String>> cambiarWhatsappCopia(@RequestBody Map<String, String> body,
+                                                                    HttpServletRequest request) {
+        authorization.requireAdmin(RequestTokens.token(request));
+        String telefono = body.getOrDefault("telefono", "");
+        telefono = telefono == null ? "" : telefono.strip();
+        if (!telefono.isEmpty() && !PhoneUtil.esCelularChileno(telefono)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PhoneUtil.MENSAJE_INVALIDO);
+        }
+        configuracion.setWhatsappCopia(telefono.isEmpty() ? "" : PhoneUtil.normalize(telefono));
+        String guardado = configuracion.whatsappCopia();
+        return ResponseEntity.ok(Map.of("telefono", guardado == null ? "" : guardado));
+    }
 }

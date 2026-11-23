@@ -217,6 +217,15 @@ export class AdminApi {
     return this.send(this.http.put<{ telefono: string }>(`${this.reportes}/whatsapp-destino`, { telefono }, { headers: SIN_SW }));
   }
 
+  /** Número al que llega una copia de cada reporte de los hermanos ('' = sin copia). */
+  whatsappCopia(): Promise<{ telefono: string }> {
+    return this.get<{ telefono: string }>(`${this.reportes}/whatsapp-copia`);
+  }
+
+  setWhatsappCopia(telefono: string): Promise<{ telefono: string }> {
+    return this.send(this.http.put<{ telefono: string }>(`${this.reportes}/whatsapp-copia`, { telefono }, { headers: SIN_SW }));
+  }
+
   /** Estado actual de un territorio; null si nunca se trabajó (204). */
   async estadoTerritorio(numero: number): Promise<EstadoTerritorioAdmin | null> {
     return (await this.get<EstadoTerritorioAdmin | null>(`${this.reportes}/estado/${numero}`)) ?? null;

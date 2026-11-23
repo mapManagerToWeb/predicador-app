@@ -387,4 +387,24 @@ class ReportAdminCiclosControllerTest {
                 .andExpect(jsonPath("$.ciclo.id").value(4))
                 .andExpect(jsonPath("$.enLaVueltaAnterior").value(0));
     }
+
+    @Test
+    void copiaDeLosReportes_seLeeYSeGuarda_conTelefonoValido() throws Exception {
+        when(configuracion.whatsappCopia()).thenReturn(null, "56987654321");
+        mvc.perform(get("/api/v1/reports/admin/whatsapp-copia").with(comoAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telefono").value(""));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/whatsapp-copia").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"telefono\":\"9 8765 4321\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telefono").value("56987654321"));
+        verify(configuracion).setWhatsappCopia("56987654321");
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/whatsapp-copia").with(comoAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"telefono\":\"123\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/reports/admin/whatsapp-copia").with(comoEncargado())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"telefono\":\"\"}"))
+                .andExpect(status().isForbidden());
+    }
 }

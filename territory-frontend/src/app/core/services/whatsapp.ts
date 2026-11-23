@@ -23,12 +23,22 @@ export class WhatsAppService {
    * consultando el endpoint de estado hasta que el envío se complete.
    */
   async sendReport(request: WhatsAppSendRequest): Promise<WhatsAppSendResponse> {
+    return this.enviar(this.sendUrl, request);
+  }
+
+  /**
+   * El administrador reenvía desde el panel un reporte que ya se envió: el
+   * servidor lo manda al número de la copia (nunca al que diga la app).
+   */
+  async reenviarDesdePanel(request: WhatsAppSendRequest): Promise<WhatsAppSendResponse> {
+    return this.enviar(`${environment.apiUrl}/reports/admin/reenviar`, request);
+  }
+
+  private async enviar(url: string, request: WhatsAppSendRequest): Promise<WhatsAppSendResponse> {
     const idempotencyKey = crypto.randomUUID();
     const headers = new HttpHeaders().set('Idempotency-Key', idempotencyKey);
 
-    const submission = await firstValueFrom(
-      this.http.post<WhatsAppDeliveryDto>(this.sendUrl, request, { headers }),
-    );
+    const submission = await firstValueFrom(this.http.post<WhatsAppDeliveryDto>(url, request, { headers }));
 
     if (submission.status !== 'IN_PROGRESS') {
       return this.toResponse(submission);

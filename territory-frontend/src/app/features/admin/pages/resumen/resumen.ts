@@ -1,3 +1,4 @@
+import { CopiaWhatsappPanel } from '../../copia-whatsapp/copia-whatsapp';
 import { AparienciaPanel } from '../../apariencia/apariencia';
 import { CapacitacionPanel } from '../../capacitacion/capacitacion';
 import { ChangeDetectionStrategy, Component, computed, ElementRef, inject, signal } from '@angular/core';
@@ -69,7 +70,7 @@ export const ESTADOS: InfoEstado[] = [
 
 @Component({
   selector: 'app-resumen',
-  imports: [ColumnChart, BarList, Heatmap, CoverageMap, ImagenAvance, CapacitacionPanel, AparienciaPanel],
+  imports: [ColumnChart, BarList, Heatmap, CoverageMap, ImagenAvance, CapacitacionPanel, AparienciaPanel, CopiaWhatsappPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './resumen.html',
   styleUrl: './resumen.css',
