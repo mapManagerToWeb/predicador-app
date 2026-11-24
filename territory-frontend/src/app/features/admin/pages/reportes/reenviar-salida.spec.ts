@@ -220,6 +220,9 @@ describe('ReenviarSalida', () => {
     whatsapp.reenviarDesdePanel.mockResolvedValueOnce({ success: false, messageId: null, error: 'x' });
     await page.reenviar();
     expect(toast.show).toHaveBeenCalledWith('No se pudo reenviar el WhatsApp. Inténtalo de nuevo.', 5000, 'error');
+    whatsapp.reenviarDesdePanel.mockResolvedValueOnce({ success: false, messageId: null, error: 'x', estado: 'sin-confirmar' });
+    await page.reenviar();
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('No pudimos confirmar'), 7000, 'warning');
     whatsapp.reenviarDesdePanel.mockRejectedValueOnce(new Error('caído'));
     await page.reenviar();
     expect(toast.show).toHaveBeenCalledWith('No se pudo reenviar el WhatsApp', 5000, 'error');

@@ -237,6 +237,9 @@ export class ReenviarSalida {
       if (resultado.success) {
         this.toast.show(`Reporte reenviado a ${this.destino()}`, 4000, 'sent');
         this.cerrar.emit();
+      } else if (resultado.estado === 'sin-confirmar') {
+        // Pudo haber salido igual: reenviarlo de inmediato podría llegar dos veces.
+        this.toast.show('No pudimos confirmar el WhatsApp. Míralo en «Envíos de WhatsApp» antes de reenviarlo.', 7000, 'warning');
       } else {
         this.toast.show('No se pudo reenviar el WhatsApp. Inténtalo de nuevo.', 5000, 'error');
       }
