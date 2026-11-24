@@ -74,6 +74,13 @@ export interface WhatsAppSendResponse {
   success: boolean;
   messageId: string | null;
   error: string | null;
+  /**
+   * 'enviado': el servidor confirmó el WhatsApp. 'fallo': el servidor dijo
+   * claramente que no se envió (o rechazó el pedido). 'sin-confirmar': con
+   * poca señal no se supo; el servidor pudo haberlo enviado igual, así que lo
+   * guardado NO se deshace.
+   */
+  estado: 'enviado' | 'fallo' | 'sin-confirmar';
 }
 
 export type WhatsAppDeliveryStatus = 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED';

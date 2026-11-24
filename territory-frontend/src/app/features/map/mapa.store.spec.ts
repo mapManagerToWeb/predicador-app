@@ -88,7 +88,7 @@ describe('MapaStore', () => {
       crearReportes: vi.fn().mockImplementation(async regs => regs.map((r: object, i: number) => ({ ...r, id: 500 + i }))),
       eliminarReportes: vi.fn().mockResolvedValue(undefined),
     };
-    whatsapp = { sendReport: vi.fn().mockResolvedValue({ success: true, messageId: 'm', error: null }) };
+    whatsapp = { sendReport: vi.fn().mockResolvedValue({ success: true, messageId: 'm', error: null, estado: 'enviado' }) };
     vista = { mostrar: vi.fn(), encuadrar: vi.fn(), mostrarLados: vi.fn(), capturar: vi.fn().mockResolvedValue('IMG') };
     TestBed.configureTestingModule({
       providers: [
@@ -205,8 +205,8 @@ describe('MapaStore', () => {
     expect(store.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
   });
 
-  it('si el WhatsApp falla, borra lo guardado y conserva las marcas', async () => {
-    whatsapp.sendReport.mockResolvedValue({ success: false, messageId: null, error: 'x' });
+  it('si el servidor dice que el WhatsApp falló, borra lo guardado y conserva las marcas', async () => {
+    whatsapp.sendReport.mockResolvedValue({ success: false, messageId: null, error: 'x', estado: 'fallo' });
     await cargar(store);
     await store.abrir(5);
     store.tocar({ manzana: '5-5.b', cercana: null });
@@ -411,12 +411,21 @@ describe('MapaStore', () => {
       await responderEstado();
     }
 
-    it('si el WhatsApp se cae después de guardar, borra lo guardado y las marcas siguen', async () => {
+    it('si no se pudo confirmar el WhatsApp (poca señal), el reporte queda guardado y no se pide reenviar', async () => {
+      whatsapp.sendReport.mockResolvedValue({ success: false, messageId: null, error: 'x', estado: 'sin-confirmar' });
+      await enviarMarcandoB();
+      await vi.waitFor(() => expect(toast.show).toHaveBeenCalledWith('Reporte guardado', 8000, 'sent', expect.stringContaining('No lo envíes de nuevo')));
+      expect(territorios.eliminarReportes).not.toHaveBeenCalled();
+      expect(store.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
+      expect(store.enviando()).toBe(false);
+    });
+
+    it('un error inesperado después de guardar tampoco borra el reporte', async () => {
       whatsapp.sendReport.mockRejectedValue(new Error('sin red'));
       await enviarMarcandoB();
-      await vi.waitFor(() => expect(territorios.eliminarReportes).toHaveBeenCalledWith([500]));
-      expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('el reporte no se guardó'), 5000, 'error');
-      expect(store.resumenes()[0]).toMatchObject({ enteras: 2, cambios: true });
+      await vi.waitFor(() => expect(toast.show).toHaveBeenCalledWith('Reporte guardado', 8000, 'sent', expect.any(String)));
+      expect(territorios.eliminarReportes).not.toHaveBeenCalled();
+      expect(store.estados().get(5)?.manzanasIds).toBe('5-5.a,5-5.b');
     });
 
     it('sin conexión con el servidor lo dice claro y no pierde nada', async () => {

@@ -79,6 +79,7 @@ describe('WhatsAppService', () => {
     const result = await promise;
     expect(result.success).toBe(false);
     expect(result.error).toBe('Token invalido');
+    expect(result.estado).toBe('fallo');
   });
 
   it('el panel reenvía por su propio camino y espera el resultado', async () => {
@@ -86,6 +87,57 @@ describe('WhatsAppService', () => {
     const postReq = httpMock.expectOne(r => r.method === 'POST' && r.url.endsWith('/reports/admin/reenviar'));
     expect(postReq.request.headers.has('Idempotency-Key')).toBe(true);
     postReq.flush({ idempotencyKey: 'key-2', status: 'SUCCEEDED', messageId: 'msg_1', error: null });
-    await expect(promise).resolves.toEqual({ success: true, messageId: 'msg_1', error: null });
+    await expect(promise).resolves.toEqual({ success: true, messageId: 'msg_1', error: null, estado: 'enviado' });
+  });
+
+  describe('con poca señal', () => {
+    it('si se corta al pedir el WhatsApp, lo reintenta con la MISMA clave', async () => {
+      const promise = service.sendReport(request);
+      const primero = httpMock.expectOne(r => r.method === 'POST');
+      const clave = primero.request.headers.get('Idempotency-Key');
+      primero.error(new ProgressEvent('error'), { status: 0 });
+      await vi.advanceTimersByTimeAsync(1000);
+      const segundo = httpMock.expectOne(r => r.method === 'POST');
+      expect(segundo.request.headers.get('Idempotency-Key')).toBe(clave);
+      segundo.flush({ idempotencyKey: clave, status: 'SUCCEEDED', messageId: 'm2', error: null });
+      await expect(promise).resolves.toMatchObject({ success: true, estado: 'enviado' });
+    });
+
+    it('si nunca se pudo entregar el pedido, queda sin confirmar (no es un fallo)', async () => {
+      const promise = service.sendReport(request);
+      httpMock.expectOne(r => r.method === 'POST').error(new ProgressEvent('error'), { status: 0 });
+      await vi.advanceTimersByTimeAsync(1000);
+      httpMock.expectOne(r => r.method === 'POST').flush('caído', { status: 503, statusText: 'x' });
+      await vi.advanceTimersByTimeAsync(2000);
+      httpMock.expectOne(r => r.method === 'POST').error(new ProgressEvent('error'), { status: 0 });
+      await expect(promise).resolves.toMatchObject({ success: false, estado: 'sin-confirmar' });
+    });
+
+    it('si el servidor rechaza el pedido (4xx), es un fallo y no se reintenta', async () => {
+      const promise = service.sendReport(request);
+      httpMock.expectOne(r => r.method === 'POST').flush('no', { status: 400, statusText: 'Bad Request' });
+      await expect(promise).resolves.toMatchObject({ success: false, estado: 'fallo' });
+      httpMock.expectNone(r => r.method === 'POST');
+    });
+
+    it('un corte al consultar el estado no corta la espera', async () => {
+      const promise = service.sendReport(request);
+      httpMock.expectOne(r => r.method === 'POST').flush({ idempotencyKey: 'k', status: 'IN_PROGRESS', messageId: null, error: null });
+      await vi.advanceTimersByTimeAsync(1000);
+      httpMock.expectOne(r => r.method === 'GET').error(new ProgressEvent('error'), { status: 0 });
+      await vi.advanceTimersByTimeAsync(2000);
+      httpMock.expectOne(r => r.method === 'GET').flush({ idempotencyKey: 'k', status: 'SUCCEEDED', messageId: 'm', error: null });
+      await expect(promise).resolves.toMatchObject({ success: true, estado: 'enviado' });
+    });
+
+    it('si pasa el tiempo sin respuesta, queda sin confirmar', async () => {
+      const promise = service.sendReport(request);
+      httpMock.expectOne(r => r.method === 'POST').flush({ idempotencyKey: 'k', status: 'IN_PROGRESS', messageId: null, error: null });
+      for (let i = 0; i < 30; i++) {
+        await vi.advanceTimersByTimeAsync(15000);
+        for (const r of httpMock.match(x => x.method === 'GET')) r.flush({ idempotencyKey: 'k', status: 'IN_PROGRESS', messageId: null, error: null });
+      }
+      await expect(promise).resolves.toMatchObject({ success: false, estado: 'sin-confirmar' });
+    });
   });
 });

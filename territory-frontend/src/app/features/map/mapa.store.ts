@@ -815,18 +815,24 @@ export class MapaStore {
         screenshotBase64: captura,
         destinationNumber: perfil.telefono || null,
       });
-      if (!respuesta.success) {
+      // Solo se deshace lo guardado si el servidor dijo claramente que el
+      // WhatsApp falló. Sin confirmación (poca señal) el servidor pudo haberlo
+      // enviado igual: borrar el reporte dejaba un WhatsApp sin reporte, y el
+      // hermano lo volvía a enviar (pasó 4 veces seguidas el 24-11-2026).
+      if (respuesta.estado === 'fallo') {
         await this.revertir(guardados);
         this.toast.show('No se pudo enviar el WhatsApp: el reporte no se guardó. Tus marcas siguen acá.', 5000, 'error');
         return;
       }
       confirmado = true;
       this.despuesDeEnviar(guardados);
-      this.toast.show('Reporte enviado', 4000, 'sent', 'Te lo enviamos por WhatsApp');
+      if (respuesta.estado === 'enviado') this.toast.show('Reporte enviado', 4000, 'sent', 'Te lo enviamos por WhatsApp');
+      else this.avisarGuardadoSinConfirmar();
     } catch (error) {
       if (guardados.length > 0 && !confirmado) {
-        await this.revertir(guardados);
-        this.toast.show('No se pudo enviar el WhatsApp: el reporte no se guardó. Tus marcas siguen acá.', 5000, 'error');
+        // El reporte ya está guardado: no se borra por un error de conexión.
+        this.despuesDeEnviar(guardados);
+        this.avisarGuardadoSinConfirmar();
       } else if (!confirmado) {
         const caido = error instanceof HttpErrorResponse && (error.status === 0 || error.status >= 500);
         this.toast.show(
@@ -875,6 +881,15 @@ export class MapaStore {
     for (const n of numeros) this.quitar(n);
     this.inicioSesion.set(null);
     this.toast.show('Práctica: reporte simulado. No se envió nada.', 4500, 'success', 'Tus marcas viven solo en este teléfono');
+  }
+
+  private avisarGuardadoSinConfirmar(): void {
+    this.toast.show(
+      'Reporte guardado',
+      8000,
+      'sent',
+      'Con poca señal no pudimos confirmar el WhatsApp. No lo envíes de nuevo: si no te llega, el encargado lo reenvía desde el panel.',
+    );
   }
 
   private async revertir(guardados: Reporte[]): Promise<void> {
